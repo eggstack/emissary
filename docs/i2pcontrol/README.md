@@ -1,13 +1,21 @@
 # I2PControl for Emissary
 
-Status: closed internally against the pinned Proposal 170 revision by M019A
+Status: corrective pass required
 
 Proposal 170 is still **Open**. This documentation is pinned to the
-2026-05-20 revision (created and last updated 2026-05-20). M017's broad
-closure was invalidated by the exact-wire review; its component evidence is
-retained as history.
+2026-05-20 revision (created and last updated 2026-05-20).
 
-This document describes the I2PControl HTTPS JSON-RPC service foundation in Emissary.
+The prior M019A `closed internally against pinned revision` disposition is
+invalidated by:
+
+- `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`
+
+Current roadmap and support classification:
+
+- `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
+- [proposal-170-support.md](proposal-170-support.md)
+
+This document describes the current I2PControl HTTPS JSON-RPC service foundation in Emissary. It must not be read as a claim that Proposal 170 is complete.
 
 ## Compile feature
 
@@ -50,10 +58,10 @@ password = "your-secure-password"
 
 ### Security notes
 
-- **Default binding is loopback only** (127.0.0.1:7650). Non-loopback binding requires explicit configuration and produces a security warning.
+- **Default binding is loopback only** (`127.0.0.1:7650`). Non-loopback binding requires explicit configuration and produces a security warning.
 - **Empty password is rejected** when I2PControl is enabled.
-- **Credentials are never logged** or included in Debug output.
 - **Existing configurations without `[i2pcontrol]`** parse unchanged and preserve prior behavior.
+- Authentication, token placement, secret persistence, and response-redaction behavior are under corrective review in M020/M021. Do not rely on the prior completion claim.
 
 ## HTTPS certificate behavior
 
@@ -68,9 +76,17 @@ I2PControl is served over HTTPS. Certificate behavior:
 
 **No plaintext HTTP fallback is supported.**
 
-## Authentication
+## Authentication corrective notice
 
-I2PControl uses JSON-RPC authentication:
+The existing I2PControl contract authenticates with `API` and `Password`, returns a numeric `API` and a `Token`, and expects that token in the `params` object of subsequent protected requests.
+
+The current Emissary implementation does not yet conform fully to that flow: it requires a nonstandard username, serializes `API` as a string, and primarily accepts the token through `X-I2PControl-Token`.
+
+M020 owns the correction:
+
+- `plans/implementation/i2pcontrol-proposal-170/020-base-i2pcontrol-and-jsonrpc-interoperability.md`
+
+Until M020 lands, the following current implementation example describes the existing compatibility behavior, not the intended canonical contract:
 
 ```json
 {
@@ -85,7 +101,7 @@ I2PControl uses JSON-RPC authentication:
 }
 ```
 
-Success returns an opaque token:
+Current success response:
 
 ```json
 {
@@ -98,55 +114,72 @@ Success returns an opaque token:
 }
 ```
 
-Subsequent requests must include the token via the `X-I2PControl-Token` header.
+Current protected requests use `X-I2PControl-Token`. M020 will restore standard `params.Token` and retain the header only as a separately documented compatibility extension if it remains unambiguous.
 
-### Token behavior
+### Token behavior retained for review
 
-- Tokens are cryptographically random (32 bytes, hex-encoded).
-- Tokens are stored in-memory only; no persistence.
+- Tokens are cryptographically random and opaque.
+- Tokens are stored in memory only.
 - Tokens are invalidated on process restart.
-- Maximum concurrent tokens bounded at 1024.
+- Token count is bounded.
 
-## M001 support status
+The exact error-code and conflict behavior is part of M020 and must not be treated as closed before its implementation disposition.
 
-**The I2PControl transport, authentication, and JSON-RPC foundation is implemented.**
+## Foundation status
 
-## M002 support status
+The repository contains a substantial I2PControl foundation:
 
-**The Proposal 170 control-plane domain types, backend interface, and restart-safe persistence are implemented.**
+- feature-gated HTTPS serving;
+- bounded request bodies, connection tasks, and concurrent requests;
+- typed Proposal 170 tunnel/action/domain models;
+- exhaustive explicit unsupported tunnel backend registry;
+- versioned generation-store persistence;
+- passive service registry;
+- bounded SAM observation handle;
+- RouterInfo contract/source adapters;
+- production composition and focused tests.
 
-M002 provides the administrative infrastructure consumed by later milestones:
+These components are retained candidate implementation, not proof of complete Proposal 170 conformance.
 
-- **Domain types**: `TunnelType` (12 variants), `TunnelAction` (8 variants), `TunnelName`, `TunnelDefinition`, `TunnelOptions`, `TunnelOwnership`, `TunnelRuntimeState`, `StartIntent`, `OptionRedacted`
-- **Address book types**: `AdministrativeAddressBookType` (4 books), `AddressBookEntry`, `SubscriptionSet`, `AddressBookConfiguration`
-- **Backend interface**: `TunnelBackend` trait, `UnsupportedTunnelBackend`, `FakeTunnelBackend`, exhaustive registry
-- **Persistence**: `GenerationStore<T>` with versioned envelopes, atomic publication, corruption fallback, bounded retention
-- **Stores**: `TunnelStore`, `AddressBookStore`, `SubscriptionStore`
-- **Fakes**: In-memory fake stores for handler tests
+## Corrective sequence
 
-See [administrative-state.md](administrative-state.md), [tunnel-backends.md](tunnel-backends.md), and [security.md](security.md) for details.
+| Milestone | Scope |
+|---|---|
+| M020 | existing I2PControl authentication/token/error and JSON-RPC correctness |
+| M021 | exact TunnelManager wire, atomic persistence, and secret boundary |
+| M022 | actual runtime AddressBook authority and source objects |
+| M023 | startup tunnel inventory and ClientServicesInfo lifecycle/address truthfulness |
+| M024 | recoverable bounded SAM observation |
+| M025 | exact RouterInfo contract/source matrix |
+| M026 | feasible bounded read-only router inspection sources |
+| M027 | literal conformance, documentation reconciliation, and independent closure |
 
-The current implementation distinguishes three claims:
+See `plans/implementation/i2pcontrol-proposal-170/README.md` for dependencies and handoff rules.
 
-- **Wire implemented** — exact names, casing, presence rules, response fields,
-  and JSON types are recognized.
-- **Source available** — Emissary has a truthful current source for the value.
-- **Runtime implemented** — the operation has a real runtime backend.
+## Support dimensions
 
-M018A reconciled the wire contract, and M019A independently reviewed the final
-implementation head. The bounded internal status is closed against the pinned
-open revision; this does not imply upstream review or acceptance.
+Every claim is separated into:
 
-Retained implementation evidence includes:
+- **Wire** — exact names, casing, parameter-presence rules, response fields, and JSON types.
+- **Source** — a truthful current Emissary data source exists.
+- **Runtime** — a real backend performs the operation.
+- **Persistence** — mutation is durable and failure-atomic.
+- **Evidence** — literal external-contract, failure, restart, and production-composition proof exists.
 
-- `RouterInfo` selectors (M009/M010: truthful sources, bounded inspection)
-- `TunnelManager` operations (M004: durable CRUD for all 12 types; unsupported
-  lifecycle backends remain explicit)
-- `ClientServicesInfo` selectors (M011/M016: live tunnel/listener/session state)
-- `AddressBook` operations (M003: four persistent stores)
-- Real TLS serving (M012: TlsAcceptor retained and consumed)
-- Production composition (M008: no fakes, fail-closed, shared state)
+Compatibility aliases, unavailable fields, administrative shadow stores, and unsupported backend stubs are not counted as full operational implementation.
+
+## Missing tunnel data planes
+
+Proposal 170 corrective work does **not** implement missing tunnel data planes. HTTP, IRC, SOCKS-IRC, CONNECT, Streamr, bidirectional, and other missing listener/destination/LeaseSet/traffic implementations remain separate security-focused work.
+
+The current API may retain their definitions and explicit unsupported runtime behavior. It must not report them running or simulate success.
 
 ## No frontend controls
 
-M001 does not add any frontend controls, screens, views, or state. I2PControl runs independently of the UI. The UI and I2PControl features are independent and do not conflict.
+I2PControl does not add frontend controls, screens, views, or frontend-owned state. It runs independently of the UI. The corrective roadmap preserves this separation.
+
+## Internal-only boundary
+
+All work is internal to `eggstack/emissary`.
+
+No plan authorizes upstream issues, pull requests, reviews, discussions, submissions, patches, maintainer outreach, merge preparation, or writes to any upstream/third-party repository. External specifications and source trees may be inspected read-only for internal correctness only.

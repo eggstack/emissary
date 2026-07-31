@@ -14,7 +14,7 @@ Current corrective roadmap:
 
 Next executable handoff:
 
-- M020, `plans/implementation/i2pcontrol-proposal-170/020-base-i2pcontrol-and-jsonrpc-interoperability.md`
+- M023, `plans/implementation/i2pcontrol-proposal-170/023-startup-tunnel-inventory-and-client-services.md`
 
 ## Status model
 
@@ -46,7 +46,7 @@ Retained candidate implementation includes:
 - live event counters and log ring sources;
 - explicit unavailable/unsupported behavior in several paths.
 
-Material corrective work remains in M022–M027.
+Material corrective work remains in M023–M027; M022's scoped AddressBook bridge is closed.
 
 ## Base I2PControl/JSON-RPC
 
@@ -58,7 +58,7 @@ an unambiguous compatibility path, distinct I2PControl authentication and
 version errors, notification execution with response suppression, strict
 request-ID validation, and direct base RouterInfo selector compatibility.
 
-The subsystem remains open while M022–M027 complete method-specific and source
+The subsystem remains open while M023–M027 complete method-specific and source
 truthfulness work.
 
 ## TunnelManager
@@ -105,15 +105,18 @@ Their API definitions may persist and round-trip. Start/restart must return dete
 
 ## AddressBook
 
-Current status: durable administrative API retained; runtime/source correction required
+Current status: runtime authority bridged; final source-matrix review remains
+owned by M025.
 
-Known defect:
+The runtime `AddressBookHandle` is now the single durable/mutable authority for
+the four books, metadata, and lookup publication. Successful mutations are
+visible through normal runtime lookup before success is returned. Legacy
+administrative generations are migration input only and collision failures are
+fail-closed.
 
-The current four-book store is disconnected from the running router's normal address-book lookup source. A successful API mutation can therefore leave runtime resolution unchanged.
-
-The corrective target is one narrow runtime owner adapter or one synchronously published authoritative state. Two independently authoritative stores and best-effort synchronization are prohibited.
-
-Subscription/config RouterInfo shapes and source classifications also require correction.
+Subscription/config selectors now return the pinned `{path, entries}` object
+shape. Emissary has no actual path-backed source for these metadata objects, so
+`path: null` is returned rather than a fabricated filesystem path.
 
 Owner: M022, with final matrix integration in M025.
 
@@ -174,7 +177,7 @@ Owners: M022, rechecked by M027.
 |---|---|---|
 | M020 | closed | base I2PControl authentication/token/error and JSON-RPC correctness |
 | M021 | closed | TunnelManager exact wire, atomic persistence, secret boundary |
-| M022 | ready | actual AddressBook runtime authority and source objects |
+| M022 | closed internally against pinned revision | actual AddressBook runtime authority and source objects |
 | M023 | ready | startup tunnel inventory and client-service lifecycle/address truthfulness |
 | M024 | blocked | recoverable bounded SAM observation |
 | M025 | blocked | exact RouterInfo contract/source matrix |

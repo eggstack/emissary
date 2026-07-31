@@ -1,15 +1,23 @@
 # Proposal 170 AddressBook Administrative API
 
-Status: closed internally against the pinned Proposal 170 revision by M019A
+Status: M022 closed internally against the pinned Proposal 170 revision; final
+43-selector conformance remains owned by M025–M027.
 
-This document describes the Proposal 170 AddressBook administrative API for Emissary's I2PControl service.
+This document describes the Proposal 170 AddressBook API for Emissary's
+I2PControl service and its runtime ownership boundary.
 
 ## Overview
 
 The AddressBook API provides administrative management of four independent
-address books, a subscription set, and a configuration map. These are
-**administrative stores only** — they do not affect runtime destination
-resolution.
+address books, a subscription set, and a configuration map. The four book
+identities remain independent at the API boundary, while successful entry
+mutations are committed by the running runtime `AddressBookHandle` and are
+immediately visible to normal destination lookup.
+
+Runtime precedence is unchanged: private, local, router, then published. A
+hostname collision across books is rejected instead of changing the router's
+existing resolution policy. The downloaded hosts source remains the published
+runtime source.
 
 Canonical Proposal 170 requests use one `AddressBook` method and select exactly
 one mode. The linked Java reference implementation returns operation details
@@ -121,17 +129,22 @@ The following selectors expose address-book state through the RouterInfo method:
 | `i2p.router.addressbook.local.list` | array | Canonical local book entries |
 | `i2p.router.addressbook.router.list` | array | Canonical router book entries |
 | `i2p.router.addressbook.published.list` | array | Canonical published book entries |
-| `i2p.router.addressbook.subscriptions` | array | Subscription URLs |
-| `i2p.router.addressbook.config` | object | Configuration key-value pairs |
+| `i2p.router.addressbook.subscriptions` | object | `{path, entries}`; `path` is `null` because Emissary has no path-backed subscription source |
+| `i2p.router.addressbook.config` | object | `{path, entries}`; `path` is `null` because configuration metadata is not a file authority |
 
 ## Persistence
 
-All administrative state persists through M002's `GenerationStore` with:
+The runtime owner persists one complete state in the address-book source with:
 
-- Versioned envelopes
-- Atomic publication (write-to-temp, rename)
-- Corruption fallback to prior valid generation
-- Bounded retention
+- bounded JSON state;
+- write/sync/rename publication;
+- a last-known-good rollback copy;
+- serialized mutation ownership.
+
+The former I2PControl `addressbooks/` generations are migration input only.
+They are imported once when no runtime state exists, with deterministic
+collision failure, and are never used as a second authority or deleted
+automatically.
 
 ## Security
 
@@ -142,6 +155,15 @@ All administrative state persists through M002's `GenerationStore` with:
 - No filesystem paths derived from input
 - Path-like configuration values are inert
 
-## Runtime Independence
+## Runtime source map
 
-**Administrative books do not affect runtime destination resolution.** The current runtime address book, downloader, and resolver remain unchanged. No automatic import or export occurs between administrative and runtime state.
+| Source | Owner | Runtime role |
+|---|---|---|
+| Existing `addressbook/addresses` and destination files | `AddressBookManager` | Published downloaded source and compatibility lookup cache |
+| Private/local/router/published control entries | Shared runtime `AddressBookHandle` | Durable administrative entries and normal lookup input |
+| Subscription URLs | Runtime owner metadata | Stored only; `SetSubscriptions` never fetches synchronously |
+| Configuration map | Runtime owner metadata | Non-operative metadata; request values never select files |
+
+Startup constructs the runtime owner before Router and I2PControl composition.
+I2PControl receives only its bounded handle; it cannot replace the resolver,
+control downloading, cancel tasks, or write arbitrary paths.

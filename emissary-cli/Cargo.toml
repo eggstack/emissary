@@ -18,7 +18,7 @@ emissary-core = { path = "../emissary-core", version = "0.4.0" }
 emissary-util = { path = "../emissary-util", version = "0.4.0", features = ["tokio"] }
 futures = "0.3.31"
 httparse = "1.10.1"
-serde_json = { version = "1.0.140", optional = true }
+serde_json = "1.0.140"
 thiserror = "2.0.12"
 tokio-tungstenite = { version = "0.27.0", default-features = false, features = ["native-tls"], optional = true }
 url = "2.5.4"
@@ -62,5 +62,5 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["ring",
 [features]
 default = ["ui"]
 ui = ["dioxus/desktop", "dioxus/liveview", "dioxus-liveview", "axum"]
-i2pcontrol = ["axum", "axum/json", "http", "hyper", "hyper-util", "serde_json", "rcgen", "rustls-pemfile", "tokio-rustls", "tower", "tower-http", "async-trait"]
+i2pcontrol = ["axum", "axum/json", "http", "hyper", "hyper-util", "rcgen", "rustls-pemfile", "tokio-rustls", "tower", "tower-http", "async-trait"]
 metrics = ["emissary-util/metrics"]

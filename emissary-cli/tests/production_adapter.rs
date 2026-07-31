@@ -170,7 +170,16 @@ fn production_control_plane_identity_and_uptime() {
 #[tokio::test]
 async fn production_address_book_control_crud() {
     let dir = tempfile::tempdir().unwrap();
-    let ab = ProductionAddressBookControl::new(dir.keep());
+    let base = dir.keep();
+    let manager = emissary_cli::address_book::AddressBookManager::new(
+        base.clone(),
+        emissary_cli::config::AddressBookConfig {
+            default: None,
+            subscriptions: None,
+        },
+    )
+    .await;
+    let ab = ProductionAddressBookControl::new(manager.handle(), base.join("addressbooks"));
     ab.load().await.unwrap();
 
     use emissary_cli::i2pcontrol::{
@@ -210,8 +219,17 @@ async fn production_address_book_control_crud() {
 #[tokio::test]
 async fn production_address_book_persistence_round_trip() {
     let dir = tempfile::tempdir().unwrap();
+    let base = dir.path().to_path_buf();
     {
-        let ab = ProductionAddressBookControl::new(dir.path().to_path_buf());
+        let manager = emissary_cli::address_book::AddressBookManager::new(
+            base.clone(),
+            emissary_cli::config::AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let ab = ProductionAddressBookControl::new(manager.handle(), base.join("addressbooks"));
         ab.load().await.unwrap();
         use emissary_cli::i2pcontrol::{
             control_plane::AddressBookControl,
@@ -231,7 +249,15 @@ async fn production_address_book_persistence_round_trip() {
         .unwrap();
     }
     {
-        let ab = ProductionAddressBookControl::new(dir.path().to_path_buf());
+        let manager = emissary_cli::address_book::AddressBookManager::new(
+            base.clone(),
+            emissary_cli::config::AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let ab = ProductionAddressBookControl::new(manager.handle(), base.join("addressbooks"));
         ab.load().await.unwrap();
         use emissary_cli::i2pcontrol::{
             control_plane::AddressBookControl, domain::address_book::AdministrativeAddressBookType,

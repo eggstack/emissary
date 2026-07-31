@@ -27,13 +27,12 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M022 and M023 ready | M020 and M021 closed; source corrections remain |
+| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M023 ready | M020–M022 closed; source corrections remain |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M022 — AddressBook runtime bridge and canonical source reconciliation | ready | `plans/implementation/i2pcontrol-proposal-170/022-addressbook-runtime-bridge.md` | M020, M021 closed |
 | I2PControl Proposal 170 | M023 — Startup tunnel inventory and ClientServicesInfo truthfulness | ready | `plans/implementation/i2pcontrol-proposal-170/023-startup-tunnel-inventory-and-client-services.md` | M021 closed |
 
 ## Registered successor handoffs
@@ -59,6 +58,7 @@ These plans are complete handoffs but are not executable until their hard depend
 |---|---|---|---|
 | I2PControl Proposal 170 | M020 — Base I2PControl and JSON-RPC interoperability | closed | `plans/closure/i2pcontrol-proposal-170/020-closure.md` |
 | I2PControl Proposal 170 | M021 — TunnelManager exact wire, atomic persistence, and secret boundary | closed | `plans/closure/i2pcontrol-proposal-170/021-closure.md` |
+| I2PControl Proposal 170 | M022 — AddressBook runtime bridge and canonical source reconciliation | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/022-closure.md` |
 
 ## Historical invalidation and supersession
 
@@ -77,7 +77,7 @@ These plans are complete handoffs but are not executable until their hard depend
 | Direct base RouterInfo compatibility after token removal | high | M020 | resolved |
 | Canonical TunnelManager `get` schema and validation | high | M021 | resolved; M023 owns truthful startup sources |
 | Non-atomic tunnel rename and secret handling | high | M021 | resolved; M022/M023 consume the corrected primitives |
-| AddressBook disconnected administrative shadow | high | M022 | ready |
+| AddressBook disconnected administrative shadow | high | M022 | resolved; M025 owns final selector/source matrix |
 | Startup tunnel inventory and stale proxy state | high/medium | M023 | ready |
 | Sticky SAM observation overflow | medium | M024 | blocked on M023 |
 | RouterInfo 43-selector source/claim contradictions | high claim defect | M025 | blocked on M020/M022/M023/M024 |

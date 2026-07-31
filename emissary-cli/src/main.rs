@@ -206,30 +206,59 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
     let router_config = config.config.take().expect("to exist");
     let base_path = config.base_path.clone();
 
-    let (router, events, local_router_info, address_book_manager) =
-        match config.address_book.take() {
-            None => Router::<TokioRuntime>::new(config.into(), None, Some(Arc::new(storage)))
-                .await
-                .map(|(router, event_subscriber, info)| (router, event_subscriber, info, None)),
-
-            Some(address_book_config) => {
-                // create address book, allocate address book handle and pass it to `Router`
-                let address_book_manager =
-                    AddressBookManager::new(config.base_path.clone(), address_book_config).await;
-                let address_book_handle = address_book_manager.handle();
-
-                Router::<TokioRuntime>::new(
-                    config.into(),
-                    Some(address_book_handle),
-                    Some(Arc::new(storage)),
-                )
-                .await
-                .map(|(router, event_subscriber, info)| {
-                    (router, event_subscriber, info, Some(address_book_manager))
-                })
-            }
+    let address_book_config = config.address_book.take().or_else(|| {
+        #[cfg(feature = "i2pcontrol")]
+        if router_config.i2pcontrol.as_ref().is_some_and(|config| config.enabled) {
+            return Some(crate::config::AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            });
         }
-        .map_err(|error| anyhow!(error))?;
+        None
+    });
+
+    let (router, events, local_router_info, address_book_manager) = match address_book_config {
+        None => Router::<TokioRuntime>::new(config.into(), None, Some(Arc::new(storage)))
+            .await
+            .map(|(router, event_subscriber, info)| (router, event_subscriber, info, None)),
+
+        Some(address_book_config) => {
+            // create address book, allocate address book handle and pass it to `Router`
+            let address_book_manager =
+                AddressBookManager::new(config.base_path.clone(), address_book_config).await;
+            let address_book_handle = address_book_manager.handle();
+
+            Router::<TokioRuntime>::new(
+                config.into(),
+                Some(address_book_handle),
+                Some(Arc::new(storage)),
+            )
+            .await
+            .map(|(router, event_subscriber, info)| {
+                (router, event_subscriber, info, Some(address_book_manager))
+            })
+        }
+    }
+    .map_err(|error| anyhow!(error))?;
+
+    #[cfg(feature = "i2pcontrol")]
+    let address_book_handle_for_control =
+        address_book_manager.as_ref().map(|manager| manager.handle());
+
+    #[cfg(feature = "i2pcontrol")]
+    if router_config.i2pcontrol.as_ref().is_some_and(|config| config.enabled) {
+        let handle = address_book_handle_for_control
+            .as_ref()
+            .expect("I2PControl address book is composed with the router");
+        let migration = i2pcontrol::production::ProductionAddressBookControl::new(
+            Arc::clone(handle),
+            base_path.join("addressbooks"),
+        );
+        migration
+            .load()
+            .await
+            .map_err(|error| anyhow!("failed to initialize address book authority: {error}"))?;
+    }
 
     // save newest router info to disk
     File::create(path.join("router.info"))?.write_all(&local_router_info)?;
@@ -468,6 +497,10 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                 .with_service_registry(registry_for_i2pcontrol)
                 .with_sam_listener_enabled(router.protocol_address_info().sam_tcp.is_some())
                 .with_log_ring(log_ring.expect("I2PControl logger ring is initialized"));
+
+                if let Some(handle) = &address_book_handle_for_control {
+                    ctx = ctx.with_address_book_handle(Arc::clone(handle));
+                }
 
                 if let Some(handle) = router.sam_session_observation_handle() {
                     ctx = ctx.with_sam_session_observation(handle);

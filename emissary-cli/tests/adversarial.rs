@@ -874,6 +874,14 @@ async fn tls_test_server_with_connection_limit(
     use tokio_rustls::{rustls::ServerConfig, TlsAcceptor};
 
     let tmp = tempfile::tempdir().unwrap();
+    let address_book_manager = emissary_cli::address_book::AddressBookManager::new(
+        tmp.path().to_owned(),
+        emissary_cli::config::AddressBookConfig {
+            default: None,
+            subscriptions: None,
+        },
+    )
+    .await;
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let bind = listener.local_addr().unwrap();
 
@@ -893,6 +901,7 @@ async fn tls_test_server_with_connection_limit(
         ProductionControls {
             address_books: Arc::new(
                 emissary_cli::i2pcontrol::production::ProductionAddressBookControl::new(
+                    address_book_manager.handle(),
                     tmp.path().join("ab"),
                 ),
             ),

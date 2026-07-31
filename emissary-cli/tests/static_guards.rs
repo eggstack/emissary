@@ -353,9 +353,7 @@ fn production_adapter_does_not_silently_truncate() {
 #[test]
 fn production_address_book_adapter_is_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
-    let ab = ProductionAddressBookControl::new(std::env::temp_dir());
     assert_send_sync::<ProductionAddressBookControl>();
-    let _ = ab;
 }
 
 #[test]

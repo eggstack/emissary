@@ -155,7 +155,7 @@ M026 bounded core inspection for feasible remaining selectors
 M027 conformance and independent reclosure
 ```
 
-M020 and M021 are closed. M022 and M023 are now dependency-ready and may
+M020 through M022 are closed. M023 is now dependency-ready and may
 execute in parallel against M021's corrected shared persistence/security
 boundary. M024 depends on M023's final ClientServicesInfo ownership. M025
 depends on M020, M022, and M023. M026 depends on M025's exact source matrix.
@@ -378,7 +378,7 @@ Use focused test filters named in each plan before broad package tests. Use touc
 | M019A | invalidated closure | historical evidence; see `019a-closure-invalidation.md` |
 | M020 | closed | `plans/closure/i2pcontrol-proposal-170/020-closure.md` |
 | M021 | closed | `plans/closure/i2pcontrol-proposal-170/021-closure.md` |
-| M022 | ready | hard dependencies M020 and M021 are closed |
+| M022 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/022-closure.md` |
 | M023 | ready | hard dependency M021 is closed |
 | M024 | blocked | hard dependency M023 |
 | M025 | blocked | hard dependencies M020, M022, M023, M024 |

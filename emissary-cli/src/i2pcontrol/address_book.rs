@@ -38,7 +38,7 @@
 //! - Listing/lookup follows the exact result shape and deterministic ordering.
 //! - Oversize results fail explicitly and are never truncated.
 //! - No handler writes `router.toml`.
-//! - No handler calls current runtime `AddressBookHandle` mutators.
+//! - Production mutations go through the runtime owner's bounded handle.
 //! - No administrative state changes runtime destination resolution.
 //! - Logs and errors contain no full destination, subscription value, configuration value, token,
 //!   or state path.
@@ -50,6 +50,8 @@ use crate::i2pcontrol::{
     rpc::{self, JsonRpcErrorResponse, JsonRpcRequest, JsonRpcSuccess, RequestId},
     server::I2pControlState,
 };
+
+use emissary_core::{crypto::base64_decode, primitives::Destination};
 
 const LOG_TARGET: &str = "emissary::i2pcontrol::address_book";
 
@@ -868,10 +870,7 @@ fn validate_hostname(hostname: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Validate a destination for Proposal 170 address book entries.
-///
-/// Destinations must be non-empty and must not contain control characters.
-/// Full I2P destination parsing is performed by the destination decoder.
+/// Validate and structurally decode a destination for Proposal 170 entries.
 fn validate_destination(destination: &str) -> Result<(), String> {
     if destination.is_empty() {
         return Err("Destination must not be empty".to_string());
@@ -884,6 +883,11 @@ fn validate_destination(destination: &str) -> Result<(), String> {
     if destination.chars().any(|c| c.is_control()) {
         return Err("Destination must not contain control characters".to_string());
     }
+
+    let decoded = base64_decode(destination)
+        .ok_or_else(|| "Destination is not a valid I2P Base64 destination".to_string())?;
+    Destination::parse(&decoded)
+        .map_err(|_| "Destination is not a structurally valid I2P destination".to_string())?;
 
     Ok(())
 }
@@ -913,8 +917,8 @@ fn error_response(id: RequestId, code: i32, message: impl Into<String>) -> serde
 /// - `i2p.router.addressbook.local` — array of local book entries
 /// - `i2p.router.addressbook.router` — array of router book entries
 /// - `i2p.router.addressbook.published` — array of published book entries
-/// - `i2p.router.addressbook.subscriptions` — array of subscription URLs
-/// - `i2p.router.addressbook.config` — configuration key-value object
+/// - `i2p.router.addressbook.subscriptions` — object with `path` and `entries`
+/// - `i2p.router.addressbook.config` — object with `path` and `entries`
 ///
 /// # Response format
 ///
@@ -975,7 +979,7 @@ pub async fn resolve_address_book_selectors(
         let urls: Vec<&str> = subs.as_slice().iter().map(|s| s.as_str()).collect();
         result.insert(
             rpc::router_info_keys::ADDRESS_BOOK_SUBSCRIPTIONS.to_string(),
-            serde_json::json!(urls),
+            serde_json::json!({"path": null, "entries": urls}),
         );
     }
     if requested_keys.contains(&rpc::router_info_keys::ADDRESS_BOOK_CONFIG) {
@@ -984,7 +988,7 @@ pub async fn resolve_address_book_selectors(
             config.as_map().iter().map(|(k, v)| (k.clone(), serde_json::json!(v))).collect();
         result.insert(
             rpc::router_info_keys::ADDRESS_BOOK_CONFIG.to_string(),
-            serde_json::json!(map),
+            serde_json::json!({"path": null, "entries": map}),
         );
     }
 
@@ -1045,8 +1049,7 @@ mod tests {
 
     #[test]
     fn validate_destination_valid() {
-        assert!(validate_destination("base64dest").is_ok());
-        assert!(validate_destination(&"A".repeat(1000)).is_ok());
+        assert!(validate_destination(&valid_destination()).is_ok());
     }
 
     #[test]
@@ -1063,6 +1066,23 @@ mod tests {
     #[test]
     fn validate_destination_control_chars() {
         assert!(validate_destination("test\n").is_err());
+    }
+
+    fn valid_destination() -> String {
+        use std::sync::OnceLock;
+
+        static VALID: OnceLock<String> = OnceLock::new();
+        VALID
+            .get_or_init(|| {
+                use emissary_core::{
+                    crypto::{base64_encode, SigningPrivateKey},
+                    primitives::Destination,
+                };
+                use emissary_util::runtime::tokio::Runtime as TokioRuntime;
+                let key = SigningPrivateKey::from_bytes(&[0xa; 32]).unwrap();
+                base64_encode(Destination::new::<TokioRuntime>(key.public()).serialize())
+            })
+            .clone()
     }
 
     // --- Handler integration tests using FakeAddressBookControl ---
@@ -1108,7 +1128,7 @@ mod tests {
         let state = test_state();
         let req = ab_request(
             "AddressBook",
-            serde_json::json!({"book": "local", "request": "Add", "name": "test.i2p", "value": "base64dest"}),
+            serde_json::json!({"book": "local", "request": "Add", "name": "test.i2p", "value": valid_destination()}),
         );
         let resp = handle_address_book(&state, &req).await;
         assert_eq!(resp["result"], "ok");
@@ -1121,7 +1141,7 @@ mod tests {
         let arr = resp["result"].as_array().unwrap();
         assert_eq!(arr.len(), 1);
         assert_eq!(arr[0]["name"], "test.i2p");
-        assert_eq!(arr[0]["value"], "base64dest");
+        assert_eq!(arr[0]["value"], valid_destination());
     }
 
     #[tokio::test]
@@ -1132,7 +1152,7 @@ mod tests {
             serde_json::json!({
                 "Type": "private",
                 "Hostname": "canonical.i2p",
-                "Destination": "base64dest"
+                "Destination": valid_destination()
             }),
         );
         let resp = handle_address_book(&state, &add).await;
@@ -1145,7 +1165,7 @@ mod tests {
             serde_json::json!({
                 "Type": "private",
                 "Hostname": "canonical.i2p",
-                "Destination": "base64dest",
+                "Destination": valid_destination(),
                 "Delete": false
             }),
         );
@@ -1184,7 +1204,7 @@ mod tests {
                 "Type": "private",
                 "book": "private",
                 "Hostname": "mixed.i2p",
-                "Destination": "base64dest"
+                "Destination": valid_destination()
             }),
         );
         let resp = handle_address_book(&state, &req).await;
@@ -1197,7 +1217,7 @@ mod tests {
         // Add first
         let req = ab_request(
             "AddressBook",
-            serde_json::json!({"book": "router", "request": "Add", "name": "found.i2p", "value": "dest123"}),
+            serde_json::json!({"book": "router", "request": "Add", "name": "found.i2p", "value": valid_destination()}),
         );
         handle_address_book(&state, &req).await;
 
@@ -1207,7 +1227,7 @@ mod tests {
         );
         let resp = handle_address_book(&state, &req).await;
         assert_eq!(resp["result"]["name"], "found.i2p");
-        assert_eq!(resp["result"]["value"], "dest123");
+        assert_eq!(resp["result"]["value"], valid_destination());
     }
 
     #[tokio::test]
@@ -1227,14 +1247,14 @@ mod tests {
         // Add
         let req = ab_request(
             "AddressBook",
-            serde_json::json!({"book": "private", "request": "Add", "name": "host.i2p", "value": "old"}),
+            serde_json::json!({"book": "private", "request": "Add", "name": "host.i2p", "value": valid_destination()}),
         );
         handle_address_book(&state, &req).await;
 
         // Update
         let req = ab_request(
             "AddressBook",
-            serde_json::json!({"book": "private", "request": "Update", "name": "host.i2p", "value": "new"}),
+            serde_json::json!({"book": "private", "request": "Update", "name": "host.i2p", "value": valid_destination()}),
         );
         let resp = handle_address_book(&state, &req).await;
         assert_eq!(resp["result"], "ok");
@@ -1245,7 +1265,7 @@ mod tests {
             serde_json::json!({"book": "private", "request": "Lookup", "name": "host.i2p"}),
         );
         let resp = handle_address_book(&state, &req).await;
-        assert_eq!(resp["result"]["value"], "new");
+        assert_eq!(resp["result"]["value"], valid_destination());
     }
 
     #[tokio::test]
@@ -1253,7 +1273,7 @@ mod tests {
         let state = test_state();
         let req = ab_request(
             "AddressBook",
-            serde_json::json!({"book": "private", "request": "Update", "name": "noexist.i2p", "value": "dest"}),
+            serde_json::json!({"book": "private", "request": "Update", "name": "noexist.i2p", "value": valid_destination()}),
         );
         let resp = handle_address_book(&state, &req).await;
         assert_eq!(resp["error"]["code"], -1);
@@ -1265,7 +1285,7 @@ mod tests {
         // Add
         let req = ab_request(
             "AddressBook",
-            serde_json::json!({"book": "local", "request": "Add", "name": "del.i2p", "value": "dest"}),
+            serde_json::json!({"book": "local", "request": "Add", "name": "del.i2p", "value": valid_destination()}),
         );
         handle_address_book(&state, &req).await;
 
@@ -1361,7 +1381,7 @@ mod tests {
         let state = test_state();
         let req = ab_request(
             "AddressBook",
-            serde_json::json!({"book": "private", "request": "Add", "value": "dest"}),
+            serde_json::json!({"book": "private", "request": "Add", "value": valid_destination()}),
         );
         let resp = handle_address_book(&state, &req).await;
         assert_eq!(resp["error"]["code"], -32602);
@@ -1383,7 +1403,7 @@ mod tests {
         let state = test_state();
         let req = ab_request(
             "AddressBook",
-            serde_json::json!({"book": "private", "request": "Add", "name": "", "value": "dest"}),
+            serde_json::json!({"book": "private", "request": "Add", "name": "", "value": valid_destination()}),
         );
         let resp = handle_address_book(&state, &req).await;
         assert_eq!(resp["error"]["code"], -32602);
@@ -1548,14 +1568,14 @@ mod tests {
         // Add to private
         let req = ab_request(
             "AddressBook",
-            serde_json::json!({"book": "private", "request": "Add", "name": "p.i2p", "value": "p-dest"}),
+            serde_json::json!({"book": "private", "request": "Add", "name": "p.i2p", "value": valid_destination()}),
         );
         handle_address_book(&state, &req).await;
 
         // Add to local
         let req = ab_request(
             "AddressBook",
-            serde_json::json!({"book": "local", "request": "Add", "name": "l.i2p", "value": "l-dest"}),
+            serde_json::json!({"book": "local", "request": "Add", "name": "l.i2p", "value": valid_destination()}),
         );
         handle_address_book(&state, &req).await;
 
@@ -1600,7 +1620,7 @@ mod tests {
         // Add entry
         let req = ab_request(
             "AddressBook",
-            serde_json::json!({"book": "private", "request": "Add", "name": "host.i2p", "value": "dest"}),
+            serde_json::json!({"book": "private", "request": "Add", "name": "host.i2p", "value": valid_destination()}),
         );
         handle_address_book(&state, &req).await;
 
@@ -1700,11 +1720,13 @@ mod tests {
         )
         .await
         .unwrap();
-        let arr = result
+        let obj = result
             .get(rpc::router_info_keys::ADDRESS_BOOK_SUBSCRIPTIONS)
             .unwrap()
-            .as_array()
+            .as_object()
             .unwrap();
+        assert!(obj.get("path").unwrap().is_null());
+        let arr = obj.get("entries").unwrap().as_array().unwrap();
         assert_eq!(arr.len(), 2);
         assert_eq!(arr[0], "http://sub1.example.com");
         assert_eq!(arr[1], "http://sub2.example.com");
@@ -1726,7 +1748,8 @@ mod tests {
             .unwrap()
             .as_object()
             .unwrap();
-        assert_eq!(obj.get("mode").unwrap(), "aggressive");
+        assert!(obj.get("path").unwrap().is_null());
+        assert_eq!(obj.get("entries").unwrap()["mode"], "aggressive");
     }
 
     #[tokio::test]

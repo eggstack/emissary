@@ -18,9 +18,9 @@
 
 //! Production adapters for I2PControl control plane traits.
 //!
-//! These adapters wrap the real emissary-core subsystems and the persistent
-//! I2PControl stores. They are read-only inspection interfaces that copy
-//! bounded state into snapshot DTOs without exposing mutable handles.
+//! These adapters wrap the real emissary-core subsystems, the runtime
+//! address-book owner, and bounded persistent I2PControl stores. They expose
+//! only purpose-specific handles and snapshot DTOs.
 //!
 //! All adapters are `Send + Sync` and document no mutation, no event
 //! subscriber consumption, and no private key exposure.
@@ -28,6 +28,10 @@
 use std::{path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
+
+use crate::address_book::{
+    AddressBookHandle, RuntimeAddressBookEntry, RuntimeAddressBookSnapshot, RuntimeAddressBookType,
+};
 
 use crate::i2pcontrol::{
     backends::{registry::TunnelBackendRegistry, BackendError, TunnelBackend},
@@ -179,39 +183,76 @@ impl ControlPlane for ProductionControlPlane {
 
 // --- Production AddressBookControl ------------------------------------------
 
-/// Production address book control plane backed by the persistent
-/// [`AddressBookStore`].
-///
-/// Wraps the durable generation store. All operations read or modify the
-/// persistent state on disk.
+/// Production address book control plane backed by the running router's
+/// [`AddressBookHandle`]. The old I2PControl generation store is accepted only
+/// as one-time migration input and is never retained as a second authority.
 pub struct ProductionAddressBookControl {
-    inner: Arc<tokio::sync::Mutex<AddressBookStore>>,
+    runtime: Arc<AddressBookHandle>,
+    legacy_dir: PathBuf,
 }
 
 impl ProductionAddressBookControl {
-    /// Create a new production address book control plane with a backing
-    /// store rooted at `dir`.
-    pub fn new(dir: PathBuf) -> Self {
+    /// Create a production adapter for the already-composed runtime owner.
+    pub fn new(runtime: Arc<AddressBookHandle>, legacy_dir: PathBuf) -> Self {
         Self {
-            inner: Arc::new(tokio::sync::Mutex::new(AddressBookStore::new(
-                dir,
-                1024 * 1024,
-            ))),
+            runtime,
+            legacy_dir,
         }
     }
 
-    /// Load existing state from disk.
+    /// Validate the runtime source and migrate the legacy administrative store
+    /// before it can become a second authority.
     pub async fn load(&self) -> Result<(), String> {
-        let mut store = self.inner.lock().await;
-        store.load().await.map_err(|e| format!("store load: {e}"))?;
-        Ok(())
+        if let Some(error) = self.runtime.runtime_initialization_error() {
+            return Err(error);
+        }
+        if self.runtime.runtime_authority_present() {
+            return Ok(());
+        }
+
+        let mut store = AddressBookStore::new(self.legacy_dir.clone(), 1024 * 1024);
+        store.load().await.map_err(|e| format!("legacy store load: {e}"))?;
+        if store.total_entries() == 0
+            && store.subscriptions().is_empty()
+            && store.configuration().is_empty()
+        {
+            return Ok(());
+        }
+
+        let mut snapshot = RuntimeAddressBookSnapshot::default();
+        for (source, target) in [
+            (
+                AdministrativeAddressBookType::Private,
+                &mut snapshot.private,
+            ),
+            (AdministrativeAddressBookType::Local, &mut snapshot.local),
+            (AdministrativeAddressBookType::Router, &mut snapshot.router),
+            (
+                AdministrativeAddressBookType::Published,
+                &mut snapshot.published,
+            ),
+        ] {
+            for entry in store.list(source) {
+                target.insert(
+                    entry.hostname.clone(),
+                    RuntimeAddressBookEntry {
+                        hostname: entry.hostname.clone(),
+                        destination: entry.destination.clone(),
+                    },
+                );
+            }
+        }
+        snapshot.subscriptions = store.subscriptions().as_slice().to_vec();
+        snapshot.configuration = store.configuration().as_map().clone();
+        self.runtime.import_legacy_runtime_state(snapshot).await
     }
 }
 
 impl Clone for ProductionAddressBookControl {
     fn clone(&self) -> Self {
         Self {
-            inner: Arc::clone(&self.inner),
+            runtime: Arc::clone(&self.runtime),
+            legacy_dir: self.legacy_dir.clone(),
         }
     }
 }
@@ -222,8 +263,13 @@ impl AddressBookControl for ProductionAddressBookControl {
         &self,
         book_type: AdministrativeAddressBookType,
     ) -> Result<Vec<AddressBookEntry>, String> {
-        let store = self.inner.lock().await;
-        Ok(store.list(book_type).into_iter().cloned().collect())
+        Ok(self
+            .runtime
+            .runtime_list(runtime_book_type(book_type))
+            .await?
+            .into_iter()
+            .map(runtime_entry)
+            .collect())
     }
 
     async fn lookup(
@@ -231,8 +277,11 @@ impl AddressBookControl for ProductionAddressBookControl {
         book_type: AdministrativeAddressBookType,
         hostname: &str,
     ) -> Result<Option<AddressBookEntry>, String> {
-        let store = self.inner.lock().await;
-        Ok(store.lookup(book_type, hostname).cloned())
+        Ok(self
+            .runtime
+            .runtime_lookup(runtime_book_type(book_type), hostname)
+            .await?
+            .map(runtime_entry))
     }
 
     async fn add(
@@ -240,9 +289,9 @@ impl AddressBookControl for ProductionAddressBookControl {
         book_type: AdministrativeAddressBookType,
         entry: AddressBookEntry,
     ) -> Result<(), String> {
-        let mut store = self.inner.lock().await;
-        store.add(book_type, entry).await.map_err(|e| format!("store add: {e}"))?;
-        Ok(())
+        self.runtime
+            .runtime_add(runtime_book_type(book_type), runtime_entry_from(entry))
+            .await
     }
 
     async fn update(
@@ -250,9 +299,9 @@ impl AddressBookControl for ProductionAddressBookControl {
         book_type: AdministrativeAddressBookType,
         entry: AddressBookEntry,
     ) -> Result<bool, String> {
-        let mut store = self.inner.lock().await;
-        let rev = store.update(book_type, entry).await.map_err(|e| format!("store update: {e}"))?;
-        Ok(rev.is_some())
+        self.runtime
+            .runtime_update(runtime_book_type(book_type), runtime_entry_from(entry))
+            .await
     }
 
     async fn delete(
@@ -260,52 +309,54 @@ impl AddressBookControl for ProductionAddressBookControl {
         book_type: AdministrativeAddressBookType,
         hostname: &str,
     ) -> Result<bool, String> {
-        let mut store = self.inner.lock().await;
-        let rev = store
-            .delete(book_type, hostname)
-            .await
-            .map_err(|e| format!("store delete: {e}"))?;
-        Ok(rev.is_some())
+        self.runtime.runtime_delete(runtime_book_type(book_type), hostname).await
     }
 
     async fn delete_all(&self, book_type: AdministrativeAddressBookType) -> Result<bool, String> {
-        let mut store = self.inner.lock().await;
-        let rev = store
-            .delete_all(book_type)
-            .await
-            .map_err(|e| format!("store delete_all: {e}"))?;
-        Ok(rev.is_some())
+        self.runtime.runtime_delete_all(runtime_book_type(book_type)).await
     }
 
     async fn subscriptions(&self) -> Result<SubscriptionSet, String> {
-        let store = self.inner.lock().await;
-        Ok(store.subscriptions())
+        Ok(SubscriptionSet::from_vec(
+            self.runtime.runtime_subscriptions().await?,
+        ))
     }
 
     async fn set_subscriptions(&self, subscriptions: SubscriptionSet) -> Result<(), String> {
-        let mut store = self.inner.lock().await;
-        store
-            .set_subscriptions(subscriptions)
-            .await
-            .map_err(|e| format!("store set_subscriptions: {e}"))?;
-        Ok(())
+        self.runtime.runtime_set_subscriptions(subscriptions.as_slice().to_vec()).await
     }
 
     async fn configuration(&self) -> Result<AddressBookConfiguration, String> {
-        let store = self.inner.lock().await;
-        Ok(store.configuration())
+        Ok(AddressBookConfiguration::from_map(
+            self.runtime.runtime_configuration().await?,
+        ))
     }
 
     async fn set_configuration(
         &self,
         configuration: AddressBookConfiguration,
     ) -> Result<(), String> {
-        let mut store = self.inner.lock().await;
-        store
-            .set_configuration(configuration)
-            .await
-            .map_err(|e| format!("store set_configuration: {e}"))?;
-        Ok(())
+        self.runtime.runtime_set_configuration(configuration.as_map().clone()).await
+    }
+}
+
+fn runtime_book_type(book_type: AdministrativeAddressBookType) -> RuntimeAddressBookType {
+    match book_type {
+        AdministrativeAddressBookType::Private => RuntimeAddressBookType::Private,
+        AdministrativeAddressBookType::Local => RuntimeAddressBookType::Local,
+        AdministrativeAddressBookType::Router => RuntimeAddressBookType::Router,
+        AdministrativeAddressBookType::Published => RuntimeAddressBookType::Published,
+    }
+}
+
+fn runtime_entry(entry: RuntimeAddressBookEntry) -> AddressBookEntry {
+    AddressBookEntry::new(entry.hostname, entry.destination)
+}
+
+fn runtime_entry_from(entry: AddressBookEntry) -> RuntimeAddressBookEntry {
+    RuntimeAddressBookEntry {
+        hostname: entry.hostname,
+        destination: entry.destination,
     }
 }
 
@@ -731,8 +782,97 @@ impl RouterInfoControl for ProductionRouterInfoControl {
 
 #[cfg(test)]
 mod tests {
-    // Note: Adapter unit tests live in `emissary-cli/tests/production_adapter.rs`
-    // because the production adapter requires a concrete `Runtime` implementation
-    // (e.g. `emissary_core::runtime::mock::MockRuntime`) which is only available
-    // within the emissary-core crate's own test build, not to downstream tests.
+    use super::*;
+    use crate::{
+        address_book::{AddressBookManager, RuntimeAddressBookType},
+        config::AddressBookConfig,
+    };
+
+    #[tokio::test]
+    async fn legacy_address_book_state_migrates_into_runtime_owner_once() {
+        let base = tempfile::tempdir().unwrap().keep();
+        let legacy_dir = base.join("addressbooks");
+        let mut legacy = AddressBookStore::new(legacy_dir.clone(), 1024 * 1024);
+        legacy
+            .add(
+                AdministrativeAddressBookType::Private,
+                AddressBookEntry::new("legacy.i2p", "legacy-destination"),
+            )
+            .await
+            .unwrap();
+
+        let manager = AddressBookManager::new(
+            base.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let runtime = manager.handle();
+        let adapter = ProductionAddressBookControl::new(runtime.clone(), legacy_dir.clone());
+        adapter.load().await.unwrap();
+        assert_eq!(
+            runtime.runtime_list(RuntimeAddressBookType::Private).await.unwrap()[0].hostname,
+            "legacy.i2p"
+        );
+        assert!(runtime.runtime_authority_present());
+
+        drop(manager);
+        let manager = AddressBookManager::new(
+            base,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let runtime = manager.handle();
+        ProductionAddressBookControl::new(runtime.clone(), legacy_dir)
+            .load()
+            .await
+            .unwrap();
+        assert_eq!(
+            runtime.runtime_list(RuntimeAddressBookType::Private).await.unwrap().len(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn legacy_address_book_migration_rejects_hostname_collisions() {
+        let base = tempfile::tempdir().unwrap().keep();
+        let legacy_dir = base.join("addressbooks");
+        tokio::fs::create_dir_all(base.join("addressbook")).await.unwrap();
+        tokio::fs::write(
+            base.join("addressbook/addresses"),
+            "collision.i2p=published-destination\n",
+        )
+        .await
+        .unwrap();
+
+        let mut legacy = AddressBookStore::new(legacy_dir.clone(), 1024 * 1024);
+        legacy
+            .add(
+                AdministrativeAddressBookType::Private,
+                AddressBookEntry::new("collision.i2p", "private-destination"),
+            )
+            .await
+            .unwrap();
+
+        let manager = AddressBookManager::new(
+            base,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let runtime = manager.handle();
+        let error = ProductionAddressBookControl::new(runtime.clone(), legacy_dir)
+            .load()
+            .await
+            .unwrap_err();
+        assert!(error.contains("collision"));
+        assert!(runtime.runtime_list(RuntimeAddressBookType::Private).await.unwrap().is_empty());
+    }
 }

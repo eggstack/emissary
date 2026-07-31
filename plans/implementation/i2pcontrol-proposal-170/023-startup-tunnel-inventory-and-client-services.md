@@ -1,6 +1,6 @@
 # M023 — Startup Tunnel Inventory and ClientServicesInfo Truthfulness
 
-Status: blocked
+Status: ready
 
 Primary class: capability/ownership corrective pass
 

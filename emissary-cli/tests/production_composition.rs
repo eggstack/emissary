@@ -207,6 +207,14 @@ async fn production_sam_observation_source_reaches_client_services_serializer() 
         tunnels.clone() as Arc<dyn TunnelManagerControl>,
     ));
     let sam_handle = SamSessionObservationHandle::empty_for_test();
+    let address_book_manager = emissary_cli::address_book::AddressBookManager::new(
+        tmp.path().to_owned(),
+        emissary_cli::config::AddressBookConfig {
+            default: None,
+            subscriptions: None,
+        },
+    )
+    .await;
     let registry = ServiceRegistry::new();
     registry
         .allocate_handle(ServiceCategory::Sam)
@@ -223,6 +231,7 @@ async fn production_sam_observation_source_reaches_client_services_serializer() 
         ProductionControls {
             address_books: Arc::new(
                 emissary_cli::i2pcontrol::production::ProductionAddressBookControl::new(
+                    address_book_manager.handle(),
                     tmp.path().join("addressbooks"),
                 ),
             ),
@@ -335,9 +344,18 @@ async fn fail_closed_on_tunnel_dir_creation_failure() {
 #[tokio::test]
 async fn successful_startup_returns_instance() {
     let tmp = tempfile::tempdir().unwrap();
+    let address_book_manager = emissary_cli::address_book::AddressBookManager::new(
+        tmp.path().to_owned(),
+        emissary_cli::config::AddressBookConfig {
+            default: None,
+            subscriptions: None,
+        },
+    )
+    .await;
 
     let ctx =
-        emissary_cli::i2pcontrol::server::ServerInitContext::new("test-id".to_string(), vec![]);
+        emissary_cli::i2pcontrol::server::ServerInitContext::new("test-id".to_string(), vec![])
+            .with_address_book_handle(address_book_manager.handle());
 
     let config = emissary_cli::i2pcontrol::server::I2pControlConfig {
         enabled: true,
@@ -371,8 +389,17 @@ async fn restart_preserves_durable_state() {
     };
 
     // First instance: create a tunnel via production adapter
+    let address_book_manager1 = emissary_cli::address_book::AddressBookManager::new(
+        base_path.to_owned(),
+        emissary_cli::config::AddressBookConfig {
+            default: None,
+            subscriptions: None,
+        },
+    )
+    .await;
     let ctx1 =
-        emissary_cli::i2pcontrol::server::ServerInitContext::new("test-id".to_string(), vec![]);
+        emissary_cli::i2pcontrol::server::ServerInitContext::new("test-id".to_string(), vec![])
+            .with_address_book_handle(address_book_manager1.handle());
     let _instance1 = emissary_cli::i2pcontrol::server::init_server(&config, base_path, ctx1)
         .await
         .unwrap();
@@ -392,8 +419,17 @@ async fn restart_preserves_durable_state() {
     tm1.create(def).await.unwrap();
 
     // Second instance: reconstruct from the same base path
+    let address_book_manager2 = emissary_cli::address_book::AddressBookManager::new(
+        base_path.to_owned(),
+        emissary_cli::config::AddressBookConfig {
+            default: None,
+            subscriptions: None,
+        },
+    )
+    .await;
     let ctx2 =
-        emissary_cli::i2pcontrol::server::ServerInitContext::new("test-id".to_string(), vec![]);
+        emissary_cli::i2pcontrol::server::ServerInitContext::new("test-id".to_string(), vec![])
+            .with_address_book_handle(address_book_manager2.handle());
     let _instance2 = emissary_cli::i2pcontrol::server::init_server(&config, base_path, ctx2)
         .await
         .unwrap();

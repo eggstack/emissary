@@ -16,6 +16,8 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
+#![cfg_attr(not(feature = "i2pcontrol"), allow(dead_code))]
+
 use crate::config::AddressBookConfig;
 
 use emissary_core::{
@@ -33,7 +35,15 @@ use reqwest::{
 };
 
 use std::{
-    collections::HashMap, future::Future, path::PathBuf, pin::Pin, sync::Arc, time::Duration,
+    collections::{BTreeMap, HashMap},
+    future::Future,
+    path::PathBuf,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
 
 /// Logging target for the file
@@ -44,6 +54,336 @@ const RETRY_BACKOFF: Duration = Duration::from_secs(30);
 
 /// How many times each subscription is tried before giving up.
 const SUBSCRIPTION_NUM_RETRIES: usize = 5usize;
+
+/// Administrative address-book source selected by Proposal 170.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeAddressBookType {
+    /// Private entries.
+    Private,
+    /// Local entries.
+    Local,
+    /// Router entries.
+    Router,
+    /// Published entries.
+    Published,
+}
+
+/// A bounded entry owned by the runtime address-book authority.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RuntimeAddressBookEntry {
+    /// Hostname used for lookup.
+    pub hostname: String,
+    /// Full or legacy base32 destination representation.
+    pub destination: String,
+}
+
+/// Complete runtime address-book state exchanged with the I2PControl adapter.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RuntimeAddressBookSnapshot {
+    /// Private entries.
+    pub private: BTreeMap<String, RuntimeAddressBookEntry>,
+    /// Local entries.
+    pub local: BTreeMap<String, RuntimeAddressBookEntry>,
+    /// Router entries.
+    pub router: BTreeMap<String, RuntimeAddressBookEntry>,
+    /// Published entries, including entries loaded by the existing downloader.
+    pub published: BTreeMap<String, RuntimeAddressBookEntry>,
+    /// Stored subscription metadata.
+    pub subscriptions: Vec<String>,
+    /// Stored non-operative configuration metadata.
+    pub configuration: BTreeMap<String, String>,
+}
+
+impl RuntimeAddressBookSnapshot {
+    fn book(
+        &self,
+        book_type: RuntimeAddressBookType,
+    ) -> &BTreeMap<String, RuntimeAddressBookEntry> {
+        match book_type {
+            RuntimeAddressBookType::Private => &self.private,
+            RuntimeAddressBookType::Local => &self.local,
+            RuntimeAddressBookType::Router => &self.router,
+            RuntimeAddressBookType::Published => &self.published,
+        }
+    }
+
+    fn book_mut(
+        &mut self,
+        book_type: RuntimeAddressBookType,
+    ) -> &mut BTreeMap<String, RuntimeAddressBookEntry> {
+        match book_type {
+            RuntimeAddressBookType::Private => &mut self.private,
+            RuntimeAddressBookType::Local => &mut self.local,
+            RuntimeAddressBookType::Router => &mut self.router,
+            RuntimeAddressBookType::Published => &mut self.published,
+        }
+    }
+}
+
+/// Runtime address-book owner shared by the router and I2PControl.
+struct RuntimeAddressBookOwner {
+    path: PathBuf,
+    addresses: Arc<RwLock<HashMap<String, String>>>,
+    serialized: Arc<RwLock<String>>,
+    state: RwLock<RuntimeAddressBookSnapshot>,
+    mutation: tokio::sync::Mutex<()>,
+    authority_present: AtomicBool,
+    initialization_error: Option<String>,
+}
+
+impl RuntimeAddressBookOwner {
+    async fn new(
+        path: PathBuf,
+        addresses: Arc<RwLock<HashMap<String, String>>>,
+        serialized: Arc<RwLock<String>>,
+        initial_subscriptions: Vec<String>,
+    ) -> Arc<Self> {
+        let state_path = path.join("control-state.json");
+        let backup_path = path.join("control-state.json.bak");
+        let current_exists = state_path.exists();
+        let backup_exists = backup_path.exists();
+        let mut initialization_error = None;
+
+        let loaded = match tokio::fs::read_to_string(&state_path).await {
+            Ok(raw) => match serde_json::from_str::<RuntimeAddressBookSnapshot>(&raw) {
+                Ok(state) => Some(state),
+                Err(_) => match tokio::fs::read_to_string(&backup_path).await {
+                    Ok(raw) => serde_json::from_str(&raw).ok(),
+                    Err(_) => None,
+                },
+            },
+            Err(_) => match tokio::fs::read_to_string(&backup_path).await {
+                Ok(raw) => serde_json::from_str(&raw).ok(),
+                Err(_) => None,
+            },
+        };
+
+        let authority_present = current_exists || backup_exists;
+        let initial_subscriptions_for_fallback = initial_subscriptions.clone();
+        let state = loaded.unwrap_or_else(|| {
+            if authority_present {
+                initialization_error = Some("address book state is corrupt".to_string());
+            }
+            let mut state = RuntimeAddressBookSnapshot {
+                subscriptions: initial_subscriptions_for_fallback,
+                ..RuntimeAddressBookSnapshot::default()
+            };
+            for (hostname, destination) in addresses.read().iter() {
+                state.published.insert(
+                    hostname.clone(),
+                    RuntimeAddressBookEntry {
+                        hostname: hostname.clone(),
+                        destination: destination.clone(),
+                    },
+                );
+            }
+            state
+        });
+        let owner = Arc::new(Self {
+            path,
+            addresses,
+            serialized,
+            state: RwLock::new(state),
+            mutation: tokio::sync::Mutex::new(()),
+            authority_present: AtomicBool::new(authority_present),
+            initialization_error,
+        });
+        owner.rebuild_runtime_indexes();
+        owner
+    }
+
+    fn rebuild_runtime_indexes(&self) {
+        let state = self.state.read();
+        let mut effective = BTreeMap::new();
+        for book in [
+            &state.private,
+            &state.local,
+            &state.router,
+            &state.published,
+        ] {
+            for (hostname, entry) in book {
+                effective
+                    .entry(hostname.clone())
+                    .or_insert_with(|| base32_for_destination(&entry.destination));
+            }
+        }
+        let mut addresses = self.addresses.write();
+        addresses.clear();
+        addresses.extend(effective);
+        let mut serialized = self.serialized.write();
+        *serialized = addresses
+            .iter()
+            .map(|(hostname, address)| format!("{hostname}={address}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
+
+    fn initialization_error(&self) -> Option<String> {
+        self.initialization_error.clone()
+    }
+
+    fn authority_present(&self) -> bool {
+        self.authority_present.load(Ordering::Acquire)
+    }
+
+    fn snapshot(&self) -> RuntimeAddressBookSnapshot {
+        self.state.read().clone()
+    }
+
+    fn entries(&self, book_type: RuntimeAddressBookType) -> Vec<RuntimeAddressBookEntry> {
+        self.state.read().book(book_type).values().cloned().collect()
+    }
+
+    async fn persist(&self, state: &RuntimeAddressBookSnapshot) -> Result<(), String> {
+        let raw = serde_json::to_vec(state)
+            .map_err(|_| "address book serialization failed".to_string())?;
+        if raw.len() > 1024 * 1024 {
+            return Err("address book state exceeds its size limit".to_string());
+        }
+        tokio::fs::create_dir_all(&self.path)
+            .await
+            .map_err(|_| "address book persistence failed".to_string())?;
+        let temp = self.path.join(".control-state.json.tmp");
+        let current = self.path.join("control-state.json");
+        let backup = self.path.join("control-state.json.bak");
+        tokio::fs::write(&temp, &raw)
+            .await
+            .map_err(|_| "address book persistence failed".to_string())?;
+        let file = tokio::fs::File::open(&temp)
+            .await
+            .map_err(|_| "address book persistence failed".to_string())?;
+        file.sync_all()
+            .await
+            .map_err(|_| "address book persistence failed".to_string())?;
+        drop(file);
+        if current.exists() {
+            tokio::fs::copy(&current, &backup)
+                .await
+                .map_err(|_| "address book persistence failed".to_string())?;
+        }
+        tokio::fs::rename(&temp, &current)
+            .await
+            .map_err(|_| "address book persistence failed".to_string())?;
+        Ok(())
+    }
+
+    fn persist_sync(&self, state: &RuntimeAddressBookSnapshot) {
+        let Ok(raw) = serde_json::to_vec(state) else {
+            return;
+        };
+        if std::fs::create_dir_all(&self.path).is_err() {
+            return;
+        }
+        let temp = self.path.join(".control-state.json.tmp");
+        let current = self.path.join("control-state.json");
+        let backup = self.path.join("control-state.json.bak");
+        if std::fs::write(&temp, raw).is_err() {
+            return;
+        }
+        if current.exists() && std::fs::copy(&current, &backup).is_err() {
+            let _ = std::fs::remove_file(&temp);
+            return;
+        }
+        let _ = std::fs::rename(&temp, &current);
+    }
+
+    fn legacy_publish_sync(&self, entry: RuntimeAddressBookEntry) {
+        let mut state = self.state.write();
+        state.published.insert(entry.hostname.clone(), entry);
+        let committed = state.clone();
+        drop(state);
+        self.persist_sync(&committed);
+        self.authority_present.store(true, Ordering::Release);
+        self.rebuild_runtime_indexes();
+    }
+
+    fn legacy_remove_sync(&self, hostname: &str) {
+        let mut state = self.state.write();
+        state.published.remove(hostname);
+        let committed = state.clone();
+        drop(state);
+        self.persist_sync(&committed);
+        self.authority_present.store(true, Ordering::Release);
+        self.rebuild_runtime_indexes();
+    }
+
+    async fn commit(&self, state: RuntimeAddressBookSnapshot) -> Result<(), String> {
+        let _guard = self.mutation.lock().await;
+        self.persist(&state).await?;
+        *self.state.write() = state;
+        self.authority_present.store(true, Ordering::Release);
+        self.rebuild_runtime_indexes();
+        Ok(())
+    }
+
+    async fn mutate<T, F>(&self, update: F) -> Result<T, String>
+    where
+        F: FnOnce(&mut RuntimeAddressBookSnapshot) -> Result<T, String>,
+    {
+        let _guard = self.mutation.lock().await;
+        let mut state = self.snapshot();
+        let result = update(&mut state)?;
+        self.persist(&state).await?;
+        *self.state.write() = state;
+        self.authority_present.store(true, Ordering::Release);
+        self.rebuild_runtime_indexes();
+        Ok(result)
+    }
+
+    async fn import_legacy(&self, legacy: RuntimeAddressBookSnapshot) -> Result<(), String> {
+        if self.authority_present() {
+            return Ok(());
+        }
+        let current = self.snapshot();
+        for book in [
+            &legacy.private,
+            &legacy.local,
+            &legacy.router,
+            &legacy.published,
+        ] {
+            for hostname in book.keys() {
+                if current.published.contains_key(hostname)
+                    || current.private.contains_key(hostname)
+                    || current.local.contains_key(hostname)
+                    || current.router.contains_key(hostname)
+                {
+                    return Err("address book migration collision".to_string());
+                }
+            }
+        }
+        let mut merged = current;
+        merged.private = legacy.private;
+        merged.local = legacy.local;
+        merged.router = legacy.router;
+        merged.published.extend(legacy.published);
+        merged.subscriptions = legacy.subscriptions;
+        merged.configuration = legacy.configuration;
+        self.commit(merged).await
+    }
+
+    async fn merge_downloaded(&self, addresses: HashMap<String, (String, String)>) {
+        let _guard = self.mutation.lock().await;
+        let mut state = self.snapshot();
+        for (hostname, (_, destination)) in addresses {
+            state.published.entry(hostname.clone()).or_insert(RuntimeAddressBookEntry {
+                hostname,
+                destination,
+            });
+        }
+        if self.persist(&state).await.is_ok() {
+            *self.state.write() = state;
+            self.authority_present.store(true, Ordering::Release);
+            self.rebuild_runtime_indexes();
+        }
+    }
+}
+
+fn base32_for_destination(destination: &str) -> String {
+    base64_decode(destination)
+        .and_then(|decoded| Destination::parse(&decoded).ok())
+        .map(|destination| base32_encode(destination.id().to_vec()))
+        .unwrap_or_else(|| destination.to_string())
+}
 
 /// Used when requesting address books from servers. This should reduce load to servers whose
 /// address books haven't changed since our last lookup.
@@ -109,6 +449,9 @@ pub struct AddressBookManager {
 
     /// Additional subscriptions.
     subscriptions: Vec<String>,
+
+    /// Shared runtime authority used by the router and I2PControl.
+    owner: Arc<RuntimeAddressBookOwner>,
 }
 
 impl AddressBookManager {
@@ -140,12 +483,24 @@ impl AddressBookManager {
             ),
         };
 
+        let addresses = Arc::new(RwLock::new(addresses));
+        let serialized = Arc::new(RwLock::new(serialized));
+        let subscriptions = config.subscriptions.unwrap_or_default();
+        let owner = RuntimeAddressBookOwner::new(
+            path.clone(),
+            Arc::clone(&addresses),
+            Arc::clone(&serialized),
+            subscriptions.clone(),
+        )
+        .await;
+
         Self {
             address_book_path: path,
-            addresses: Arc::new(RwLock::new(addresses)),
+            addresses,
             hosts_url: config.default,
-            serialized: Arc::new(RwLock::new(serialized)),
-            subscriptions: config.subscriptions.unwrap_or_default(),
+            serialized,
+            subscriptions,
+            owner,
         }
     }
 
@@ -155,6 +510,7 @@ impl AddressBookManager {
             address_book_path: Arc::from(self.address_book_path.to_str().expect("to succeed")),
             addresses: Arc::clone(&self.addresses),
             serialized: Arc::clone(&self.serialized),
+            owner: Arc::clone(&self.owner),
         })
     }
 
@@ -470,6 +826,7 @@ impl AddressBookManager {
     /// addresses along with their hostnames into a file and stores all .Base64-encoded destinations
     /// into a separate directory where each destination is indexed by their hostname.
     async fn save_to_disk(&self, addresses: HashMap<String, (String, String)>) {
+        let persisted_addresses = addresses.clone();
         let (addresses, destinations): (HashMap<_, _>, HashMap<_, _>) = addresses
             .into_iter()
             .map(|(hostname, (base32, base64))| ((hostname.clone(), base32), (hostname, base64)))
@@ -530,6 +887,8 @@ impl AddressBookManager {
                     }
                 },
         }
+
+        self.owner.merge_downloaded(persisted_addresses).await;
     }
 }
 
@@ -545,9 +904,159 @@ pub struct AddressBookHandle {
     /// Serialized list of Base32 addresses.
     #[allow(dead_code)]
     serialized: Arc<RwLock<String>>,
+
+    /// Shared runtime owner and durable state.
+    owner: Arc<RuntimeAddressBookOwner>,
 }
 
 impl AddressBookHandle {
+    /// Return a sanitized initialization failure, if the newest runtime state
+    /// and its rollback copy were both unusable.
+    pub fn runtime_initialization_error(&self) -> Option<String> {
+        self.owner.initialization_error()
+    }
+
+    /// Whether a runtime-owned control state already exists. Legacy
+    /// administrative generations must not be re-imported after this point.
+    pub fn runtime_authority_present(&self) -> bool {
+        self.owner.authority_present()
+    }
+
+    /// List one administrative book from the runtime owner.
+    pub async fn runtime_list(
+        &self,
+        book_type: RuntimeAddressBookType,
+    ) -> Result<Vec<RuntimeAddressBookEntry>, String> {
+        Ok(self.owner.entries(book_type))
+    }
+
+    /// Look up one administrative entry.
+    pub async fn runtime_lookup(
+        &self,
+        book_type: RuntimeAddressBookType,
+        hostname: &str,
+    ) -> Result<Option<RuntimeAddressBookEntry>, String> {
+        Ok(self.owner.state.read().book(book_type).get(hostname).cloned())
+    }
+
+    /// Add one entry, preserving deterministic collision rules.
+    pub async fn runtime_add(
+        &self,
+        book_type: RuntimeAddressBookType,
+        entry: RuntimeAddressBookEntry,
+    ) -> Result<(), String> {
+        self.owner
+            .mutate(|state| {
+                if state.book(book_type).contains_key(&entry.hostname) {
+                    return Err("address book entry already exists".to_string());
+                }
+                let occupied_elsewhere = [
+                    RuntimeAddressBookType::Private,
+                    RuntimeAddressBookType::Local,
+                    RuntimeAddressBookType::Router,
+                    RuntimeAddressBookType::Published,
+                ]
+                .into_iter()
+                .filter(|book| *book != book_type)
+                .any(|book| state.book(book).contains_key(&entry.hostname));
+                if occupied_elsewhere {
+                    return Err("address book hostname collision".to_string());
+                }
+                state.book_mut(book_type).insert(entry.hostname.clone(), entry);
+                Ok(())
+            })
+            .await
+    }
+
+    /// Replace one existing entry.
+    pub async fn runtime_update(
+        &self,
+        book_type: RuntimeAddressBookType,
+        entry: RuntimeAddressBookEntry,
+    ) -> Result<bool, String> {
+        self.owner
+            .mutate(|state| {
+                if !state.book(book_type).contains_key(&entry.hostname) {
+                    return Ok(false);
+                }
+                state.book_mut(book_type).insert(entry.hostname.clone(), entry);
+                Ok(true)
+            })
+            .await
+    }
+
+    /// Delete one entry.
+    pub async fn runtime_delete(
+        &self,
+        book_type: RuntimeAddressBookType,
+        hostname: &str,
+    ) -> Result<bool, String> {
+        self.owner
+            .mutate(|state| Ok(state.book_mut(book_type).remove(hostname).is_some()))
+            .await
+    }
+
+    /// Delete every entry in one book.
+    pub async fn runtime_delete_all(
+        &self,
+        book_type: RuntimeAddressBookType,
+    ) -> Result<bool, String> {
+        self.owner
+            .mutate(|state| {
+                if state.book(book_type).is_empty() {
+                    return Ok(false);
+                }
+                state.book_mut(book_type).clear();
+                Ok(true)
+            })
+            .await
+    }
+
+    /// Read stored subscription metadata.
+    pub async fn runtime_subscriptions(&self) -> Result<Vec<String>, String> {
+        Ok(self.owner.state.read().subscriptions.clone())
+    }
+
+    /// Replace stored subscription metadata without fetching anything.
+    pub async fn runtime_set_subscriptions(
+        &self,
+        subscriptions: Vec<String>,
+    ) -> Result<(), String> {
+        self.owner
+            .mutate(|state| {
+                state.subscriptions = subscriptions;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Read stored non-operative address-book configuration metadata.
+    pub async fn runtime_configuration(&self) -> Result<BTreeMap<String, String>, String> {
+        Ok(self.owner.state.read().configuration.clone())
+    }
+
+    /// Replace stored non-operative address-book configuration metadata.
+    pub async fn runtime_set_configuration(
+        &self,
+        configuration: BTreeMap<String, String>,
+    ) -> Result<(), String> {
+        self.owner
+            .mutate(|state| {
+                state.configuration = configuration;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Import the old administrative generation store once, before it can
+    /// become a second authority.
+    pub async fn import_legacy_runtime_state(
+        &self,
+        snapshot: RuntimeAddressBookSnapshot,
+    ) -> Result<(), String> {
+        self.owner.import_legacy(snapshot).await
+    }
+
     /// Add new host to address book.
     ///
     /// Only the base32 address of the host is stored on disk.
@@ -556,19 +1065,26 @@ impl AddressBookHandle {
         self.addresses.write().insert(host.clone(), address.clone());
 
         // update the on-disk version of the base32 address list
-        let mut inner = self.serialized.write();
-        inner.push_str(&format!("\n{host}={address}"));
-
-        if let Err(error) = std::fs::write(format!("{}/addresses", self.address_book_path), &*inner)
         {
-            tracing::warn!(
-                target: LOG_TARGET,
-                %host,
-                %address,
-                error = ?error.kind(),
-                "failed to update on-disk base32 address list",
-            );
+            let mut inner = self.serialized.write();
+            inner.push_str(&format!("\n{host}={address}"));
+
+            if let Err(error) =
+                std::fs::write(format!("{}/addresses", self.address_book_path), &*inner)
+            {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    %host,
+                    %address,
+                    error = ?error.kind(),
+                    "failed to update on-disk base32 address list",
+                );
+            }
         }
+        self.owner.legacy_publish_sync(RuntimeAddressBookEntry {
+            hostname: host,
+            destination: address,
+        });
     }
 
     /// Add new host to address book.
@@ -581,18 +1097,21 @@ impl AddressBookHandle {
         self.addresses.write().insert(host.clone(), base32_address.clone());
 
         // update the on-disk version of the base32 address list
-        let mut inner = self.serialized.write();
-        inner.push_str(&format!("\n{host}={base32_address}"));
-
-        if let Err(error) = std::fs::write(format!("{}/addresses", self.address_book_path), &*inner)
         {
-            tracing::warn!(
-                target: LOG_TARGET,
-                %host,
-                address = %base32_address,
-                error = ?error.kind(),
-                "failed to update on-disk base32 address list",
-            );
+            let mut inner = self.serialized.write();
+            inner.push_str(&format!("\n{host}={base32_address}"));
+
+            if let Err(error) =
+                std::fs::write(format!("{}/addresses", self.address_book_path), &*inner)
+            {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    %host,
+                    address = %base32_address,
+                    error = ?error.kind(),
+                    "failed to update on-disk base32 address list",
+                );
+            }
         }
 
         if let Err(error) = std::fs::write(
@@ -606,6 +1125,10 @@ impl AddressBookHandle {
                 "failed to write base64-encoded destination on disk",
             );
         }
+        self.owner.legacy_publish_sync(RuntimeAddressBookEntry {
+            hostname: host,
+            destination: base64_encode(destination.serialize()),
+        });
     }
 
     /// Remove `host` from address book.
@@ -614,21 +1137,24 @@ impl AddressBookHandle {
         self.addresses.write().remove(host);
 
         // update the on-disk version of the base32 address list
-        let mut inner = self.serialized.write();
-        *inner = inner
-            .lines()
-            .filter(|line| !line.starts_with(&format!("{host}=")))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        if let Err(error) = std::fs::write(format!("{}/addresses", self.address_book_path), &*inner)
         {
-            tracing::warn!(
-                target: LOG_TARGET,
-                %host,
-                error = ?error.kind(),
-                "failed to update on-disk base32 address list",
-            );
+            let mut inner = self.serialized.write();
+            *inner = inner
+                .lines()
+                .filter(|line| !line.starts_with(&format!("{host}=")))
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            if let Err(error) =
+                std::fs::write(format!("{}/addresses", self.address_book_path), &*inner)
+            {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    %host,
+                    error = ?error.kind(),
+                    "failed to update on-disk base32 address list",
+                );
+            }
         }
 
         // remove destination file for the host
@@ -643,15 +1169,29 @@ impl AddressBookHandle {
                 "failed to remove destination for host",
             );
         }
+        self.owner.legacy_remove_sync(host);
     }
 }
 
 impl AddressBook for AddressBookHandle {
     fn resolve_base64(&self, host: String) -> Pin<Box<dyn Future<Output = Option<String>> + Send>> {
         let path = Arc::clone(&self.address_book_path);
+        let owner = Arc::clone(&self.owner);
 
         Box::pin(async move {
-            tokio::fs::read_to_string(format!("{path}/destinations/{host}.txt")).await.ok()
+            if let Ok(destination) =
+                tokio::fs::read_to_string(format!("{path}/destinations/{host}.txt")).await
+            {
+                return Some(destination);
+            }
+            let state = owner.state.read();
+            state
+                .private
+                .get(&host)
+                .or_else(|| state.local.get(&host))
+                .or_else(|| state.router.get(&host))
+                .or_else(|| state.published.get(&host))
+                .map(|entry| entry.destination.clone())
         })
     }
 
@@ -1481,5 +2021,112 @@ mod tests {
         address_book.save_host_modified_times(loaded.clone()).await;
         let saved = address_book.load_host_modified_times().await;
         assert_eq!(loaded, saved);
+    }
+
+    #[tokio::test]
+    async fn runtime_control_mutation_is_visible_and_restart_safe() {
+        use emissary_core::crypto::SigningPrivateKey;
+        use emissary_util::runtime::tokio::Runtime as TokioRuntime;
+
+        let dir = tempdir().unwrap().keep();
+        let destination = {
+            let key = SigningPrivateKey::from_bytes(&[0xa; 32]).unwrap();
+            base64_encode(
+                emissary_core::primitives::Destination::new::<TokioRuntime>(key.public())
+                    .serialize(),
+            )
+        };
+        let expected_base32 = base32_encode(
+            Destination::parse(base64_decode(&destination).unwrap()).unwrap().id().to_vec(),
+        );
+        let manager = AddressBookManager::new(
+            dir.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let handle = manager.handle();
+        handle
+            .runtime_add(
+                RuntimeAddressBookType::Private,
+                RuntimeAddressBookEntry {
+                    hostname: "runtime.i2p".to_string(),
+                    destination: destination.clone(),
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            handle.runtime_list(RuntimeAddressBookType::Private).await.unwrap().len(),
+            1
+        );
+        assert_eq!(
+            handle.resolve_base64("runtime.i2p".to_string()).await,
+            Some(destination)
+        );
+        assert_eq!(handle.resolve_base32("runtime.i2p"), Some(expected_base32));
+
+        drop(manager);
+        let manager = AddressBookManager::new(
+            dir,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let handle = manager.handle();
+        assert!(handle.resolve_base32("runtime.i2p").is_some());
+        assert!(handle.resolve_base64("runtime.i2p".to_string()).await.is_some());
+        handle
+            .runtime_delete(RuntimeAddressBookType::Private, "runtime.i2p")
+            .await
+            .unwrap();
+        assert!(handle.resolve_base32("runtime.i2p").is_none());
+    }
+
+    #[tokio::test]
+    async fn runtime_owner_rejects_persistence_failure_without_runtime_change() {
+        let dir = tempdir().unwrap().keep();
+        let manager = AddressBookManager::new(
+            dir.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let handle = manager.handle();
+        handle
+            .runtime_add(
+                RuntimeAddressBookType::Private,
+                RuntimeAddressBookEntry {
+                    hostname: "stable.i2p".to_string(),
+                    destination: "stable-destination".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+
+        let state_path = dir.join("addressbook/control-state.json");
+        tokio::fs::remove_file(&state_path).await.unwrap();
+        tokio::fs::create_dir(&state_path).await.unwrap();
+        let result = handle
+            .runtime_update(
+                RuntimeAddressBookType::Private,
+                RuntimeAddressBookEntry {
+                    hostname: "stable.i2p".to_string(),
+                    destination: "new-destination".to_string(),
+                },
+            )
+            .await;
+        assert!(result.is_err());
+        assert_eq!(
+            handle.resolve_base64("stable.i2p".to_string()).await,
+            Some("stable-destination".to_string())
+        );
     }
 }

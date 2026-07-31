@@ -62,8 +62,10 @@ pub trait ControlPlane: Send + Sync {
 /// - Only one administrative book is mutated per operation.
 /// - All four books remain independent across operations.
 /// - Success means durable commit; failure leaves prior state active.
-/// - No implementation writes to `router.toml` or the runtime address book.
-/// - No implementation performs network fetches or filesystem side effects.
+/// - Production mutations use the composed runtime address-book owner rather than a disconnected
+///   administrative shadow.
+/// - No implementation writes to `router.toml`, fetches subscriptions, or accepts request-selected
+///   filesystem paths.
 #[async_trait]
 pub trait AddressBookControl: Send + Sync {
     /// List all entries in the specified book.

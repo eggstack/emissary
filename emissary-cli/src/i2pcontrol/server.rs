@@ -53,6 +53,8 @@ use super::{
     tls::TlsConfig,
 };
 
+use crate::address_book::AddressBookHandle;
+
 use emissary_core::{crypto::base64_encode, SamSessionObservationHandle};
 
 const LOG_TARGET: &str = "emissary::i2pcontrol::server";
@@ -622,6 +624,8 @@ pub struct ServerInitContext {
     pub sam_session_observation: Option<SamSessionObservationHandle>,
     /// Whether the core router actually bound the SAM listener.
     pub sam_listener_enabled: bool,
+    /// The runtime address-book owner composed into the router.
+    pub address_book_handle: Option<Arc<AddressBookHandle>>,
 }
 
 impl ServerInitContext {
@@ -639,6 +643,7 @@ impl ServerInitContext {
             log_ring: None,
             sam_session_observation: None,
             sam_listener_enabled: false,
+            address_book_handle: None,
         }
     }
 
@@ -690,6 +695,12 @@ impl ServerInitContext {
         self.sam_listener_enabled = enabled;
         self
     }
+
+    /// Inject the real runtime address-book owner.
+    pub fn with_address_book_handle(mut self, handle: Arc<AddressBookHandle>) -> Self {
+        self.address_book_handle = Some(handle);
+        self
+    }
 }
 
 /// Initialize the I2PControl server: validate config, set up TLS, bind the port.
@@ -731,7 +742,13 @@ pub async fn init_server(
             ab_dir.display()
         ))
     })?;
-    let address_books = Arc::new(ProductionAddressBookControl::new(ab_dir));
+    let address_book_handle = ctx.address_book_handle.ok_or_else(|| {
+        I2pControlError::Config("I2PControl requires the runtime address-book owner".into())
+    })?;
+    let address_books = Arc::new(ProductionAddressBookControl::new(
+        address_book_handle,
+        ab_dir,
+    ));
     address_books.load().await.map_err(|e| {
         I2pControlError::Persistence(format!("failed to load address book store: {e}"))
     })?;
@@ -1879,7 +1896,16 @@ mod tests {
                 private_key: None,
             },
         };
-        let ctx = ServerInitContext::new("id".into(), vec![]);
+        let manager = crate::address_book::AddressBookManager::new(
+            tmp.path().to_owned(),
+            crate::config::AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let ctx =
+            ServerInitContext::new("id".into(), vec![]).with_address_book_handle(manager.handle());
 
         let _ = init_server(&config, tmp.path(), ctx).await.unwrap();
 

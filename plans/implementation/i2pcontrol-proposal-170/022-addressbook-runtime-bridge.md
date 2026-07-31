@@ -1,6 +1,6 @@
 # M022 — AddressBook Runtime Bridge and Canonical Source Reconciliation
 
-Status: blocked
+Status: implemented
 
 Primary class: capability/ownership corrective pass
 

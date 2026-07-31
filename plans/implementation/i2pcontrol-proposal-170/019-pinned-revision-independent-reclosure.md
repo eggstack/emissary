@@ -16,7 +16,8 @@ The current sequence is:
 - `plans/implementation/i2pcontrol-proposal-170/018a-wire-semantics-and-internal-only-corrective-pass.md`
 - `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md`
 
-M019A is the only future closure handoff and remains blocked until M018A completes on a frozen head.
+M019A is the only future closure handoff and is now ready after M018A completed on frozen head
+`a3c4f469f4877e5ff4a0bb4230da298f0b367ed2` with its disposition.
 
 ## Internal-only rule
 

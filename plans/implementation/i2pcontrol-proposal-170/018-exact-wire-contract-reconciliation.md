@@ -16,7 +16,7 @@ Current corrective successor:
 
 - `plans/implementation/i2pcontrol-proposal-170/018a-wire-semantics-and-internal-only-corrective-pass.md`
 
-Blocked internal closure successor:
+Ready internal closure successor after the corrective implementation:
 
 - `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md`
 
@@ -68,9 +68,10 @@ All writes must remain in `eggstack/emissary` unless a future explicit maintaine
 
 ## Current execution rule
 
-Execute only M018A.
+M018A is complete and its disposition is recorded. M019A is now ready; its independent review
+must remain within the successor handoff.
 
-M019A remains blocked until M018A:
+M018A completed the required successor conditions:
 
 - corrects all high and medium findings;
 - adds the required regressions;

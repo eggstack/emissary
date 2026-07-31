@@ -26,36 +26,35 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | active internal corrective work | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M018A ready | M018 initial disposition reopened; M019 superseded; M019A blocked until corrected frozen head |
+| I2PControl Proposal 170 | active internal corrective work | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M019A ready | M018A frozen at `a3c4f46`; M019A is the distinct internal final gate |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M018A — wire semantics and internal-only corrective pass | ready | `plans/implementation/i2pcontrol-proposal-170/018a-wire-semantics-and-internal-only-corrective-pass.md` | existing M018 implementation at `ea35de9`; bounded corrective scope only |
+| I2PControl Proposal 170 | M019A — internal pinned-revision reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md` | M018A frozen at `a3c4f46`; distinct internal reviewer required |
 
 ## Active closure work
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M018 initial implementation | corrective pass required | `ea35de9` | `plans/closure/i2pcontrol-proposal-170/018-implementation-disposition.md` |
+| I2PControl Proposal 170 | M018A — wire semantics and internal-only corrective pass | closing | `a3c4f46` | `plans/closure/i2pcontrol-proposal-170/018a-implementation-disposition.md` |
 
 ## Blocked and superseded handoffs
 
 | Subsystem | Handoff | Status | Plan | Blocker or disposition |
 |---|---|---|---|---|
 | I2PControl Proposal 170 | M019 — original pinned reclosure | superseded | `plans/implementation/i2pcontrol-proposal-170/019-pinned-revision-independent-reclosure.md` | replaced by M019A after post-M018 findings and policy correction |
-| I2PControl Proposal 170 | M019A — internal pinned-revision reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md` | M018A must land on a frozen complete head with disposition; distinct internal reviewer required |
 
 ## Current corrective findings
 
 | Finding | Severity | Owner | State |
 |---|---|---|---|
-| Transit total uses received plus sent rather than forwarded/transmitted transit bytes | high | M018A | ready |
-| Valid canonical TunnelManager operational failures do not consistently use structured `result.status` | high | M018A | ready |
-| Base and compatibility surfaces remain counted as canonical Proposal 170 inventory in the conformance manifest | medium | M018A | ready |
-| TunnelManager canonical examples and `Name`/`All` wording need correction | low | M018A | ready |
-| No true live-session SAM-to-I2PControl end-to-end test | medium evidence decision | M019A | blocked pending M018A; qualified evidence retained |
+| Transit total uses received plus sent rather than forwarded/transmitted transit bytes | high | M018A | resolved at `a3c4f46` |
+| Valid canonical TunnelManager operational failures do not consistently use structured `result.status` | high | M018A | resolved at `a3c4f46` |
+| Base and compatibility surfaces remain counted as canonical Proposal 170 inventory in the conformance manifest | medium | M018A | resolved at `a3c4f46` |
+| TunnelManager canonical examples and `Name`/`All` wording need correction | low | M018A | resolved at `a3c4f46` |
+| No true live-session SAM-to-I2PControl end-to-end test | medium evidence decision | M019A | ready for explicit adjudication; qualified evidence retained |
 | Initial active planning lacked an absolute no-upstream rule | governance | M018A/M019A | normative rule now codified; implementation and closure must attest compliance |
 
 ## Internal-only upstream boundary
@@ -122,14 +121,14 @@ M001–M004 remain historical implementation foundations. M005–M007 are supers
 | `plans/closure/i2pcontrol-proposal-170/016-implementation-disposition.md` | bounded SAM implementation retained |
 | `plans/closure/i2pcontrol-proposal-170/017-closure.md` plus invalidation | historical component evidence only |
 | `plans/closure/i2pcontrol-proposal-170/018-implementation-disposition.md` | corrective pass required |
-| M018A plan | sole ready implementation handoff |
+| M018A plan | implementation frozen; closing disposition recorded |
 | original M019 plan | superseded and non-executable |
-| M019A plan | blocked final internal gate |
+| M019A plan | ready final internal gate |
 
 ## Registry maintenance rules
 
-1. Execute only M018A.
-2. Keep M019A blocked until M018A freezes a complete implementation/test head and records `018a-implementation-disposition.md`.
+1. M018A is frozen and closing at `a3c4f46`; its disposition is the implementation evidence.
+2. M019A is ready and is the next executable internal closure gate.
 3. Never execute the superseded M019 plan.
 4. Do not count base protocol, compatibility aliases, unavailable sources, or unsupported runtimes as canonical operational coverage.
 5. Preserve historical closure and invalidation records rather than rewriting them into passing evidence.

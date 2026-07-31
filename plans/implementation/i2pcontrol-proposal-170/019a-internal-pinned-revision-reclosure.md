@@ -1,8 +1,8 @@
 # I2PControl Proposal 170 Milestone 019A — Internal Pinned-Revision Reclosure
 
-Status: blocked
+Status: ready
 
-Planning baseline: `db5e0679369dcefe61eb24bd10079dbf98086cea`
+Planning baseline: `a3c4f469f4877e5ff4a0bb4230da298f0b367ed2`
 
 Supersedes:
 
@@ -251,7 +251,9 @@ M019A may close only when:
 
 ## 11. Activation rule
 
-M019A remains blocked until M018A freezes a complete implementation/test head and records its disposition.
+M019A is ready now that M018A froze a complete implementation/test head at
+`a3c4f469f4877e5ff4a0bb4230da298f0b367ed2` and recorded its disposition. It still requires
+the distinct reviewer identified in the activation dependency.
 
 Once activated:
 

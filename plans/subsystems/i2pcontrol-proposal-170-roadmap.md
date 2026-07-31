@@ -2,7 +2,7 @@
 
 Status: active internal corrective work
 
-Current corrective baseline: `db5e0679369dcefe61eb24bd10079dbf98086cea`
+Current corrective baseline: `a3c4f469f4877e5ff4a0bb4230da298f0b367ed2`
 
 Pinned source:
 
@@ -114,7 +114,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/018a-wire-semantics-and-internal-only-corrective-pass.md`
 
-Status: ready
+Status: closing
 
 Objective:
 
@@ -148,7 +148,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md`
 
-Status: blocked
+Status: ready
 
 Activation requires a complete frozen M018A head and a distinct auditable internal reviewer.
 
@@ -251,9 +251,9 @@ No remote or upstream CI, release check, platform matrix, coverage gate, fuzzing
 | 016 | bounded SAM implementation | retained |
 | 017 | invalidated broad closure | component evidence retained |
 | 018 | corrective pass required | initial implementation retained at `ea35de9` |
-| 018A | ready | sole executable implementation handoff |
+| 018A | closing | implementation frozen at `a3c4f46`; disposition recorded |
 | 019 | superseded | non-executable |
-| 019A | blocked | final internal revision-bound closure gate |
+| 019A | ready | final internal revision-bound closure gate |
 
 ## 12. Completion definition
 

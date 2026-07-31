@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Milestone 018A — Wire Semantics and Internal-Only Corrective Pass
 
-Status: ready
+Status: implemented
 
 Planning baseline: `db5e0679369dcefe61eb24bd10079dbf98086cea`
 
@@ -28,7 +28,8 @@ M018A owns only:
 4. directly affected focused tests and documentation;
 5. codification and enforcement of the internal-only, no-upstream-submission boundary.
 
-M018A is the sole dependency-ready implementation handoff. M019A remains blocked until M018A lands on a frozen complete head.
+M018A is the sole dependency-ready implementation handoff at handoff time. M019A becomes
+dependency-ready only after M018A lands on a frozen complete head with its disposition.
 
 ## 2. Absolute internal-only boundary
 

@@ -1,173 +1,200 @@
 # Proposal 170 Support Status
 
-Status: closed internally against the pinned Proposal 170 revision by M019A
+Status: corrective pass required
 
-Proposal 170 remains Open and this status is pinned to the 2026-05-20 revision.
-M017's broad closure is invalidated historical evidence.
+Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
+
+The prior M019A `closed internally against pinned revision` disposition is invalidated by:
+
+- `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`
+
+Current corrective roadmap:
+
+- `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
+
+Next executable handoff:
+
+- M020, `plans/implementation/i2pcontrol-proposal-170/020-base-i2pcontrol-and-jsonrpc-interoperability.md`
+
+## Status model
 
 Support is reported separately as:
 
-- **Wire** — exact public names, casing, presence semantics, response fields,
-  and JSON types;
-- **Source** — truthful current Emissary data source;
-- **Runtime** — real backend implementation.
-
-This document tracks the implementation status of Proposal 170 I2PControl expansion in Emissary.
-
-## Method support
-
-| Method | Status | Milestone |
-|---|---|---|
-| `Authenticate` | Implemented | M001 |
-| `GetKeys` | Not started | — |
-| `RouterInfo` | Canonical wire implemented; source classified per exact key | M018 |
-| `AddressBook` | Canonical wire and administrative source implemented | M018 |
-| `TunnelManager` | Canonical wire/CRUD implemented; lifecycle runtime is explicit per backend | M018 |
-| `ClientServicesInfo` | Canonical direct wire and live sources implemented | M018 |
-
-## TunnelManager action support
-
-| Action | Status | Notes |
-|---|---|---|
-| `list` | Compatibility only | Emissary extension; not canonical |
-| `create` | Wire/CRUD implemented | All 12 types; structured success and failure result |
-| `edit` | Wire/CRUD implemented | Atomic rename, field preservation, structured operation failures |
-| `get` | Wire/CRUD implemented | Structured `status` + `info`, including missing-tunnel failures |
-| `delete` | Wire/CRUD implemented | Startup-managed rejected |
-| `start` | Wire implemented; runtime per backend | Unsupported backends and lookup failures return explicit status |
-| `stop` | Wire implemented; runtime per backend | Unsupported stop is safe/idempotent; failures are explicit status |
-| `restart` | Wire implemented; runtime per backend | Unsupported backends and lookup failures return explicit status |
-
-## Tunnel type runtime support
-
-| Type | CRUD | Start | Stop | Restart |
-|---|---|---|---|---|
-| `client` | Implemented | Not implemented | Safe no-op | Not implemented |
-| `httpclient` | Implemented | Not implemented | Safe no-op | Not implemented |
-| `ircclient` | Implemented | Not implemented | Safe no-op | Not implemented |
-| `socks` | Implemented | Not implemented | Safe no-op | Not implemented |
-| `socksirc` | Implemented | Not implemented | Safe no-op | Not implemented |
-| `connectclient` | Implemented | Not implemented | Safe no-op | Not implemented |
-| `streamrclient` | Implemented | Not implemented | Safe no-op | Not implemented |
-| `server` | Implemented | Not implemented | Safe no-op | Not implemented |
-| `httpserver` | Implemented | Not implemented | Safe no-op | Not implemented |
-| `httpbidirserver` | Implemented | Not implemented | Safe no-op | Not implemented |
-| `ircserver` | Implemented | Not implemented | Safe no-op | Not implemented |
-| `streamrserver` | Implemented | Not implemented | Safe no-op | Not implemented |
-
-### CRUD
-
-All 12 tunnel types support durable create, lossless get, edit with field preservation, and delete. Startup-managed definitions are read-only.
-
-### Lifecycle
-
-All tunnel types currently resolve to `UnsupportedTunnelBackend`. Start and restart return `error - <type> not implemented`. Stop is a safe idempotent no-op.
-
-Real tunnel data-plane implementations are deferred outside the I2PControl scope. The Proposal 170 contract is satisfied by explicit unsupported stubs.
-
-## AddressBook support
-
-| Action | Status | Notes |
-|---|---|---|
-| `List` | Implemented | Per-book listing |
-| `Lookup` | Implemented | Hostname lookup |
-| `Add` | Implemented | Entry insertion |
-| `Update` | Implemented | Entry update |
-| `Delete` | Implemented | Per-entry or per-book |
-
-### Books
-
-| Book | Status |
+| Dimension | Meaning |
 |---|---|
-| `private` | Implemented |
-| `local` | Implemented |
-| `router` | Implemented |
-| `published` | Implemented |
+| Wire | exact public request/response names, casing, presence semantics, and JSON types |
+| Source | truthful current Emissary source exists |
+| Runtime | a real backend performs the requested operation |
+| Persistence | mutation is durable and failure-atomic |
+| Evidence | literal external-contract, failure, restart, and production-composition proof exists |
 
-## RouterInfo selectors
+Parser acceptance, compatibility aliases, administrative shadow state, unavailable sources, and unsupported runtime stubs are not counted as full operational implementation.
 
-121 legacy/base selectors and exactly 43 canonical Proposal 170 additions are
-registered and dispatched as separate inventories. See [router-info.md](router-info.md) for the split
-catalog and [router-info-source-map.md](router-info-source-map.md) for source
-classification. Canonical unavailable fields return an explicit error.
+## Current overall disposition
 
-| Selector group | Status | Notes |
+The repository contains substantial retained Proposal 170 infrastructure, but it is not currently considered complete.
+
+Retained candidate implementation includes:
+
+- HTTPS I2PControl service with bounded request and connection handling;
+- typed twelve-tunnel inventory and exhaustive unsupported backend registry;
+- durable generation stores;
+- direct Proposal 170 parameter forms;
+- passive service registry;
+- bounded SAM observation handle;
+- exact 43-key RouterInfo inventory scaffold;
+- live event counters and log ring sources;
+- explicit unavailable/unsupported behavior in several paths.
+
+Material corrective work remains in M020–M027.
+
+## Base I2PControl/JSON-RPC
+
+Current status: corrective pass required
+
+Known defects:
+
+- canonical authentication requires a nonstandard username;
+- successful `API` is returned as a string rather than a number;
+- protected methods require a header token instead of standard `params.Token`;
+- I2PControl-specific missing/unknown/version/password errors are not distinguished;
+- notifications are discarded without executing the operation;
+- invalid request IDs may be coerced;
+- direct base RouterInfo compatibility is not preserved cleanly alongside Proposal 170 additions.
+
+Owner: M020.
+
+## TunnelManager
+
+Current status: wire/CRUD infrastructure retained; corrective pass required
+
+Retained:
+
+- seven lowercase canonical action parser;
+- twelve exact tunnel type parser;
+- durable administrative definitions;
+- explicit unsupported backend for every missing data plane;
+- safe inactive behavior for unsupported runtimes.
+
+Known defects:
+
+- canonical `get` returns the wrong `info` schema;
+- option validation is incomplete;
+- edit/rename is not one failure-atomic publication;
+- secret-bearing options may be duplicated, persisted, and returned unexpectedly;
+- restrictive-permission failure is best effort;
+- startup-managed tunnel inventory is not production-backed;
+- canonical lifecycle status translation is incomplete.
+
+Owners: M021 and M023.
+
+### Missing tunnel data planes
+
+The following remain intentionally out of scope for this Proposal 170 corrective sequence:
+
+- HTTP client/server and bidirectional server;
+- IRC client/server;
+- SOCKS-IRC and CONNECT variants;
+- Streamr client/server;
+- any other missing listener/destination/LeaseSet/traffic implementation.
+
+Their API definitions may persist and round-trip. Start/restart must return deterministic not-implemented operation status; stop must remain safe and inactive. They must never report running or open resources.
+
+## AddressBook
+
+Current status: durable administrative API retained; runtime/source correction required
+
+Known defect:
+
+The current four-book store is disconnected from the running router's normal address-book lookup source. A successful API mutation can therefore leave runtime resolution unchanged.
+
+The corrective target is one narrow runtime owner adapter or one synchronously published authoritative state. Two independently authoritative stores and best-effort synchronization are prohibited.
+
+Subscription/config RouterInfo shapes and source classifications also require correction.
+
+Owner: M022, with final matrix integration in M025.
+
+## ClientServicesInfo
+
+Current status: direct wire scaffold retained; source/lifecycle correction required
+
+| Selector | Retained behavior | Corrective requirement |
 |---|---|---|
-| Identity/static | Implemented | Startup-retained values |
-| Router news | Wire/source implemented | Source-provided string |
-| Clock skew | Implemented | Protocol-permitted null (no clock skew estimate) |
-| Network status | Implemented | EventMetrics firewall status |
-| Share ratio | Implemented | Retained configuration |
-| Configured BW | Implemented | Retained configuration |
-| UDP transport | Unavailable | No transport-specific canonical source; aggregate connection counts are not used |
-| UDP transport (peers, stats, cookie, hidden) | Unavailable | No Emissary equivalent for Java-I2P peer categories |
-| TCP transport | Unavailable | No transport-specific canonical source |
-| TCP transport (hosts, status, version, firewalled, peers) | Unavailable | No Emissary equivalent |
-| NetDB | Unavailable | NetDB task is spawned; no inspection interface |
-| Bandwidth totals | Implemented | Live EventMetrics adapter |
-| Bandwidth recent windows | Unavailable | No canonical production rolling-window source |
-| Tunnels (participating, configured) | Implemented | Live EventMetrics + TunnelManager |
-| Tunnels (exploratory, client, queue) | Unavailable | Tunnel pool tasks are spawned; no inspection interface |
-| I2PTunnel controller info | Wire/source implemented | Canonical response is an info list from the shared TunnelManager store |
-| Peers (known, active, RouterInfo lookup) | Unavailable | No bounded live source exposed by Emissary core |
-| Peers (banned, limits, activeStats) | Unavailable | No canonical ban owner or per-peer transport stats |
-| Logs | Implemented | LogRing with redaction |
-| Address book | Canonical list wire/source implemented | Subscription/config canonical RouterInfo fields remain unavailable |
+| `I2PTunnel` | live query of control-plane store | include startup-managed inventory and use actual I2P address provenance |
+| `HTTPProxy` | bind/listening observation | publish inactive state on task exit |
+| `SOCKS` | bind/listening observation | publish inactive state on task exit |
+| `SAM` | bounded active-session source | recover from transient incomplete/overflow state without restart |
+| `BOB` | exact boolean `false` | retained |
+| `I2CP` | actual listener state | revalidate in final source matrix |
 
-## ClientServicesInfo selectors
+Owners: M023 and M024.
 
-Implemented in M006, corrected in M011 for live state truthfulness, and
-reconciled in M018. Direct presence of the six exact keys selects a service;
-the nested boolean `Selector` map is compatibility-only:
+## RouterInfo
 
-| Selector | Response shape | Source | M011 status |
-|---|---|---|---|
-| `I2PTunnel` | `{client: {…}, server: {…}}` | `TunnelManagerControl::list()` (live query) | Live query at request time |
-| `HTTPProxy` | `{enabled, address, port}` | HTTP proxy `Listening`/`Stopped` | `enabled: true` only after bind |
-| `SOCKS` | `{enabled, address, port}` | SOCKS proxy `Listening`/`Stopped` | `enabled: true` only after bind |
-| `SAM` | `{enabled, sessions}` | core listener plus bounded `SamServer` observation handle | M016 current active-session map; overflow or missing source fails explicitly |
-| `BOB` | `false` (boolean) | exact Proposal 170 value (not implemented) | Unchanged |
-| `I2CP` | `{enabled}` | core `ProtocolAddressInfo::i2cp` | `enabled: true` only while bound |
+Current status: exact 43-key inventory scaffold retained; source/claim reconciliation required
 
-See [`docs/i2pcontrol/client-services.md`](client-services.md) for the
-full method documentation, including live query semantics,
-configured-vs-listening semantics, and integration evidence.
+The repository currently recognizes exactly 43 Proposal 170 additions, but many are unavailable and several source/type classifications contradict serializers or documentation. Unqualified completion is therefore invalid.
 
-## Security
+M025 will freeze one exact matrix containing key, JSON type, source owner, source status, serializer, and fixture.
 
-- Timing-resistant password comparison
-- Token-based authentication
-- Request body and string length limits
-- Secret redaction in logs and Debug output
-- Log ring redaction of private keys, passwords, tokens
-- No file system mutations outside persistence store
-- No network activity in handler code
-- Pre-query budget estimation prevents oversized responses
-- Per-selector item bounds enforce collection limits
-- No `EventSubscriber` consumption (frontend events preserved)
-- No private keys or session material in responses
+M026 may add bounded read-only snapshots only where the authoritative state already exists. It must not add new historical samplers, polling loops, algorithms, peer categories, or fabricated defaults.
 
-## Roadmap
+Fields that cannot be sourced without invasive redesign will remain explicitly unavailable and require a final `partial Proposal 170 support` disposition rather than a false complete claim.
 
-| Milestone | Status | Description |
+## Persistence and security
+
+Retained strengths:
+
+- versioned complete generations;
+- deterministic serialization;
+- write/sync/rename publication;
+- prior-generation fallback;
+- bounded retention;
+- authentication before protected handler execution;
+- request and collection bounds;
+- redacted tracing in several paths.
+
+Corrective requirements:
+
+- one generation per logical tunnel edit/rename;
+- prior state preserved on publication failure;
+- actual AddressBook/runtime consistency;
+- secret values stored once and never unintentionally returned/logged;
+- restrictive permissions enforced rather than best effort where supported;
+- literal negative tests for tokens, passwords, keys, credentials, paths, and destinations.
+
+Owners: M021 and M022, rechecked by M027.
+
+## Corrective sequence
+
+| Milestone | Status | Scope |
 |---|---|---|
-| M001 | Closed | Base protocol, auth, JSON-RPC |
-| M002 | Closed | Tunnel domain, persistence, backend trait |
-| M003 | Closed | AddressBook handler |
-| M004 | Closed | TunnelManager contract and stubs |
-| M005 | Superseded | RouterInfo inspection (superseded by M009/M010) |
-| M006 | Superseded | ClientServicesInfo (superseded by M011) |
-| M007 | Superseded | Conformance and strict closure (superseded by M012/M013) |
-| M008 | Closed | Production composition and durable-state integrity |
-| M009 | Closed | RouterInfo availability and truthfulness |
-| M010 | Closed | Bounded core router inspection |
-| M011 | Closed | ClientServicesInfo live state |
-| M012 | Closed | Real TLS and request resource hardening |
-| M013 | Closed | Production conformance and independent reclosure |
-| M014 | Closed | Spec-constrained truthfulness and local hardening |
-| M015 | Superseded | Historical reclosure; superseded by M017 |
-| M016 | Closed | Bounded SAM session observation corrective pass |
-| M017 | Invalidated | Historical final-head review; broad closure superseded by M018/M018A |
-| M018 | Corrective pass required | Initial exact wire-contract reconciliation; retained as history |
-| M018A | Closed for implementation | Wire semantics and internal-only corrective pass |
-| M019A | Closed internally against pinned revision | Independent final pinned-revision reclosure; no upstream acceptance implied |
+| M020 | ready | base I2PControl authentication/token/error and JSON-RPC correctness |
+| M021 | blocked | TunnelManager exact wire, atomic persistence, secret boundary |
+| M022 | blocked | actual AddressBook runtime authority and source objects |
+| M023 | blocked | startup tunnel inventory and client-service lifecycle/address truthfulness |
+| M024 | blocked | recoverable bounded SAM observation |
+| M025 | blocked | exact RouterInfo contract/source matrix |
+| M026 | blocked | feasible bounded read-only router inspection sources |
+| M027 | blocked | literal conformance, documentation reconciliation, independent closure |
+
+See `plans/implementation/i2pcontrol-proposal-170/README.md` for dependencies and handoff rules.
+
+## Final-status rule
+
+Only M027 may restore a final status.
+
+Possible dispositions:
+
+- `closed internally against pinned revision` when exact wire behavior and every claimed source/runtime dimension have evidence;
+- `partial Proposal 170 support` when one or more pinned sources remain truthfully unavailable;
+- `corrective pass required` for unresolved high/medium defects;
+- `blocked` when necessary evidence cannot be obtained.
+
+No internal status implies upstream review, acceptance, certification, adoption, approval, or merge.
+
+## Internal-only boundary
+
+All work is internal to `eggstack/emissary`.
+
+No corrective plan authorizes upstream issues, pull requests, reviews, discussions, submissions, patches, maintainer outreach, merge preparation, or writes to any upstream/third-party repository. External sources may be inspected read-only for internal correctness only.

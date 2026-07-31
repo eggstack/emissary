@@ -17,51 +17,69 @@ Canonical direction:
 - **blocked** — a named dependency or evidence requirement prevents progress.
 - **closing** — implementation landed and independent closure evidence is being gathered.
 - **closed** — closure record accepted.
-- **closed against pinned revision** — closure accepted against an explicitly named revision of an open external specification.
-- **corrective pass required** — a prior closure was invalidated by a material implementation or evidence defect.
-- **superseded** — replaced by another document.
+- **closed internally against pinned revision** — internal closure accepted against an explicitly named revision of an open external specification; does not imply upstream review or acceptance.
+- **corrective pass required** — a prior disposition or closure was invalidated by a material implementation or evidence defect.
+- **superseded** — replaced by another document and not executable.
 - **archived** — inactive and retained for traceability.
 
 ## Active subsystem roadmaps
 
-| Subsystem | Status | Roadmap | Current milestone | Dependencies or blockers |
+| Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | active exact-contract corrective work | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M018 closing; M019 ready | M018 frozen at `ea35de9`; M019 is the independent pinned-revision final gate |
+| I2PControl Proposal 170 | active internal corrective work | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M018A ready | M018 initial disposition reopened; M019 superseded; M019A blocked until corrected frozen head |
 
 ## Dependency-ready implementation plans
 
-| Subsystem | Milestone | Status | Implementation plan | Dependencies |
+| Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | 018 — exact wire-contract reconciliation | closing | `plans/implementation/i2pcontrol-proposal-170/018-exact-wire-contract-reconciliation.md` | frozen implementation head `ea35de9`; disposition `plans/closure/i2pcontrol-proposal-170/018-implementation-disposition.md` |
-| I2PControl Proposal 170 | 019 — pinned-revision independent reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/019-pinned-revision-independent-reclosure.md` | M018 head frozen; distinct reviewer/source recheck required |
+| I2PControl Proposal 170 | M018A — wire semantics and internal-only corrective pass | ready | `plans/implementation/i2pcontrol-proposal-170/018a-wire-semantics-and-internal-only-corrective-pass.md` | existing M018 implementation at `ea35de9`; bounded corrective scope only |
 
 ## Active closure work
 
-| Subsystem | Milestone | Status | Implementation plan | Evidence commit | Closure record |
-|---|---|---|---|---|---|
-| I2PControl Proposal 170 | 018 — exact wire-contract reconciliation | closing | `plans/implementation/i2pcontrol-proposal-170/018-exact-wire-contract-reconciliation.md` | `ea35de9` | `plans/closure/i2pcontrol-proposal-170/018-implementation-disposition.md` |
-
-## Blocked plans
-
-| Subsystem | Milestone | Status | Plan | Blocker |
+| Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| I2PControl Proposal 170 | M018 initial implementation | corrective pass required | `ea35de9` | `plans/closure/i2pcontrol-proposal-170/018-implementation-disposition.md` |
 
-## Current exact-contract findings
+## Blocked and superseded handoffs
+
+| Subsystem | Handoff | Status | Plan | Blocker or disposition |
+|---|---|---|---|---|
+| I2PControl Proposal 170 | M019 — original pinned reclosure | superseded | `plans/implementation/i2pcontrol-proposal-170/019-pinned-revision-independent-reclosure.md` | replaced by M019A after post-M018 findings and policy correction |
+| I2PControl Proposal 170 | M019A — internal pinned-revision reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md` | M018A must land on a frozen complete head with disposition; distinct internal reviewer required |
+
+## Current corrective findings
 
 | Finding | Severity | Owner | State |
 |---|---|---|---|
-| Exact Proposal 170 RouterInfo keys are absent or renamed, and a 121-key legacy catalog is mislabeled as Proposal 170 | high | M018 | resolved at `ea35de9`; M019 recheck |
-| AddressBook canonical `Type`/`Hostname`/`Destination`/optional `Delete` and in-method `SetSubscriptions`/`SetConfig` modes are missing | high | M018 | resolved at `ea35de9`; M019 recheck |
-| TunnelManager lowercase actions and structured result envelopes are missing; `List` and capitalized actions are extensions | high | M018 | resolved at `ea35de9`; M019 recheck |
-| ClientServicesInfo direct parameter-by-presence form is missing | high | M018 | resolved at `ea35de9`; M019 recheck |
-| Real-session-to-production-ClientServicesInfo SAM evidence is incomplete | medium evidence | M018 | qualified closest-production evidence; M019 decision |
-| Wire, source, and runtime support claims are conflated | medium documentation | M018 | resolved at `ea35de9`; M019 recheck |
-| M017 claimed zero unresolved high/medium findings | closure defect | M019 | ready for independent review |
+| Transit total uses received plus sent rather than forwarded/transmitted transit bytes | high | M018A | ready |
+| Valid canonical TunnelManager operational failures do not consistently use structured `result.status` | high | M018A | ready |
+| Base and compatibility surfaces remain counted as canonical Proposal 170 inventory in the conformance manifest | medium | M018A | ready |
+| TunnelManager canonical examples and `Name`/`All` wording need correction | low | M018A | ready |
+| No true live-session SAM-to-I2PControl end-to-end test | medium evidence decision | M019A | blocked pending M018A; qualified evidence retained |
+| Initial active planning lacked an absolute no-upstream rule | governance | M018A/M019A | normative rule now codified; implementation and closure must attest compliance |
+
+## Internal-only upstream boundary
+
+The Proposal 170 workstream is internal to `eggstack/emissary`.
+
+No active or historical plan authorizes:
+
+- upstream issues, pull requests, merge requests, discussions, review requests, or patch submissions;
+- upstream review, feedback, adoption, approval, or merge solicitation;
+- pushes of branches, commits, tags, patches, or artifacts to an upstream remote;
+- upstream maintainer outreach;
+- preparation of an upstream contribution package, patch series, submission checklist, or merge plan;
+- connector/API write actions against an upstream repository.
+
+External specifications, source trees, pull requests, commits, and discussions may be inspected read-only for internal verification and cited internally.
+
+All writes for this workstream must target `eggstack/emissary`. A future upstream contribution requires a new explicit maintainer directive that supersedes `plans/003-planning-process.md`; no current plan grants that authority.
+
+Any upstream write, submission, solicitation, or merge-preparation action is a stop condition and invalidates affected closure evidence.
 
 ## Pinned Proposal 170 authority
 
-Current corrective work is pinned to:
+Current internal work is pinned to:
 
 - proposal: `I2PControl Expansion`, Proposal 170;
 - status: `Open`;
@@ -69,56 +87,55 @@ Current corrective work is pinned to:
 - last updated: `2026-05-20`;
 - canonical page: `https://i2p.net/en/proposals/170-i2pcontrol-expansion/`.
 
-Because the proposal is Open, final closure must recheck the source and state `closed against pinned revision`. A changed proposal revision blocks M019 until implementation and fixtures are reconciled.
+Because the proposal is Open, final status may only be `closed internally against pinned revision`. A changed proposal revision blocks internal closure until the manifest and fixtures are reconciled. It does not trigger or authorize upstream contact.
 
-## M018 scope guard
+## M018A scope guard
 
-M018 owns exact public wire reconciliation only:
+M018A owns only:
 
-- exact 43 RouterInfo additions, direct parameter presence, response keys, and JSON types;
-- exact AddressBook operation modes and response adjudication;
-- exact lowercase TunnelManager actions, option inventory, and structured results;
-- exact direct-parameter ClientServicesInfo requests;
-- compatibility alias separation;
-- literal official-example fixtures;
-- one strongest-available SAM production-composition integration path;
-- directly affected conformance/support documents.
+- forwarded/transmitted semantics for `i2p.router.net.total.transit.bytes`;
+- canonical TunnelManager operational-failure `result.status` envelopes;
+- canonical/base/compatibility manifest separation;
+- directly affected tests and documentation;
+- internal-only policy verification.
 
-Existing compatibility forms may remain, but they must be labeled extensions and must not substitute for canonical Proposal 170 forms.
+M018A must not add:
 
-M018 must not add:
-
-- `.github/workflows/**`, CI/nightly/platform/coverage/evidence machinery;
+- `.github/workflows/**`, CI, platform, coverage, or evidence machinery;
 - release, publishing, packaging, or version automation;
+- upstream contribution or review activity;
 - missing tunnel data planes;
 - broad router, transport, NetDB, peer, tunnel, cryptographic, resolver, frontend, SAM, or I2CP redesign;
-- generic protocol/schema/fixture/inspection frameworks;
+- generic protocol/schema/fixture frameworks;
+- dependencies;
 - repository-wide formatting;
-- fabricated values for unavailable sources.
+- fabricated values.
 
 ## Historical records and current authority
 
-M001–M004 remain historical implementation foundations. M005–M007 are superseded. M008–M014 and M016 contain retained implementation evidence. M015 remains an invalid historical closure. M017's SAM/fencing/TLS review evidence is retained, but its broad Proposal 170 closure is invalidated.
+M001–M004 remain historical implementation foundations. M005–M007 are superseded. M008–M014 and M016 contain retained implementation evidence. M015 remains an invalid historical closure. M017's component evidence is retained, but its broad closure is invalidated. The initial M018 implementation is retained but requires M018A correction.
 
-| Milestone | Record | Current disposition |
-|---|---|---|
-| 014 | `plans/closure/i2pcontrol-proposal-170/014-closure.md` | implementation retained; broad final acceptance reopened by M018/M019 |
-| 015 | `plans/closure/i2pcontrol-proposal-170/015-closure.md` | invalid historical closure |
-| 016 | `plans/closure/i2pcontrol-proposal-170/016-implementation-disposition.md` | bounded SAM implementation retained |
-| 017 | `plans/closure/i2pcontrol-proposal-170/017-closure.md` and `017-closure-invalidation.md` | closure invalidated; historical evidence only |
-| 018 | `plans/implementation/i2pcontrol-proposal-170/018-exact-wire-contract-reconciliation.md` | closing; frozen head `ea35de9`; disposition recorded |
-| 019 | `plans/implementation/i2pcontrol-proposal-170/019-pinned-revision-independent-reclosure.md` | ready final gate |
+| Record | Current disposition |
+|---|---|
+| `plans/closure/i2pcontrol-proposal-170/014-closure.md` | implementation evidence retained |
+| `plans/closure/i2pcontrol-proposal-170/015-closure.md` | invalid historical closure |
+| `plans/closure/i2pcontrol-proposal-170/016-implementation-disposition.md` | bounded SAM implementation retained |
+| `plans/closure/i2pcontrol-proposal-170/017-closure.md` plus invalidation | historical component evidence only |
+| `plans/closure/i2pcontrol-proposal-170/018-implementation-disposition.md` | corrective pass required |
+| M018A plan | sole ready implementation handoff |
+| original M019 plan | superseded and non-executable |
+| M019A plan | blocked final internal gate |
 
 ## Registry maintenance rules
 
-1. M018 implementation is frozen; M019 is the active independent review handoff.
-2. Keep final Proposal 170 subsystem closure pending until M019 completes its pinned-revision review.
-3. Do not count compatibility aliases, legacy/base keys, unavailable sources, or unsupported runtimes as canonical operational coverage.
-4. Preserve M017 and its invalidation as history; do not rewrite M017 into passing evidence.
-5. If the open Proposal 170 source changes, rebase the contract manifest before closure.
-6. Move M018 to `closing` and M019 to `ready` only after all applicable M018 acceptance criteria land.
-7. M019 must use a distinct auditable reviewer and independently compare literal fixtures to the pinned source.
-8. Any high/medium M019 finding returns to M018 when it fits that boundary; do not create another milestone for the same defects.
-9. Final status may be `closed against pinned revision` only with zero unresolved high/medium findings.
+1. Execute only M018A.
+2. Keep M019A blocked until M018A freezes a complete implementation/test head and records `018a-implementation-disposition.md`.
+3. Never execute the superseded M019 plan.
+4. Do not count base protocol, compatibility aliases, unavailable sources, or unsupported runtimes as canonical operational coverage.
+5. Preserve historical closure and invalidation records rather than rewriting them into passing evidence.
+6. If the Open proposal changes, rebase the internal contract manifest without contacting or submitting to upstream.
+7. M019A must use a distinct auditable internal reviewer and perform read-only source verification.
+8. Any high/medium M019A finding returns to M018A when it fits that boundary.
+9. Final status may be `closed internally against pinned revision` only with zero unresolved high/medium findings and a no-upstream compliance attestation.
 10. Verification remains local and package-scoped; remote CI is not required.
-11. Do not expand this corrective line into CI, release, broad security, missing tunnel runtime, or generic framework work.
+11. No plan may initiate, prepare, request, or imply upstream submission, review, adoption, or merge.

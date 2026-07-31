@@ -155,7 +155,7 @@ M026 bounded core inspection for feasible remaining selectors
 M027 conformance and independent reclosure
 ```
 
-M020 is ready. M021 depends hard on M020 because standard token removal and request parsing affect TunnelManager fixtures. M022 and M023 depend hard on M021's corrected shared tunnel/address model only where they consume it; they may otherwise execute in parallel after M021. M024 depends on M023's final ClientServicesInfo ownership. M025 depends on M020, M022, and M023. M026 depends on M025's exact source matrix. M027 depends on every implementation milestone reaching a frozen disposition.
+M020 is closed. M021 depended hard on M020 because standard token removal and request parsing affect TunnelManager fixtures, so M021 is now ready. M022 and M023 depend hard on M021's corrected shared tunnel/address model only where they consume it; they may otherwise execute in parallel after M021. M024 depends on M023's final ClientServicesInfo ownership. M025 depends on M020, M022, and M023. M026 depends on M025's exact source matrix. M027 depends on every implementation milestone reaching a frozen disposition.
 
 ## 8. Milestones
 
@@ -163,7 +163,7 @@ M020 is ready. M021 depends hard on M020 because standard token removal and requ
 
 Plan: `020-base-i2pcontrol-and-jsonrpc-interoperability.md`
 
-Status: ready
+Status: closed
 
 Objective:
 
@@ -182,7 +182,7 @@ Exit: literal existing-I2PControl fixtures and Proposal 170 requests work throug
 
 Plan: `021-tunnelmanager-wire-atomicity-and-secrets.md`
 
-Status: blocked on M020
+Status: ready
 
 Objective:
 
@@ -372,8 +372,8 @@ Use focused test filters named in each plan before broad package tests. Use touc
 | M001–M018A | historical implementation evidence | retained only as referenced |
 | M019 | superseded | non-executable |
 | M019A | invalidated closure | historical evidence; see `019a-closure-invalidation.md` |
-| M020 | ready | next executable handoff |
-| M021 | blocked | hard dependency M020 |
+| M020 | closed | `plans/closure/i2pcontrol-proposal-170/020-closure.md` |
+| M021 | ready | next executable handoff; hard dependency M020 is closed |
 | M022 | blocked | hard dependencies M020 and M021 |
 | M023 | blocked | hard dependency M021 |
 | M024 | blocked | hard dependency M023 |

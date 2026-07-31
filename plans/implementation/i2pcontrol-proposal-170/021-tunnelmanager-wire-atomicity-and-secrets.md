@@ -1,6 +1,6 @@
 # M021 — TunnelManager Exact Wire, Atomic Persistence, and Secret Boundary
 
-Status: blocked
+Status: ready
 
 Primary class: capability/invariant corrective pass
 

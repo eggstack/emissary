@@ -1,6 +1,6 @@
 # M020 — Base I2PControl and JSON-RPC Interoperability
 
-Status: ready
+Status: closed
 
 Primary class: invariant/capability corrective pass
 

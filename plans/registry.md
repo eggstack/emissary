@@ -27,13 +27,13 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M020 ready | M019A closure invalidated; exact base interoperability and method/source corrections required |
+| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M021 ready | M020 closed; method/source corrections remain |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M020 — Base I2PControl and JSON-RPC interoperability | ready | `plans/implementation/i2pcontrol-proposal-170/020-base-i2pcontrol-and-jsonrpc-interoperability.md` | none |
+| I2PControl Proposal 170 | M021 — TunnelManager exact wire, atomic persistence, and secret boundary | ready | `plans/implementation/i2pcontrol-proposal-170/021-tunnelmanager-wire-atomicity-and-secrets.md` | M020 closed |
 
 ## Registered successor handoffs
 
@@ -41,7 +41,6 @@ These plans are complete handoffs but are not executable until their hard depend
 
 | Subsystem | Handoff | Status | Implementation plan | Hard dependency |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M021 — TunnelManager exact wire, atomic persistence, and secret boundary | blocked | `plans/implementation/i2pcontrol-proposal-170/021-tunnelmanager-wire-atomicity-and-secrets.md` | M020 |
 | I2PControl Proposal 170 | M022 — AddressBook runtime bridge and canonical source reconciliation | blocked | `plans/implementation/i2pcontrol-proposal-170/022-addressbook-runtime-bridge.md` | M020, M021 |
 | I2PControl Proposal 170 | M023 — Startup tunnel inventory and ClientServicesInfo truthfulness | blocked | `plans/implementation/i2pcontrol-proposal-170/023-startup-tunnel-inventory-and-client-services.md` | M021 |
 | I2PControl Proposal 170 | M024 — Recoverable bounded SAM observation | blocked | `plans/implementation/i2pcontrol-proposal-170/024-recoverable-bounded-sam-observation.md` | M023 |
@@ -53,7 +52,13 @@ These plans are complete handoffs but are not executable until their hard depend
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| — | None | — | — | M019A is invalidated; no closure work is active until implementation dispositions land |
+| — | None | — | — | M019A is invalidated; no closure work is active |
+
+## Recently closed milestones
+
+| Subsystem | Milestone | Status | Closure record |
+|---|---|---|---|
+| I2PControl Proposal 170 | M020 — Base I2PControl and JSON-RPC interoperability | closed | `plans/closure/i2pcontrol-proposal-170/020-closure.md` |
 
 ## Historical invalidation and supersession
 
@@ -67,11 +72,11 @@ These plans are complete handoffs but are not executable until their hard depend
 
 | Finding group | Severity | Owner | State |
 |---|---|---|---|
-| Standard I2PControl auth/token/error incompatibility | high | M020 | ready |
-| JSON-RPC notification and request-ID correctness | high | M020 | ready |
-| Direct base RouterInfo compatibility after token removal | high | M020 | ready |
-| Canonical TunnelManager `get` schema and validation | high | M021 | blocked on M020 |
-| Non-atomic tunnel rename and secret handling | high | M021 | blocked on M020 |
+| Standard I2PControl auth/token/error incompatibility | high | M020 | resolved |
+| JSON-RPC notification and request-ID correctness | high | M020 | resolved |
+| Direct base RouterInfo compatibility after token removal | high | M020 | resolved |
+| Canonical TunnelManager `get` schema and validation | high | M021 | ready |
+| Non-atomic tunnel rename and secret handling | high | M021 | ready |
 | AddressBook disconnected administrative shadow | high | M022 | blocked on M020/M021 |
 | Startup tunnel inventory and stale proxy state | high/medium | M023 | blocked on M021 |
 | Sticky SAM observation overflow | medium | M024 | blocked on M023 |
@@ -140,7 +145,7 @@ A changed proposal revision blocks M027 until the contract matrix and fixtures a
 
 ## Registry maintenance rules
 
-1. M020 is the only dependency-ready implementation plan at registration time.
+1. Only the next dependency-ready implementation plan is listed in the dependency-ready table.
 2. Move a successor to `ready` only after every named hard dependency has an accepted implementation disposition.
 3. Every implementation milestone must create a disposition before unblocking its successor.
 4. Never execute superseded M019 or treat invalidated M019A as current closure.

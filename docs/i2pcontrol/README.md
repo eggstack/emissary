@@ -76,17 +76,11 @@ I2PControl is served over HTTPS. Certificate behavior:
 
 **No plaintext HTTP fallback is supported.**
 
-## Authentication corrective notice
+## Authentication
 
-The existing I2PControl contract authenticates with `API` and `Password`, returns a numeric `API` and a `Token`, and expects that token in the `params` object of subsequent protected requests.
-
-The current Emissary implementation does not yet conform fully to that flow: it requires a nonstandard username, serializes `API` as a string, and primarily accepts the token through `X-I2PControl-Token`.
-
-M020 owns the correction:
-
-- `plans/implementation/i2pcontrol-proposal-170/020-base-i2pcontrol-and-jsonrpc-interoperability.md`
-
-Until M020 lands, the following current implementation example describes the existing compatibility behavior, not the intended canonical contract:
+Emissary follows the I2PControl authentication flow: `Authenticate` accepts
+`API` and `Password`, returns a string `Token` and numeric `API`, and protected
+requests place that token in `params.Token`.
 
 ```json
 {
@@ -94,7 +88,6 @@ Until M020 lands, the following current implementation example describes the exi
   "method": "Authenticate",
   "params": {
     "API": 2,
-    "Username": "i2pcontrol",
     "Password": "your-password"
   },
   "id": 1
@@ -109,12 +102,36 @@ Current success response:
   "id": 1,
   "result": {
     "Token": "hex-encoded-token",
-    "API": "2"
+    "API": 2
   }
 }
 ```
 
-Current protected requests use `X-I2PControl-Token`. M020 will restore standard `params.Token` and retain the header only as a separately documented compatibility extension if it remains unambiguous.
+Subsequent protected requests include `Token` with their method parameters:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "RouterInfo",
+  "params": {
+    "Token": "hex-encoded-token",
+    "i2p.router.version": true
+  },
+  "id": 2
+}
+```
+
+`X-I2PControl-Token` remains a compatibility-only transport. If both forms
+are present, they must match; the header never overrides `params.Token`.
+
+Authentication failures use the standard I2PControl-specific error inventory:
+missing password (`-32001`), missing token (`-32002`), unknown token
+(`-32003`), missing API version (`-32005`), and unsupported API version
+(`-32006`). Token state is in-memory only, so restart invalidates all tokens.
+
+Notifications execute normal authentication, validation, and handler side
+effects but return HTTP `204 No Content`. An explicit `id: null` is retained as
+a response ID and is not treated as a notification.
 
 ### Token behavior retained for review
 

@@ -8,7 +8,6 @@ pub fn valid_authenticate_request(id: Value) -> Value {
         "method": "Authenticate",
         "params": {
             "API": 2,
-            "Username": "i2pcontrol",
             "Password": "test-password"
         },
         "id": id
@@ -97,7 +96,6 @@ pub fn string_id() -> Value {
         "method": "Authenticate",
         "params": {
             "API": 2,
-            "Username": "i2pcontrol",
             "Password": "test-password"
         },
         "id": "abc-123"
@@ -112,14 +110,13 @@ pub fn wrong_api_version() -> Value {
         "method": "Authenticate",
         "params": {
             "API": 3,
-            "Username": "i2pcontrol",
             "Password": "test-password"
         },
         "id": 1
     })
 }
 
-/// Authenticate with wrong username.
+/// Authenticate with a legacy username compatibility field.
 #[allow(dead_code)]
 pub fn wrong_username() -> Value {
     json!({
@@ -127,7 +124,7 @@ pub fn wrong_username() -> Value {
         "method": "Authenticate",
         "params": {
             "API": 2,
-            "Username": "wrong",
+            "Username": "legacy-client",
             "Password": "test-password"
         },
         "id": 1
@@ -142,7 +139,6 @@ pub fn wrong_password() -> Value {
         "method": "Authenticate",
         "params": {
             "API": 2,
-            "Username": "i2pcontrol",
             "Password": "wrong-password"
         },
         "id": 1

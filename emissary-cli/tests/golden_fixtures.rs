@@ -40,7 +40,6 @@ fn fixture_authenticate_request_structure() {
         "method": "Authenticate",
         "params": {
             "API": 2,
-            "Username": "i2pcontrol",
             "Password": "fixture-password-REDACTED"
         },
         "id": 1
@@ -50,7 +49,7 @@ fn fixture_authenticate_request_structure() {
     assert!(parsed.params.is_some());
     let params = parsed.params.unwrap();
     assert_eq!(params.get("API"), Some(&json!(2)));
-    assert_eq!(params.get("Username"), Some(&json!("i2pcontrol")));
+    assert!(!params.contains_key("Username"));
     assert!(params.get("Password").is_some());
 }
 
@@ -61,7 +60,7 @@ fn fixture_authenticate_success_envelope() {
         "id": 1,
         "result": {
             "Token": "fixture-token-REDACTED",
-            "API": "2"
+            "API": 2
         }
     });
     // Envelope must have exactly jsonrpc, id, result — no extra keys
@@ -83,8 +82,8 @@ fn fixture_authenticate_success_envelope() {
     // Token must be a non-empty string
     let token = result.get("Token").unwrap().as_str().unwrap();
     assert!(!token.is_empty());
-    // API must be a string
-    assert!(result.get("API").unwrap().is_string());
+    // API must be a JSON number
+    assert!(result.get("API").unwrap().is_number());
 }
 
 #[test]
@@ -93,8 +92,8 @@ fn fixture_authenticate_error_envelope() {
         "jsonrpc": "2.0",
         "id": 1,
         "error": {
-            "code": -1,
-            "message": "Invalid username or password"
+            "code": -32001,
+            "message": "Invalid password provided"
         }
     });
     let obj = resp.as_object().unwrap();
@@ -105,7 +104,7 @@ fn fixture_authenticate_error_envelope() {
     );
 
     let error = obj.get("error").unwrap().as_object().unwrap();
-    assert_eq!(error.get("code"), Some(&json!(-1)));
+    assert_eq!(error.get("code"), Some(&json!(-32001)));
     assert!(error.get("message").unwrap().is_string());
 }
 
@@ -559,11 +558,11 @@ fn fixture_error_internal_error() {
 fn fixture_error_auth_failure() {
     let err = emissary_cli::i2pcontrol::rpc::JsonRpcErrorResponse::new(
         emissary_cli::i2pcontrol::rpc::RequestId::Null,
-        emissary_cli::i2pcontrol::rpc::error_codes::APP_ERROR,
-        "Invalid username or password",
+        emissary_cli::i2pcontrol::rpc::error_codes::INVALID_PASSWORD,
+        emissary_cli::i2pcontrol::rpc::error_codes::INVALID_PASSWORD_MESSAGE,
     );
     let json = serde_json::to_value(&err).unwrap();
-    assert_eq!(json["error"]["code"], -1);
+    assert_eq!(json["error"]["code"], -32001);
 }
 
 // ──────────────────────────────────────────────────────────────────────

@@ -221,7 +221,6 @@ fn large_string_in_params() {
         "method": "Authenticate",
         "params": {
             "API": 2,
-            "Username": "i2pcontrol",
             "Password": large_string
         },
         "id": 1
@@ -233,7 +232,7 @@ fn large_string_in_params() {
         Ok(parsed) => {
             assert_eq!(parsed.method, "Authenticate");
             let params = parsed.params.unwrap();
-            assert_eq!(params.len(), 3);
+            assert_eq!(params.len(), 2);
         }
         Err(err) => {
             // If rejected, must be a specific error
@@ -332,10 +331,8 @@ fn error_response_with_data() {
 
 #[test]
 fn success_response_has_exact_structure() {
-    let resp = rpc::JsonRpcSuccess::new(
-        rpc::RequestId::Number(1),
-        json!({"Token": "abc", "API": "2"}),
-    );
+    let resp =
+        rpc::JsonRpcSuccess::new(rpc::RequestId::Number(1), json!({"Token": "abc", "API": 2}));
     let json = serde_json::to_value(&resp).unwrap();
     let obj = json.as_object().unwrap();
 
@@ -580,7 +577,7 @@ fn canary_not_in_error_with_data() {
 
 #[test]
 fn token_not_in_parse_error_messages() {
-    let body = r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Username":"i2pcontrol","Password":"my-secret-token"},"id":1}"#;
+    let body = r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Password":"my-secret-token"},"id":1}"#;
     let result = rpc::parse_request(body);
     if let Err(err) = result {
         let msg = err.error.message.to_lowercase();
@@ -978,12 +975,12 @@ async fn tls_connect_and_request(
     String::from_utf8(body_buf).map_err(|e| format!("utf8: {e}"))
 }
 
-/// Async helper: connect via TLS with a custom token header.
+/// Async helper: connect via TLS with the canonical params.Token transport.
 async fn tls_connect_with_token(
     connector: &TlsConnector,
     addr: std::net::SocketAddr,
     method: &str,
-    params: serde_json::Value,
+    mut params: serde_json::Value,
     token: &str,
 ) -> Result<String, String> {
     let tcp = TcpStream::connect(addr).await.map_err(|e| format!("tcp connect: {e}"))?;
@@ -991,6 +988,10 @@ async fn tls_connect_with_token(
         .map_err(|e| format!("server name: {e}"))?;
     let mut tls = connector.connect(domain, tcp).await.map_err(|e| format!("tls connect: {e}"))?;
 
+    params
+        .as_object_mut()
+        .ok_or_else(|| "protected params must be an object".to_string())?
+        .insert("Token".to_string(), serde_json::json!(token));
     let body = serde_json::json!({
         "jsonrpc": "2.0",
         "method": method,
@@ -999,7 +1000,7 @@ async fn tls_connect_with_token(
     });
     let body_str = body.to_string();
     let request = format!(
-        "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nX-I2PControl-Token: {token}\r\nContent-Length: {}\r\n\r\n{}",
+        "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
         body_str.len(),
         body_str
     );
@@ -1069,7 +1070,7 @@ async fn tls_connection_bound_enforced() {
         &connector,
         addr,
         "Authenticate",
-        serde_json::json!({"API": 2, "Username": "i2pcontrol", "Password": "testpass"}),
+        serde_json::json!({"API": 2, "Password": "testpass"}),
     )
     .await
     .unwrap();
@@ -1105,7 +1106,7 @@ async fn tls_client_authenticates_and_dispatches() {
         &connector,
         addr,
         "Authenticate",
-        serde_json::json!({"API": 2, "Username": "i2pcontrol", "Password": "testpass"}),
+        serde_json::json!({"API": 2, "Password": "testpass"}),
     )
     .await
     .unwrap();
@@ -1175,7 +1176,7 @@ async fn plaintext_rejected_by_tls_server() {
         let body = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "Authenticate",
-            "params": {"API": 2, "Username": "i2pcontrol", "Password": "testpass"},
+            "params": {"API": 2, "Password": "testpass"},
             "id": 1,
         });
         let body_str = body.to_string();

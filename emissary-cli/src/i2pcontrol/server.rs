@@ -1055,114 +1055,62 @@ pub(crate) async fn handle_jsonrpc(
         Err(err) => return Json(serde_json::to_value(&err).unwrap()).into_response(),
     };
 
-    // Handle notification (null ID) — no response
-    if request.id.is_none() || request.id == Some(RequestId::Null) {
-        return StatusCode::NO_CONTENT.into_response();
-    }
-
-    // Dispatch the method
-    let response = match request.method.as_str() {
-        rpc::methods::AUTHENTICATE => handle_authenticate(&state, &request).await,
-        rpc::methods::ADDRESS_BOOK => {
-            let token = extract_token(&headers);
-            if !state.token_service.validate(token) {
-                serde_json::to_value(JsonRpcErrorResponse::new(
-                    resolve_id(&request.id),
-                    rpc::error_codes::APP_ERROR,
-                    "Authentication required",
-                ))
-                .unwrap()
-            } else {
-                super::address_book::handle_address_book(&state, &request).await
-            }
-        }
-        rpc::methods::SET_SUBSCRIPTIONS => {
-            let token = extract_token(&headers);
-            if !state.token_service.validate(token) {
-                serde_json::to_value(JsonRpcErrorResponse::new(
-                    resolve_id(&request.id),
-                    rpc::error_codes::APP_ERROR,
-                    "Authentication required",
-                ))
-                .unwrap()
-            } else {
-                super::address_book::handle_set_subscriptions(&state, &request).await
-            }
-        }
-        rpc::methods::SET_CONFIG => {
-            let token = extract_token(&headers);
-            if !state.token_service.validate(token) {
-                serde_json::to_value(JsonRpcErrorResponse::new(
-                    resolve_id(&request.id),
-                    rpc::error_codes::APP_ERROR,
-                    "Authentication required",
-                ))
-                .unwrap()
-            } else {
-                super::address_book::handle_set_config(&state, &request).await
-            }
-        }
-        rpc::methods::TUNNEL_MANAGER => {
-            let token = extract_token(&headers);
-            if !state.token_service.validate(token) {
-                serde_json::to_value(JsonRpcErrorResponse::new(
-                    resolve_id(&request.id),
-                    rpc::error_codes::APP_ERROR,
-                    "Authentication required",
-                ))
-                .unwrap()
-            } else {
-                super::tunnel_manager::handle_tunnel_manager(&state, &request).await
-            }
-        }
-        rpc::methods::ROUTER_INFO => {
-            let token = extract_token(&headers);
-            if !state.token_service.validate(token) {
-                serde_json::to_value(JsonRpcErrorResponse::new(
-                    resolve_id(&request.id),
-                    rpc::error_codes::APP_ERROR,
-                    "Authentication required",
-                ))
-                .unwrap()
-            } else {
-                super::router_info_handler::handle_router_info(&state, &request).await
-            }
-        }
-        rpc::methods::CLIENT_SERVICES_INFO => {
-            let token = extract_token(&headers);
-            if !state.token_service.validate(token) {
-                serde_json::to_value(JsonRpcErrorResponse::new(
-                    resolve_id(&request.id),
-                    rpc::error_codes::APP_ERROR,
-                    "Authentication required",
-                ))
-                .unwrap()
-            } else {
-                super::client_services::handle_client_services_info(&state, &request).await
-            }
-        }
-        _ => {
-            // Unknown method — check token first for protected methods
-            let token = extract_token(&headers);
-            if !state.token_service.validate(token) {
-                serde_json::to_value(JsonRpcErrorResponse::new(
-                    resolve_id(&request.id),
-                    rpc::error_codes::APP_ERROR,
-                    "Authentication required",
-                ))
-                .unwrap()
-            } else {
-                serde_json::to_value(JsonRpcErrorResponse::new(
-                    resolve_id(&request.id),
-                    rpc::error_codes::METHOD_NOT_FOUND,
-                    format!("Method '{}' not found", request.method),
-                ))
-                .unwrap()
-            }
+    // Authenticate before method-specific selector/config parsing. The
+    // protected dispatcher receives a sanitized request with Token removed.
+    let response = if request.method == rpc::methods::AUTHENTICATE {
+        handle_authenticate(&state, &request).await
+    } else {
+        match authenticate_protected_request(&state, &headers, &request) {
+            Ok(request) => dispatch_protected(&state, &request).await,
+            Err(error) => serde_json::to_value(error).unwrap(),
         }
     };
 
-    Json(response).into_response()
+    // Execute notifications through the same path as ordinary requests, then
+    // suppress the response. Explicit JSON null remains a response ID and is
+    // therefore not treated as a notification.
+    let dispatch = DispatchResult {
+        response,
+        emit_response: !request.is_notification(),
+    };
+    if dispatch.emit_response {
+        Json(dispatch.response).into_response()
+    } else {
+        StatusCode::NO_CONTENT.into_response()
+    }
+}
+
+/// Result of the common dispatch path. Keeping response emission separate
+/// ensures notification execution cannot bypass authentication, validation,
+/// resource limits, or handler side effects.
+struct DispatchResult {
+    response: serde_json::Value,
+    emit_response: bool,
+}
+
+async fn dispatch_protected(
+    state: &I2pControlState,
+    request: &JsonRpcRequest,
+) -> serde_json::Value {
+    match request.method.as_str() {
+        rpc::methods::ADDRESS_BOOK =>
+            super::address_book::handle_address_book(state, request).await,
+        rpc::methods::SET_SUBSCRIPTIONS =>
+            super::address_book::handle_set_subscriptions(state, request).await,
+        rpc::methods::SET_CONFIG => super::address_book::handle_set_config(state, request).await,
+        rpc::methods::TUNNEL_MANAGER =>
+            super::tunnel_manager::handle_tunnel_manager(state, request).await,
+        rpc::methods::ROUTER_INFO =>
+            super::router_info_handler::handle_router_info(state, request).await,
+        rpc::methods::CLIENT_SERVICES_INFO =>
+            super::client_services::handle_client_services_info(state, request).await,
+        _ => serde_json::to_value(JsonRpcErrorResponse::new(
+            resolve_id(&request.id),
+            rpc::error_codes::METHOD_NOT_FOUND,
+            format!("Method '{}' not found", request.method),
+        ))
+        .unwrap(),
+    }
 }
 
 /// Handle the Authenticate method.
@@ -1201,31 +1149,26 @@ async fn handle_authenticate(
         }
     };
 
-    // Validate API version
+    // Missing and unsupported API versions are distinct I2PControl errors.
     let api_version = match params.api {
-        Some(v) if auth::validate_api_version(v) => v,
-        _ => {
+        None => {
             return serde_json::to_value(JsonRpcErrorResponse::new(
                 id,
-                rpc::error_codes::INVALID_PARAMS,
-                "Invalid or missing API version (must be 1 or 2)",
+                rpc::error_codes::UNSPECIFIED_API_VERSION,
+                rpc::error_codes::UNSPECIFIED_API_VERSION_MESSAGE,
+            ))
+            .unwrap();
+        }
+        Some(v) if auth::validate_api_version(v) => v,
+        Some(_) => {
+            return serde_json::to_value(JsonRpcErrorResponse::new(
+                id,
+                rpc::error_codes::UNSUPPORTED_API_VERSION,
+                rpc::error_codes::UNSUPPORTED_API_VERSION_MESSAGE,
             ))
             .unwrap();
         }
     };
-
-    // Validate username
-    match params.username.as_deref() {
-        Some("i2pcontrol") => {}
-        _ => {
-            return serde_json::to_value(JsonRpcErrorResponse::new(
-                id,
-                rpc::error_codes::APP_ERROR,
-                "Invalid username or password",
-            ))
-            .unwrap();
-        }
-    }
 
     // Validate password
     let password = match params.password.as_deref() {
@@ -1233,8 +1176,8 @@ async fn handle_authenticate(
         None => {
             return serde_json::to_value(JsonRpcErrorResponse::new(
                 id,
-                rpc::error_codes::APP_ERROR,
-                "Invalid username or password",
+                rpc::error_codes::INVALID_PASSWORD,
+                rpc::error_codes::INVALID_PASSWORD_MESSAGE,
             ))
             .unwrap();
         }
@@ -1243,8 +1186,8 @@ async fn handle_authenticate(
     if !auth::compare_passwords(password, &state.password) {
         return serde_json::to_value(JsonRpcErrorResponse::new(
             id,
-            rpc::error_codes::APP_ERROR,
-            "Invalid username or password",
+            rpc::error_codes::INVALID_PASSWORD,
+            rpc::error_codes::INVALID_PASSWORD_MESSAGE,
         ))
         .unwrap();
     }
@@ -1261,18 +1204,63 @@ async fn handle_authenticate(
         id,
         serde_json::to_value(AuthenticateResult {
             Token: token,
-            API: api_version.to_string(),
+            API: api_version,
         })
         .unwrap(),
     ))
     .unwrap()
 }
 
-/// Extract the token from the request headers.
-///
-/// I2PControl uses the `X-I2PControl-Token` header for authentication.
-fn extract_token(headers: &HeaderMap) -> &str {
-    headers.get("X-I2PControl-Token").and_then(|v| v.to_str().ok()).unwrap_or("")
+/// Authenticate a protected request and remove authentication metadata before
+/// method-specific validation. The header remains a compatibility extension;
+/// an explicit params.Token always takes precedence and conflicts fail closed.
+fn authenticate_protected_request(
+    state: &I2pControlState,
+    headers: &HeaderMap,
+    request: &JsonRpcRequest,
+) -> Result<JsonRpcRequest, JsonRpcErrorResponse> {
+    let id = resolve_id(&request.id);
+    let parameter_token = request
+        .params
+        .as_ref()
+        .and_then(|params| params.get("Token"))
+        .map(|value| value.as_str().map(str::to_owned));
+    let header_token = headers
+        .get("X-I2PControl-Token")
+        .map(|value| value.to_str().ok().map(str::to_owned));
+
+    let token = match (parameter_token, header_token) {
+        (None, None) => {
+            return Err(JsonRpcErrorResponse::new(
+                id,
+                rpc::error_codes::NO_TOKEN,
+                rpc::error_codes::NO_TOKEN_MESSAGE,
+            ));
+        }
+        (Some(Some(token)), None) | (None, Some(Some(token))) => token,
+        (Some(Some(parameter)), Some(Some(header))) if parameter == header => parameter,
+        _ => {
+            return Err(JsonRpcErrorResponse::new(
+                id,
+                rpc::error_codes::INVALID_TOKEN,
+                rpc::error_codes::INVALID_TOKEN_MESSAGE,
+            ));
+        }
+    };
+
+    if !state.token_service.validate(&token) {
+        return Err(JsonRpcErrorResponse::new(
+            id,
+            rpc::error_codes::INVALID_TOKEN,
+            rpc::error_codes::INVALID_TOKEN_MESSAGE,
+        ));
+    }
+
+    let mut sanitized = request.clone();
+    if let Some(params) = sanitized.params.as_mut() {
+        params.remove("Token");
+    }
+    Ok(sanitized)
 }
 
 #[cfg(test)]
@@ -1312,20 +1300,6 @@ mod tests {
     }
 
     #[test]
-    fn extract_token_from_headers() {
-        let mut headers = HeaderMap::new();
-        let name: axum::http::HeaderName = "x-i2pcontrol-token".parse().unwrap();
-        headers.insert(name, "test-token-123".parse().unwrap());
-        assert_eq!(extract_token(&headers), "test-token-123");
-    }
-
-    #[test]
-    fn extract_token_missing() {
-        let headers = HeaderMap::new();
-        assert_eq!(extract_token(&headers), "");
-    }
-
-    #[test]
     fn resolve_id_returns_id() {
         assert_eq!(
             resolve_id(&Some(RequestId::Number(1))),
@@ -1336,6 +1310,187 @@ mod tests {
     #[test]
     fn resolve_id_defaults_to_null() {
         assert_eq!(resolve_id(&None), RequestId::Null);
+    }
+
+    fn request(method: &str, params: serde_json::Value, id: Option<RequestId>) -> JsonRpcRequest {
+        JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            method: method.to_string(),
+            params: params.as_object().cloned(),
+            id,
+        }
+    }
+
+    #[tokio::test]
+    async fn authenticate_uses_standard_params_and_numeric_api() {
+        let state = I2pControlState::new_test("testpass".to_string());
+        let response = handle_authenticate(
+            &state,
+            &request(
+                rpc::methods::AUTHENTICATE,
+                serde_json::json!({"API": 2, "Password": "testpass"}),
+                Some(RequestId::Number(7)),
+            ),
+        )
+        .await;
+
+        assert_eq!(response["result"]["API"], 2);
+        assert!(response["result"]["API"].is_number());
+        assert!(response["result"]["Token"].is_string());
+        assert!(!response["result"]["Token"].as_str().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn authenticate_distinguishes_password_and_api_errors() {
+        let state = I2pControlState::new_test("testpass".to_string());
+
+        let missing_password = handle_authenticate(
+            &state,
+            &request(
+                rpc::methods::AUTHENTICATE,
+                serde_json::json!({"API": 2}),
+                Some(RequestId::Number(1)),
+            ),
+        )
+        .await;
+        assert_eq!(
+            missing_password["error"]["code"],
+            rpc::error_codes::INVALID_PASSWORD
+        );
+        assert_eq!(
+            missing_password["error"]["message"],
+            rpc::error_codes::INVALID_PASSWORD_MESSAGE
+        );
+
+        let missing_api = handle_authenticate(
+            &state,
+            &request(
+                rpc::methods::AUTHENTICATE,
+                serde_json::json!({"Password": "testpass"}),
+                Some(RequestId::Number(2)),
+            ),
+        )
+        .await;
+        assert_eq!(
+            missing_api["error"]["code"],
+            rpc::error_codes::UNSPECIFIED_API_VERSION
+        );
+
+        let unsupported_api = handle_authenticate(
+            &state,
+            &request(
+                rpc::methods::AUTHENTICATE,
+                serde_json::json!({"API": 3, "Password": "testpass"}),
+                Some(RequestId::Number(3)),
+            ),
+        )
+        .await;
+        assert_eq!(
+            unsupported_api["error"]["code"],
+            rpc::error_codes::UNSUPPORTED_API_VERSION
+        );
+
+        let wrong_password = handle_authenticate(
+            &state,
+            &request(
+                rpc::methods::AUTHENTICATE,
+                serde_json::json!({"API": 2, "Password": "wrong-secret"}),
+                Some(RequestId::Number(4)),
+            ),
+        )
+        .await;
+        assert_eq!(
+            wrong_password["error"]["code"],
+            rpc::error_codes::INVALID_PASSWORD
+        );
+        assert!(!wrong_password.to_string().contains("wrong-secret"));
+    }
+
+    #[tokio::test]
+    async fn protected_authentication_sanitizes_params_and_supports_base_router_info() {
+        let router_info = FakeRouterInfoControl::new();
+        router_info.set_version("Emissary test".to_string());
+        let mut state = I2pControlState::new_test("testpass".to_string());
+        state.set_router_info(Box::new(router_info));
+        let token = state.token_service().issue();
+        let original = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"Token": token, "i2p.router.version": false}),
+            Some(RequestId::Number(1)),
+        );
+        let sanitized = authenticate_protected_request(&state, &HeaderMap::new(), &original)
+            .expect("params.Token should authenticate");
+        assert!(!sanitized.params.as_ref().unwrap().contains_key("Token"));
+        assert!(sanitized.params.as_ref().unwrap().contains_key("i2p.router.version"));
+
+        let response = dispatch_protected(&state, &sanitized).await;
+        assert_eq!(response["result"]["i2p.router.version"], "Emissary test");
+    }
+
+    #[tokio::test]
+    async fn protected_authentication_distinguishes_missing_unknown_and_conflicting_tokens() {
+        let state = I2pControlState::new_test("testpass".to_string());
+        let base_request = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"i2p.router.version": true}),
+            Some(RequestId::Number(1)),
+        );
+        let missing =
+            authenticate_protected_request(&state, &HeaderMap::new(), &base_request).unwrap_err();
+        assert_eq!(missing.error.code, rpc::error_codes::NO_TOKEN);
+
+        let unknown = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"Token": "unknown", "i2p.router.version": true}),
+            Some(RequestId::Number(2)),
+        );
+        let unknown =
+            authenticate_protected_request(&state, &HeaderMap::new(), &unknown).unwrap_err();
+        assert_eq!(unknown.error.code, rpc::error_codes::INVALID_TOKEN);
+        assert!(!unknown.error.message.contains("unknown"));
+
+        let token = state.token_service().issue();
+        let mut headers = HeaderMap::new();
+        headers.insert("X-I2PControl-Token", "different".parse().unwrap());
+        let conflict = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"Token": token, "i2p.router.version": true}),
+            Some(RequestId::Number(3)),
+        );
+        let conflict = authenticate_protected_request(&state, &headers, &conflict).unwrap_err();
+        assert_eq!(conflict.error.code, rpc::error_codes::INVALID_TOKEN);
+
+        let header_only = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"i2p.router.version": true}),
+            Some(RequestId::Number(4)),
+        );
+        headers.insert("X-I2PControl-Token", token.parse().unwrap());
+        assert!(authenticate_protected_request(&state, &headers, &header_only).is_ok());
+    }
+
+    #[tokio::test]
+    async fn notifications_execute_then_suppress_success_and_error_responses() {
+        let state = Arc::new(I2pControlState::new_for_test("testpass".to_string()));
+        let success = handle_jsonrpc(
+            State(Arc::clone(&state)),
+            HeaderMap::new(),
+            r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Password":"testpass"}}"#
+                .to_string(),
+        )
+        .await;
+        assert_eq!(success.status(), StatusCode::NO_CONTENT);
+        assert_eq!(state.token_service().count(), 1);
+
+        let error = handle_jsonrpc(
+            State(Arc::clone(&state)),
+            HeaderMap::new(),
+            r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Password":"wrong"}}"#
+                .to_string(),
+        )
+        .await;
+        assert_eq!(error.status(), StatusCode::NO_CONTENT);
+        assert_eq!(state.token_service().count(), 1);
     }
 
     // --- M008 composition and provenance tests ---

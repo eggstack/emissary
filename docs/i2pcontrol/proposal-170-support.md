@@ -46,23 +46,20 @@ Retained candidate implementation includes:
 - live event counters and log ring sources;
 - explicit unavailable/unsupported behavior in several paths.
 
-Material corrective work remains in M020–M027.
+Material corrective work remains in M021–M027.
 
 ## Base I2PControl/JSON-RPC
 
-Current status: corrective pass required
+Current status: implementation complete; closure recorded in M020.
 
-Known defects:
+M020 establishes canonical `API`/`Password` authentication, numeric `API`
+responses, standard `params.Token` extraction with the header retained only as
+an unambiguous compatibility path, distinct I2PControl authentication and
+version errors, notification execution with response suppression, strict
+request-ID validation, and direct base RouterInfo selector compatibility.
 
-- canonical authentication requires a nonstandard username;
-- successful `API` is returned as a string rather than a number;
-- protected methods require a header token instead of standard `params.Token`;
-- I2PControl-specific missing/unknown/version/password errors are not distinguished;
-- notifications are discarded without executing the operation;
-- invalid request IDs may be coerced;
-- direct base RouterInfo compatibility is not preserved cleanly alongside Proposal 170 additions.
-
-Owner: M020.
+The subsystem remains open while M021–M027 complete method-specific and source
+truthfulness work.
 
 ## TunnelManager
 
@@ -169,8 +166,8 @@ Owners: M021 and M022, rechecked by M027.
 
 | Milestone | Status | Scope |
 |---|---|---|
-| M020 | ready | base I2PControl authentication/token/error and JSON-RPC correctness |
-| M021 | blocked | TunnelManager exact wire, atomic persistence, secret boundary |
+| M020 | closed | base I2PControl authentication/token/error and JSON-RPC correctness |
+| M021 | ready | TunnelManager exact wire, atomic persistence, secret boundary |
 | M022 | blocked | actual AddressBook runtime authority and source objects |
 | M023 | blocked | startup tunnel inventory and client-service lifecycle/address truthfulness |
 | M024 | blocked | recoverable bounded SAM observation |

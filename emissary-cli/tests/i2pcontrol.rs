@@ -300,7 +300,7 @@ fn tls_recovers_from_invalid_material() {
 fn jsonrpc_success_response_serializes() {
     let resp = emissary_cli::i2pcontrol::rpc::JsonRpcSuccess::new(
         emissary_cli::i2pcontrol::rpc::RequestId::Number(1),
-        json!({"Token": "abc", "API": "2"}),
+        json!({"Token": "abc", "API": 2}),
     );
     let json = serde_json::to_string(&resp).unwrap();
     assert!(json.contains("\"jsonrpc\":\"2.0\""));

@@ -271,10 +271,11 @@ pub async fn handle_router_info(
             }
         }
     } else {
-        // Canonical form: every direct key is selected by presence, and its
-        // value is intentionally ignored.
+        // Direct form: every supported base or Proposal 170 key is selected
+        // by presence, and its value is intentionally ignored. The standard
+        // Token metadata has already been removed by the dispatcher.
         for key in params.keys() {
-            if !rpc::router_info_keys::is_proposal_170_addition(key) {
+            if !rpc::is_valid_router_info_selector(key) {
                 return error_response(
                     id,
                     rpc::error_codes::INVALID_PARAMS,

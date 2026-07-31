@@ -48,6 +48,17 @@ pub struct JsonRpcRequest {
     pub id: Option<RequestId>,
 }
 
+impl JsonRpcRequest {
+    /// Return whether this request is a notification.
+    ///
+    /// Notification status is represented by an absent ID. An explicit JSON
+    /// `null` remains a valid, serializable request ID and is not conflated
+    /// with notification dispatch.
+    pub fn is_notification(&self) -> bool {
+        self.id.is_none()
+    }
+}
+
 /// JSON-RPC 2.0 success response envelope.
 #[derive(Debug, Clone, Serialize)]
 pub struct JsonRpcSuccess {
@@ -74,6 +85,7 @@ pub struct JsonRpcErrorResponse {
 }
 
 /// JSON-RPC 2.0 error codes.
+#[allow(dead_code)]
 pub mod error_codes {
     /// Parse error: invalid JSON.
     pub const PARSE_ERROR: i32 = -32700;
@@ -90,8 +102,36 @@ pub mod error_codes {
     /// Internal error.
     pub const INTERNAL_ERROR: i32 = -32603;
 
-    /// Application-defined error (e.g., authentication failure).
+    /// Invalid password provided to Authenticate.
+    pub const INVALID_PASSWORD: i32 = -32001;
+
+    /// No authentication token was presented for a protected method.
+    pub const NO_TOKEN: i32 = -32002;
+
+    /// The presented authentication token does not exist.
+    pub const INVALID_TOKEN: i32 = -32003;
+
+    /// The presented authentication token expired and was removed.
+    pub const TOKEN_EXPIRED: i32 = -32004;
+
+    /// Authenticate did not include an API version.
+    pub const UNSPECIFIED_API_VERSION: i32 = -32005;
+
+    /// Authenticate included an unsupported API version.
+    pub const UNSUPPORTED_API_VERSION: i32 = -32006;
+
+    /// Legacy application-defined error retained for method-specific failures.
     pub const APP_ERROR: i32 = -1;
+
+    pub const INVALID_PASSWORD_MESSAGE: &str = "Invalid password provided";
+    pub const NO_TOKEN_MESSAGE: &str = "No authentication token presented";
+    pub const INVALID_TOKEN_MESSAGE: &str = "Authentication token doesn't exist";
+    pub const TOKEN_EXPIRED_MESSAGE: &str =
+        "The provided authentication token was expired and will be removed";
+    pub const UNSPECIFIED_API_VERSION_MESSAGE: &str =
+        "The version of the I2PControl API used wasn't specified, but is required to be specified";
+    pub const UNSUPPORTED_API_VERSION_MESSAGE: &str =
+        "The version of the I2PControl API specified is not supported by I2PControl";
 }
 
 impl JsonRpcSuccess {
@@ -194,8 +234,22 @@ pub fn parse_request(body: &str) -> Result<JsonRpcRequest, JsonRpcErrorResponse>
         ));
     }
 
-    // Extract id
-    let id = obj.get("id").cloned().map(RequestId::from_json);
+    // Extract and validate id before any other request-specific validation. An
+    // invalid ID is an invalid request; its arbitrary JSON value must never be
+    // coerced into null or zero and reflected in an error response.
+    let id = match obj.get("id") {
+        Some(value) => match RequestId::from_json(value) {
+            Ok(id) => Some(id),
+            Err(()) => {
+                return Err(JsonRpcErrorResponse::new(
+                    RequestId::Null,
+                    error_codes::INVALID_REQUEST,
+                    "Request id must be a string, integer, or null",
+                ));
+            }
+        },
+        None => None,
+    };
 
     // Extract params — must be an object if present (named params)
     let params = match obj.get("params") {
@@ -219,12 +273,12 @@ pub fn parse_request(body: &str) -> Result<JsonRpcRequest, JsonRpcErrorResponse>
 }
 
 impl RequestId {
-    fn from_json(val: serde_json::Value) -> Self {
+    fn from_json(val: &serde_json::Value) -> Result<Self, ()> {
         match val {
-            serde_json::Value::String(s) => RequestId::String(s),
-            serde_json::Value::Number(n) => RequestId::Number(n.as_i64().unwrap_or(0)),
-            serde_json::Value::Null => RequestId::Null,
-            _ => RequestId::Null,
+            serde_json::Value::String(s) => Ok(RequestId::String(s.clone())),
+            serde_json::Value::Number(n) => n.as_i64().map(RequestId::Number).ok_or(()),
+            serde_json::Value::Null => Ok(RequestId::Null),
+            _ => Err(()),
         }
     }
 }
@@ -343,10 +397,6 @@ pub struct AuthenticateParams {
     #[serde(rename = "API")]
     pub api: Option<i32>,
 
-    /// Username. Must be "i2pcontrol".
-    #[serde(rename = "Username")]
-    pub username: Option<String>,
-
     /// Password.
     #[serde(rename = "Password")]
     pub password: Option<String>,
@@ -360,7 +410,7 @@ pub struct AuthenticateResult {
     pub Token: String,
 
     /// Negotiated API version.
-    pub API: String,
+    pub API: i32,
 }
 
 /// Proposal 170 RouterInfo selector keys.
@@ -1197,7 +1247,7 @@ mod tests {
 
     #[test]
     fn parse_valid_request() {
-        let body = r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Username":"i2pcontrol","Password":"secret"},"id":1}"#;
+        let body = r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Password":"secret"},"id":1}"#;
         let req = parse_request(body).unwrap();
         assert_eq!(req.jsonrpc, "2.0");
         assert_eq!(req.method, "Authenticate");
@@ -1252,6 +1302,40 @@ mod tests {
         let body = r#"{"jsonrpc":"2.0","method":"Authenticate","id":"abc"}"#;
         let req = parse_request(body).unwrap();
         assert_eq!(req.id, Some(RequestId::String("abc".to_string())));
+    }
+
+    #[test]
+    fn parse_request_ids_preserve_null_and_notification_status() {
+        let explicit_null =
+            parse_request(r#"{"jsonrpc":"2.0","method":"Authenticate","id":null}"#).unwrap();
+        assert_eq!(explicit_null.id, Some(RequestId::Null));
+        assert!(!explicit_null.is_notification());
+
+        let notification = parse_request(r#"{"jsonrpc":"2.0","method":"Authenticate"}"#).unwrap();
+        assert!(notification.id.is_none());
+        assert!(notification.is_notification());
+    }
+
+    #[test]
+    fn parse_request_rejects_invalid_ids_without_coercion() {
+        for id in ["true", "1.5", "{}", "[]", "9223372036854775808"] {
+            let body = format!(r#"{{"jsonrpc":"2.0","method":"Authenticate","id":{id}}}"#);
+            let err = parse_request(&body).unwrap_err();
+            assert_eq!(err.error.code, error_codes::INVALID_REQUEST);
+            assert_eq!(err.id, RequestId::Null);
+        }
+    }
+
+    #[test]
+    fn parse_request_accepts_integral_ids_at_i64_bounds() {
+        for (literal, expected) in [
+            ("-9223372036854775808", i64::MIN),
+            ("9223372036854775807", i64::MAX),
+        ] {
+            let body = format!(r#"{{"jsonrpc":"2.0","method":"Authenticate","id":{literal}}}"#);
+            let request = parse_request(&body).unwrap();
+            assert_eq!(request.id, Some(RequestId::Number(expected)));
+        }
     }
 
     #[test]
@@ -1318,7 +1402,7 @@ mod tests {
     fn serialize_success_response() {
         let resp = JsonRpcSuccess::new(
             RequestId::Number(1),
-            serde_json::json!({"Token": "abc", "API": "2"}),
+            serde_json::json!({"Token": "abc", "API": 2}),
         );
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"jsonrpc\":\"2.0\""));

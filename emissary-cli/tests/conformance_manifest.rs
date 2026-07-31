@@ -608,6 +608,36 @@ const ERROR_CODE_MANIFEST: &[ErrorCodeRow] = &[
         code: -1,
         owner_milestone: "M001",
     },
+    ErrorCodeRow {
+        name: "INVALID_PASSWORD",
+        code: -32001,
+        owner_milestone: "M020",
+    },
+    ErrorCodeRow {
+        name: "NO_TOKEN",
+        code: -32002,
+        owner_milestone: "M020",
+    },
+    ErrorCodeRow {
+        name: "INVALID_TOKEN",
+        code: -32003,
+        owner_milestone: "M020",
+    },
+    ErrorCodeRow {
+        name: "TOKEN_EXPIRED",
+        code: -32004,
+        owner_milestone: "M020",
+    },
+    ErrorCodeRow {
+        name: "UNSPECIFIED_API_VERSION",
+        code: -32005,
+        owner_milestone: "M020",
+    },
+    ErrorCodeRow {
+        name: "UNSUPPORTED_API_VERSION",
+        code: -32006,
+        owner_milestone: "M020",
+    },
 ];
 
 #[test]
@@ -618,14 +648,20 @@ fn error_code_manifest_matches_production() {
     assert_eq!(error_codes::INVALID_PARAMS, -32602);
     assert_eq!(error_codes::INTERNAL_ERROR, -32603);
     assert_eq!(error_codes::APP_ERROR, -1);
+    assert_eq!(error_codes::INVALID_PASSWORD, -32001);
+    assert_eq!(error_codes::NO_TOKEN, -32002);
+    assert_eq!(error_codes::INVALID_TOKEN, -32003);
+    assert_eq!(error_codes::TOKEN_EXPIRED, -32004);
+    assert_eq!(error_codes::UNSPECIFIED_API_VERSION, -32005);
+    assert_eq!(error_codes::UNSUPPORTED_API_VERSION, -32006);
 }
 
 #[test]
 fn error_code_manifest_count() {
     assert_eq!(
         ERROR_CODE_MANIFEST.len(),
-        6,
-        "Proposal 170 defines exactly 6 JSON-RPC error codes"
+        12,
+        "Proposal 170 uses five standard, one legacy application, and six I2PControl-specific error codes"
     );
 }
 

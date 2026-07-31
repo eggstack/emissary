@@ -1,115 +1,98 @@
 # M018 Implementation Disposition — Exact Wire-Contract Reconciliation
 
-Status: closing
+Status: corrective pass required
 
-Frozen implementation head: `ea35de9` (`fix(i2pcontrol): reconcile Proposal 170 wire contract`)
+Frozen initial implementation head: `ea35de9be339fa2c963f9c553cbbcf01540e3ee3`
 
-Implementation executor: Codex implementation run recorded in the repository
-session that produced `ea35de9`.
+Initial disposition commit: `db5e0679369dcefe61eb24bd10079dbf98086cea`
 
-This is the M018 implementation handoff and disposition. It is not the final
-independent Proposal 170 closure; M019 is now unblocked for that review.
+Implementation executor: Codex implementation run recorded in the repository session that produced `ea35de9`.
 
-## Pinned sources and adjudications
+This record preserves the implementation evidence that landed at `ea35de9`, but its prior `closing` disposition is no longer sufficient for final review. A later internal source-level review found unresolved protocol-semantic and coverage-classification defects. M018A is now the active corrective handoff; M019 is superseded and M019A remains blocked.
 
-Normative source:
+## Internal-only authority boundary
 
-- I2P Proposal 170, `I2PControl Expansion`
-- status: `Open`
-- created: `2026-05-20`
-- last updated: `2026-05-20`
-- <https://i2p.net/en/proposals/170-i2pcontrol-expansion/>
+This workstream is internal to `eggstack/emissary`.
 
-AddressBook response ambiguity was resolved against the linked Java reference
-implementation PR #6:
+No implementation or review record authorizes:
 
-- <https://github.com/i2p/i2p.plugins.i2pcontrol/pull/6>
-- <https://raw.githubusercontent.com/Nick2k4L/i2p.plugins.i2pcontrol/enhancement/src/java/net/i2p/i2pcontrol/servlets/jsonrpc2handlers/AddressBookHandler.java>
+- an upstream issue, pull request, merge request, discussion, review request, or patch submission;
+- upstream approval, adoption, or merge solicitation;
+- branch, commit, tag, patch, or artifact pushes to an upstream remote;
+- upstream maintainer outreach;
+- preparation of an upstream contribution package or merge plan.
 
-The reference handler builds `success`/`message` in the JSON-RPC response
-parameters, so the canonical Emissary shape is a JSON-RPC `result` object:
-`{"success": boolean, "message": string}`. The proposal's top-level
-`success` example is treated as an inconsistent example. Emissary sanitizes
-messages and does not expose the reference implementation's filesystem paths.
+External Proposal 170 and reference-implementation sources are read-only evidence. All repository writes must remain in `eggstack/emissary` unless a future explicit maintainer directive supersedes this policy.
 
-## Requirement-to-evidence matrix
+## Retained implementation evidence
 
-| Requirement | Evidence | Disposition |
+The following initial M018 work remains retained unless M018A finds a direct regression:
+
+| Requirement | Evidence | Current disposition |
 |---|---|---|
-| Exact 43 RouterInfo additions | `rpc::router_info_keys::PROPOSAL_170_ADDITIONS` and `PROPOSAL_170_CONTRACT`; conformance/static manifest tests | Pass; legacy/base 121-key catalog is separate |
-| Canonical RouterInfo direct presence and exact response keys | `router_info_handler.rs`; `canonical_direct_wire_fixture_returns_exact_fields`, logs, unavailable, and conformance tests | Pass |
-| Canonical nullable fields and logs clear type | `i2p.router.id`, `clockskew`, `info`, `logs`, `logs.clear` fixture | Pass; clear returns exact `"success"` |
-| Truthful unavailable/ambiguous RouterInfo fields | Contract source states plus whole-request unavailable path | Pass; no fabricated defaults |
-| Canonical AddressBook entry, delete, subscriptions, config modes | AddressBook handler and three literal canonical unit fixtures | Pass |
-| AddressBook response-envelope adjudication | This record's pinned Java PR/raw source decision and response-envelope fixture | Pass; M019 independently rechecks source |
-| Compatibility AddressBook forms | Existing action-style/separate-method tests; canonical/compatibility mixing rejection | Pass; extensions remain explicitly non-canonical |
-| Seven lowercase TunnelManager actions | `TunnelAction::from_str_exact`, canonical action manifest, all-seven literal fixture | Pass; `List` and capitals are compatibility-only |
-| Structured TunnelManager results and honest runtime status | canonical create/edit/get/lifecycle/delete fixture; backend registry count and unsupported status paths | Pass; no tunnel data plane added |
-| Tunnel option inventory | `tunnel-manager.md` matrix; typed extraction/range validation and raw round-trip | Pass for wire/CRUD; runtime remains per-backend |
-| ClientServicesInfo direct presence | direct official example, any-value, and mixed-form fixtures | Pass |
-| Bounded SAM observation retained | Existing M016 evidence plus production composition serializer test | Qualified; see SAM evidence below |
-| Three-dimensional documentation | conformance, support, method, and source-map updates | Pass |
-| Scope guard | `git diff --name-only`; no CI, release, core, frontend, or data-plane edits | Pass |
+| Exact 43 RouterInfo addition strings | `rpc::router_info_keys::PROPOSAL_170_ADDITIONS` and exact-set tests | retained |
+| Canonical RouterInfo direct parameter presence | `router_info_handler.rs` and literal direct-form tests | retained |
+| Canonical nullable fields and `logs.clear` type | focused RouterInfo fixtures | retained |
+| Truthful unavailable canonical fields | source-state manifest and whole-request unavailable path | retained |
+| Canonical AddressBook modes | `AddressBook` direct entry, `SetSubscriptions`, and `SetConfig` handlers and fixtures | retained |
+| AddressBook response adjudication | linked Java reference implementation read-only comparison | retained for M019A recheck |
+| Compatibility AddressBook forms | separate action-style and standalone method paths with mixed-form rejection | retained as compatibility only |
+| Seven lowercase TunnelManager actions | canonical action parser and action fixture | retained |
+| Canonical TunnelManager structured success responses | create/edit/get/lifecycle/delete success fixtures | retained, but failure envelopes require M018A correction |
+| Tunnel option inventory | documentation matrix, typed validation, and raw round-trip | retained |
+| ClientServicesInfo direct presence | direct official-form, any-value, and mixed-form fixtures | retained |
+| Bounded SAM observation | M016 publisher lifecycle evidence plus closest-production composition serializer test | qualified; M019A adjudication required |
+| Wire/source/runtime documentation separation | conformance and support documents | retained, subject to manifest correction |
+| Scope guard | no CI, release, frontend, broad core, or tunnel data-plane edits | retained |
 
-## SAM evidence and limitation
+## Post-disposition findings
 
-The repository does not expose the core SAM observation publisher outside
-`SamServer`, and a deterministic real destination/session activation requires a
-live SAM protocol/tunnel-pool environment. M018 therefore does not claim a
-true end-to-end session lifecycle test.
+| ID | Finding | Severity | Disposition |
+|---|---|---|---|
+| M018A-F1 | `i2p.router.net.total.transit.bytes` returns received plus sent transit bytes instead of the forwarded/transmitted total | high | return to M018A |
+| M018A-F2 | Valid canonical TunnelManager operational failures sometimes return JSON-RPC application errors instead of structured `result.status` | high | return to M018A |
+| M018A-F3 | `conformance_manifest.rs` still labels base methods and action-style AddressBook compatibility modes as canonical Proposal 170 inventory | medium | return to M018A |
+| M018A-F4 | TunnelManager documentation contains capitalized canonical examples and imprecise `Name`/`All` requirements | low | correct in M018A |
+| M018A-F5 | Active planning lacked an absolute internal-only/no-upstream-submission rule | governance | corrected in planning governance and active handoffs; verify in M018A |
+| M018-F6 | No true real-session-to-production-ClientServicesInfo test | medium evidence decision | retained qualified evidence; M019A must accept or reject explicitly |
 
-`emissary-cli/tests/production_composition.rs::production_sam_observation_source_reaches_client_services_serializer`
-constructs real production address-book/tunnel/router/control adapters, passes
-the shared `SamSessionObservationHandle` through `I2pControlState`, and queries
-the ClientServicesInfo serializer with a listening SAM registry entry. The
-bounded empty snapshot is returned as an actual empty session map. M019 must
-decide whether this closest-production evidence is sufficient or require an
-environment-specific real SAM integration.
+## Why the initial verification missed these findings
 
-M016's accepted publisher lifecycle and serializer evidence remains retained;
-no direct regression was found.
+- The exact-set tests checked selector names and JSON types but did not assert the semantic relationship between distinct transit received and transmitted counters.
+- TunnelManager fixtures primarily covered successful canonical actions and unsupported backend statuses; they did not exhaust valid-operation lookup, ownership, persistence, and backend failure envelopes.
+- The static conformance manifest was updated around exact RouterInfo and TunnelManager sets but retained historical comments and counts that conflated base/compatibility inventory with Proposal 170 canonical additions.
+- Planning referenced upstream sources for contract interpretation without an explicit prohibition against upstream write/submission activity.
 
-## Verification outcomes
+M018A must add regressions that would fail on each of these defects.
 
-Passed at frozen head:
+## SAM evidence limitation
 
-```text
-rtk cargo check -p emissary-cli --no-default-features --features i2pcontrol
-rtk cargo test -p emissary-cli --no-default-features --features i2pcontrol
-rtk cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
-rtk rustfmt +nightly --edition 2021 --check <all M018-touched Rust files>
-rtk git diff --check
-```
+The initial M018 pass did not claim a true end-to-end SAM session lifecycle test.
 
-The feature-gated package suite passed all `1130` tests. Stable
-`cargo fmt --all -- --check` remains blocked by pre-existing repository-wide
-formatting differences and this repository's nightly-only rustfmt options;
-only M018-touched Rust files were formatted and checked with configured
-nightly rustfmt. No unrelated files were reformatted.
+`emissary-cli/tests/production_composition.rs::production_sam_observation_source_reaches_client_services_serializer` exercises the production control adapters, shared `SamSessionObservationHandle`, `I2pControlState`, and canonical serializer with a listening SAM registry entry and a bounded empty snapshot.
 
-## Compatibility, security, and scope review
+M016 separately proves publisher insertion, socket updates, removal, generation, overflow, and serialization behavior. M019A must decide whether the combined evidence is adequate for internal revision-bound closure. It must not relabel this as a true live-session end-to-end test.
 
-- Existing nested RouterInfo/ClientServicesInfo selectors and capitalized/List
-  TunnelManager forms remain accepted only as compatibility extensions.
-- Canonical and compatibility request forms reject ambiguous mixtures.
-- AddressBook persistence, bounds, validation, redaction, and administrative /
-  runtime separation remain intact.
-- Unavailable inspection and unsupported tunnel runtime behavior remains
-  explicit; no false running state or fabricated selector value was added.
-- No credentials, private keys, full destinations, filesystem paths, or
-  internal authority are exposed by the canonical responses.
-- No CI, release, frontend, broad core, transport, NetDB, peer, or tunnel
-  data-plane scope entered the change.
+## Initial verification outcomes retained
 
-## Findings and handoff
+The initial M018 head recorded successful package-scoped check, test, clippy, touched-file nightly rustfmt, and `git diff --check` outcomes, including 1,130 feature-gated package tests.
 
-M018-F1 through M018-F5 and M018-F7 are implemented or dispositioned by the
-frozen head. M018-F6 remains a named evidence limitation, not a claim of true
-end-to-end coverage. No unresolved implementation high/medium finding is
-known within the M018 scope. M019 must independently recheck the pinned
-source, this disposition, the final head, and whether the qualified SAM
-evidence satisfies strict closure.
+These results do not close M018A. The corrective implementation must rerun the targeted package commands and add focused regressions for transit semantics, TunnelManager canonical failures, and manifest classification.
 
-M018 is therefore `closing`, not final subsystem `closed`. M019 is moved to
-`ready` because the implementation head is frozen, the disposition is present,
-and its distinct reviewer/final-head/source recheck are the remaining gate.
+## Current handoff
+
+Active implementation plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/018a-wire-semantics-and-internal-only-corrective-pass.md`
+
+Blocked internal closure plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md`
+
+M018A must freeze a new complete implementation/test head and create:
+
+- `plans/closure/i2pcontrol-proposal-170/018a-implementation-disposition.md`
+
+Only then may M019A become ready.
+
+The original M019 handoff is superseded and must not be executed.

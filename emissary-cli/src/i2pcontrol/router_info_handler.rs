@@ -396,7 +396,7 @@ async fn assemble_response(
         let bytes = router_info.transit_bytes().await?;
         result.insert(
             rpc::router_info_keys::P170_NET_TOTAL_TRANSIT_BYTES.to_string(),
-            serde_json::json!(bytes.received.saturating_add(bytes.sent)),
+            serde_json::json!(bytes.sent),
         );
     }
     if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_SHARE_RATIO) {
@@ -1361,6 +1361,29 @@ mod tests {
             serde_json::json!([])
         );
         assert_eq!(result["i2p.router.net.tunnels.totalsuccessrate"], 75.0);
+    }
+
+    #[tokio::test]
+    async fn canonical_transit_bytes_returns_forwarded_counter_only() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_transit_bytes(TransitBytes {
+            received: 11,
+            sent: 22,
+        });
+        let state = test_state(ri);
+        let resp = handle_router_info(
+            &state,
+            &direct_request(serde_json::json!({
+                "i2p.router.net.total.transit.bytes": false,
+            })),
+        )
+        .await;
+
+        assert_eq!(
+            resp["result"]["i2p.router.net.total.transit.bytes"], 22,
+            "transit bytes are forwarded/transmitted bytes, not received plus sent"
+        );
+        assert!(resp["result"]["i2p.router.net.total.transit.bytes"].is_u64());
     }
 
     #[tokio::test]

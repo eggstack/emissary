@@ -1,6 +1,6 @@
 # RouterInfo Method
 
-Status: M018 exact-wire implementation; M019 independent closure pending
+Status: closed internally against the pinned Proposal 170 revision by M019A
 
 This document describes the Proposal 170 `RouterInfo` JSON-RPC method implementation in Emissary.
 
@@ -75,6 +75,11 @@ These are set via `I2pControlState::set_startup_values()` during router initiali
 - `tunnel_build_failures`: Cumulative tunnel build failures
 
 Counters are monotonic except process restart. Reads are non-destructive.
+
+The canonical `i2p.router.net.total.transit.bytes` selector reports the
+forwarded/transmitted transit counter (`total_transit_sent`). It does not add
+the received and sent counters together; those counters remain distinct source
+metrics.
 
 ### Rolling window (RollingWindow)
 

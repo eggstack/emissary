@@ -345,9 +345,11 @@ async fn handle_create(
         Err(e) => {
             // Duplicate name is a Proposal 170 textual operation status, not a JSON-RPC error
             if canonical && e.contains("already exists") {
-                operation_response(id, e, None, None)
+                operation_error_response(id, e, None)
             } else if e.contains("already exists") {
                 success_response(id, serde_json::json!(e))
+            } else if canonical {
+                operation_error_response(id, e, None)
             } else {
                 tracing::error!(target: LOG_TARGET, "Create failed: {}", e);
                 error_response(id, rpc::error_codes::APP_ERROR, e)
@@ -384,29 +386,41 @@ async fn handle_edit(
     let existing = match state.tunnel_get(tunnel_name).await {
         Ok(Some(d)) => d,
         Ok(None) => {
-            return error_response(
-                id,
-                rpc::error_codes::APP_ERROR,
-                format!("error - tunnel '{}' not found", tunnel_name),
-            );
+            return if canonical {
+                operation_error_response(id, format!("tunnel '{}' not found", tunnel_name), None)
+            } else {
+                error_response(
+                    id,
+                    rpc::error_codes::APP_ERROR,
+                    format!("error - tunnel '{}' not found", tunnel_name),
+                )
+            };
         }
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "Edit lookup failed: {}", e);
-            return error_response(
-                id,
-                rpc::error_codes::INTERNAL_ERROR,
-                "Failed to look up tunnel definition",
-            );
+            return if canonical {
+                operation_error_response(id, e, None)
+            } else {
+                error_response(
+                    id,
+                    rpc::error_codes::INTERNAL_ERROR,
+                    "Failed to look up tunnel definition",
+                )
+            };
         }
     };
 
     // Reject edits to startup-managed definitions
     if existing.ownership == TunnelOwnership::StartupManaged {
-        return error_response(
-            id,
-            rpc::error_codes::APP_ERROR,
-            "error - tunnel is managed by the startup configuration",
-        );
+        return if canonical {
+            operation_error_response(id, "tunnel is managed by the startup configuration", None)
+        } else {
+            error_response(
+                id,
+                rpc::error_codes::APP_ERROR,
+                "error - tunnel is managed by the startup configuration",
+            )
+        };
     }
 
     // Parse new name if provided
@@ -503,14 +517,23 @@ async fn handle_edit(
             None,
         ),
         Ok(true) => success_response(id, serde_json::json!("ok")),
-        Ok(false) => error_response(
-            id,
-            rpc::error_codes::APP_ERROR,
-            format!("error - tunnel '{}' not found", tunnel_name),
-        ),
+        Ok(false) =>
+            if canonical {
+                operation_error_response(id, format!("tunnel '{}' not found", tunnel_name), None)
+            } else {
+                error_response(
+                    id,
+                    rpc::error_codes::APP_ERROR,
+                    format!("error - tunnel '{}' not found", tunnel_name),
+                )
+            },
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "Edit failed: {}", e);
-            error_response(id, rpc::error_codes::APP_ERROR, e)
+            if canonical {
+                operation_error_response(id, e, None)
+            } else {
+                error_response(id, rpc::error_codes::APP_ERROR, e)
+            }
         }
     }
 }
@@ -578,18 +601,27 @@ async fn handle_get(
                 success_response(id, result)
             }
         }
-        Ok(None) => error_response(
-            id,
-            rpc::error_codes::APP_ERROR,
-            format!("error - tunnel '{}' not found", tunnel_name),
-        ),
+        Ok(None) =>
+            if canonical {
+                operation_error_response(id, format!("tunnel '{}' not found", tunnel_name), None)
+            } else {
+                error_response(
+                    id,
+                    rpc::error_codes::APP_ERROR,
+                    format!("error - tunnel '{}' not found", tunnel_name),
+                )
+            },
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "Get failed: {}", e);
-            error_response(
-                id,
-                rpc::error_codes::INTERNAL_ERROR,
-                "Failed to get tunnel definition",
-            )
+            if canonical {
+                operation_error_response(id, e, None)
+            } else {
+                error_response(
+                    id,
+                    rpc::error_codes::INTERNAL_ERROR,
+                    "Failed to get tunnel definition",
+                )
+            }
         }
     }
 }
@@ -618,11 +650,19 @@ async fn handle_delete(
     match state.tunnel_get(tunnel_name).await {
         Ok(Some(def)) =>
             if def.ownership == TunnelOwnership::StartupManaged {
-                return error_response(
-                    id,
-                    rpc::error_codes::APP_ERROR,
-                    "error - tunnel is managed by the startup configuration",
-                );
+                return if canonical {
+                    operation_error_response(
+                        id,
+                        "tunnel is managed by the startup configuration",
+                        None,
+                    )
+                } else {
+                    error_response(
+                        id,
+                        rpc::error_codes::APP_ERROR,
+                        "error - tunnel is managed by the startup configuration",
+                    )
+                };
             },
         Ok(None) => {
             // Delete of absent name is a successful no-op
@@ -639,11 +679,15 @@ async fn handle_delete(
         }
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "Delete lookup failed: {}", e);
-            return error_response(
-                id,
-                rpc::error_codes::INTERNAL_ERROR,
-                "Failed to look up tunnel definition",
-            );
+            return if canonical {
+                operation_error_response(id, e, None)
+            } else {
+                error_response(
+                    id,
+                    rpc::error_codes::INTERNAL_ERROR,
+                    "Failed to look up tunnel definition",
+                )
+            };
         }
     }
 
@@ -664,11 +708,15 @@ async fn handle_delete(
         Ok(false) => success_response(id, serde_json::json!("ok")),
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "Delete failed: {}", e);
-            error_response(
-                id,
-                rpc::error_codes::INTERNAL_ERROR,
-                "Failed to delete tunnel definition",
-            )
+            if canonical {
+                operation_error_response(id, e, None)
+            } else {
+                error_response(
+                    id,
+                    rpc::error_codes::INTERNAL_ERROR,
+                    "Failed to delete tunnel definition",
+                )
+            }
         }
     }
 }
@@ -705,29 +753,41 @@ async fn handle_lifecycle(
     let definition = match state.tunnel_get(tunnel_name).await {
         Ok(Some(d)) => d,
         Ok(None) => {
-            return error_response(
-                id,
-                rpc::error_codes::APP_ERROR,
-                format!("error - tunnel '{}' not found", tunnel_name),
-            );
+            return if canonical {
+                operation_error_response(id, format!("tunnel '{}' not found", tunnel_name), None)
+            } else {
+                error_response(
+                    id,
+                    rpc::error_codes::APP_ERROR,
+                    format!("error - tunnel '{}' not found", tunnel_name),
+                )
+            };
         }
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "Lifecycle lookup failed: {}", e);
-            return error_response(
-                id,
-                rpc::error_codes::INTERNAL_ERROR,
-                "Failed to look up tunnel definition",
-            );
+            return if canonical {
+                operation_error_response(id, e, None)
+            } else {
+                error_response(
+                    id,
+                    rpc::error_codes::INTERNAL_ERROR,
+                    "Failed to look up tunnel definition",
+                )
+            };
         }
     };
 
     // Reject lifecycle on startup-managed tunnels
     if definition.ownership == TunnelOwnership::StartupManaged {
-        return error_response(
-            id,
-            rpc::error_codes::APP_ERROR,
-            "error - tunnel is managed by the startup configuration",
-        );
+        return if canonical {
+            operation_error_response(id, "tunnel is managed by the startup configuration", None)
+        } else {
+            error_response(
+                id,
+                rpc::error_codes::APP_ERROR,
+                "error - tunnel is managed by the startup configuration",
+            )
+        };
     }
 
     let result = match action {
@@ -742,7 +802,11 @@ async fn handle_lifecycle(
         Ok(status) => success_response(id, serde_json::json!(status)),
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "{} failed: {}", action, e);
-            error_response(id, rpc::error_codes::APP_ERROR, e)
+            if canonical {
+                operation_error_response(id, e, None)
+            } else {
+                error_response(id, rpc::error_codes::APP_ERROR, e)
+            }
         }
     }
 }
@@ -761,11 +825,15 @@ async fn handle_lifecycle_all(
         Ok(defs) => defs,
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "All {} list failed: {}", action, e);
-            return error_response(
-                id,
-                rpc::error_codes::INTERNAL_ERROR,
-                "Failed to list tunnel definitions",
-            );
+            return if canonical {
+                operation_error_response(id, e, None)
+            } else {
+                error_response(
+                    id,
+                    rpc::error_codes::INTERNAL_ERROR,
+                    "Failed to list tunnel definitions",
+                )
+            };
         }
     };
 
@@ -1245,6 +1313,20 @@ fn operation_response(
     success_response(id, serde_json::Value::Object(result))
 }
 
+fn operation_error_response(
+    id: RequestId,
+    message: impl Into<String>,
+    results: Option<serde_json::Value>,
+) -> serde_json::Value {
+    let message = message.into();
+    let status = if message.starts_with("error -") {
+        message
+    } else {
+        format!("error - {message}")
+    };
+    operation_response(id, status, results, None)
+}
+
 fn error_response(id: RequestId, code: i32, message: impl Into<String>) -> serde_json::Value {
     serde_json::to_value(JsonRpcErrorResponse::new(id, code, message)).unwrap()
 }
@@ -1369,6 +1451,60 @@ mod tests {
         );
         let resp = handle_tunnel_manager(&state, &delete).await;
         assert!(resp["result"]["status"].is_string());
+    }
+
+    #[tokio::test]
+    async fn canonical_operation_failures_use_structured_status() {
+        let state = test_state();
+
+        for action in ["edit", "get", "start", "stop", "restart"] {
+            let resp = handle_tunnel_manager(
+                &state,
+                &tm_request(
+                    "TunnelManager",
+                    serde_json::json!({"Action": action, "Name": "missing"}),
+                ),
+            )
+            .await;
+            assert!(
+                resp["error"].is_null(),
+                "canonical {action} leaked an error envelope"
+            );
+            assert!(
+                resp["result"]["status"]
+                    .as_str()
+                    .is_some_and(|status| status.starts_with("error -")),
+                "canonical {action} failure must use result.status: {resp}"
+            );
+        }
+
+        let create = handle_tunnel_manager(
+            &state,
+            &tm_request(
+                "TunnelManager",
+                serde_json::json!({"Action": "create", "Type": "socks", "Name": "collision"}),
+            ),
+        )
+        .await;
+        assert!(create["result"]["status"].as_str().unwrap().starts_with("success -"));
+
+        let duplicate = handle_tunnel_manager(
+            &state,
+            &tm_request(
+                "TunnelManager",
+                serde_json::json!({"Action": "create", "Type": "socks", "Name": "collision"}),
+            ),
+        )
+        .await;
+        assert!(duplicate["error"].is_null());
+        assert!(duplicate["result"]["status"].as_str().unwrap().starts_with("error -"));
+
+        let malformed = handle_tunnel_manager(
+            &state,
+            &tm_request("TunnelManager", serde_json::json!({"Action": "create"})),
+        )
+        .await;
+        assert_eq!(malformed["error"]["code"], rpc::error_codes::INVALID_PARAMS);
     }
 
     #[tokio::test]

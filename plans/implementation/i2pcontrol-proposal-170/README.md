@@ -29,9 +29,9 @@ External Proposal 170 and reference-implementation sources may be inspected read
 | Handoff | Status | Plan | Activation dependency |
 |---|---|---|---|
 | M018 — Initial exact wire-contract reconciliation | corrective pass required | `018-exact-wire-contract-reconciliation.md` | implementation retained at `ea35de9`; post-disposition defects recorded |
-| M018A — Wire semantics and internal-only corrective pass | ready | `018a-wire-semantics-and-internal-only-corrective-pass.md` | sole executable implementation handoff |
+| M018A — Wire semantics and internal-only corrective pass | closed for implementation | `018a-wire-semantics-and-internal-only-corrective-pass.md` | frozen head `a3c4f46`; disposition recorded |
 | M019 — Original pinned-revision reclosure | superseded | `019-pinned-revision-independent-reclosure.md` | non-executable; replaced by M019A |
-| M019A — Internal pinned-revision reclosure | blocked | `019a-internal-pinned-revision-reclosure.md` | complete frozen M018A head, disposition, and distinct internal reviewer |
+| M019A — Internal pinned-revision reclosure | closed internally against pinned revision | `019a-internal-pinned-revision-reclosure.md` | reviewed at frozen head `a3c4f46`; closure recorded |
 
 Earlier milestones remain historical as recorded in the subsystem roadmap and registry.
 
@@ -44,7 +44,8 @@ M018A wire semantics and internal-only corrective pass
 M019A internal pinned-revision independent reclosure
 ```
 
-Execute only M018A. Do not begin M019A until the registry marks M018A `closing` and M019A `ready`.
+M018A implementation is closed and M019A has completed the distinct auditable internal review.
+No future implementation or closure handoff is dependency-ready in this workstream.
 
 Never execute the superseded M019 plan.
 
@@ -108,7 +109,8 @@ It must verify:
 
 Any unresolved high or medium finding rejects closure and returns to M018A.
 
-Final status may only be `closed internally against pinned revision`. It must not imply upstream review, acceptance, certification, adoption, or merge.
+Final status is `closed internally against pinned revision`. It does not imply upstream review,
+acceptance, certification, adoption, or merge.
 
 ## Verification rule
 

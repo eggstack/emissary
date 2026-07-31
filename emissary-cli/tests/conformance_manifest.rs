@@ -16,12 +16,12 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-//! Proposal 170 conformance manifest — machine-checkable exact-set validator.
+//! I2PControl conformance manifest — machine-checkable exact-set validator.
 //!
-//! This test file is the single source of truth for contract completeness.
-//! It enumerates every method, selector, tunnel type, tunnel action,
-//! address book, ClientServicesInfo selector, JSON-RPC error code,
-//! and validation rule required by Proposal 170.
+//! This test file separates base JSON-RPC/I2PControl inventory, canonical
+//! Proposal 170 additions, and Emissary compatibility extensions. It
+//! enumerates each inventory without treating an extension as canonical
+//! Proposal 170 coverage.
 //!
 //! The checker fails for:
 //! - manifest row without handler/source/test
@@ -43,7 +43,7 @@ use emissary_cli::i2pcontrol::{
 };
 
 // ──────────────────────────────────────────────────────────────────────
-// § 1. Method manifest — every Proposal 170 method
+// § 1. Base method manifest — every I2PControl method
 // ──────────────────────────────────────────────────────────────────────
 
 struct MethodRow {
@@ -57,7 +57,7 @@ struct MethodRow {
     fixture_id: &'static str,
 }
 
-const METHOD_MANIFEST: &[MethodRow] = &[
+const BASE_METHOD_MANIFEST: &[MethodRow] = &[
     MethodRow {
         name: methods::AUTHENTICATE,
         auth_required: false,
@@ -110,7 +110,7 @@ const METHOD_MANIFEST: &[MethodRow] = &[
 
 #[test]
 fn method_manifest_matches_production_constants() {
-    let manifest_names: HashSet<&str> = METHOD_MANIFEST.iter().map(|r| r.name).collect();
+    let manifest_names: HashSet<&str> = BASE_METHOD_MANIFEST.iter().map(|r| r.name).collect();
     let production_methods = [
         methods::AUTHENTICATE,
         methods::GET_KEYS,
@@ -124,17 +124,31 @@ fn method_manifest_matches_production_constants() {
     let production_set: HashSet<&str> = production_methods.iter().copied().collect();
     assert_eq!(
         manifest_names, production_set,
-        "method manifest must exactly match production constants"
+        "base method manifest must exactly match production constants"
     );
 }
 
 #[test]
-fn method_manifest_count() {
+fn base_method_manifest_count() {
     assert_eq!(
-        METHOD_MANIFEST.len(),
+        BASE_METHOD_MANIFEST.len(),
         8,
-        "Proposal 170 defines exactly 8 methods"
+        "the base I2PControl surface contains exactly 8 methods"
     );
+}
+
+const COMPATIBILITY_STANDALONE_METHODS: &[&str] =
+    &[methods::SET_CONFIG, methods::SET_SUBSCRIPTIONS];
+
+#[test]
+fn standalone_base_methods_are_not_proposal_additions() {
+    assert_eq!(
+        COMPATIBILITY_STANDALONE_METHODS,
+        &[methods::SET_CONFIG, methods::SET_SUBSCRIPTIONS]
+    );
+    assert!(COMPATIBILITY_STANDALONE_METHODS
+        .iter()
+        .all(|method| BASE_METHOD_MANIFEST.iter().any(|row| row.name == *method)));
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -275,7 +289,7 @@ struct TunnelActionRow {
     owner_milestone: &'static str,
 }
 
-const TUNNEL_ACTION_MANIFEST: &[TunnelActionRow] = &[
+const CANONICAL_TUNNEL_ACTION_MANIFEST: &[TunnelActionRow] = &[
     TunnelActionRow {
         name: "create",
         owner_milestone: "M004",
@@ -309,7 +323,7 @@ const TUNNEL_ACTION_MANIFEST: &[TunnelActionRow] = &[
 #[test]
 fn tunnel_action_manifest_count() {
     assert_eq!(
-        TUNNEL_ACTION_MANIFEST.len(),
+        CANONICAL_TUNNEL_ACTION_MANIFEST.len(),
         7,
         "Proposal 170 defines exactly 7 canonical tunnel actions"
     );
@@ -317,12 +331,25 @@ fn tunnel_action_manifest_count() {
 
 #[test]
 fn tunnel_action_manifest_unique() {
-    let names: HashSet<&str> = TUNNEL_ACTION_MANIFEST.iter().map(|r| r.name).collect();
+    let names: HashSet<&str> = CANONICAL_TUNNEL_ACTION_MANIFEST.iter().map(|r| r.name).collect();
     assert_eq!(
         names.len(),
-        TUNNEL_ACTION_MANIFEST.len(),
+        CANONICAL_TUNNEL_ACTION_MANIFEST.len(),
         "tunnel action manifest must have unique names"
     );
+}
+
+#[test]
+fn canonical_tunnel_actions_are_separate_from_compatibility_actions() {
+    let canonical: HashSet<&str> =
+        CANONICAL_TUNNEL_ACTION_MANIFEST.iter().map(|r| r.name).collect();
+    let compatibility: HashSet<&str> = rpc::tunnel_actions::COMPATIBILITY.iter().copied().collect();
+    assert_eq!(
+        canonical,
+        rpc::tunnel_actions::CANONICAL.iter().copied().collect()
+    );
+    assert!(canonical.is_disjoint(&compatibility));
+    assert!(compatibility.contains(rpc::tunnel_actions::LIST));
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -374,46 +401,41 @@ fn address_book_manifest_count() {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// § 5. Address book request modes — all 5
+// § 5. Address book request modes — canonical and compatibility partitions
 // ──────────────────────────────────────────────────────────────────────
 
-struct AddressBookRequestRow {
-    #[allow(dead_code)]
-    name: &'static str,
-    #[allow(dead_code)]
-    owner_milestone: &'static str,
-}
+const CANONICAL_ADDRESS_BOOK_MODES: &[&str] = &[
+    "Type + Hostname + Destination",
+    "SetSubscriptions",
+    "SetConfig",
+];
 
-const ADDRESS_BOOK_REQUEST_MANIFEST: &[AddressBookRequestRow] = &[
-    AddressBookRequestRow {
-        name: address_book_requests::LIST,
-        owner_milestone: "M003",
-    },
-    AddressBookRequestRow {
-        name: address_book_requests::LOOKUP,
-        owner_milestone: "M003",
-    },
-    AddressBookRequestRow {
-        name: address_book_requests::ADD,
-        owner_milestone: "M003",
-    },
-    AddressBookRequestRow {
-        name: address_book_requests::UPDATE,
-        owner_milestone: "M003",
-    },
-    AddressBookRequestRow {
-        name: address_book_requests::DELETE,
-        owner_milestone: "M003",
-    },
+const COMPATIBILITY_ADDRESS_BOOK_MODES: &[&str] = &[
+    address_book_requests::LIST,
+    address_book_requests::LOOKUP,
+    address_book_requests::ADD,
+    address_book_requests::UPDATE,
+    address_book_requests::DELETE,
 ];
 
 #[test]
-fn address_book_request_manifest_count() {
+fn canonical_address_book_modes_are_explicit() {
     assert_eq!(
-        ADDRESS_BOOK_REQUEST_MANIFEST.len(),
-        5,
-        "Proposal 170 defines exactly 5 address book request modes"
+        CANONICAL_ADDRESS_BOOK_MODES,
+        &[
+            "Type + Hostname + Destination",
+            "SetSubscriptions",
+            "SetConfig"
+        ]
     );
+}
+
+#[test]
+fn compatibility_address_book_actions_are_not_canonical_modes() {
+    assert_eq!(COMPATIBILITY_ADDRESS_BOOK_MODES.len(), 5);
+    assert!(COMPATIBILITY_ADDRESS_BOOK_MODES
+        .iter()
+        .all(|mode| !CANONICAL_ADDRESS_BOOK_MODES.contains(mode)));
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -655,7 +677,7 @@ fn no_duplicate_router_info_selectors() {
 
 #[test]
 fn no_duplicate_methods() {
-    let names: Vec<&str> = METHOD_MANIFEST.iter().map(|r| r.name).collect();
+    let names: Vec<&str> = BASE_METHOD_MANIFEST.iter().map(|r| r.name).collect();
     let set: HashSet<&str> = names.iter().copied().collect();
     assert_eq!(
         set.len(),

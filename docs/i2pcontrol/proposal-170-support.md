@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: M018 implementation complete; M019 pinned-revision independent closure pending
+Status: closed internally against the pinned Proposal 170 revision by M019A
 
 Proposal 170 remains Open and this status is pinned to the 2026-05-20 revision.
 M017's broad closure is invalidated historical evidence.
@@ -30,13 +30,13 @@ This document tracks the implementation status of Proposal 170 I2PControl expans
 | Action | Status | Notes |
 |---|---|---|
 | `list` | Compatibility only | Emissary extension; not canonical |
-| `create` | Wire/CRUD implemented | All 12 types; structured result |
-| `edit` | Wire/CRUD implemented | Atomic rename, field preservation |
-| `get` | Wire/CRUD implemented | Structured `status` + `info` |
+| `create` | Wire/CRUD implemented | All 12 types; structured success and failure result |
+| `edit` | Wire/CRUD implemented | Atomic rename, field preservation, structured operation failures |
+| `get` | Wire/CRUD implemented | Structured `status` + `info`, including missing-tunnel failures |
 | `delete` | Wire/CRUD implemented | Startup-managed rejected |
-| `start` | Wire implemented; runtime per backend | Unsupported backends return explicit status |
-| `stop` | Wire implemented; runtime per backend | Unsupported stop is safe/idempotent |
-| `restart` | Wire implemented; runtime per backend | Unsupported backends return explicit status |
+| `start` | Wire implemented; runtime per backend | Unsupported backends and lookup failures return explicit status |
+| `stop` | Wire implemented; runtime per backend | Unsupported stop is safe/idempotent; failures are explicit status |
+| `restart` | Wire implemented; runtime per backend | Unsupported backends and lookup failures return explicit status |
 
 ## Tunnel type runtime support
 
@@ -86,8 +86,8 @@ Real tunnel data-plane implementations are deferred outside the I2PControl scope
 
 ## RouterInfo selectors
 
-121 legacy/base selectors plus exactly 43 canonical Proposal 170 additions are
-registered and dispatched. See [router-info.md](router-info.md) for the split
+121 legacy/base selectors and exactly 43 canonical Proposal 170 additions are
+registered and dispatched as separate inventories. See [router-info.md](router-info.md) for the split
 catalog and [router-info-source-map.md](router-info-source-map.md) for source
 classification. Canonical unavailable fields return an explicit error.
 
@@ -167,6 +167,7 @@ configured-vs-listening semantics, and integration evidence.
 | M014 | Closed | Spec-constrained truthfulness and local hardening |
 | M015 | Superseded | Historical reclosure; superseded by M017 |
 | M016 | Closed | Bounded SAM session observation corrective pass |
-| M017 | Invalidated | Historical final-head review; broad closure superseded by M018/M019 |
-| M018 | Closing | Exact wire-contract reconciliation implementation |
-| M019 | Ready after M018 handoff | Pinned-revision independent reclosure |
+| M017 | Invalidated | Historical final-head review; broad closure superseded by M018/M018A |
+| M018 | Corrective pass required | Initial exact wire-contract reconciliation; retained as history |
+| M018A | Closed for implementation | Wire semantics and internal-only corrective pass |
+| M019A | Closed internally against pinned revision | Independent final pinned-revision reclosure; no upstream acceptance implied |

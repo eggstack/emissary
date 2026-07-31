@@ -1,8 +1,8 @@
 # I2PControl Proposal 170 Roadmap
 
-Status: active exact-contract corrective work
+Status: active internal corrective work
 
-Current planning baseline: `2816857633a927b629c051e07e7efa5baa8d6e07`
+Current corrective baseline: `db5e0679369dcefe61eb24bd10079dbf98086cea`
 
 Pinned source:
 
@@ -16,294 +16,259 @@ Canonical references:
 - `plans/003-planning-process.md`
 - `plans/adrs/ADR-0001-proposal-170-contract-and-stub-boundary.md`
 - `plans/closure/i2pcontrol-proposal-170/017-closure-invalidation.md`
-- `plans/implementation/i2pcontrol-proposal-170/018-exact-wire-contract-reconciliation.md`
-- `plans/implementation/i2pcontrol-proposal-170/019-pinned-revision-independent-reclosure.md`
+- `plans/closure/i2pcontrol-proposal-170/018-implementation-disposition.md`
+- `plans/implementation/i2pcontrol-proposal-170/018a-wire-semantics-and-internal-only-corrective-pass.md`
+- `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md`
 
 ## 1. Purpose and boundary
 
-This subsystem owns exact Proposal 170 I2PControl wire compatibility:
+This subsystem owns internal compatibility of `eggstack/emissary` with the pinned Proposal 170 I2PControl wire contract:
 
-- exact method names;
-- exact parameter names and casing;
-- selection by direct parameter presence where specified;
-- exact action vocabulary;
-- exact response fields and JSON types;
-- truthful unavailable behavior;
+- exact method, parameter, action, selector, and response vocabulary;
+- exact JSON types and parameter-presence semantics;
+- truthful source-unavailable and runtime-unsupported behavior;
 - compatibility with already-shipped Emissary extensions;
-- accurate documentation of wire, source, and runtime support.
+- accurate internal documentation of wire, source, runtime, and evidence status.
+
+This roadmap does not authorize an upstream contribution.
 
 It does not own:
 
+- upstream review, pull requests, merge requests, issues, discussions, patches, adoption, or maintainer outreach;
 - router algorithms;
 - transport or NetDB inspection architecture;
 - peer selection;
 - missing tunnel data planes;
 - frontend behavior;
 - runtime address-book precedence;
-- release or CI policy;
-- broad security or formatting work.
+- CI, release, packaging, publishing, or version policy;
+- broad security, dependency, or formatting work.
 
-## 2. Why the workstream is reopened
+## 2. Internal-only policy
 
-M016 correctly landed a bounded read-only SAM session observation handle. M017 accepted that component and several earlier truthfulness/resource corrections, but it did not independently compare the complete public wire vocabulary against the current official Proposal 170 text.
+All work is internal to `eggstack/emissary`.
 
-The later comparison found high-severity contract defects:
+Agents and reviewers MUST NOT:
 
-1. exact RouterInfo keys are missing or renamed;
-2. the 121-key legacy/base registry is mislabeled as Proposal 170, while the pinned proposal adds exactly 43 RouterInfo keys;
-3. AddressBook uses a different request model;
-4. TunnelManager uses different action casing and result envelopes;
-5. ClientServicesInfo uses a nested selector envelope instead of direct parameter presence.
+- write to an upstream repository;
+- open or modify upstream issues, pull requests, merge requests, discussions, reviews, or proposals;
+- request upstream review, feedback, adoption, approval, or merge;
+- push branches, commits, tags, patches, or artifacts to an upstream remote;
+- contact upstream maintainers on behalf of this workstream;
+- prepare an upstream contribution package, patch series, or merge plan.
 
-The current implementation is useful, but the broad `closed` status is invalid. M017 is retained as historical component evidence and superseded as final closure authority.
+Read-only inspection of the official proposal and reference implementations is allowed solely for internal verification.
 
-## 3. Retained accepted implementation
+A future upstream contribution requires a separate explicit maintainer directive that supersedes this roadmap and `plans/003-planning-process.md`. No current milestone or closure record grants that authority.
 
-The following remain accepted absent a direct regression:
+Violation is a stop condition and invalidates closure evidence.
 
-- bounded SAM session observation and explicit overflow failure;
+## 3. Retained implementation
+
+The following remain accepted absent direct regression:
+
+- the exact 43-key Proposal 170 RouterInfo manifest and direct request form;
+- canonical AddressBook direct modes and response adjudication;
+- seven lowercase TunnelManager actions and structured success responses;
+- direct ClientServicesInfo service parameters;
+- bounded SAM session observation and explicit overflow behavior;
 - atomic service-generation fencing;
-- pre-spawn TLS connection bounds and saturation/restoration evidence;
-- live metrics and tracing-backed log observation;
-- truthful unavailable RouterInfo behavior instead of fabricated values;
+- pre-spawn TLS connection bounds;
+- live metric and log sources;
 - durable administrative tunnel and address-book stores;
-- explicit unsupported tunnel backends.
+- truthful unavailable sources and explicit unsupported tunnel runtimes;
+- compatibility-path separation in production handlers.
 
-M018 wraps exact protocol compatibility around these components. It must not rewrite them without a direct need.
+The initial M018 implementation at `ea35de9` is retained but not sufficient for closure.
 
 ## 4. Current findings
 
 | ID | Finding | Severity | Owner |
 |---|---|---|---|
-| M018-F1 | Exact Proposal 170 RouterInfo keys absent or renamed | high | M018 |
-| M018-F2 | 121-key legacy/base catalog mislabeled as Proposal 170 instead of exact 43-key addition set | medium | M018 |
-| M018-F3 | AddressBook canonical operation modes missing | high | M018 |
-| M018-F4 | TunnelManager lowercase actions and structured results missing | high | M018 |
-| M018-F5 | ClientServicesInfo direct parameter-by-presence request missing | high | M018 |
-| M018-F6 | No true real-session-to-production-ClientServicesInfo SAM evidence | medium evidence | M018 |
-| M018-F7 | M017 broad closure claim invalid | closure defect | M019 |
+| M018A-F1 | Transit total uses received plus sent rather than forwarded/transmitted transit bytes | high | M018A |
+| M018A-F2 | Valid canonical TunnelManager operational failures do not consistently use structured `result.status` | high | M018A |
+| M018A-F3 | Base and compatibility inventory remains labeled as canonical Proposal 170 coverage in the static manifest | medium | M018A |
+| M018A-F4 | TunnelManager canonical examples and `Name`/`All` wording require correction | low | M018A |
+| M018A-F5 | Internal-only/no-upstream authority needed normative codification | governance | codified; M018A/M019A must verify |
+| M018-F6 | No true live-session-to-production-ClientServicesInfo SAM test | medium evidence decision | M019A |
 
-No additional router/runtime finding is activated.
+No new router, transport, NetDB, tunnel-runtime, or frontend finding is activated.
 
-## 5. Corrective sequence
+## 5. Current sequence
 
 ```text
-M018 Exact wire-contract reconciliation
+M018 initial exact-wire implementation (retained, corrective disposition)
     |
     v
-M019 Pinned-revision independent reclosure
+M018A wire semantics and internal-only corrective pass
+    |
+    v
+M019A internal pinned-revision independent reclosure
 ```
 
-This is the complete current sequence.
+The original M019 plan is superseded and non-executable.
 
-If M019 identifies a defect within M018's boundary, return it to M018 rather than creating another milestone.
-
-## 6. M018 — Exact wire-contract reconciliation
+## 6. M018A — Wire semantics and internal-only corrective pass
 
 Plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/018-exact-wire-contract-reconciliation.md`
-
-Status: closing
-
-### Objective
-
-Implement and test the exact pinned public contract while retaining safe compatibility extensions.
-
-### Work areas
-
-#### RouterInfo
-
-- create an exact machine-checkable manifest of the 43 Proposal 170 additions;
-- recognize exact official keys such as `i2p.router.id`, `i2p.router.clockskew`, `i2p.router.info`, `i2p.router.logs`, and `i2p.router.logs.clear`;
-- use direct parameter-by-presence semantics;
-- preserve exact response keys and JSON types;
-- retain genuinely equivalent old names only as compatibility aliases;
-- classify unavailable selectors truthfully.
-
-#### AddressBook
-
-Implement the three canonical modes inside `AddressBook`:
-
-- `Type` + `Hostname` + `Destination`, with optional presence-selected `Delete`;
-- `SetSubscriptions`;
-- `SetConfig`.
-
-The open proposal contains inconsistent response-envelope examples. M018 must pin the linked reference implementation or record an explicit architecture-owner adjudication before closure.
-
-Existing `book`/`request`/`name`/`value` and separate method forms may remain compatibility extensions.
-
-#### TunnelManager
-
-- accept lowercase `create`, `edit`, `get`, `start`, `stop`, `restart`, and `delete`;
-- return structured canonical `status`, `results`, and `info` fields;
-- preserve capitalized actions and `List` only as documented extensions;
-- inventory every proposal option and range;
-- keep unsupported runtime backends explicit rather than implementing data planes.
-
-#### ClientServicesInfo
-
-- select `I2PTunnel`, `HTTPProxy`, `SOCKS`, `SAM`, `BOB`, and `I2CP` by direct parameter presence with any value;
-- preserve nested boolean `Selector` only as a compatibility extension;
-- reject ambiguous mixed forms;
-- retain bounded current SAM observations;
-- add the strongest feasible production-composition SAM session lifecycle test.
-
-#### Documentation
-
-Separate:
-
-- wire implemented;
-- source available;
-- runtime implemented.
-
-No compatibility extension or unavailable source counts as canonical operational support.
-
-### Exit conditions
-
-- all applicable M018 acceptance criteria pass;
-- exact source decisions and ambiguities are recorded;
-- literal official-example fixtures pass;
-- M017 is consistently marked invalidated;
-- final implementation head is frozen;
-- M018 moves to `closing`;
-- M019 becomes `ready`.
-
-## 7. M019 — Pinned-revision independent reclosure
-
-Plan:
-
-- `plans/implementation/i2pcontrol-proposal-170/019-pinned-revision-independent-reclosure.md`
+- `plans/implementation/i2pcontrol-proposal-170/018a-wire-semantics-and-internal-only-corrective-pass.md`
 
 Status: ready
 
-### Activation
+Objective:
 
-M019 is activated after M018 landed on frozen head `ea35de9` with its complete implementation disposition.
+- return the existing transmitted/forwarded transit counter for `i2p.router.net.total.transit.bytes`;
+- ensure valid canonical TunnelManager operation failures use structured `result.status`;
+- separate base, canonical Proposal 170, and Emissary compatibility manifests;
+- correct directly affected documentation;
+- verify and attest the internal-only/no-upstream boundary.
 
-### Review duties
+Required regressions:
 
-- refetch Proposal 170 and verify revision metadata;
-- independently compare the exact 43 RouterInfo manifest;
-- compare literal AddressBook, TunnelManager, and ClientServicesInfo fixtures field-for-field;
-- verify compatibility forms are secondary and non-ambiguous;
-- verify unsupported sources/runtimes remain truthful;
-- verify the SAM integration evidence;
-- classify all changed files;
-- run targeted local commands;
-- record a distinct auditable reviewer.
+- distinct transit received/sent values prove no double counting;
+- missing/owned/rejected canonical tunnel operations remain inside structured result envelopes;
+- malformed requests still return JSON-RPC validation errors;
+- compatibility action responses remain unchanged;
+- canonical and compatibility inventory cannot be conflated.
 
-### Exit conditions
+Exit conditions:
 
-- source revision unchanged or implementation rebased;
-- zero unresolved high/medium findings;
-- exact final reviewed head recorded;
-- reviewer independence auditable;
-- no scope expansion;
-- accepted `plans/closure/i2pcontrol-proposal-170/019-closure.md`;
-- registry and roadmap become `closed against pinned revision`.
+- all M018A findings resolved or explicitly blocked;
+- targeted package verification passes;
+- no prohibited scope or external write occurs;
+- new frozen implementation/test head recorded;
+- `plans/closure/i2pcontrol-proposal-170/018a-implementation-disposition.md` exists;
+- M018A moves to `closing`;
+- M019A becomes `ready`.
 
-## 8. Exact contract policy
+## 7. M019A — Internal pinned-revision independent reclosure
 
-### Canonical versus compatibility
+Plan:
 
-Canonical Proposal 170 forms:
+- `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md`
 
-- must use exact official spelling and casing;
-- must pass literal official-example fixtures;
-- must not depend on an alias or extension path.
+Status: blocked
+
+Activation requires a complete frozen M018A head and a distinct auditable internal reviewer.
+
+Review duties:
+
+- read-only refetch and pin verification of Proposal 170;
+- exact 43-key and transit-semantic audit;
+- AddressBook mode/envelope audit;
+- TunnelManager success and operational-failure envelope audit;
+- ClientServicesInfo and SAM evidence audit;
+- canonical/base/compatibility manifest audit;
+- wire/source/runtime/evidence claim audit;
+- changed-file and targeted command review;
+- internal-only/no-upstream compliance attestation.
+
+M019A must reject closure for any unresolved high or medium finding. It must not modify production code and close in the same pass.
+
+## 8. Canonical, compatibility, and evidence policy
+
+### Canonical Proposal 170
+
+Canonical forms:
+
+- use exact official names and casing;
+- use exact direct parameter-presence behavior where specified;
+- preserve exact response keys and JSON types;
+- pass literal internal fixtures derived from the pinned source;
+- do not depend on an Emissary compatibility path.
+
+### Compatibility
 
 Compatibility forms:
 
-- may remain to avoid breaking existing Emissary clients;
-- must be documented separately;
-- must not alter canonical output keys/types;
-- must not be counted as Proposal 170 coverage;
-- must reject ambiguous mixing with canonical forms.
+- may remain to avoid breaking internal/existing Emissary clients;
+- must be separately named and counted;
+- must not substitute for canonical behavior;
+- must reject ambiguous mixing;
+- do not imply upstream compatibility certification.
 
-### Unavailable versus unsupported
+### Coverage dimensions
 
-- `wire implemented` means the exact request is recognized and typed correctly;
-- `source unavailable` means Emissary cannot truthfully supply current data;
-- `runtime unsupported` means the administrative wire exists but the operational backend does not.
+| Dimension | Meaning |
+|---|---|
+| Wire implemented | exact request and response contract is recognized |
+| Source available | a truthful current Emissary source exists |
+| Runtime implemented | a real operational backend exists |
+| Evidence qualified | implementation is present but closure evidence has a named limitation |
 
-Unavailable or unsupported behavior must not be described as full runtime support.
+Unavailable, unsupported, compatibility-only, or qualified items are not full operational coverage.
 
-## 9. Verification policy
+## 9. Scope guard
 
-Use targeted local verification only:
+Allowed production scope:
+
+- the existing RouterInfo transit mapping and smallest existing metric DTO/adapter seam;
+- existing TunnelManager handler result-envelope logic;
+- existing static conformance manifest;
+- focused tests and directly affected I2PControl documentation.
+
+Prohibited:
+
+- upstream write, submission, review, adoption, or merge activity;
+- `.github/workflows/**`;
+- CI, release, packaging, publishing, version, matrix, coverage, or generated-evidence machinery;
+- tunnel data-plane implementation;
+- broad router, transport, NetDB, peer, tunnel, crypto, resolver, frontend, SAM, or I2CP redesign;
+- generic protocol/schema/fixture frameworks;
+- dependencies;
+- repository-wide formatting;
+- fabricated defaults.
+
+## 10. Verification policy
+
+Use local package-scoped verification:
 
 ```bash
-cargo fmt --all -- --check
 cargo check -p emissary-cli --no-default-features --features i2pcontrol
 cargo test -p emissary-cli --no-default-features --features i2pcontrol
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 ```
 
-Run core commands only if M018 uses its narrow core exception or requires existing core integration targets:
+Focused runs:
 
 ```bash
-cargo check -p emissary-core --features std,events
-cargo test -p emissary-core
-cargo clippy -p emissary-core --features std,events --all-targets -- -D warnings
+cargo test -p emissary-cli --no-default-features --features i2pcontrol transit
+cargo test -p emissary-cli --no-default-features --features i2pcontrol tunnel_manager
+cargo test -p emissary-cli --no-default-features --features i2pcontrol conformance_manifest
 ```
 
-Known unrelated formatting differences may be recorded and replaced by touched-file nightly rustfmt checks. Do not format unrelated files.
+Use touched-file configured formatting checks when the known workspace baseline blocks full stable formatting. Do not reformat unrelated files.
 
-Not required:
-
-- remote CI;
-- platform matrices;
-- coverage gates;
-- fuzzing;
-- network farms;
-- release dry runs;
-- generated evidence bundles;
-- full unrelated workspace audits.
-
-## 10. Scope guard
-
-Allowed production scope is existing I2PControl dispatch, handlers, DTOs, control traits, and smallest required composition seams.
-
-One narrow core read-only accessor is allowed only when an exact official field already has a safe canonical source and no existing handle exposes it. This exception may not be used to build broad transport, NetDB, peer, or tunnel inspection.
-
-Prohibited:
-
-- `.github/workflows/**`;
-- CI, release, publishing, or version automation;
-- tunnel data-plane implementation;
-- broad router/transport/NetDB/peer/tunnel/crypto/resolver/frontend redesign;
-- generic protocol, schema, fixture, inspection, or compatibility frameworks;
-- repository-wide formatting;
-- fabricated defaults.
+No remote or upstream CI, release check, platform matrix, coverage gate, fuzzing, network farm, submission check, or evidence bundle is required.
 
 ## 11. Milestone status
 
-| Milestone | Status | Current disposition |
+| Milestone/handoff | Status | Current disposition |
 |---|---|---|
-| 001–004 | historical implementation foundations | retained |
-| 005–007 | superseded | retained as history |
-| 008–014 | implementation evidence retained | final broad closure reopened |
-| 015 | invalid historical closure | superseded |
-| 016 | bounded SAM implementation retained | accepted component |
-| 017 | corrective pass required | closure invalidated by exact-contract findings |
-| 018 | ready | sole implementation handoff |
-| 019 | blocked | final pinned-revision closure gate |
+| 001–014 | historical implementation evidence | retained as recorded |
+| 015 | invalid historical closure | retained as history |
+| 016 | bounded SAM implementation | retained |
+| 017 | invalidated broad closure | component evidence retained |
+| 018 | corrective pass required | initial implementation retained at `ea35de9` |
+| 018A | ready | sole executable implementation handoff |
+| 019 | superseded | non-executable |
+| 019A | blocked | final internal revision-bound closure gate |
 
 ## 12. Completion definition
 
-The Proposal 170 workstream may be marked `closed against pinned revision` only when M019 confirms:
+The workstream may become `closed internally against pinned revision` only when M019A confirms:
 
-- exact current source revision;
-- exact 43 RouterInfo additions;
-- exact AddressBook canonical modes;
-- exact lowercase TunnelManager actions and structured results;
-- exact direct ClientServicesInfo request form;
-- literal official-example fixtures;
-- safe compatibility preservation;
+- exact current proposal revision;
+- exact 43 RouterInfo additions and forwarded/transmitted transit semantics;
+- exact AddressBook canonical modes and adjudicated results;
+- exact lowercase TunnelManager actions and structured success/failure operation results;
+- exact direct ClientServicesInfo form;
+- base and compatibility inventory excluded from canonical totals;
 - truthful unavailable and unsupported classifications;
-- accepted SAM current-session evidence;
+- accepted or explicitly blocked SAM evidence;
 - zero unresolved high/medium findings;
-- no scope expansion.
+- no scope expansion;
+- complete internal-only compliance attestation.
 
-Any future change to the Open proposal invalidates only the revision-bound closure claim and requires a new source comparison, not an automatic broad implementation rewrite.
+Internal closure must not imply upstream review, acceptance, adoption, certification, or merge. Any future change to the Open proposal requires a new internal comparison only.

@@ -1,6 +1,6 @@
 # RouterInfo Selector Source Map
 
-Status: M018 exact-wire source inventory; M019 independent closure pending
+Status: closed internally against the pinned Proposal 170 revision by M019A
 
 This document is the single source of truth for every Proposal 170 RouterInfo
 selector's wire key, output type, nullability, semantic definition, canonical

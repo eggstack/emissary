@@ -1,6 +1,6 @@
 # RouterInfo Method
 
-Status: M018A corrective implementation complete; M019A internal closure pending
+Status: closed internally against the pinned Proposal 170 revision by M019A
 
 This document describes the Proposal 170 `RouterInfo` JSON-RPC method implementation in Emissary.
 

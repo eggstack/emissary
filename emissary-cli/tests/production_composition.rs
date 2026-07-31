@@ -189,7 +189,8 @@ async fn production_sam_observation_source_reaches_client_services_serializer() 
     // This is the closest production seam: real production controls and the
     // exact shared observation handle are passed through I2pControlState to
     // the ClientServicesInfo serializer. M019 must decide whether this is
-    // sufficient or require an environment-specific SAM integration.
+    // sufficient or require an environment-specific SAM integration. M019A
+    // accepts this as qualified composition evidence, not true end-to-end SAM.
     let tmp = tempfile::tempdir().unwrap();
     let tunnels =
         Arc::new(ProductionTunnelManagerControl::new(tmp.path().join("tunnels")).unwrap());

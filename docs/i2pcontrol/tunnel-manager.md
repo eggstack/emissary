@@ -1,6 +1,6 @@
 # I2PControl TunnelManager
 
-Status: M018A corrective implementation complete; M019A internal closure pending
+Status: closed internally against the pinned Proposal 170 revision by M019A
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
 
@@ -80,7 +80,7 @@ All requests follow the JSON-RPC 2.0 envelope:
 
 ### Optional fields
 
-- `All` - Boolean, valid only for `Start`, `Stop`, `Restart`
+- `All` - Boolean, valid only for lowercase `start`, `stop`, and `restart`
 - `NewName` - String, valid only for `Edit` (atomic rename)
 - Tunnel option fields (see Tunnel options)
 

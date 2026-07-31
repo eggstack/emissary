@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Roadmap
 
-Status: active internal corrective work
+Status: closed internally against pinned revision
 
 Current corrective baseline: `a3c4f469f4877e5ff4a0bb4230da298f0b367ed2`
 
@@ -114,7 +114,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/018a-wire-semantics-and-internal-only-corrective-pass.md`
 
-Status: closing
+Status: closed for implementation
 
 Objective:
 
@@ -140,7 +140,7 @@ Exit conditions:
 - new frozen implementation/test head recorded;
 - `plans/closure/i2pcontrol-proposal-170/018a-implementation-disposition.md` exists;
 - M018A moves to `closing`;
-- M019A becomes `ready`.
+- M019A was made `ready` for the independent final gate.
 
 ## 7. M019A — Internal pinned-revision independent reclosure
 
@@ -148,7 +148,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md`
 
-Status: ready
+Status: closed internally against pinned revision
 
 Activation requires a complete frozen M018A head and a distinct auditable internal reviewer.
 
@@ -164,7 +164,8 @@ Review duties:
 - changed-file and targeted command review;
 - internal-only/no-upstream compliance attestation.
 
-M019A must reject closure for any unresolved high or medium finding. It must not modify production code and close in the same pass.
+M019A rejected no high or medium finding. It modified no production code and closed
+against the frozen implementation/test head.
 
 ## 8. Canonical, compatibility, and evidence policy
 
@@ -251,13 +252,13 @@ No remote or upstream CI, release check, platform matrix, coverage gate, fuzzing
 | 016 | bounded SAM implementation | retained |
 | 017 | invalidated broad closure | component evidence retained |
 | 018 | corrective pass required | initial implementation retained at `ea35de9` |
-| 018A | closing | implementation frozen at `a3c4f46`; disposition recorded |
+| 018A | closed for implementation | implementation frozen at `a3c4f46`; disposition recorded |
 | 019 | superseded | non-executable |
-| 019A | ready | final internal revision-bound closure gate |
+| 019A | closed internally against pinned revision | final internal revision-bound closure accepted |
 
 ## 12. Completion definition
 
-The workstream may become `closed internally against pinned revision` only when M019A confirms:
+M019A confirms that the workstream is `closed internally against pinned revision`:
 
 - exact current proposal revision;
 - exact 43 RouterInfo additions and forwarded/transmitted transit semantics;
@@ -272,3 +273,7 @@ The workstream may become `closed internally against pinned revision` only when 
 - complete internal-only compliance attestation.
 
 Internal closure must not imply upstream review, acceptance, adoption, certification, or merge. Any future change to the Open proposal requires a new internal comparison only.
+
+No future milestone is blocked or newly unblocked by this closure; the roadmap has no
+dependency-ready successor. A future proposal revision requires a new internally authorized
+comparison and does not reopen this record automatically.

@@ -26,19 +26,19 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | active internal corrective work | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M019A ready | M018A frozen at `a3c4f46`; M019A is the distinct internal final gate |
+| I2PControl Proposal 170 | closed internally against pinned revision | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M019A closed | Final internal gate accepted at frozen implementation head `a3c4f46` |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M019A — internal pinned-revision reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md` | M018A frozen at `a3c4f46`; distinct internal reviewer required |
+| — | None | — | — | No dependency-ready implementation plan remains in this workstream |
 
 ## Active closure work
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M018A — wire semantics and internal-only corrective pass | closing | `a3c4f46` | `plans/closure/i2pcontrol-proposal-170/018a-implementation-disposition.md` |
+| — | None | — | — | No active closure work remains in this workstream |
 
 ## Blocked and superseded handoffs
 
@@ -54,8 +54,8 @@ Canonical direction:
 | Valid canonical TunnelManager operational failures do not consistently use structured `result.status` | high | M018A | resolved at `a3c4f46` |
 | Base and compatibility surfaces remain counted as canonical Proposal 170 inventory in the conformance manifest | medium | M018A | resolved at `a3c4f46` |
 | TunnelManager canonical examples and `Name`/`All` wording need correction | low | M018A | resolved at `a3c4f46` |
-| No true live-session SAM-to-I2PControl end-to-end test | medium evidence decision | M019A | ready for explicit adjudication; qualified evidence retained |
-| Initial active planning lacked an absolute no-upstream rule | governance | M018A/M019A | normative rule now codified; implementation and closure must attest compliance |
+| No true live-session SAM-to-I2PControl end-to-end test | medium evidence decision | M019A | accepted as a qualified evidence limitation; no full end-to-end claim made |
+| Initial active planning lacked an absolute no-upstream rule | governance | M018A/M019A | resolved; normative rule codified and closure attested |
 
 ## Internal-only upstream boundary
 
@@ -121,20 +121,21 @@ M001–M004 remain historical implementation foundations. M005–M007 are supers
 | `plans/closure/i2pcontrol-proposal-170/016-implementation-disposition.md` | bounded SAM implementation retained |
 | `plans/closure/i2pcontrol-proposal-170/017-closure.md` plus invalidation | historical component evidence only |
 | `plans/closure/i2pcontrol-proposal-170/018-implementation-disposition.md` | corrective pass required |
-| M018A plan | implementation frozen; closing disposition recorded |
+| M018A plan | implementation frozen; closed-for-implementation disposition recorded |
 | original M019 plan | superseded and non-executable |
-| M019A plan | ready final internal gate |
+| M019A plan | closed internally against pinned revision; `plans/closure/i2pcontrol-proposal-170/019a-closure.md` |
 
 ## Registry maintenance rules
 
-1. M018A is frozen and closing at `a3c4f46`; its disposition is the implementation evidence.
-2. M019A is ready and is the next executable internal closure gate.
+1. M018A is frozen and closed for implementation at `a3c4f46`; its disposition is the implementation evidence.
+2. M019A is closed internally against the pinned revision; its closure record is the final gate.
 3. Never execute the superseded M019 plan.
 4. Do not count base protocol, compatibility aliases, unavailable sources, or unsupported runtimes as canonical operational coverage.
 5. Preserve historical closure and invalidation records rather than rewriting them into passing evidence.
 6. If the Open proposal changes, rebase the internal contract manifest without contacting or submitting to upstream.
 7. M019A must use a distinct auditable internal reviewer and perform read-only source verification.
-8. Any high/medium M019A finding returns to M018A when it fits that boundary.
-9. Final status may be `closed internally against pinned revision` only with zero unresolved high/medium findings and a no-upstream compliance attestation.
+8. Any future high/medium finding in this boundary requires a new corrective disposition; none remains unresolved.
+9. Final status is `closed internally against pinned revision`, with zero unresolved high/medium findings and a no-upstream compliance attestation.
 10. Verification remains local and package-scoped; remote CI is not required.
 11. No plan may initiate, prepare, request, or imply upstream submission, review, adoption, or merge.
+12. No future plan is dependency-blocked or newly unblocked; the subsystem has no registered successor.

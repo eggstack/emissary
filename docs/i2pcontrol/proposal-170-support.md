@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: M018A corrective implementation complete; M019A internal closure pending
+Status: closed internally against the pinned Proposal 170 revision by M019A
 
 Proposal 170 remains Open and this status is pinned to the 2026-05-20 revision.
 M017's broad closure is invalidated historical evidence.
@@ -167,6 +167,7 @@ configured-vs-listening semantics, and integration evidence.
 | M014 | Closed | Spec-constrained truthfulness and local hardening |
 | M015 | Superseded | Historical reclosure; superseded by M017 |
 | M016 | Closed | Bounded SAM session observation corrective pass |
-| M017 | Invalidated | Historical final-head review; broad closure superseded by M018/M019 |
-| M018 | Closing | Exact wire-contract reconciliation implementation |
-| M019 | Ready after M018 handoff | Pinned-revision independent reclosure |
+| M017 | Invalidated | Historical final-head review; broad closure superseded by M018/M018A |
+| M018 | Corrective pass required | Initial exact wire-contract reconciliation; retained as history |
+| M018A | Closed for implementation | Wire semantics and internal-only corrective pass |
+| M019A | Closed internally against pinned revision | Independent final pinned-revision reclosure; no upstream acceptance implied |

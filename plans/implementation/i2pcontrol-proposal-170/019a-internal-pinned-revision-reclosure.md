@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Milestone 019A — Internal Pinned-Revision Reclosure
 
-Status: ready
+Status: closed internally against pinned revision
 
 Planning baseline: `a3c4f469f4877e5ff4a0bb4230da298f0b367ed2`
 
@@ -8,11 +8,11 @@ Supersedes:
 
 - `plans/implementation/i2pcontrol-proposal-170/019-pinned-revision-independent-reclosure.md`
 
-Activation dependency:
+Activation dependency (satisfied):
 
 - M018A is complete on a frozen implementation/test head;
 - `plans/closure/i2pcontrol-proposal-170/018a-implementation-disposition.md` exists;
-- the registry marks M018A `closing` and M019A `ready`;
+- the registry marked M018A `closing` and M019A `ready` at activation;
 - the M019A reviewer is distinct from the final M018A implementation executor and identifies the separate internal review run.
 
 Primary class: internal independent protocol-conformance closure
@@ -251,16 +251,17 @@ M019A may close only when:
 
 ## 11. Activation rule
 
-M019A is ready now that M018A froze a complete implementation/test head at
-`a3c4f469f4877e5ff4a0bb4230da298f0b367ed2` and recorded its disposition. It still requires
-the distinct reviewer identified in the activation dependency.
+M019A was activated after M018A froze a complete implementation/test head at
+`a3c4f469f4877e5ff4a0bb4230da298f0b367ed2` and recorded its disposition. The distinct
+reviewer requirement was satisfied by the internal review run recorded in the closure
+artifact.
 
 Once activated:
 
-1. perform read-only source verification;
-2. record findings before closure edits;
-3. do not modify production code in the same review pass;
-4. reject and return high/medium defects to M018A;
-5. create `019a-closure.md` only after the final internal head passes;
-6. update registry and roadmap only after closure acceptance;
-7. never initiate upstream submission, review, or merge activity.
+1. read-only source verification was performed;
+2. findings were recorded before closure edits;
+3. no production code was modified in the review pass;
+4. no high/medium defect required return to M018A;
+5. `019a-closure.md` was created after the final internal head passed;
+6. the registry and roadmap were updated after closure acceptance;
+7. no upstream submission, review, or merge activity was initiated.

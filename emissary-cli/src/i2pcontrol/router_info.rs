@@ -643,6 +643,12 @@ impl FakeRouterInfoControl {
         inner.recent_transit = Ok(traffic);
     }
 
+    /// Set cumulative transit byte counters for tests.
+    pub fn set_transit_bytes(&self, bytes: TransitBytes) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.transit_bytes = Ok(bytes);
+    }
+
     /// Set tunnel build stats for tests.
     pub fn set_build_stats(&self, stats: TunnelBuildStats) {
         let mut inner = self.inner.lock().unwrap();

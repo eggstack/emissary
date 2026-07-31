@@ -1,6 +1,6 @@
 # Proposal 170 Conformance Matrix
 
-Status: normative inventory for M018 implementation; M019 independent closure pending
+Status: normative inventory for M018A corrective implementation; M019A internal closure pending
 
 Proposal 170 remains Open and this inventory is pinned to the revision created
 and last updated on 2026-05-20. M017's broad closure is invalidated historical
@@ -212,23 +212,23 @@ fixture/test ID. It is the single source of truth for contract completeness.
 |---|---|---|---|---|---|---|---|---|---|
 | TunnelManager method | `method` = `"TunnelManager"` | required | — | — | — | — | M004 | `fixture_tunnel_manager` | — |
 | `Action` parameter | `params.Action` | required | — | — | Canonical values: `create`, `edit`, `get`, `start`, `stop`, `restart`, `delete` | — | M018 | `canonical_wire_fixture_covers_all_seven_actions` | Lowercase is canonical; capitalized values and `List` are compatibility-only |
-| `type` parameter | `params.type` | required for Create/Edit | — | — | Must be one of declared tunnel types | — | M004 | `fixture_tm_type` | Exact type names |
-| `name` parameter | `params.name` | required for most actions | — | — | Non-empty string | — | M004 | `fixture_tm_name` | — |
+| `Type` parameter | `params.Type` | required for canonical `create`; optional for `edit` | — | — | When present, must be one of declared tunnel types | — | M004 | `fixture_tm_type` | Exact canonical casing |
+| `Name` parameter | `params.Name` | required for create/edit/delete and single-tunnel get/start/stop/restart | — | — | Non-empty string; omitted when lifecycle uses `All: true` | — | M004 | `fixture_tm_name` | Exact canonical casing |
 | List result | `result` | compatibility `List` only | array | non-null | Historical extension | — | M004 | `fixture_tm_list` | Not in canonical action manifest |
 | Create result | `result.status`, `result.results` | on canonical `create` | structured object | non-null | Operation status text and result list | Durable store | M018 | `canonical_wire_fixture_covers_all_seven_actions` | Wire/source implemented |
 | Get result | `result.status`, `result.info` | on canonical `get` | structured object | non-null | Tunnel definition in `info` | Durable store | M018 | `canonical_wire_fixture_covers_all_seven_actions` | Runtime lifecycle may remain unsupported |
-| Edit result | `result.status` | on Edit | string | non-null | Operation status text | — | M004 | `fixture_tm_edit` | — |
-| Delete result | `result.status` | on Delete | string | non-null | Operation status text | — | M004 | `fixture_tm_delete` | — |
-| Start result | `result.status` | on Start | string | non-null | Operation status text | — | M004 | `fixture_tm_start` | — |
-| Stop result | `result.status` | on Stop | string | non-null | Operation status text | — | M004 | `fixture_tm_stop` | — |
-| Restart result | `result.status` | on Restart | string | non-null | Operation status text | — | M004 | `fixture_tm_restart` | — |
-| Unsupported start/restart | `result.status` | on unsupported Start/Restart | string | non-null | `"error - ... not implemented"` | Unsupported backend | M004 | `fixture_tm_unsupported_start` | Deterministic error per ADR-0001 |
+| Edit result | `result.status` | on canonical `edit` | string | non-null | Operation status text, including `error - ...` for valid operation failures | — | M004 | `fixture_tm_edit` | — |
+| Delete result | `result.status` | on canonical `delete` | string | non-null | Operation status text, including `error - ...` for valid operation failures | — | M004 | `fixture_tm_delete` | — |
+| Start result | `result.status` | on canonical `start` | string | non-null | Operation status text, including `error - ...` for valid operation failures | — | M004 | `fixture_tm_start` | — |
+| Stop result | `result.status` | on canonical `stop` | string | non-null | Operation status text, including `error - ...` for valid operation failures | — | M004 | `fixture_tm_stop` | — |
+| Restart result | `result.status` | on canonical `restart` | string | non-null | Operation status text, including `error - ...` for valid operation failures | — | M004 | `fixture_tm_restart` | — |
+| Unsupported start/restart | `result.status` | on unsupported canonical `start`/`restart` | string | non-null | `"error - ... not implemented"` | Unsupported backend | M004 | `fixture_tm_unsupported_start` | Deterministic error per ADR-0001 |
 
 ### TunnelManager All Rule
 
 | Contract item | Request key/type | Required/optional/presence | Response key/type | Nullability | Validation/error behavior | Planned data source | Owner milestone | Fixture/test ID | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| All tunnel name | `params.name` = `"All"` | reserved | — | — | Must not be used for Create; used only with Start/Stop/Restart | — | M004 | `fixture_tm_all` | Exact spelling: `All` (capital A) |
+| All selector | `params.All` = `true` | presence/value selected | — | — | Used only with canonical `start`/`stop`/`restart`; `Name` is omitted | — | M004 | `fixture_tm_all` | Exact spelling: `All` (capital A) |
 | All Start/Stop/Restart | canonical lowercase action + `All: true` | — | structured status object | non-null | Dispatches all definitions; unsupported backends remain explicit | Backend registry | M018 | `canonical_wire_fixture_covers_all_seven_actions` | Runtime support is per backend |
 
 ### Tunnel Types

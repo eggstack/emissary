@@ -1,6 +1,6 @@
 # I2PControl TunnelManager
 
-Status: M018 canonical wire implementation; M019 independent closure pending
+Status: M018A corrective implementation complete; M019A internal closure pending
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
 
@@ -33,7 +33,7 @@ actions. `List` is excluded from the canonical action manifest.
 
 ### Action restrictions
 
-`All` is accepted only for `Start`, `Stop`, and `Restart`. It is rejected with an error for `Create`, `Edit`, `Get`, and `Delete`.
+`All` is accepted only for the lowercase canonical `start`, `stop`, and `restart` actions. It is rejected with an error for `create`, `edit`, `get`, and `delete`.
 
 ## Tunnel types
 
@@ -75,7 +75,7 @@ All requests follow the JSON-RPC 2.0 envelope:
 ### Required fields
 
 - `Action` - One of the seven lowercase canonical action strings
-- `Name` - Required for all canonical actions
+- `Name` - Required for `create`, `edit`, `delete`, and single-tunnel `get`, `start`, `stop`, or `restart`
 - `Type` - Required for `create`
 
 ### Optional fields
@@ -134,8 +134,10 @@ Retrieves a tunnel definition by name.
 
 Canonical `get` returns `{status, info}`. Canonical `create`, `edit`, lifecycle,
 and `delete` return a structured `{status}` result, with `results` where the
-operation returns a result list. Compatibility requests retain their historical
-response shapes.
+operation returns a result list. Valid canonical operations that fail during
+lookup, ownership, persistence, or backend dispatch still return
+`result.status: "error - ..."`; malformed requests remain JSON-RPC errors.
+Compatibility requests retain their historical response shapes.
 
 ### Delete
 
@@ -192,7 +194,7 @@ For unsupported backends, stop is safe and idempotent.
 
 ```json
 {
-  "Action": "Restart",
+  "Action": "restart",
   "Name": "my-proxy"
 }
 ```
@@ -203,7 +205,7 @@ Composed as stop then start through the backend registry.
 
 ```json
 {
-  "Action": "Start",
+  "Action": "start",
   "All": true
 }
 ```

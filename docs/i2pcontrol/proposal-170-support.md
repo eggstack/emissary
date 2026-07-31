@@ -46,7 +46,7 @@ Retained candidate implementation includes:
 - live event counters and log ring sources;
 - explicit unavailable/unsupported behavior in several paths.
 
-Material corrective work remains in M021–M027.
+Material corrective work remains in M022–M027.
 
 ## Base I2PControl/JSON-RPC
 
@@ -58,7 +58,7 @@ an unambiguous compatibility path, distinct I2PControl authentication and
 version errors, notification execution with response suppression, strict
 request-ID validation, and direct base RouterInfo selector compatibility.
 
-The subsystem remains open while M021–M027 complete method-specific and source
+The subsystem remains open while M022–M027 complete method-specific and source
 truthfulness work.
 
 ## TunnelManager
@@ -166,16 +166,16 @@ Corrective requirements:
 - restrictive permissions enforced rather than best effort where supported;
 - literal negative tests for tokens, passwords, keys, credentials, paths, and destinations.
 
-Owners: M021 and M022, rechecked by M027.
+Owners: M022, rechecked by M027.
 
 ## Corrective sequence
 
 | Milestone | Status | Scope |
 |---|---|---|
 | M020 | closed | base I2PControl authentication/token/error and JSON-RPC correctness |
-| M021 | ready | TunnelManager exact wire, atomic persistence, secret boundary |
-| M022 | blocked | actual AddressBook runtime authority and source objects |
-| M023 | blocked | startup tunnel inventory and client-service lifecycle/address truthfulness |
+| M021 | closed | TunnelManager exact wire, atomic persistence, secret boundary |
+| M022 | ready | actual AddressBook runtime authority and source objects |
+| M023 | ready | startup tunnel inventory and client-service lifecycle/address truthfulness |
 | M024 | blocked | recoverable bounded SAM observation |
 | M025 | blocked | exact RouterInfo contract/source matrix |
 | M026 | blocked | feasible bounded read-only router inspection sources |

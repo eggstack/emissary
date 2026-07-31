@@ -78,9 +78,9 @@ See `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`.
 | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|
 | M020 — Base I2PControl and JSON-RPC interoperability | closed | `020-base-i2pcontrol-and-jsonrpc-interoperability.md` | none |
-| M021 — TunnelManager exact wire, atomic persistence, and secret boundary | ready | `021-tunnelmanager-wire-atomicity-and-secrets.md` | M020 closed |
-| M022 — AddressBook runtime bridge and source reconciliation | blocked | `022-addressbook-runtime-bridge.md` | M020, M021 |
-| M023 — Startup tunnel inventory and ClientServicesInfo truthfulness | blocked | `023-startup-tunnel-inventory-and-client-services.md` | M021 |
+| M021 — TunnelManager exact wire, atomic persistence, and secret boundary | closed | `021-tunnelmanager-wire-atomicity-and-secrets.md` | M020 closed |
+| M022 — AddressBook runtime bridge and source reconciliation | ready | `022-addressbook-runtime-bridge.md` | M020, M021 closed |
+| M023 — Startup tunnel inventory and ClientServicesInfo truthfulness | ready | `023-startup-tunnel-inventory-and-client-services.md` | M021 closed |
 | M024 — Recoverable bounded SAM observation | blocked | `024-recoverable-bounded-sam-observation.md` | M023 |
 | M025 — RouterInfo contract and source reconciliation | blocked | `025-routerinfo-contract-and-source-reconciliation.md` | M020, M022, M023, M024 |
 | M026 — Bounded router inspection sources | blocked | `026-bounded-router-inspection-sources.md` | M025 |

@@ -155,7 +155,11 @@ M026 bounded core inspection for feasible remaining selectors
 M027 conformance and independent reclosure
 ```
 
-M020 is closed. M021 depended hard on M020 because standard token removal and request parsing affect TunnelManager fixtures, so M021 is now ready. M022 and M023 depend hard on M021's corrected shared tunnel/address model only where they consume it; they may otherwise execute in parallel after M021. M024 depends on M023's final ClientServicesInfo ownership. M025 depends on M020, M022, and M023. M026 depends on M025's exact source matrix. M027 depends on every implementation milestone reaching a frozen disposition.
+M020 and M021 are closed. M022 and M023 are now dependency-ready and may
+execute in parallel against M021's corrected shared persistence/security
+boundary. M024 depends on M023's final ClientServicesInfo ownership. M025
+depends on M020, M022, and M023. M026 depends on M025's exact source matrix.
+M027 depends on every implementation milestone reaching a frozen disposition.
 
 ## 8. Milestones
 
@@ -182,7 +186,7 @@ Exit: literal existing-I2PControl fixtures and Proposal 170 requests work throug
 
 Plan: `021-tunnelmanager-wire-atomicity-and-secrets.md`
 
-Status: ready
+Status: closed
 
 Objective:
 
@@ -201,7 +205,7 @@ Exit: all seven actions have literal success/failure fixtures, rename failure in
 
 Plan: `022-addressbook-runtime-bridge.md`
 
-Status: blocked on M020 and M021
+Status: ready
 
 Objective:
 
@@ -219,7 +223,7 @@ Exit: successful mutations are observable through both the API and normal runtim
 
 Plan: `023-startup-tunnel-inventory-and-client-services.md`
 
-Status: blocked on M021
+Status: ready
 
 Objective:
 
@@ -373,9 +377,9 @@ Use focused test filters named in each plan before broad package tests. Use touc
 | M019 | superseded | non-executable |
 | M019A | invalidated closure | historical evidence; see `019a-closure-invalidation.md` |
 | M020 | closed | `plans/closure/i2pcontrol-proposal-170/020-closure.md` |
-| M021 | ready | next executable handoff; hard dependency M020 is closed |
-| M022 | blocked | hard dependencies M020 and M021 |
-| M023 | blocked | hard dependency M021 |
+| M021 | closed | `plans/closure/i2pcontrol-proposal-170/021-closure.md` |
+| M022 | ready | hard dependencies M020 and M021 are closed |
+| M023 | ready | hard dependency M021 is closed |
 | M024 | blocked | hard dependency M023 |
 | M025 | blocked | hard dependencies M020, M022, M023, M024 |
 | M026 | blocked | hard dependency M025 |

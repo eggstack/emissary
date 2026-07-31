@@ -79,7 +79,7 @@ Material deviations MUST be recorded rather than hidden.
 
 A closure record decides whether a milestone is actually complete. It MUST include:
 
-- implementation commits or pull requests;
+- implementation commits or pull requests when they exist internally;
 - a requirement-to-evidence matrix;
 - exact verification commands and outcomes;
 - invariant review;
@@ -90,6 +90,8 @@ A closure record decides whether a milestone is actually complete. It MUST inclu
 - disposition: closed, conditionally closed, corrective pass required, or blocked.
 
 A code commit, compilation result, or implementation-agent assertion is not closure evidence by itself.
+
+A reference to a pull request in a closure record describes existing internal repository evidence only. It does not authorize creating, requesting, or preparing an upstream pull request.
 
 ### 2.6 Archive records
 
@@ -160,7 +162,8 @@ The implementation agent MUST:
 - keep administrative, runtime, and frontend ownership distinct;
 - add tests and documentation with production changes;
 - identify incomplete work explicitly;
-- leave closure judgment to the closure record.
+- leave closure judgment to the closure record;
+- obey the internal-only external-interaction boundary in Section 11.
 
 ## 7. Corrective passes
 
@@ -202,7 +205,8 @@ Before registration, review an implementation plan for:
 7. failure, cancellation, restart, and contention semantics;
 8. security and authorization effects;
 9. test and static-guard evidence;
-10. unambiguous closure criteria.
+10. unambiguous closure criteria;
+11. explicit external-interaction authority and compliance with Section 11.
 
 If these cannot be answered, the plan is not ready for handoff.
 
@@ -211,15 +215,51 @@ If these cannot be answered, the plan is not ready for handoff.
 Every Proposal 170 implementation plan MUST explicitly verify that it does not:
 
 - implement a deferred tunnel data plane;
-- add protocol fields, aliases, statuses, methods, or tunnel types;
+- add protocol fields, aliases, statuses, methods, or tunnel types outside the explicitly pinned contract or documented internal compatibility surface;
 - change router algorithms or network behavior;
 - make administrative address books authoritative at runtime;
 - couple I2PControl to frontend state;
 - report unsupported services as active;
 - consume a single-owner event receiver used by another subsystem;
-- replace truthful unavailability with fabricated defaults.
+- replace truthful unavailability with fabricated defaults;
+- initiate or prepare upstream submission, review, adoption, or merge activity.
 
-## 11. Planning anti-patterns
+## 11. Internal-only external-interaction boundary
+
+Unless a maintainer issues a new explicit directive naming the target repository and authorized action, all Emissary planning and implementation work is internal-only.
+
+An agent operating from repository plans MUST NOT:
+
+- open, draft, update, or comment on an issue, pull request, merge request, discussion, review, or proposal in an upstream or third-party repository;
+- request upstream review, approval, feedback, adoption, or merge;
+- push commits, branches, tags, patches, releases, or generated artifacts to an upstream remote;
+- contact upstream maintainers on behalf of a workstream;
+- prepare a contribution package, patch series, upstream merge plan, or submission checklist;
+- add roadmap or closure steps whose purpose is upstream submission;
+- use GitHub or another connector write action against an upstream repository.
+
+Read-only external research is permitted when required for correctness:
+
+- inspecting specifications, source code, commits, pull requests, issues, and discussions;
+- citing external sources internally;
+- comparing internal behavior with an external contract or reference implementation.
+
+Read-only access to an upstream pull request or reference implementation is evidence gathering only. It MUST NOT be interpreted as an invitation or authority to submit work.
+
+Repository writes MUST remain within the user-authorized internal repository or fork. For the current Proposal 170 workstream, that repository is `eggstack/emissary`.
+
+Any plan that requires upstream interaction is blocked until an explicit maintainer directive supersedes this section. Silence, prior upstream references, public licensing, technical compatibility, or a completed internal implementation do not grant submission authority.
+
+A closure record for work involving external specifications MUST attest that:
+
+- external sources were accessed read-only;
+- no upstream repository or maintainer channel was mutated;
+- no upstream review, merge, adoption, or submission was requested;
+- no upstream contribution artifact was prepared under the plan.
+
+Violation of this section invalidates the affected handoff or closure evidence and requires an internal corrective disposition.
+
+## 12. Planning anti-patterns
 
 The following are prohibited or strongly discouraged:
 
@@ -232,4 +272,5 @@ The following are prohibited or strongly discouraged:
 - recording only successful evidence;
 - claiming contract completion from infrastructure alone;
 - broad core refactors justified only by API convenience;
-- implementing deferred runtime behavior during a protocol-contract milestone.
+- implementing deferred runtime behavior during a protocol-contract milestone;
+- treating read-only upstream research as authority to submit, request review, or seek merge.

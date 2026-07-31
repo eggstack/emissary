@@ -155,9 +155,8 @@ M026 bounded core inspection for feasible remaining selectors
 M027 conformance and independent reclosure
 ```
 
-M020 through M022 are closed. M023 is now dependency-ready and may
-execute in parallel against M021's corrected shared persistence/security
-boundary. M024 depends on M023's final ClientServicesInfo ownership. M025
+M020 through M023 are closed. M024 is now dependency-ready and may
+execute against M023's final ClientServicesInfo ownership. M025
 depends on M020, M022, and M023. M026 depends on M025's exact source matrix.
 M027 depends on every implementation milestone reaching a frozen disposition.
 
@@ -205,7 +204,7 @@ Exit: all seven actions have literal success/failure fixtures, rename failure in
 
 Plan: `022-addressbook-runtime-bridge.md`
 
-Status: ready
+Status: closed
 
 Objective:
 
@@ -242,7 +241,7 @@ Exit: current startup inventory is visible and immutable, task exit clears enabl
 
 Plan: `024-recoverable-bounded-sam-observation.md`
 
-Status: blocked on M023
+Status: ready
 
 Objective:
 
@@ -379,8 +378,8 @@ Use focused test filters named in each plan before broad package tests. Use touc
 | M020 | closed | `plans/closure/i2pcontrol-proposal-170/020-closure.md` |
 | M021 | closed | `plans/closure/i2pcontrol-proposal-170/021-closure.md` |
 | M022 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/022-closure.md` |
-| M023 | ready | hard dependency M021 is closed |
-| M024 | blocked | hard dependency M023 |
+| M023 | closed | hard dependency M021 is closed |
+| M024 | ready | hard dependency M023 is closed |
 | M025 | blocked | hard dependencies M020, M022, M023, M024 |
 | M026 | blocked | hard dependency M025 |
 | M027 | blocked | hard dependencies M020–M026 |

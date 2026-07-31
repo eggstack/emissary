@@ -27,13 +27,13 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M023 ready | M020–M022 closed; source corrections remain |
+| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M024 ready | M020–M023 closed; SAM/source corrections remain |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M023 — Startup tunnel inventory and ClientServicesInfo truthfulness | ready | `plans/implementation/i2pcontrol-proposal-170/023-startup-tunnel-inventory-and-client-services.md` | M021 closed |
+| I2PControl Proposal 170 | M024 — Recoverable bounded SAM observation | ready | `plans/implementation/i2pcontrol-proposal-170/024-recoverable-bounded-sam-observation.md` | M023 closed |
 
 ## Registered successor handoffs
 
@@ -41,7 +41,6 @@ These plans are complete handoffs but are not executable until their hard depend
 
 | Subsystem | Handoff | Status | Implementation plan | Hard dependency |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M024 — Recoverable bounded SAM observation | blocked | `plans/implementation/i2pcontrol-proposal-170/024-recoverable-bounded-sam-observation.md` | M023 |
 | I2PControl Proposal 170 | M025 — RouterInfo contract and source reconciliation | blocked | `plans/implementation/i2pcontrol-proposal-170/025-routerinfo-contract-and-source-reconciliation.md` | M020, M022, M023, M024 |
 | I2PControl Proposal 170 | M026 — Bounded router inspection sources | blocked | `plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md` | M025 |
 | I2PControl Proposal 170 | M027 — Exact conformance and independent reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/027-proposal-170-conformance-and-reclosure.md` | M020–M026 |
@@ -78,8 +77,8 @@ These plans are complete handoffs but are not executable until their hard depend
 | Canonical TunnelManager `get` schema and validation | high | M021 | resolved; M023 owns truthful startup sources |
 | Non-atomic tunnel rename and secret handling | high | M021 | resolved; M022/M023 consume the corrected primitives |
 | AddressBook disconnected administrative shadow | high | M022 | resolved; M025 owns final selector/source matrix |
-| Startup tunnel inventory and stale proxy state | high/medium | M023 | ready |
-| Sticky SAM observation overflow | medium | M024 | blocked on M023 |
+| Startup tunnel inventory and stale proxy state | high/medium | M023 | resolved; M024 consumes final service-source evidence |
+| Sticky SAM observation overflow | medium | M024 | ready |
 | RouterInfo 43-selector source/claim contradictions | high claim defect | M025 | blocked on M020/M022/M023/M024 |
 | Feasible bounded core inspection sources | medium | M026 | blocked on M025 |
 | Literal external conformance and honest reclosure | high evidence defect | M027 | blocked on M020–M026 |

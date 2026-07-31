@@ -31,6 +31,7 @@ use emissary_core::{
 
 use crate::i2pcontrol::{
     control_plane::TunnelManagerControl,
+    production::MAX_TUNNEL_INVENTORY,
     rpc::{self, JsonRpcErrorResponse, JsonRpcRequest, JsonRpcSuccess, RequestId},
     service_registry::{ObservedServiceState, ServiceCategory, ServiceSnapshot},
 };
@@ -254,6 +255,11 @@ async fn resolve_i2ptunnel_live(
     tunnel_manager: &dyn TunnelManagerControl,
 ) -> Result<serde_json::Value, String> {
     let definitions = tunnel_manager.list().await?;
+    if definitions.len() > MAX_TUNNEL_INVENTORY {
+        return Err(format!(
+            "I2PTunnel inventory exceeds maximum of {MAX_TUNNEL_INVENTORY} entries"
+        ));
+    }
 
     let mut client_obj = serde_json::Map::new();
     let mut server_obj = serde_json::Map::new();
@@ -262,12 +268,18 @@ async fn resolve_i2ptunnel_live(
         let name = def.name.as_str().to_string();
         let is_client = def.tunnel_type.is_client();
 
-        let address = def
-            .options
-            .target_destination
-            .clone()
-            .or_else(|| def.options.hosting_destination.clone())
-            .unwrap_or_default();
+        let address = if is_client {
+            def.options.target_destination.clone()
+        } else {
+            def.options.hosting_destination.clone()
+        }
+        .filter(|address| !address.is_empty())
+        .ok_or_else(|| {
+            format!(
+                "I2PTunnel '{}' has no actual I2P destination available",
+                def.name.as_str()
+            )
+        })?;
 
         let mut entry = serde_json::Map::new();
         entry.insert("address".to_string(), serde_json::json!(address));

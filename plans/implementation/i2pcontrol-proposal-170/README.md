@@ -80,8 +80,8 @@ See `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`.
 | M020 — Base I2PControl and JSON-RPC interoperability | closed | `020-base-i2pcontrol-and-jsonrpc-interoperability.md` | none |
 | M021 — TunnelManager exact wire, atomic persistence, and secret boundary | closed | `021-tunnelmanager-wire-atomicity-and-secrets.md` | M020 closed |
 | M022 — AddressBook runtime bridge and source reconciliation | closed internally against pinned revision | `022-addressbook-runtime-bridge.md` | M020, M021 closed |
-| M023 — Startup tunnel inventory and ClientServicesInfo truthfulness | ready | `023-startup-tunnel-inventory-and-client-services.md` | M021 closed |
-| M024 — Recoverable bounded SAM observation | blocked | `024-recoverable-bounded-sam-observation.md` | M023 |
+| M023 — Startup tunnel inventory and ClientServicesInfo truthfulness | closed | `023-startup-tunnel-inventory-and-client-services.md` | M021 closed |
+| M024 — Recoverable bounded SAM observation | ready | `024-recoverable-bounded-sam-observation.md` | M023 closed |
 | M025 — RouterInfo contract and source reconciliation | blocked | `025-routerinfo-contract-and-source-reconciliation.md` | M020, M022, M023, M024 |
 | M026 — Bounded router inspection sources | blocked | `026-bounded-router-inspection-sources.md` | M025 |
 | M027 — Exact conformance and independent reclosure | blocked | `027-proposal-170-conformance-and-reclosure.md` | M020–M026 |
@@ -115,7 +115,7 @@ M026 feasible bounded owner snapshots
 M027 exact conformance and independent reclosure
 ```
 
-M021 is now the only dependency-ready handoff. Successor plans are complete handoffs but must not execute before their hard dependencies close.
+M024 is now the only dependency-ready handoff. Successor plans are complete handoffs but must not execute before their hard dependencies close.
 
 ## Handoff discipline
 

@@ -16,6 +16,19 @@ The TunnelManager handler implements the `TunnelManager` JSON-RPC method for all
 - Ownership enforcement for startup-managed tunnels
 - Deterministic unsupported backend behavior for all 12 tunnel types
 
+Production inventory is the deterministic union of startup-configured generic
+client/server definitions and persisted control-plane definitions. Startup
+definitions are read-only observations and are not copied into the persistent
+generation store. A duplicate name across the two sources fails closed during
+I2PControl initialization; create and rename reject startup-owned names.
+
+The existing generic client/server managers do not expose independently
+cancellable named tasks: they own retrying task sets and their lifecycle
+authority is not safely targetable per name. M023 therefore deliberately keeps
+startup lifecycle operations externally managed rather than adding a supervisor
+or task registry. Proposal 170 lifecycle operations fail before touching those
+manager-owned tasks.
+
 ## Actions
 
 The seven canonical actions are lowercase:

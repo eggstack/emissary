@@ -42,7 +42,7 @@ use super::{
     errors::I2pControlError,
     production::{
         EventMetrics, ProductionAddressBookControl, ProductionControlPlane,
-        ProductionRouterInfoControl, ProductionTunnelManagerControl,
+        ProductionRouterInfoControl, ProductionTunnelManagerControl, StartupTunnelInventory,
     },
     router_info::RouterInfoControl,
     rpc::{
@@ -626,6 +626,9 @@ pub struct ServerInitContext {
     pub sam_listener_enabled: bool,
     /// The runtime address-book owner composed into the router.
     pub address_book_handle: Option<Arc<AddressBookHandle>>,
+    /// Startup-configured generic tunnel definitions shared with production
+    /// TunnelManager and the existing tunnel managers.
+    pub startup_tunnel_inventory: Option<StartupTunnelInventory>,
 }
 
 impl ServerInitContext {
@@ -644,6 +647,7 @@ impl ServerInitContext {
             sam_session_observation: None,
             sam_listener_enabled: false,
             address_book_handle: None,
+            startup_tunnel_inventory: None,
         }
     }
 
@@ -699,6 +703,13 @@ impl ServerInitContext {
     /// Inject the real runtime address-book owner.
     pub fn with_address_book_handle(mut self, handle: Arc<AddressBookHandle>) -> Self {
         self.address_book_handle = Some(handle);
+        self
+    }
+
+    /// Inject the startup tunnel inventory built by the application
+    /// composition root.
+    pub fn with_startup_tunnel_inventory(mut self, inventory: StartupTunnelInventory) -> Self {
+        self.startup_tunnel_inventory = Some(inventory);
         self
     }
 }
@@ -761,8 +772,13 @@ pub async fn init_server(
             tm_dir.display()
         ))
     })?;
+    let startup_tunnel_inventory = ctx.startup_tunnel_inventory.unwrap_or_default();
     let tunnels: Arc<ProductionTunnelManagerControl> = Arc::new(
-        ProductionTunnelManagerControl::new(tm_dir.clone()).map_err(|e| {
+        ProductionTunnelManagerControl::new_with_startup_inventory(
+            tm_dir.clone(),
+            startup_tunnel_inventory,
+        )
+        .map_err(|e| {
             I2pControlError::Persistence(format!("failed to create tunnel manager: {e}"))
         })?,
     );

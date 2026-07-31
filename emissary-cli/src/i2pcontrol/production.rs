@@ -25,35 +25,197 @@
 //! All adapters are `Send + Sync` and document no mutation, no event
 //! subscriber consumption, and no private key exposure.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    path::PathBuf,
+    sync::{Arc, RwLock},
+};
 
 use async_trait::async_trait;
 
-use crate::address_book::{
-    AddressBookHandle, RuntimeAddressBookEntry, RuntimeAddressBookSnapshot, RuntimeAddressBookType,
-};
-
-use crate::i2pcontrol::{
-    backends::{registry::TunnelBackendRegistry, BackendError, TunnelBackend},
-    control_plane::{AddressBookControl, ControlPlane, TunnelManagerControl},
-    domain::{
-        address_book::{
-            AddressBookConfiguration, AddressBookEntry, AdministrativeAddressBookType,
-            SubscriptionSet,
+use crate::{
+    address_book::{
+        AddressBookHandle, RuntimeAddressBookEntry, RuntimeAddressBookSnapshot,
+        RuntimeAddressBookType,
+    },
+    i2pcontrol::{
+        backends::{registry::TunnelBackendRegistry, BackendError, TunnelBackend},
+        control_plane::{AddressBookControl, ControlPlane, TunnelManagerControl},
+        domain::{
+            address_book::{
+                AddressBookConfiguration, AddressBookEntry, AdministrativeAddressBookType,
+                SubscriptionSet,
+            },
+            tunnel::{TunnelDefinition, TunnelName, TunnelType},
         },
-        tunnel::{TunnelDefinition, TunnelName, TunnelType},
+        observability::LogRing,
+        router_info::{
+            ActivePeerStats, BannedPeer, ClockSkew, I2PTunnelStats, InspectionError,
+            InspectionGroup, LogEntry, LogSnapshot, NetworkSnapshot, NetworkStatus, PeerIdentity,
+            PeerLimits, RecentTransitTraffic, RouterInfoControl, TransitBytes, TransportBytes,
+            TunnelBuildStats, TunnelSummary,
+        },
+        stores::{address_book_store::AddressBookStore, tunnel_store::TunnelStore},
     },
-    observability::LogRing,
-    router_info::{
-        ActivePeerStats, BannedPeer, ClockSkew, I2PTunnelStats, InspectionError, InspectionGroup,
-        LogEntry, LogSnapshot, NetworkSnapshot, NetworkStatus, PeerIdentity, PeerLimits,
-        RecentTransitTraffic, RouterInfoControl, TransitBytes, TransportBytes, TunnelBuildStats,
-        TunnelSummary,
-    },
-    stores::{address_book_store::AddressBookStore, tunnel_store::TunnelStore},
 };
 
 use emissary_core::{events::EventHandle, runtime::Runtime, FirewallStatus};
+
+/// Maximum number of startup and control-plane tunnel definitions exposed by
+/// one logical inventory.
+pub const MAX_TUNNEL_INVENTORY: usize = 1000;
+
+/// Parsed startup client tunnel values needed by the I2PControl composition
+/// seam. This deliberately avoids making the library-side I2PControl code
+/// depend on the binary's full configuration module.
+#[derive(Debug, Clone)]
+pub struct StartupClientConfig {
+    pub name: String,
+    pub address: Option<String>,
+    pub port: u16,
+    pub destination: String,
+    pub destination_port: Option<u16>,
+}
+
+/// Parsed startup server tunnel values needed by the I2PControl composition
+/// seam. The private destination path is intentionally not copied into the
+/// administrative inventory.
+#[derive(Debug, Clone)]
+pub struct StartupServerConfig {
+    pub name: String,
+    pub port: u16,
+}
+
+/// Read-only startup tunnel definitions shared by I2PControl and the existing
+/// generic tunnel managers.
+///
+/// The control plane may observe this source, but it never persists or mutates
+/// these definitions. The only runtime update is the actual server I2P
+/// destination reported by the existing Yosemite session after it starts.
+#[derive(Clone, Default)]
+pub struct StartupTunnelInventory {
+    definitions: Arc<RwLock<BTreeMap<String, TunnelDefinition>>>,
+}
+
+impl StartupTunnelInventory {
+    /// Map the already-parsed startup configuration into bounded domain DTOs.
+    pub fn from_configs(
+        clients: &[StartupClientConfig],
+        servers: &[StartupServerConfig],
+    ) -> Result<Self, String> {
+        let mut definitions = BTreeMap::new();
+        if clients.len().saturating_add(servers.len()) > MAX_TUNNEL_INVENTORY {
+            return Err(format!(
+                "startup tunnel inventory exceeds maximum of {MAX_TUNNEL_INVENTORY} entries"
+            ));
+        }
+
+        for config in clients {
+            let definition = startup_client_definition(config)?;
+            insert_startup_definition(&mut definitions, definition)?;
+        }
+        for config in servers {
+            let definition = startup_server_definition(config)?;
+            insert_startup_definition(&mut definitions, definition)?;
+        }
+
+        Ok(Self {
+            definitions: Arc::new(RwLock::new(definitions)),
+        })
+    }
+
+    /// Return startup definitions in deterministic name order.
+    pub fn list(&self) -> Result<Vec<TunnelDefinition>, String> {
+        let definitions = self
+            .definitions
+            .read()
+            .map_err(|_| "startup tunnel inventory lock poisoned".to_string())?;
+        Ok(definitions.values().cloned().collect())
+    }
+
+    /// Return one startup definition by its exact configured name.
+    pub fn get(&self, name: &str) -> Result<Option<TunnelDefinition>, String> {
+        let definitions = self
+            .definitions
+            .read()
+            .map_err(|_| "startup tunnel inventory lock poisoned".to_string())?;
+        Ok(definitions.get(name).cloned())
+    }
+
+    /// Publish the actual destination exposed by a running server tunnel.
+    pub fn publish_server_destination(&self, name: &str, destination: &str) -> Result<(), String> {
+        let mut definitions = self
+            .definitions
+            .write()
+            .map_err(|_| "startup tunnel inventory lock poisoned".to_string())?;
+        let Some(definition) = definitions.get_mut(name) else {
+            return Err("startup tunnel name is not configured".to_string());
+        };
+        if definition.tunnel_type != TunnelType::Server {
+            return Err("startup tunnel is not a server definition".to_string());
+        }
+        if destination.is_empty() {
+            return Err("server tunnel destination is empty".to_string());
+        }
+        definition.options.hosting_destination = Some(destination.to_string());
+        Ok(())
+    }
+}
+
+fn insert_startup_definition(
+    definitions: &mut BTreeMap<String, TunnelDefinition>,
+    definition: TunnelDefinition,
+) -> Result<(), String> {
+    let name = definition.name.as_str().to_string();
+    if definitions.insert(name, definition).is_some() {
+        return Err("duplicate startup tunnel name across client and server configuration".into());
+    }
+    Ok(())
+}
+
+fn startup_client_definition(config: &StartupClientConfig) -> Result<TunnelDefinition, String> {
+    let name = TunnelName::new(config.name.clone()).map_err(|error| error.to_string())?;
+    Ok(TunnelDefinition {
+        name,
+        tunnel_type: TunnelType::Client,
+        ownership: crate::i2pcontrol::domain::tunnel::TunnelOwnership::StartupManaged,
+        runtime_state: crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::ExternallyManaged,
+        start_intent: crate::i2pcontrol::domain::tunnel::StartIntent::StartOnLoad,
+        options: crate::i2pcontrol::domain::tunnel::TunnelOptions {
+            target_destination: Some(config.destination.clone()),
+            target_port: config.destination_port,
+            listen_interface: config.address.clone(),
+            listen_port: Some(config.port),
+            ..Default::default()
+        },
+        raw_config: BTreeMap::from([
+            ("name".into(), serde_json::json!(config.name)),
+            ("type".into(), serde_json::json!("client")),
+        ]),
+    })
+}
+
+fn startup_server_definition(config: &StartupServerConfig) -> Result<TunnelDefinition, String> {
+    let name = TunnelName::new(config.name.clone()).map_err(|error| error.to_string())?;
+    Ok(TunnelDefinition {
+        name,
+        tunnel_type: TunnelType::Server,
+        ownership: crate::i2pcontrol::domain::tunnel::TunnelOwnership::StartupManaged,
+        runtime_state: crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::ExternallyManaged,
+        start_intent: crate::i2pcontrol::domain::tunnel::StartIntent::StartOnLoad,
+        options: crate::i2pcontrol::domain::tunnel::TunnelOptions {
+            listen_port: Some(config.port),
+            // The destination is filled only after the existing server
+            // manager obtains it from Yosemite Session::destination().
+            hosting_destination: None,
+            ..Default::default()
+        },
+        raw_config: BTreeMap::from([
+            ("name".into(), serde_json::json!(config.name)),
+            ("type".into(), serde_json::json!("server")),
+        ]),
+    })
+}
 
 // `Runtime` is used by `EventHandleMetrics<R>` below.
 
@@ -367,16 +529,27 @@ fn runtime_entry_from(entry: AddressBookEntry) -> RuntimeAddressBookEntry {
 pub struct ProductionTunnelManagerControl {
     inner: Arc<tokio::sync::Mutex<TunnelStore>>,
     registry: TunnelBackendRegistry,
+    startup: StartupTunnelInventory,
 }
 
 impl ProductionTunnelManagerControl {
     /// Create a new production tunnel manager control plane.
+    #[allow(dead_code)]
     pub fn new(dir: PathBuf) -> Result<Self, String> {
+        Self::new_with_startup_inventory(dir, StartupTunnelInventory::default())
+    }
+
+    /// Create a production tunnel manager with the composed startup source.
+    pub fn new_with_startup_inventory(
+        dir: PathBuf,
+        startup: StartupTunnelInventory,
+    ) -> Result<Self, String> {
         let registry = crate::i2pcontrol::backends::registry::create_default_registry()
             .map_err(|e| format!("failed to create registry: {e}"))?;
         Ok(Self {
             inner: Arc::new(tokio::sync::Mutex::new(TunnelStore::new(dir, 1024 * 1024))),
             registry,
+            startup,
         })
     }
 
@@ -384,6 +557,26 @@ impl ProductionTunnelManagerControl {
     pub async fn load(&self) -> Result<(), String> {
         let mut store = self.inner.lock().await;
         store.load().await.map_err(|e| format!("store load: {e}"))?;
+        let startup_names = self
+            .startup
+            .list()?
+            .into_iter()
+            .map(|definition| definition.name.as_str().to_string())
+            .collect::<std::collections::BTreeSet<_>>();
+        if store
+            .list()
+            .iter()
+            .any(|definition| startup_names.contains(definition.name.as_str()))
+        {
+            return Err(
+                "startup and persisted tunnel definitions contain a colliding name".to_string(),
+            );
+        }
+        if startup_names.len().saturating_add(store.len()) > MAX_TUNNEL_INVENTORY {
+            return Err(format!(
+                "combined tunnel inventory exceeds maximum of {MAX_TUNNEL_INVENTORY} entries"
+            ));
+        }
         Ok(())
     }
 }
@@ -393,6 +586,7 @@ impl Clone for ProductionTunnelManagerControl {
         Self {
             inner: Arc::clone(&self.inner),
             registry: self.registry.clone(),
+            startup: self.startup.clone(),
         }
     }
 }
@@ -401,16 +595,47 @@ impl Clone for ProductionTunnelManagerControl {
 impl TunnelManagerControl for ProductionTunnelManagerControl {
     async fn list(&self) -> Result<Vec<TunnelDefinition>, String> {
         let store = self.inner.lock().await;
-        Ok(store.list().into_iter().cloned().collect())
+        let startup = self.startup.list()?;
+        let mut definitions = BTreeMap::new();
+        for definition in startup {
+            definitions.insert(definition.name.as_str().to_string(), definition);
+        }
+        for definition in store.list() {
+            if definitions
+                .insert(definition.name.as_str().to_string(), definition.clone())
+                .is_some()
+            {
+                return Err(
+                    "startup and persisted tunnel definitions contain a colliding name".into(),
+                );
+            }
+        }
+        if definitions.len() > MAX_TUNNEL_INVENTORY {
+            return Err(format!(
+                "combined tunnel inventory exceeds maximum of {MAX_TUNNEL_INVENTORY} entries"
+            ));
+        }
+        Ok(definitions.into_values().collect())
     }
 
     async fn get(&self, name: &str) -> Result<Option<TunnelDefinition>, String> {
+        if let Some(definition) = self.startup.get(name)? {
+            return Ok(Some(definition));
+        }
         let store = self.inner.lock().await;
         Ok(store.get(name).cloned())
     }
 
     async fn create(&self, definition: TunnelDefinition) -> Result<(), String> {
+        if self.startup.get(definition.name.as_str())?.is_some() {
+            return Err("error - tunnel name is owned by startup configuration".into());
+        }
         let mut store = self.inner.lock().await;
+        if store.len().saturating_add(self.startup.list()?.len()) >= MAX_TUNNEL_INVENTORY {
+            return Err(format!(
+                "combined tunnel inventory exceeds maximum of {MAX_TUNNEL_INVENTORY} entries"
+            ));
+        }
         if store.contains(definition.name.as_str()) {
             return Err(format!(
                 "error - tunnel '{}' already exists",
@@ -427,6 +652,14 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         definition: TunnelDefinition,
         new_name: Option<TunnelName>,
     ) -> Result<bool, String> {
+        if self.startup.get(name)?.is_some() {
+            return Err("error - tunnel name is owned by startup configuration".into());
+        }
+        if let Some(candidate) = new_name.as_ref() {
+            if self.startup.get(candidate.as_str())?.is_some() {
+                return Err("error - tunnel name is owned by startup configuration".into());
+            }
+        }
         let mut store = self.inner.lock().await;
         if store.get(name).is_none() {
             return Ok(false);
@@ -446,12 +679,18 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn delete(&self, name: &str) -> Result<bool, String> {
+        if self.startup.get(name)?.is_some() {
+            return Err("error - tunnel is managed by startup configuration".into());
+        }
         let mut store = self.inner.lock().await;
         let rev = store.remove(name).await.map_err(|e| format!("store remove: {e}"))?;
         Ok(rev.is_some())
     }
 
     async fn start(&self, name: &str) -> Result<String, String> {
+        if self.startup.get(name)?.is_some() {
+            return Err("startup-managed tunnel lifecycle is externally managed".into());
+        }
         let def = {
             let store = self.inner.lock().await;
             store
@@ -469,6 +708,9 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn stop(&self, name: &str) -> Result<String, String> {
+        if self.startup.get(name)?.is_some() {
+            return Err("startup-managed tunnel lifecycle is externally managed".into());
+        }
         let def = {
             let store = self.inner.lock().await;
             store
@@ -484,6 +726,9 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn restart(&self, name: &str) -> Result<String, String> {
+        if self.startup.get(name)?.is_some() {
+            return Err("startup-managed tunnel lifecycle is externally managed".into());
+        }
         let def = {
             let store = self.inner.lock().await;
             store

@@ -46,8 +46,8 @@ selectors do not appear in the response.
 ### `I2PTunnel`
 
 Always returns an object with `client` and `server` keys. Each value is
-a map of tunnel name to entry object (currently `{address}`, optionally
-`{port}` for server tunnels). Empty when no definitions exist.
+a deterministic map of tunnel name to entry object (currently `{address}`,
+optionally `{port}` for server tunnels). Empty when no definitions exist.
 
 ```json
 {
@@ -62,14 +62,26 @@ a map of tunnel name to entry object (currently `{address}`, optionally
 }
 ```
 
-**Live query (M011):** I2PTunnel inventory is queried from the shared
-`TunnelManagerControl` at request time, not from a startup-only
-registry snapshot. Successful Create/Edit/Rename/Delete mutations are
-visible to the next ClientServicesInfo query without restart. Store
-failures propagate as JSON-RPC errors rather than empty inventory.
+I2PTunnel inventory is queried from the shared `TunnelManagerControl` at
+request time. It combines the already-parsed startup client/server tunnel
+configuration with persisted control-plane definitions; startup entries are
+marked `StartupManaged`, remain read-only, and are never copied into the
+control-plane generation store. Successful control-plane mutations are visible
+to the next ClientServicesInfo query without restart. Store failures and
+missing address data propagate as JSON-RPC errors rather than empty or
+fabricated inventory.
 
-Unsupported definitions appear in the map but always with `Configured`
-state — they never report active/listening/running.
+For client tunnels, `address` is the configured remote I2P destination. For
+server tunnels, `address` is the destination returned by the running Yosemite
+session. A server's local TCP target/listen host is never serialized as an I2P
+address. A server entry is unavailable until its session has published an
+actual destination, at which point the selector fails explicitly if no
+contract-compatible address can be returned.
+
+Unsupported definitions remain explicit configured/inactive administrative
+definitions. If an unsupported definition has no actual I2P destination, this
+selector returns an error rather than presenting an empty address or claiming
+that the definition is active.
 
 ### `HTTPProxy`
 
@@ -188,6 +200,10 @@ exact Proposal 170 response shape.
   address and is actively serving requests.
 - Only `Listening` maps to `enabled: true` in the public response.
   `Configured` and `Starting` always map to `enabled: false`.
+- After either proxy's `run()` future returns, the composition root publishes
+  `Stopped`, so a successfully bound task cannot leave a stale enabled state.
+- Proxy observer updates are generation-fenced; an exited task from an older
+  generation cannot stop a replacement listener.
 - For I2PTunnel, the response does not distinguish configured from
   listening — it returns the inventory regardless. Unsupported
   tunnel definitions never appear in a running state.
@@ -205,15 +221,19 @@ exact Proposal 170 response shape.
   destinations, keys, payloads, or command channels cross the composition
   boundary.
 
-### I2PTunnel live query
+### I2PTunnel shared inventory
 
-I2PTunnel inventory is no longer populated at startup and stored in
-the registry. Instead, the handler queries `TunnelManagerControl::list()`
-at request time. This ensures:
+The application maps startup configuration once, before I2PControl serves, and
+passes the resulting read-only inventory to both production I2PControl and the
+existing generic tunnel-manager composition. The handler queries
+`TunnelManagerControl::list()` at request time. This ensures:
 
+- Startup and control-plane definitions appear exactly once in deterministic
+  name order
 - Successful Create/Edit/Rename/Delete mutations are visible immediately
 - Store failures propagate as JSON-RPC errors, not empty inventory
-- No stale startup-only inventory can persist across mutations
+- Startup/control-plane name collisions fail closed at startup and cannot be
+  created or renamed through the API
 - Unsupported definitions appear in the inventory but never as
   active/running/listening
 
@@ -254,7 +274,7 @@ consulted.
 Response size is bounded before dispatch:
 
 - `MAX_RESPONSE_BYTES` = 1 MiB (estimated)
-- `MAX_TUNNEL_DEFINITIONS` = 1000 per I2PTunnel map
+- `MAX_TUNNEL_INVENTORY` = 1000 combined startup/control-plane definitions
 - `SAM_SESSION_OBSERVATION_LIMIT` = 1000 sessions
 - `SAM_SOCKET_OBSERVATION_LIMIT` = 8 sockets per session
 

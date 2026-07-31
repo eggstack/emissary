@@ -642,6 +642,21 @@ fn no_startup_only_i2ptunnel_population() {
     );
 }
 
+/// Guard: production composition must pass the parsed startup inventory into
+/// the real tunnel manager, rather than constructing a disconnected fake or
+/// relying on a registry-only snapshot.
+#[test]
+fn production_composition_uses_shared_startup_inventory() {
+    let main = read_source("src/main.rs");
+    let server = read_source("src/i2pcontrol/server.rs");
+    let production = read_source("src/i2pcontrol/production.rs");
+    assert!(main.contains("StartupTunnelInventory::from_configs"));
+    assert!(main.contains("with_startup_tunnel_inventory"));
+    assert!(server.contains("new_with_startup_inventory"));
+    assert!(production.contains("startup and persisted tunnel definitions"));
+    assert!(production.contains("StartupManaged"));
+}
+
 /// Guard: no unconditional SAM sessions placeholder in production handler.
 ///
 /// Catches the defect where resolve_sam always returns "sessions": {}

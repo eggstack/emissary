@@ -202,6 +202,47 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
     let client_tunnels = mem::take(&mut config.client_tunnels);
     let client_tunnel_options = mem::take(&mut config.client_tunnel_options);
     let server_tunnels = mem::take(&mut config.server_tunnels);
+    #[cfg(feature = "i2pcontrol")]
+    let startup_clients = client_tunnels
+        .iter()
+        .map(|config| i2pcontrol::production::StartupClientConfig {
+            name: config.name.clone(),
+            address: config.address.clone(),
+            port: config.port,
+            destination: config.destination.clone(),
+            destination_port: config.destination_port,
+        })
+        .collect::<Vec<_>>();
+    #[cfg(feature = "i2pcontrol")]
+    let startup_servers = server_tunnels
+        .iter()
+        .map(|config| i2pcontrol::production::StartupServerConfig {
+            name: config.name.clone(),
+            port: config.port,
+        })
+        .collect::<Vec<_>>();
+    #[cfg(feature = "i2pcontrol")]
+    let startup_tunnel_inventory = i2pcontrol::production::StartupTunnelInventory::from_configs(
+        &startup_clients,
+        &startup_servers,
+    )
+    .map_err(|error| anyhow!("invalid startup tunnel inventory: {error}"))?;
+    #[cfg(feature = "i2pcontrol")]
+    let server_inventory_for_observer = startup_tunnel_inventory.clone();
+    #[cfg(feature = "i2pcontrol")]
+    let server_destination_observer = Some(Arc::new(move |name: &str, destination: &str| {
+        if let Err(error) =
+            server_inventory_for_observer.publish_server_destination(name, destination)
+        {
+            tracing::warn!(
+                target: LOG_TARGET,
+                %error,
+                "failed to publish startup server tunnel destination",
+            );
+        }
+    }) as crate::tunnel::server::DestinationObserver);
+    #[cfg(not(feature = "i2pcontrol"))]
+    let server_destination_observer: Option<crate::tunnel::server::DestinationObserver> = None;
     let router_ui_config = config.router_ui.clone();
     let router_config = config.config.take().expect("to exist");
     let base_path = config.base_path.clone();
@@ -342,12 +383,20 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                             proxy.local_addr(),
                         );
                         if let Err(error) = proxy.run().await {
+                            let error_for_observer = error;
+                            #[cfg(feature = "i2pcontrol")]
+                            i2pcontrol::observers::observe_proxy_failure(
+                                &http_observer_handle,
+                                &error_for_observer,
+                            );
                             tracing::debug!(
                                 target: LOG_TARGET,
-                                ?error,
+                                error = %error_for_observer,
                                 "http proxy exited",
                             );
                         }
+                        #[cfg(feature = "i2pcontrol")]
+                        i2pcontrol::observers::observe_proxy_stopped(&http_observer_handle);
                     }
                     Err(error) => {
                         let error_for_observer = anyhow::Error::from(error);
@@ -356,6 +405,8 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                             &http_observer_handle,
                             &error_for_observer,
                         );
+                        #[cfg(feature = "i2pcontrol")]
+                        i2pcontrol::observers::observe_proxy_stopped(&http_observer_handle);
                         tracing::warn!(
                             target: LOG_TARGET,
                             error = %error_for_observer,
@@ -392,12 +443,20 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                             proxy.local_addr(),
                         );
                         if let Err(error) = proxy.run().await {
+                            let error_for_observer = error;
+                            #[cfg(feature = "i2pcontrol")]
+                            i2pcontrol::observers::observe_proxy_failure(
+                                &socks_observer_handle,
+                                &error_for_observer,
+                            );
                             tracing::debug!(
                                 target: LOG_TARGET,
-                                ?error,
+                                error = %error_for_observer,
                                 "socks proxy exited",
                             );
                         }
+                        #[cfg(feature = "i2pcontrol")]
+                        i2pcontrol::observers::observe_proxy_stopped(&socks_observer_handle);
                     }
                     Err(error) => {
                         let error_for_observer = anyhow::Error::from(error);
@@ -406,6 +465,8 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                             &socks_observer_handle,
                             &error_for_observer,
                         );
+                        #[cfg(feature = "i2pcontrol")]
+                        i2pcontrol::observers::observe_proxy_stopped(&socks_observer_handle);
                         tracing::warn!(
                             target: LOG_TARGET,
                             error = %error_for_observer,
@@ -421,9 +482,14 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
             ClientTunnelManager::new(client_tunnels, client_tunnel_options, address.port()).run(),
         );
         tokio::spawn(
-            ServerTunnelManager::new(server_tunnels, address.port(), path.clone())
-                .await
-                .run(),
+            ServerTunnelManager::new(
+                server_tunnels,
+                address.port(),
+                path.clone(),
+                server_destination_observer,
+            )
+            .await
+            .run(),
         );
 
         address_book_handle
@@ -505,6 +571,8 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                 if let Some(handle) = router.sam_session_observation_handle() {
                     ctx = ctx.with_sam_session_observation(handle);
                 }
+
+                ctx = ctx.with_startup_tunnel_inventory(startup_tunnel_inventory.clone());
 
                 let instance =
                     i2pcontrol::server::init_server(&server_config, &base_path, ctx).await?;

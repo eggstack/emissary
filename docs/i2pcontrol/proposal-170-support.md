@@ -14,7 +14,7 @@ Current corrective roadmap:
 
 Next executable handoff:
 
-- M023, `plans/implementation/i2pcontrol-proposal-170/023-startup-tunnel-inventory-and-client-services.md`
+- M024, `plans/implementation/i2pcontrol-proposal-170/024-recoverable-bounded-sam-observation.md`
 
 ## Status model
 
@@ -37,7 +37,9 @@ The repository contains substantial retained Proposal 170 infrastructure, but it
 Retained candidate implementation includes:
 
 - HTTPS I2PControl service with bounded request and connection handling;
-- typed twelve-tunnel inventory and exhaustive unsupported backend registry;
+- typed twelve-tunnel administrative inventory and exhaustive unsupported
+  backend registry (only the existing generic startup client/server managers
+  have runtime data-plane support);
 - durable generation stores;
 - direct Proposal 170 parameter forms;
 - passive service registry;
@@ -46,7 +48,7 @@ Retained candidate implementation includes:
 - live event counters and log ring sources;
 - explicit unavailable/unsupported behavior in several paths.
 
-Material corrective work remains in M023–M027; M022's scoped AddressBook bridge is closed.
+Material corrective work remains in M024–M027; M023's scoped startup/client-service correction is closed.
 
 ## Base I2PControl/JSON-RPC
 
@@ -63,8 +65,8 @@ truthfulness work.
 
 ## TunnelManager
 
-Current status: M021 implementation complete; M023 remains the source/lifecycle
-successor and the overall subsystem remains corrective-pass work
+Current status: M023 implementation complete and closed for its bounded
+source/lifecycle correction; the overall subsystem remains corrective-pass work
 
 Retained:
 
@@ -83,13 +85,21 @@ M021 now also provides:
 - secret-safe typed persistence and response serialization;
 - separate compatibility serializers for capitalized actions and `List`.
 
-Known defects:
+M023 corrections:
 
-- startup-managed tunnel inventory is not production-backed;
-- canonical lifecycle status translation still depends on M023 for truthful
-  startup-managed runtime sources.
+- startup-configured generic client/server tunnels are now mapped at
+  composition into a bounded, read-only `StartupManaged` source shared with
+  production TunnelManager and ClientServicesInfo;
+- persisted startup-name collisions fail closed, and control-plane create,
+  rename, delete, and lifecycle operations cannot target startup ownership;
+- no safe named lifecycle adapter exists: the current generic managers own
+  retrying task sets rather than independently cancellable named tasks, so
+  startup lifecycle remains explicitly externally managed;
+- proxy task exit publishes `Stopped` with generation fencing;
+- ClientServicesInfo uses client remote destinations and server session-published
+  destinations only, with explicit error behavior for unknown address state.
 
-Owner: M023 for the remaining startup/runtime source work.
+Closure: `plans/closure/i2pcontrol-proposal-170/023-closure.md`.
 
 ### Missing tunnel data planes
 
@@ -126,14 +136,15 @@ Current status: direct wire scaffold retained; source/lifecycle correction requi
 
 | Selector | Retained behavior | Corrective requirement |
 |---|---|---|
-| `I2PTunnel` | live query of control-plane store | include startup-managed inventory and use actual I2P address provenance |
-| `HTTPProxy` | bind/listening observation | publish inactive state on task exit |
-| `SOCKS` | bind/listening observation | publish inactive state on task exit |
+| `I2PTunnel` | shared live startup/control-plane inventory | M023 implemented ownership, collision, bound, and address provenance rules |
+| `HTTPProxy` | bind/listening observation | M023 publishes inactive state on task exit |
+| `SOCKS` | bind/listening observation | M023 publishes inactive state on task exit |
 | `SAM` | bounded active-session source | recover from transient incomplete/overflow state without restart |
 | `BOB` | exact boolean `false` | retained |
 | `I2CP` | actual listener state | revalidate in final source matrix |
 
-Owners: M023 and M024.
+Owner: M024 for recoverable SAM observation; M023's tunnel/proxy source work is
+implemented.
 
 ## RouterInfo
 
@@ -178,8 +189,8 @@ Owners: M022, rechecked by M027.
 | M020 | closed | base I2PControl authentication/token/error and JSON-RPC correctness |
 | M021 | closed | TunnelManager exact wire, atomic persistence, secret boundary |
 | M022 | closed internally against pinned revision | actual AddressBook runtime authority and source objects |
-| M023 | ready | startup tunnel inventory and client-service lifecycle/address truthfulness |
-| M024 | blocked | recoverable bounded SAM observation |
+| M023 | closed internally against pinned revision | startup tunnel inventory and client-service lifecycle/address truthfulness |
+| M024 | ready | recoverable bounded SAM observation |
 | M025 | blocked | exact RouterInfo contract/source matrix |
 | M026 | blocked | feasible bounded read-only router inspection sources |
 | M027 | blocked | literal conformance, documentation reconciliation, independent closure |

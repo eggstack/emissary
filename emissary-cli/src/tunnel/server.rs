@@ -22,6 +22,10 @@ use yosemite::{style, DestinationKind, RouterApi, Session, SessionOptions};
 
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
+/// Passive callback used only to publish the actual destination returned by
+/// an existing server session into the composed startup inventory.
+pub type DestinationObserver = Arc<dyn Fn(&str, &str) + Send + Sync>;
+
 /// Logging target for the file.
 const LOG_TARGET: &str = "emissary::server-tunnel";
 
@@ -56,6 +60,9 @@ pub struct TunnelConfig {
 pub struct ServerTunnelManager {
     /// Server tunnels.
     tunnels: Vec<Arc<TunnelConfig>>,
+
+    /// Optional passive destination publication callback.
+    destination_observer: Option<DestinationObserver>,
 }
 
 impl ServerTunnelManager {
@@ -64,6 +71,7 @@ impl ServerTunnelManager {
         configs: Vec<ServerTunnelConfig>,
         sam_tcp_port: u16,
         base_path: PathBuf,
+        destination_observer: Option<DestinationObserver>,
     ) -> Self {
         let mut tunnels = Vec::<Arc<TunnelConfig>>::new();
         let mut router_api = RouterApi::new(sam_tcp_port);
@@ -103,7 +111,10 @@ impl ServerTunnelManager {
             }
         }
 
-        Self { tunnels }
+        Self {
+            tunnels,
+            destination_observer,
+        }
     }
 
     /// Attempt to load destination from `path` and if it does't exist, call router over SAMv3 to
@@ -163,7 +174,10 @@ impl ServerTunnelManager {
     }
 
     /// Run the event loop of server tunnel.
-    async fn server_event_loop(config: Arc<TunnelConfig>) {
+    async fn server_event_loop(
+        config: Arc<TunnelConfig>,
+        destination_observer: Option<DestinationObserver>,
+    ) {
         tracing::info!(
             target: LOG_TARGET,
             name = %config.name,
@@ -198,6 +212,10 @@ impl ServerTunnelManager {
             }
         };
 
+        if let Some(observer) = destination_observer.as_ref() {
+            observer(&config.name, session.destination());
+        }
+
         // send `STREAM FORWARD` command to session and if it fails, sleep and try again later
         loop {
             let Err(error) = session.forward(config.port).await else {
@@ -226,7 +244,10 @@ impl ServerTunnelManager {
         }
 
         for tunnel in self.tunnels {
-            tokio::spawn(Self::server_event_loop(Arc::clone(&tunnel)));
+            tokio::spawn(Self::server_event_loop(
+                Arc::clone(&tunnel),
+                self.destination_observer.clone(),
+            ));
         }
     }
 }

@@ -388,13 +388,10 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
                 ));
             }
         }
-        store.remove(name).await.map_err(|e| format!("store remove: {e}"))?;
-        let mut def = definition;
-        if let Some(ref nn) = new_name {
-            def.name = nn.clone();
-        }
-        store.upsert(def).await.map_err(|e| format!("store upsert: {e}"))?;
-        Ok(true)
+        store
+            .update(name, definition, new_name.as_ref().map(TunnelName::as_str))
+            .await
+            .map_err(|e| format!("store update: {e}"))
     }
 
     async fn delete(&self, name: &str) -> Result<bool, String> {
@@ -413,7 +410,7 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         };
         let backend = self.registry.get(def.tunnel_type);
         match backend.start(&def).await {
-            Ok(()) => Ok(format!("ok - {} started", def.tunnel_type.as_str())),
+            Ok(()) => Ok("ok".to_string()),
             Err(BackendError::NotImplemented { tunnel_type }) =>
                 Ok(format!("error - {} not implemented", tunnel_type.as_str())),
             Err(e) => Ok(format!("error - {e}")),
@@ -446,7 +443,7 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         let backend = self.registry.get(def.tunnel_type);
         let _ = backend.stop(&def).await;
         match backend.start(&def).await {
-            Ok(()) => Ok(format!("ok - {} restarted", def.tunnel_type.as_str())),
+            Ok(()) => Ok("ok".to_string()),
             Err(BackendError::NotImplemented { tunnel_type }) =>
                 Ok(format!("error - {} not implemented", tunnel_type.as_str())),
             Err(e) => Ok(format!("error - {e}")),

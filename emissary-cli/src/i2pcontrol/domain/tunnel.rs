@@ -623,7 +623,7 @@ impl fmt::Display for OptionRedacted {
 ///
 /// This is the canonical round-trip representation consumed by TunnelManager
 /// `get` and persisted by the generation store.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct TunnelDefinition {
     /// The validated tunnel name (exact user spelling).
     pub name: TunnelName,
@@ -648,6 +648,23 @@ pub struct TunnelDefinition {
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     #[serde(default)]
     pub raw_config: BTreeMap<String, serde_json::Value>,
+}
+
+impl fmt::Debug for TunnelDefinition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Raw configuration can contain future backend credentials that are
+        // intentionally persisted once but must never enter diagnostics.
+        let raw_keys: Vec<&str> = self.raw_config.keys().map(String::as_str).collect();
+        f.debug_struct("TunnelDefinition")
+            .field("name", &self.name)
+            .field("tunnel_type", &self.tunnel_type)
+            .field("ownership", &self.ownership)
+            .field("runtime_state", &self.runtime_state)
+            .field("start_intent", &self.start_intent)
+            .field("options", &self.options)
+            .field("raw_config_keys", &raw_keys)
+            .finish()
+    }
 }
 
 #[cfg(test)]
@@ -875,5 +892,22 @@ mod tests {
         let desc_pos = json.find("description").unwrap();
         let port_pos = json.find("listen_port").unwrap();
         assert!(desc_pos < port_pos);
+    }
+
+    #[test]
+    fn tunnel_definition_debug_redacts_raw_configuration_values() {
+        let def = TunnelDefinition {
+            name: TunnelName::new("secret").unwrap(),
+            tunnel_type: TunnelType::Client,
+            ownership: TunnelOwnership::ControlPlane,
+            runtime_state: TunnelRuntimeState::Stopped,
+            start_intent: StartIntent::DoNotStart,
+            options: TunnelOptions::default(),
+            raw_config: BTreeMap::from([(
+                "OutproxyPassword".to_string(),
+                serde_json::json!("do-not-log"),
+            )]),
+        };
+        assert!(!format!("{def:?}").contains("do-not-log"));
     }
 }

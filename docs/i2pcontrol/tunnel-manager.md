@@ -1,6 +1,8 @@
 # I2PControl TunnelManager
 
-Status: closed internally against the pinned Proposal 170 revision by M019A
+Status: M021 implemented; implementation closure is recorded in
+`plans/closure/i2pcontrol-proposal-170/021-closure.md`. The subsystem remains
+`corrective pass required` until M027 performs final conformance closure.
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
 
@@ -132,6 +134,33 @@ Retrieves a tunnel definition by name.
 }
 ```
 
+The canonical response has no legacy `Name`, `Type`, `State`, flattened
+`i2p.tunnel.*`, or fabricated destination fields:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "status": "success - options for my-proxy",
+    "info": {
+      "client": true,
+      "status": "stopped",
+      "persistentClientKey": false,
+      "offlineKeys": false,
+      "targetDestination": "exampleDestinationString",
+      "rawConfig": {
+        "name": "my-proxy",
+        "type": "client",
+        "Port": 7656,
+        "TargetDestination": "exampleDestinationString",
+        "StartOnLoad": false
+      }
+    }
+  },
+  "id": 1
+}
+```
+
 Canonical `get` returns `{status, info}`. Canonical `create`, `edit`, lifecycle,
 and `delete` return a structured `{status}` result, with `results` where the
 operation returns a result list. Valid canonical operations that fail during
@@ -174,9 +203,10 @@ Returns all tunnel definitions as an array.
 }
 ```
 
-Dispatches through the backend registry. Returns:
-- `ok - <type> started` for supported backends
-- `error - <type> not implemented` for unsupported backends
+Dispatches through the backend registry. Canonical statuses are translated at
+the handler boundary and are tied to the requested action/name:
+- `success - starting tunnel <name>` for supported backends
+- `error - start tunnel <name> not implemented` for unsupported backends
 - Ownership error for startup-managed definitions
 
 ### Stop
@@ -234,7 +264,13 @@ data-plane support.
 |---|---|
 | Parsed and round-tripped | `Description`, `StartOnLoad`, `TargetDestination`, `Destination`, `TargetPort`, `ReachableBy`, `Port`, `TargetHost`, `Host` |
 | Validated and retained in raw configuration | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `UseOutproxyPlugin`, `ProxyAuth`, `OutproxyAuth`, `DelayOpen`, `Reduce`, `Close`, `NewDest`, `PersistentClientKey`, `AllowInternalSSL`, `BlockAccessInProxies`, `UniqueLocalAddressPerClient`, `MultiHoming`, `CustomOptions`, `LeaseSetClientAuths` |
-| Accepted and retained in raw configuration | `SigType`, `EncType`, `ProxyList`, `ProxyUsername`, `ProxyPassword`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `SSLProxies`, `JumpList`, `ConnectDelay`, `Profile`, `ReduceCount`, `ReduceTime`, `CloseTime`, `PrivKeyFile`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `WebsiteHostname`, `SpoofedHost`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `OptionalLookup`, `EncryptLeaseSet` |
+| Accepted and retained in raw configuration | `SigType`, `EncType`, `ProxyList`, `ProxyUsername`, `ProxyPassword`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `SSLProxies`, `JumpList`, `ConnectDelay`, `Profile`, `ReduceCount`, `ReduceTime`, `CloseTime`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `WebsiteHostname`, `SpoofedHost`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `OptionalLookup`, `EncryptLeaseSet` |
+
+`PrivKeyFile` is part of the pinned input inventory but is rejected by the
+canonical Emissary boundary because generic raw configuration must not accept
+runtime-generated key material. Passwords and authentication containers are
+accepted only for future backend persistence and are never serialized in
+generic responses.
 
 No field in this matrix starts a tunnel, creates a data-plane session, or
 reports a fabricated runtime state. Unsupported backends return an explicit
@@ -304,6 +340,12 @@ status/error while preserving durable definitions.
 - `i2cp` - Object with string key-value pairs
 - `i2p.tunnel.customOptions` - Object with string key-value pairs
 
+Canonical requests use the Proposal 170 option names above. Unknown
+top-level canonical keys and compatibility-only `i2p.tunnel.*` aliases are
+rejected. `CustomOptions` is the canonical arbitrary option container;
+`LeaseSetClientAuths` is an array of objects and is persisted but omitted from
+generic responses.
+
 ## Security
 
 - Secret fields (`ssl_key`, `proxy_password`, `irc_password`) are redacted in Debug/Display
@@ -311,6 +353,10 @@ status/error while preserving durable definitions.
 - Descriptions are validated for length (max 4096)
 - Port values are validated for u16 range
 - Error messages do not expose Rust type names or internal state
+- Secret values are stored once where future runtime use requires them and are
+  omitted from canonical and compatibility responses
+- Canonical `PrivKeyFile` input is rejected because generic raw configuration
+  is not a key-material ingress path
 
 ## Static guards
 
@@ -322,7 +368,7 @@ status/error while preserving durable definitions.
 
 ## Tests
 
-The handler includes 68 tests covering:
+The handler includes focused tests covering:
 
 - Action and type parsing validation
 - CRUD operations for all 12 tunnel types
@@ -333,3 +379,6 @@ The handler includes 68 tests covering:
 - Concurrent and race condition determinism
 - Secret redaction in Debug/Display
 - Static guards for no resource allocation
+- Exact canonical `info` keys and lower-case `rawConfig.name/type`
+- Unknown/malformed option rejection and `EncryptLeaseSet` enum boundaries
+- Secret omission from responses and one-publication rename failure behavior

@@ -78,6 +78,16 @@ pub(crate) async fn handle_tunnel_manager(
         }
     };
 
+    // Private-key material is never accepted through the generic administrative
+    // raw configuration boundary, including the compatibility path.
+    if params.contains_key("PrivKeyFile") {
+        return error_response(
+            id,
+            rpc::error_codes::INVALID_PARAMS,
+            "PrivKeyFile is not accepted by TunnelManager",
+        );
+    }
+
     // Extract and validate action (required)
     let action_str = match params.get("Action").and_then(|v| v.as_str()) {
         Some(s) => s,
@@ -134,8 +144,11 @@ pub(crate) async fn handle_tunnel_manager(
     // Extract optional NewName
     let new_name_str = params.get("NewName").and_then(|v| v.as_str());
 
-    // Reject All for non-lifecycle actions
-    if all
+    if canonical {
+        if let Err(message) = validate_canonical_request(params, action, all) {
+            return error_response(id, rpc::error_codes::INVALID_PARAMS, message);
+        }
+    } else if all
         && !matches!(
             action,
             crate::i2pcontrol::domain::tunnel::TunnelAction::Start
@@ -204,7 +217,7 @@ async fn handle_list(state: &I2pControlState, id: RequestId) -> serde_json::Valu
     match state.tunnel_list().await {
         Ok(definitions) => {
             let result: Vec<serde_json::Value> =
-                definitions.iter().map(tunnel_definition_to_get_result).collect();
+                definitions.iter().map(tunnel_definition_to_compat_result).collect();
             success_response(id, serde_json::json!(result))
         }
         Err(e) => {
@@ -483,10 +496,24 @@ async fn handle_edit(
     // Merge options: existing values preserved where new is None
     let merged_options = merge_tunnel_options(&existing.options, &new_options);
 
-    // Type is immutable in Edit (use existing)
-    let tunnel_type = tunnel_type_str
-        .and_then(TunnelType::from_str_exact)
-        .unwrap_or(existing.tunnel_type);
+    // Type is immutable in Edit. A supplied value must still be a valid
+    // canonical type and must agree with the stored definition.
+    let tunnel_type = match tunnel_type_str {
+        Some(value) => match TunnelType::from_str_exact(value) {
+            Some(parsed) if parsed == existing.tunnel_type => parsed,
+            Some(_) => {
+                return error_response(
+                    id,
+                    rpc::error_codes::INVALID_PARAMS,
+                    "Type cannot be changed by edit",
+                );
+            }
+            None => {
+                return error_response(id, rpc::error_codes::INVALID_PARAMS, "Invalid tunnel type");
+            }
+        },
+        None => existing.tunnel_type,
+    };
 
     // Build the final definition name
     let final_name = new_name.clone().unwrap_or_else(|| existing.name.clone());
@@ -494,7 +521,13 @@ async fn handle_edit(
     // Update raw_config: merge new params into existing
     let mut raw_config = existing.raw_config;
     for (k, v) in params {
-        if k != "Name" && k != "Action" && k != "Type" && k != "NewName" && k != "All" {
+        if k != "Name"
+            && k != "Action"
+            && k != "Type"
+            && k != "NewName"
+            && k != "All"
+            && !is_typed_secret_key(k)
+        {
             raw_config.insert(k.clone(), v.clone());
         }
     }
@@ -589,7 +622,11 @@ async fn handle_get(
 
     match state.tunnel_get(tunnel_name).await {
         Ok(Some(definition)) => {
-            let result = tunnel_definition_to_get_result(&definition);
+            let result = if canonical {
+                tunnel_definition_to_get_result(&definition)
+            } else {
+                tunnel_definition_to_compat_result(&definition)
+            };
             if canonical {
                 operation_response(
                     id,
@@ -798,7 +835,12 @@ async fn handle_lifecycle(
     };
 
     match result {
-        Ok(status) if canonical => operation_response(id, status, None, None),
+        Ok(status) if canonical => operation_response(
+            id,
+            canonical_lifecycle_status(action, tunnel_name, &status),
+            None,
+            None,
+        ),
         Ok(status) => success_response(id, serde_json::json!(status)),
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "{} failed: {}", action, e);
@@ -877,6 +919,11 @@ async fn handle_lifecycle_all(
 
         match result {
             Ok(status) => {
+                let status = if canonical {
+                    canonical_lifecycle_status(action, def.name.as_str(), &status)
+                } else {
+                    status
+                };
                 results.push(serde_json::json!(status));
                 last_result = status;
                 if last_result.starts_with("error") {
@@ -884,8 +931,13 @@ async fn handle_lifecycle_all(
                 }
             }
             Err(e) => {
-                results.push(serde_json::json!(e));
-                last_result = e;
+                let status = if canonical {
+                    format!("error - {action} tunnel {}", def.name.as_str())
+                } else {
+                    e
+                };
+                results.push(serde_json::json!(status));
+                last_result = status;
                 any_error = true;
             }
         }
@@ -916,68 +968,118 @@ async fn handle_lifecycle_all(
     }
 }
 
-/// Convert a TunnelDefinition to the Proposal 170 Get result format.
+/// Convert a TunnelDefinition to the exact canonical Proposal 170 `get` info.
 pub(crate) fn tunnel_definition_to_get_result(def: &TunnelDefinition) -> serde_json::Value {
-    let mut result = serde_json::Map::new();
+    let mut info = serde_json::Map::new();
+    info.insert(
+        "client".to_string(),
+        serde_json::json!(def.tunnel_type.is_client()),
+    );
+    info.insert(
+        "status".to_string(),
+        serde_json::json!(wire_runtime_status(def)),
+    );
+    info.insert(
+        "persistentClientKey".to_string(),
+        serde_json::json!(def
+            .raw_config
+            .get("PersistentClientKey")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)),
+    );
+    // Emissary has no canonical offline-key source yet. The neutral boolean
+    // is truthful and remains distinct from a fabricated destination.
+    info.insert("offlineKeys".to_string(), serde_json::json!(false));
 
+    if let Some(destination) = def.options.target_destination.as_deref().filter(|s| !s.is_empty()) {
+        info.insert(
+            "targetDestination".to_string(),
+            serde_json::json!(destination),
+        );
+    }
+
+    let mut raw_config = serde_json::Map::new();
+    raw_config.insert("name".to_string(), serde_json::json!(def.name.as_str()));
+    raw_config.insert(
+        "type".to_string(),
+        serde_json::json!(def.tunnel_type.as_str()),
+    );
+    for (key, value) in &def.raw_config {
+        if is_canonical_option_key(key) && !is_sensitive_key(key) {
+            raw_config.insert(key.clone(), value.clone());
+        }
+    }
+    insert_typed_canonical_options(&mut raw_config, def);
+    info.insert(
+        "rawConfig".to_string(),
+        serde_json::Value::Object(raw_config),
+    );
+
+    serde_json::json!(info)
+}
+
+/// Preserve the historical compatibility response without allowing secrets
+/// or internal ownership/runtime metadata to cross the wire.
+fn tunnel_definition_to_compat_result(def: &TunnelDefinition) -> serde_json::Value {
+    let mut result = serde_json::Map::new();
     result.insert("Name".to_string(), serde_json::json!(def.name.as_str()));
     result.insert(
         "Type".to_string(),
         serde_json::json!(def.tunnel_type.as_str()),
     );
+    result.insert(
+        "State".to_string(),
+        serde_json::json!(wire_runtime_status(def)),
+    );
+    for (key, value) in &def.raw_config {
+        if !is_sensitive_key(key) {
+            result.entry(key.clone()).or_insert_with(|| value.clone());
+        }
+    }
+    serde_json::Value::Object(result)
+}
 
-    // Map internal state to Proposal 170 wire state
-    let state_str = match def.runtime_state {
+fn wire_runtime_status(def: &TunnelDefinition) -> &'static str {
+    match def.runtime_state {
         TunnelRuntimeState::Running => "running",
         TunnelRuntimeState::Starting => "starting",
         TunnelRuntimeState::Stopping => "stopping",
         TunnelRuntimeState::Failed => "failed",
-        TunnelRuntimeState::Stopped | TunnelRuntimeState::Unsupported => "stopped",
-        TunnelRuntimeState::ExternallyManaged => "stopped",
+        TunnelRuntimeState::Stopped
+        | TunnelRuntimeState::Unsupported
+        | TunnelRuntimeState::ExternallyManaged => "stopped",
+    }
+}
+
+fn insert_typed_canonical_options(
+    raw_config: &mut serde_json::Map<String, serde_json::Value>,
+    def: &TunnelDefinition,
+) {
+    let insert = |key: &str, value: serde_json::Value, config: &mut serde_json::Map<_, _>| {
+        config.entry(key.to_string()).or_insert(value);
     };
-    result.insert("State".to_string(), serde_json::json!(state_str));
-
-    // Include raw_config options for lossless round-trip (after core fields,
-    // using or_insert so protocol metadata in raw_config never overwrites
-    // the correct Name/Type/State values).
-    for (k, v) in &def.raw_config {
-        result.entry(k.clone()).or_insert_with(|| v.clone());
+    if let Some(value) = &def.options.description {
+        insert("Description", serde_json::json!(value), raw_config);
     }
-
-    // Also include typed options for fields not in raw_config
-    if let Some(ref desc) = def.options.description {
-        if !result.contains_key("description") {
-            result.insert("description".to_string(), serde_json::json!(desc));
-        }
+    if let Some(value) = def.options.start_on_load {
+        insert(
+            "StartOnLoad",
+            serde_json::json!(matches!(value, StartIntent::StartOnLoad)),
+            raw_config,
+        );
     }
-    if let Some(ref dest) = def.options.target_destination {
-        if !result.contains_key("i2p.tunnel.clientDest") {
-            result.insert("i2p.tunnel.clientDest".to_string(), serde_json::json!(dest));
-        }
+    if let Some(value) = &def.options.target_destination {
+        insert("TargetDestination", serde_json::json!(value), raw_config);
     }
-    if let Some(port) = def.options.target_port {
-        if !result.contains_key("i2p.tunnel.clientDestPort") {
-            result.insert(
-                "i2p.tunnel.clientDestPort".to_string(),
-                serde_json::json!(port),
-            );
-        }
+    if let Some(value) = def.options.target_port {
+        insert("TargetPort", serde_json::json!(value), raw_config);
     }
-    if let Some(ref iface) = def.options.listen_interface {
-        if !result.contains_key("i2p.tunnel.listenInterface") {
-            result.insert(
-                "i2p.tunnel.listenInterface".to_string(),
-                serde_json::json!(iface),
-            );
-        }
+    if let Some(value) = &def.options.listen_interface {
+        insert("ReachableBy", serde_json::json!(value), raw_config);
     }
-    if let Some(port) = def.options.listen_port {
-        if !result.contains_key("i2p.tunnel.listenPort") {
-            result.insert("i2p.tunnel.listenPort".to_string(), serde_json::json!(port));
-        }
+    if let Some(value) = def.options.listen_port {
+        insert("Port", serde_json::json!(value), raw_config);
     }
-
-    serde_json::Value::Object(result)
 }
 
 /// Extract tunnel options from request params.
@@ -1095,6 +1197,9 @@ fn extract_tunnel_options(
     if let Some(v) = params.get("i2p.tunnel.proxyPassword").and_then(|v| v.as_str()) {
         options.proxy_password = crate::i2pcontrol::domain::tunnel::OptionRedacted::new(v);
     }
+    if let Some(v) = params.get("ProxyPassword").and_then(|v| v.as_str()) {
+        options.proxy_password = crate::i2pcontrol::domain::tunnel::OptionRedacted::new(v);
+    }
 
     // IRC options
     if let Some(v) = params.get("i2p.tunnel.ircServer").and_then(|v| v.as_str()) {
@@ -1131,7 +1236,11 @@ fn extract_tunnel_options(
     }
 
     // Custom options
-    if let Some(obj) = params.get("i2p.tunnel.customOptions").and_then(|v| v.as_object()) {
+    if let Some(obj) = params
+        .get("CustomOptions")
+        .or_else(|| params.get("i2p.tunnel.customOptions"))
+        .and_then(|v| v.as_object())
+    {
         for (k, v) in obj {
             if let Some(s) = v.as_str() {
                 options.custom_options.insert(k.clone(), s.to_string());
@@ -1208,7 +1317,13 @@ fn extract_raw_config(
         // Preserve only option fields for lossless round-trip.
         // Protocol metadata (Name, Action, Type, NewName, All) is not stored
         // in raw_config because it is managed by the TunnelDefinition fields.
-        if k != "Name" && k != "Action" && k != "Type" && k != "NewName" && k != "All" {
+        if k != "Name"
+            && k != "Action"
+            && k != "Type"
+            && k != "NewName"
+            && k != "All"
+            && !is_typed_secret_key(k)
+        {
             raw.insert(k.clone(), v.clone());
         }
     }
@@ -1225,6 +1340,240 @@ fn action_to_display(action: &str) -> &str {
     }
 }
 
+fn canonical_lifecycle_status(action: &str, name: &str, backend_status: &str) -> String {
+    if backend_status == "ok" {
+        let verb = match action {
+            "start" => "starting",
+            "stop" => "stopping",
+            "restart" => "restarting",
+            _ => action,
+        };
+        return format!("success - {verb} tunnel {name}");
+    }
+    if backend_status.contains("not implemented") {
+        return format!("error - {action} tunnel {name} not implemented");
+    }
+    format!("error - {action} tunnel {name}")
+}
+
+const CANONICAL_OPTION_KEYS: &[&str] = &[
+    "Port",
+    "TargetHost",
+    "Host",
+    "TargetPort",
+    "TargetDestination",
+    "Destination",
+    "StartOnLoad",
+    "Description",
+    "ReachableBy",
+    "Shared",
+    "UseSSL",
+    "TunnelLength",
+    "TunnelVariance",
+    "TunnelQuantity",
+    "TunnelBackupQuantity",
+    "SigType",
+    "EncType",
+    "CustomOptions",
+    "ProxyList",
+    "UseOutproxyPlugin",
+    "ProxyAuth",
+    "ProxyUsername",
+    "ProxyPassword",
+    "OutproxyAuth",
+    "OutproxyUsername",
+    "OutproxyPassword",
+    "OutproxyType",
+    "SSLProxies",
+    "JumpList",
+    "ConnectDelay",
+    "Profile",
+    "DelayOpen",
+    "Reduce",
+    "ReduceCount",
+    "ReduceTime",
+    "Close",
+    "CloseTime",
+    "NewDest",
+    "PersistentClientKey",
+    "PrivKeyFile",
+    "AllowUserAgent",
+    "AllowReferer",
+    "AllowAccept",
+    "AllowInternalSSL",
+    "WebsiteHostname",
+    "SpoofedHost",
+    "BlockAccessInProxies",
+    "BlockUserAgents",
+    "UserAgents",
+    "UniqueLocalAddressPerClient",
+    "BlockReferers",
+    "MultiHoming",
+    "AccessOption",
+    "AccessList",
+    "FilterFilePath",
+    "MaxConcurrentConns",
+    "ClientPerMinute",
+    "ClientPerHour",
+    "ClientPerDay",
+    "TotalInPerMinute",
+    "TotalInPerHour",
+    "TotalInPerDay",
+    "PostLimit",
+    "PostLimitTime",
+    "PerClientPeriod",
+    "TotalPeriod",
+    "TotalBanTime",
+    "EncryptLeaseSet",
+    "OptionalLookup",
+    "LeaseSetClientAuths",
+];
+
+const SENSITIVE_OPTION_KEYS: &[&str] = &[
+    "ProxyPassword",
+    "OutproxyPassword",
+    "PrivKeyFile",
+    "LeaseSetClientAuths",
+    "i2p.tunnel.sslKey",
+    "i2p.tunnel.proxyPassword",
+    "i2p.tunnel.ircPassword",
+];
+
+fn is_canonical_option_key(key: &str) -> bool {
+    CANONICAL_OPTION_KEYS.contains(&key)
+}
+
+fn is_sensitive_key(key: &str) -> bool {
+    SENSITIVE_OPTION_KEYS.contains(&key)
+}
+
+fn is_typed_secret_key(key: &str) -> bool {
+    matches!(
+        key,
+        "ProxyPassword"
+            | "i2p.tunnel.sslKey"
+            | "i2p.tunnel.proxyPassword"
+            | "i2p.tunnel.ircPassword"
+    )
+}
+
+fn validate_canonical_request(
+    params: &serde_json::Map<String, serde_json::Value>,
+    action: crate::i2pcontrol::domain::tunnel::TunnelAction,
+    all: bool,
+) -> Result<(), String> {
+    let lifecycle = matches!(
+        action,
+        crate::i2pcontrol::domain::tunnel::TunnelAction::Start
+            | crate::i2pcontrol::domain::tunnel::TunnelAction::Stop
+            | crate::i2pcontrol::domain::tunnel::TunnelAction::Restart
+    );
+
+    for key in params.keys() {
+        let allowed = matches!(key.as_str(), "Action" | "Name" | "Type" | "NewName" | "All")
+            || is_canonical_option_key(key);
+        if !allowed {
+            return Err(format!("unknown canonical parameter '{key}'"));
+        }
+        if !lifecycle
+            && !matches!(
+                action,
+                crate::i2pcontrol::domain::tunnel::TunnelAction::Create
+                    | crate::i2pcontrol::domain::tunnel::TunnelAction::Edit
+            )
+            && is_canonical_option_key(key)
+        {
+            return Err(format!(
+                "parameter '{key}' is not valid for {}",
+                action.as_str()
+            ));
+        }
+    }
+
+    if params.get("Name").is_some_and(|v| !v.is_string()) {
+        return Err("Name must be a string".to_string());
+    }
+    if params.get("NewName").is_some_and(|v| !v.is_string()) {
+        return Err("NewName must be a string".to_string());
+    }
+    if params.get("Type").is_some_and(|v| !v.is_string()) {
+        return Err("Type must be a string".to_string());
+    }
+
+    let name_required = !all || !lifecycle;
+    if name_required && !params.contains_key("Name") {
+        return Err(format!("Missing 'Name' parameter for {}", action.as_str()));
+    }
+    if let Some(name) = params.get("Name").and_then(|v| v.as_str()) {
+        validate_tunnel_name(name, "Name")?;
+    }
+    if let Some(name) = params.get("NewName").and_then(|v| v.as_str()) {
+        if action != crate::i2pcontrol::domain::tunnel::TunnelAction::Edit {
+            return Err(format!(
+                "NewName is not supported for {} action",
+                action.as_str()
+            ));
+        }
+        validate_tunnel_name(name, "NewName")?;
+    }
+    if action == crate::i2pcontrol::domain::tunnel::TunnelAction::Create {
+        if !params.contains_key("Type") {
+            return Err("Missing 'Type' parameter for create".to_string());
+        }
+        if params.get("NewName").is_some() {
+            return Err("NewName is not supported for create action".to_string());
+        }
+    }
+    if params.get("Type").is_some()
+        && !matches!(
+            action,
+            crate::i2pcontrol::domain::tunnel::TunnelAction::Create
+                | crate::i2pcontrol::domain::tunnel::TunnelAction::Edit
+        )
+    {
+        return Err(format!(
+            "Type is not supported for {} action",
+            action.as_str()
+        ));
+    }
+    if all {
+        if !lifecycle {
+            return Err(format!(
+                "All is not supported for {} action",
+                action.as_str()
+            ));
+        }
+        if params.contains_key("Name") {
+            return Err("Name must be omitted when All is true".to_string());
+        }
+    } else if lifecycle && !params.contains_key("Name") {
+        return Err(format!("Missing 'Name' parameter for {}", action.as_str()));
+    }
+    if params.contains_key("All") && !lifecycle {
+        return Err(format!(
+            "All is not supported for {} action",
+            action.as_str()
+        ));
+    }
+
+    validate_canonical_options(params)
+}
+
+fn validate_tunnel_name(value: &str, field: &str) -> Result<(), String> {
+    if value.is_empty() || value.trim().is_empty() {
+        return Err(format!("{field} must be non-empty"));
+    }
+    if value.len() > MAX_NAME_LENGTH {
+        return Err(format!(
+            "{field} exceeds maximum length of {MAX_NAME_LENGTH}"
+        ));
+    }
+    if value.chars().any(char::is_control) {
+        return Err(format!("{field} must not contain control characters"));
+    }
+    Ok(())
+}
+
 /// Validate the canonical Proposal 170 option names and the numeric ranges
 /// explicitly stated by the proposal. All other listed fields are retained
 /// losslessly in `raw_config` until a runtime backend exists.
@@ -1233,16 +1582,15 @@ fn validate_canonical_options(
 ) -> Result<(), String> {
     for (key, value) in params {
         match key.as_str() {
-            "Port" | "TargetPort" => {
-                let port = value.as_u64().ok_or_else(|| format!("{key} must be an integer"))?;
-                if port > u16::MAX as u64 {
-                    return Err(format!("{key} value {port} out of range"));
-                }
-            }
+            "Port" | "TargetPort" => validate_u16(key, value)?,
             "TunnelLength" => validate_integer_range(key, value, 0, 3)?,
             "TunnelVariance" => validate_integer_range(key, value, -2, 2)?,
             "TunnelQuantity" => validate_integer_range(key, value, 1, 6)?,
             "TunnelBackupQuantity" => validate_integer_range(key, value, 0, 3)?,
+            "ConnectDelay" | "ReduceCount" | "ReduceTime" | "CloseTime" | "MaxConcurrentConns"
+            | "ClientPerMinute" | "ClientPerHour" | "ClientPerDay" | "TotalInPerMinute"
+            | "TotalInPerHour" | "TotalInPerDay" | "PostLimit" | "PostLimitTime"
+            | "PerClientPeriod" | "TotalPeriod" | "TotalBanTime" => validate_integer(key, value)?,
             "StartOnLoad"
             | "Shared"
             | "UseSSL"
@@ -1254,25 +1602,109 @@ fn validate_canonical_options(
             | "Close"
             | "NewDest"
             | "PersistentClientKey"
+            | "AllowUserAgent"
+            | "AllowReferer"
+            | "AllowAccept"
             | "AllowInternalSSL"
             | "BlockAccessInProxies"
             | "UniqueLocalAddressPerClient"
-            | "MultiHoming"
-            | "EncryptLeaseSet" => {
-                if key == "EncryptLeaseSet" && !value.is_string() {
-                    return Err(format!("{key} must be a string"));
-                }
-                if key != "EncryptLeaseSet" && !value.is_boolean() {
-                    return Err(format!("{key} must be a boolean"));
+            | "BlockReferers"
+            | "MultiHoming" => validate_boolean(key, value)?,
+            "CustomOptions" => validate_string_map(key, value)?,
+            "LeaseSetClientAuths" => {
+                let entries = value.as_array().ok_or_else(|| format!("{key} must be an array"))?;
+                if entries.iter().any(|entry| !entry.is_object()) {
+                    return Err(format!("{key} entries must be objects"));
                 }
             }
-            "CustomOptions" | "LeaseSetClientAuths" if !value.is_object() && !value.is_array() => {
-                return Err(format!("{key} must be an object or array"));
+            "EncryptLeaseSet" => {
+                const MODES: &[&str] = &[
+                    "disable",
+                    "encrypted (aes)",
+                    "blinded",
+                    "blinded with lookup password",
+                    "encrypted (psk)",
+                    "encrypted with lookup password (psk)",
+                    "encrypted with per-user key (psk)",
+                    "encrypted with lookup password and per-user key (psk)",
+                    "encrypted with per-user key (dh)",
+                    "encrypted with lookup password and per-user key (dh)",
+                ];
+                let mode = value.as_str().ok_or_else(|| format!("{key} must be a string"))?;
+                if !MODES.contains(&mode) {
+                    return Err(format!("{key} has an unsupported value"));
+                }
             }
+            "SigType" | "EncType" => validate_text_or_integer(key, value)?,
+            "Description" | "TargetHost" | "Host" | "TargetDestination" | "Destination"
+            | "ReachableBy" | "ProxyList" | "ProxyUsername" | "OutproxyUsername"
+            | "OutproxyType" | "SSLProxies" | "JumpList" | "Profile" | "WebsiteHostname"
+            | "SpoofedHost" | "BlockUserAgents" | "UserAgents" | "AccessOption" | "AccessList"
+            | "FilterFilePath" | "OptionalLookup" | "ProxyPassword" | "OutproxyPassword" =>
+                validate_string(key, value)?,
+            "PrivKeyFile" =>
+                return Err("PrivKeyFile is not accepted by canonical TunnelManager".to_string()),
+            _ if is_canonical_option_key(key) => validate_string_or_scalar(key, value)?,
             _ => {}
         }
     }
     Ok(())
+}
+
+fn validate_string(key: &str, value: &serde_json::Value) -> Result<(), String> {
+    if value.is_string() {
+        Ok(())
+    } else {
+        Err(format!("{key} must be a string"))
+    }
+}
+
+fn validate_boolean(key: &str, value: &serde_json::Value) -> Result<(), String> {
+    if value.is_boolean() {
+        Ok(())
+    } else {
+        Err(format!("{key} must be a boolean"))
+    }
+}
+
+fn validate_u16(key: &str, value: &serde_json::Value) -> Result<(), String> {
+    let port = value.as_u64().ok_or_else(|| format!("{key} must be an integer"))?;
+    if port > u16::MAX as u64 {
+        return Err(format!("{key} value {port} out of range"));
+    }
+    Ok(())
+}
+
+fn validate_integer(key: &str, value: &serde_json::Value) -> Result<(), String> {
+    if value.as_i64().is_some() || value.as_u64().is_some() {
+        Ok(())
+    } else {
+        Err(format!("{key} must be an integer"))
+    }
+}
+
+fn validate_text_or_integer(key: &str, value: &serde_json::Value) -> Result<(), String> {
+    if value.is_string() || value.as_i64().is_some() || value.as_u64().is_some() {
+        Ok(())
+    } else {
+        Err(format!("{key} must be a string or integer"))
+    }
+}
+
+fn validate_string_map(key: &str, value: &serde_json::Value) -> Result<(), String> {
+    let object = value.as_object().ok_or_else(|| format!("{key} must be an object"))?;
+    if object.values().any(|entry| !entry.is_string()) {
+        return Err(format!("{key} values must be strings"));
+    }
+    Ok(())
+}
+
+fn validate_string_or_scalar(key: &str, value: &serde_json::Value) -> Result<(), String> {
+    if value.is_string() || value.is_boolean() || value.is_number() {
+        Ok(())
+    } else {
+        Err(format!("{key} has an invalid JSON type"))
+    }
 }
 
 fn validate_integer_range(
@@ -1438,7 +1870,14 @@ mod tests {
                 "canonical {action} must return a structured status: {resp}"
             );
             if action == "get" {
-                assert_eq!(resp["result"]["info"]["Name"], "canonical-tunnel");
+                let info = &resp["result"]["info"];
+                assert_eq!(info["client"], true);
+                assert_eq!(info["status"], "stopped");
+                assert_eq!(info["rawConfig"]["name"], "canonical-tunnel");
+                assert_eq!(info["rawConfig"]["type"], "client");
+                assert!(info["Name"].is_null());
+                assert!(info["Type"].is_null());
+                assert!(info["State"].is_null());
             }
         }
 
@@ -1505,6 +1944,119 @@ mod tests {
         )
         .await;
         assert_eq!(malformed["error"]["code"], rpc::error_codes::INVALID_PARAMS);
+    }
+
+    #[tokio::test]
+    async fn canonical_validation_rejects_unknown_and_malformed_known_fields() {
+        let state = test_state();
+        for params in [
+            serde_json::json!({
+                "Action": "create",
+                "Type": "client",
+                "Name": "unknown",
+                "NotAnOption": true
+            }),
+            serde_json::json!({
+                "Action": "create",
+                "Type": "client",
+                "Name": "wrong-type",
+                "StartOnLoad": "true"
+            }),
+            serde_json::json!({
+                "Action": "create",
+                "Type": "client",
+                "Name": "wrong-enum",
+                "EncryptLeaseSet": "not-a-mode"
+            }),
+        ] {
+            let response =
+                handle_tunnel_manager(&state, &tm_request("TunnelManager", params)).await;
+            assert_eq!(response["error"]["code"], rpc::error_codes::INVALID_PARAMS);
+        }
+    }
+
+    #[tokio::test]
+    async fn canonical_get_has_no_legacy_fields_or_secret_values() {
+        let state = test_state();
+        let create = tm_request(
+            "TunnelManager",
+            serde_json::json!({
+                "Action": "create",
+                "Type": "socks",
+                "Name": "secret-tunnel",
+                "ProxyPassword": "do-not-return",
+                "Port": 1080
+            }),
+        );
+        assert!(handle_tunnel_manager(&state, &create).await["error"].is_null());
+
+        let get = handle_tunnel_manager(
+            &state,
+            &tm_request(
+                "TunnelManager",
+                serde_json::json!({"Action": "get", "Name": "secret-tunnel"}),
+            ),
+        )
+        .await;
+        let serialized = serde_json::to_string(&get).unwrap();
+        assert!(!serialized.contains("do-not-return"));
+        let info = &get["result"]["info"];
+        assert_eq!(info["rawConfig"]["name"], "secret-tunnel");
+        assert!(info["Name"].is_null());
+        assert!(info["Type"].is_null());
+        assert!(info["State"].is_null());
+        assert!(info["rawConfig"]["ProxyPassword"].is_null());
+    }
+
+    #[test]
+    fn canonical_get_info_keys_are_pinned() {
+        let definition = TunnelDefinition {
+            name: TunnelName::new("fixture").unwrap(),
+            tunnel_type: TunnelType::Client,
+            ownership: TunnelOwnership::ControlPlane,
+            runtime_state: TunnelRuntimeState::Stopped,
+            start_intent: StartIntent::DoNotStart,
+            options: TunnelOptions::default(),
+            raw_config: std::collections::BTreeMap::new(),
+        };
+        let info = tunnel_definition_to_get_result(&definition);
+        let keys: std::collections::BTreeSet<_> =
+            info.as_object().unwrap().keys().cloned().collect();
+        let expected = [
+            "client",
+            "status",
+            "persistentClientKey",
+            "offlineKeys",
+            "rawConfig",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+        assert_eq!(keys, expected);
+    }
+
+    #[tokio::test]
+    async fn canonical_all_requires_true_without_name() {
+        let state = test_state();
+        let invalid = handle_tunnel_manager(
+            &state,
+            &tm_request(
+                "TunnelManager",
+                serde_json::json!({"Action": "start", "All": true, "Name": "one"}),
+            ),
+        )
+        .await;
+        assert_eq!(invalid["error"]["code"], rpc::error_codes::INVALID_PARAMS);
+
+        let missing_name = handle_tunnel_manager(
+            &state,
+            &tm_request("TunnelManager", serde_json::json!({"Action": "start"})),
+        )
+        .await;
+        assert_eq!(
+            missing_name["error"]["code"],
+            rpc::error_codes::INVALID_PARAMS
+        );
     }
 
     #[tokio::test]

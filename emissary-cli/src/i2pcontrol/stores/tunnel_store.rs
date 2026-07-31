@@ -60,7 +60,43 @@ impl TunnelStore {
 
     /// Load existing state from disk.
     pub async fn load(&mut self) -> StoreResult<Option<StateRevision>> {
-        self.inner.load().await
+        let revision = self.inner.load().await?;
+        let Some(revision) = revision else {
+            return Ok(None);
+        };
+
+        // Migrate generations written before the secret boundary was
+        // enforced. Typed secrets remain available to a future backend while
+        // duplicate raw copies are removed in one new complete generation.
+        let mut migrated = self.inner.current().cloned().expect("loaded payload");
+        let mut changed = false;
+        for definition in migrated.tunnels.values_mut() {
+            changed |= migrate_typed_secret(
+                &mut definition.raw_config,
+                "ProxyPassword",
+                &mut definition.options.proxy_password,
+            );
+            changed |= migrate_typed_secret(
+                &mut definition.raw_config,
+                "i2p.tunnel.proxyPassword",
+                &mut definition.options.proxy_password,
+            );
+            changed |= migrate_typed_secret(
+                &mut definition.raw_config,
+                "i2p.tunnel.sslKey",
+                &mut definition.options.ssl_key,
+            );
+            changed |= migrate_typed_secret(
+                &mut definition.raw_config,
+                "i2p.tunnel.ircPassword",
+                &mut definition.options.irc_password,
+            );
+        }
+        if changed {
+            Ok(Some(self.inner.publish(migrated, |_| Ok(())).await?))
+        } else {
+            Ok(Some(revision))
+        }
     }
 
     /// Return the current revision.
@@ -86,6 +122,43 @@ impl TunnelStore {
         tunnels.insert(name, definition);
         let payload = TunnelStorePayload { tunnels };
         self.inner.publish(payload, |_| Ok(())).await
+    }
+
+    /// Atomically update a definition, optionally changing its name.
+    ///
+    /// The complete before-state is cloned, checked, and replaced in one
+    /// generation publication. A failed publication leaves both the map and
+    /// the durable generation untouched.
+    pub async fn update(
+        &mut self,
+        name: &str,
+        mut definition: TunnelDefinition,
+        new_name: Option<&str>,
+    ) -> StoreResult<bool> {
+        let current = match self.inner.current() {
+            Some(payload) => payload.clone(),
+            None => return Ok(false),
+        };
+        if !current.tunnels.contains_key(name) {
+            return Ok(false);
+        }
+
+        let target_name = new_name.unwrap_or(name);
+        if target_name != name && current.tunnels.contains_key(target_name) {
+            return Err(super::generation_store::StoreError::InvalidState(format!(
+                "tunnel name '{}' already exists",
+                target_name
+            )));
+        }
+
+        definition.name = crate::i2pcontrol::domain::tunnel::TunnelName::new(target_name)
+            .map_err(|e| super::generation_store::StoreError::InvalidState(e.to_string()))?;
+
+        let mut tunnels = current.tunnels;
+        tunnels.remove(name);
+        tunnels.insert(target_name.to_string(), definition);
+        self.inner.publish(TunnelStorePayload { tunnels }, |_| Ok(())).await?;
+        Ok(true)
     }
 
     /// Remove a tunnel definition by name.
@@ -118,6 +191,34 @@ impl TunnelStore {
     pub fn contains(&self, name: &str) -> bool {
         self.inner.current().map(|p| p.tunnels.contains_key(name)).unwrap_or(false)
     }
+
+    /// Inject a publication failure for the next mutation in unit tests.
+    #[cfg(test)]
+    pub fn fail_next_publication(&mut self) {
+        self.inner.fail_next_publication();
+    }
+
+    /// Inject a permission-setting failure for the next mutation in unit tests.
+    #[cfg(test)]
+    pub fn fail_next_permission_change(&mut self) {
+        self.inner.fail_next_permission_change();
+    }
+}
+
+fn migrate_typed_secret(
+    raw_config: &mut BTreeMap<String, serde_json::Value>,
+    key: &str,
+    target: &mut crate::i2pcontrol::domain::tunnel::OptionRedacted,
+) -> bool {
+    let Some(value) = raw_config.remove(key) else {
+        return false;
+    };
+    if target.is_none() {
+        if let Some(secret) = value.as_str() {
+            *target = crate::i2pcontrol::domain::tunnel::OptionRedacted::new(secret);
+        }
+    }
+    true
 }
 
 #[cfg(test)]
@@ -201,6 +302,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rename_is_one_generation_and_failure_atomic() {
+        let dir = test_dir();
+        let mut store = TunnelStore::new(dir.clone(), 1024 * 1024);
+        store.upsert(test_definition("before", TunnelType::Client)).await.unwrap();
+        let first_revision = store.revision();
+
+        store.fail_next_publication();
+        let result = store
+            .update(
+                "before",
+                test_definition("after", TunnelType::Client),
+                Some("after"),
+            )
+            .await;
+        assert!(result.is_err());
+        assert_eq!(store.revision(), first_revision);
+        assert!(store.get("before").is_some());
+        assert!(store.get("after").is_none());
+
+        assert!(store
+            .update(
+                "before",
+                test_definition("after", TunnelType::Client),
+                Some("after"),
+            )
+            .await
+            .unwrap());
+        assert_eq!(
+            store.revision(),
+            StateRevision::new(first_revision.value() + 1)
+        );
+        assert!(store.get("before").is_none());
+        assert!(store.get("after").is_some());
+
+        let mut restarted = TunnelStore::new(dir.clone(), 1024 * 1024);
+        restarted.load().await.unwrap();
+        assert!(restarted.get("before").is_none());
+        assert!(restarted.get("after").is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn permission_failure_does_not_publish() {
+        let dir = test_dir();
+        let mut store = TunnelStore::new(dir.clone(), 1024 * 1024);
+        store.upsert(test_definition("before", TunnelType::Client)).await.unwrap();
+        let revision = store.revision();
+        store.fail_next_permission_change();
+        assert!(store.upsert(test_definition("after", TunnelType::Client)).await.is_err());
+        assert_eq!(store.revision(), revision);
+        assert!(store.get("before").is_some());
+        assert!(store.get("after").is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
     async fn round_trip_persistence() {
         let dir = test_dir();
         {
@@ -218,6 +376,32 @@ mod tests {
             assert!(store.get("t1").is_some());
             assert!(store.get("t2").is_some());
         }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn load_migrates_duplicate_typed_secrets_once() {
+        let dir = test_dir();
+        {
+            let mut store = TunnelStore::new(dir.clone(), 1024 * 1024);
+            let mut definition = test_definition("legacy", TunnelType::Client);
+            definition.raw_config.insert(
+                "ProxyPassword".to_string(),
+                serde_json::json!("legacy-secret"),
+            );
+            store.upsert(definition).await.unwrap();
+        }
+
+        let mut store = TunnelStore::new(dir.clone(), 1024 * 1024);
+        let revision = store.load().await.unwrap().unwrap();
+        let definition = store.get("legacy").unwrap();
+        assert_eq!(
+            definition.options.proxy_password.as_deref(),
+            Some("legacy-secret")
+        );
+        assert!(!definition.raw_config.contains_key("ProxyPassword"));
+        assert_eq!(revision, StateRevision::new(2));
 
         let _ = std::fs::remove_dir_all(&dir);
     }

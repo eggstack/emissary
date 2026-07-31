@@ -244,6 +244,12 @@ pub struct GenerationStore<T> {
 
     /// Maximum allowed serialized size in bytes.
     max_size: usize,
+
+    #[cfg(test)]
+    fail_next_publication: bool,
+
+    #[cfg(test)]
+    fail_next_permission_change: bool,
 }
 
 #[allow(dead_code)]
@@ -261,7 +267,23 @@ where
             current: None,
             revision: StateRevision::ZERO,
             max_size,
+            #[cfg(test)]
+            fail_next_publication: false,
+            #[cfg(test)]
+            fail_next_permission_change: false,
         }
+    }
+
+    /// Cause the next publication to fail immediately before the atomic rename.
+    #[cfg(test)]
+    pub fn fail_next_publication(&mut self) {
+        self.fail_next_publication = true;
+    }
+
+    /// Cause the next publication to fail while enforcing file permissions.
+    #[cfg(test)]
+    pub fn fail_next_permission_change(&mut self) {
+        self.fail_next_permission_change = true;
     }
 
     /// Validate that the store directory is safe (not a symlink, not escaping base).
@@ -348,27 +370,52 @@ where
         let final_path = self.dir.join(&gen_name);
 
         // Write to temporary file
-        tokio::fs::write(&temp_path, &json)
-            .await
-            .map_err(|e| StoreError::Io(e.to_string()))?;
+        if let Err(e) = tokio::fs::write(&temp_path, &json).await {
+            let _ = tokio::fs::remove_file(&temp_path).await;
+            return Err(StoreError::Io(e.to_string()));
+        }
 
         // Flush and sync to ensure durability before rename
-        let temp_file = tokio::fs::File::open(&temp_path)
-            .await
-            .map_err(|e| StoreError::Io(e.to_string()))?;
-        temp_file
-            .sync_all()
-            .await
-            .map_err(|e| StoreError::Io(format!("sync failed: {}", e)))?;
+        let temp_file = match tokio::fs::File::open(&temp_path).await {
+            Ok(file) => file,
+            Err(e) => {
+                let _ = tokio::fs::remove_file(&temp_path).await;
+                return Err(StoreError::Io(e.to_string()));
+            }
+        };
+        if let Err(e) = temp_file.sync_all().await {
+            let _ = tokio::fs::remove_file(&temp_path).await;
+            return Err(StoreError::Io(format!("sync failed: {}", e)));
+        }
         drop(temp_file);
 
-        // Set restrictive permissions (best effort, non-fatal on failure)
-        let _ = set_restrictive_permissions(&temp_path);
+        // Secret-bearing tunnel definitions must never be published without
+        // restrictive permissions on platforms where those permissions exist.
+        #[cfg(test)]
+        if self.fail_next_permission_change {
+            self.fail_next_permission_change = false;
+            let _ = tokio::fs::remove_file(&temp_path).await;
+            return Err(StoreError::Io(
+                "injected permission-setting failure".to_string(),
+            ));
+        }
+        if let Err(e) = set_restrictive_permissions(&temp_path) {
+            let _ = tokio::fs::remove_file(&temp_path).await;
+            return Err(e);
+        }
+
+        #[cfg(test)]
+        if self.fail_next_publication {
+            self.fail_next_publication = false;
+            let _ = tokio::fs::remove_file(&temp_path).await;
+            return Err(StoreError::Io("injected publication failure".to_string()));
+        }
 
         // Rename to final path (atomic on same filesystem)
-        tokio::fs::rename(&temp_path, &final_path)
-            .await
-            .map_err(|e| StoreError::Io(e.to_string()))?;
+        if let Err(e) = tokio::fs::rename(&temp_path, &final_path).await {
+            let _ = tokio::fs::remove_file(&temp_path).await;
+            return Err(StoreError::Io(e.to_string()));
+        }
 
         // Update in-memory state
         self.current = Some(state);

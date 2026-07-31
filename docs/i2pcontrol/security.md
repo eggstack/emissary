@@ -1,6 +1,6 @@
 # I2PControl Security
 
-Status: M002 infrastructure implemented
+Status: M021 secret-boundary and atomic-publication requirements implemented
 
 This document describes the security properties and considerations for the I2PControl administrative state in Emissary.
 
@@ -28,7 +28,8 @@ pub struct OptionRedacted(Option<String>);
 
 - `Debug` output shows `OptionRedacted(***)` instead of the value
 - `Display` output shows `***` instead of the value
-- The actual value is stored in memory for persistence but never logged
+- The actual value is stored only where persistence is required for a future
+  backend and is never logged or returned by TunnelManager responses
 
 ### Affected fields
 
@@ -37,6 +38,11 @@ The following `TunnelOptions` fields are redacted:
 - `ssl_key` - SSL private key path
 - `proxy_password` - SOCKS/HTTP proxy password
 - `irc_password` - IRC server password
+
+Canonical `ProxyPassword`, `OutproxyPassword`, and `LeaseSetClientAuths` input
+is not duplicated into response-facing `rawConfig`; response serializers filter
+all sensitive keys. Canonical `PrivKeyFile` is rejected as generic key-material
+ingress. Errors contain field names at most, never secret values.
 
 ### Logging policy
 
@@ -75,6 +81,10 @@ If the process crashes during publication:
 - Temporary files are detected and skipped on next load
 - The most recent valid generation is loaded
 - Corrupt generations fall back to prior valid ones
+
+Permission-setting failure is fatal on Unix rather than best effort. Failed
+publication removes its temporary file where possible and does not update the
+in-memory snapshot.
 
 ### Symlink rejection
 

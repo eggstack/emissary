@@ -63,7 +63,8 @@ truthfulness work.
 
 ## TunnelManager
 
-Current status: wire/CRUD infrastructure retained; corrective pass required
+Current status: M021 implementation complete; M023 remains the source/lifecycle
+successor and the overall subsystem remains corrective-pass work
 
 Retained:
 
@@ -73,17 +74,22 @@ Retained:
 - explicit unsupported backend for every missing data plane;
 - safe inactive behavior for unsupported runtimes.
 
+M021 now also provides:
+
+- exact canonical `result.status`/`result.info`/`rawConfig` response shapes;
+- strict canonical action/option/type/range validation;
+- one-publication create/edit/rename/delete persistence;
+- restrictive-permission enforcement and temporary-file cleanup on failure;
+- secret-safe typed persistence and response serialization;
+- separate compatibility serializers for capitalized actions and `List`.
+
 Known defects:
 
-- canonical `get` returns the wrong `info` schema;
-- option validation is incomplete;
-- edit/rename is not one failure-atomic publication;
-- secret-bearing options may be duplicated, persisted, and returned unexpectedly;
-- restrictive-permission failure is best effort;
 - startup-managed tunnel inventory is not production-backed;
-- canonical lifecycle status translation is incomplete.
+- canonical lifecycle status translation still depends on M023 for truthful
+  startup-managed runtime sources.
 
-Owners: M021 and M023.
+Owner: M023 for the remaining startup/runtime source work.
 
 ### Missing tunnel data planes
 

@@ -18,6 +18,7 @@ Canonical direction:
 - **closing** — implementation landed and independent closure evidence is being gathered.
 - **closed** — closure record accepted.
 - **closed internally against pinned revision** — internal closure accepted against an explicitly named revision of an open external specification; does not imply upstream review or acceptance.
+- **partial Proposal 170 support** — exact supported dimensions are closed, but one or more pinned source/runtime capabilities remain truthfully unavailable.
 - **corrective pass required** — a prior disposition or closure was invalidated by a material implementation or evidence defect.
 - **superseded** — replaced by another document and not executable.
 - **archived** — inactive and retained for traceability.
@@ -26,36 +27,84 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | closed internally against pinned revision | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M019A closed | Final internal gate accepted at frozen implementation head `a3c4f46` |
+| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M020 ready | M019A closure invalidated; exact base interoperability and method/source corrections required |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| — | None | — | — | No dependency-ready implementation plan remains in this workstream |
+| I2PControl Proposal 170 | M020 — Base I2PControl and JSON-RPC interoperability | ready | `plans/implementation/i2pcontrol-proposal-170/020-base-i2pcontrol-and-jsonrpc-interoperability.md` | none |
+
+## Registered successor handoffs
+
+These plans are complete handoffs but are not executable until their hard dependencies close.
+
+| Subsystem | Handoff | Status | Implementation plan | Hard dependency |
+|---|---|---|---|---|
+| I2PControl Proposal 170 | M021 — TunnelManager exact wire, atomic persistence, and secret boundary | blocked | `plans/implementation/i2pcontrol-proposal-170/021-tunnelmanager-wire-atomicity-and-secrets.md` | M020 |
+| I2PControl Proposal 170 | M022 — AddressBook runtime bridge and canonical source reconciliation | blocked | `plans/implementation/i2pcontrol-proposal-170/022-addressbook-runtime-bridge.md` | M020, M021 |
+| I2PControl Proposal 170 | M023 — Startup tunnel inventory and ClientServicesInfo truthfulness | blocked | `plans/implementation/i2pcontrol-proposal-170/023-startup-tunnel-inventory-and-client-services.md` | M021 |
+| I2PControl Proposal 170 | M024 — Recoverable bounded SAM observation | blocked | `plans/implementation/i2pcontrol-proposal-170/024-recoverable-bounded-sam-observation.md` | M023 |
+| I2PControl Proposal 170 | M025 — RouterInfo contract and source reconciliation | blocked | `plans/implementation/i2pcontrol-proposal-170/025-routerinfo-contract-and-source-reconciliation.md` | M020, M022, M023, M024 |
+| I2PControl Proposal 170 | M026 — Bounded router inspection sources | blocked | `plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md` | M025 |
+| I2PControl Proposal 170 | M027 — Exact conformance and independent reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/027-proposal-170-conformance-and-reclosure.md` | M020–M026 |
 
 ## Active closure work
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| — | None | — | — | No active closure work remains in this workstream |
+| — | None | — | — | M019A is invalidated; no closure work is active until implementation dispositions land |
 
-## Blocked and superseded handoffs
+## Historical invalidation and supersession
 
-| Subsystem | Handoff | Status | Plan | Blocker or disposition |
+| Subsystem | Record | Status | Document | Disposition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M019 — original pinned reclosure | superseded | `plans/implementation/i2pcontrol-proposal-170/019-pinned-revision-independent-reclosure.md` | replaced by M019A after post-M018 findings and policy correction |
+| I2PControl Proposal 170 | M019A final internal closure | invalidated | `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md` | historical evidence retained; completeness conclusion revoked |
+| I2PControl Proposal 170 | M019 original pinned reclosure | superseded | `plans/implementation/i2pcontrol-proposal-170/019-pinned-revision-independent-reclosure.md` | non-executable |
+| I2PControl Proposal 170 | M017 broad closure | invalidated historical closure | `plans/closure/i2pcontrol-proposal-170/017-closure-invalidation.md` | component evidence only |
 
 ## Current corrective findings
 
-| Finding | Severity | Owner | State |
+| Finding group | Severity | Owner | State |
 |---|---|---|---|
-| Transit total uses received plus sent rather than forwarded/transmitted transit bytes | high | M018A | resolved at `a3c4f46` |
-| Valid canonical TunnelManager operational failures do not consistently use structured `result.status` | high | M018A | resolved at `a3c4f46` |
-| Base and compatibility surfaces remain counted as canonical Proposal 170 inventory in the conformance manifest | medium | M018A | resolved at `a3c4f46` |
-| TunnelManager canonical examples and `Name`/`All` wording need correction | low | M018A | resolved at `a3c4f46` |
-| No true live-session SAM-to-I2PControl end-to-end test | medium evidence decision | M019A | accepted as a qualified evidence limitation; no full end-to-end claim made |
-| Initial active planning lacked an absolute no-upstream rule | governance | M018A/M019A | resolved; normative rule codified and closure attested |
+| Standard I2PControl auth/token/error incompatibility | high | M020 | ready |
+| JSON-RPC notification and request-ID correctness | high | M020 | ready |
+| Direct base RouterInfo compatibility after token removal | high | M020 | ready |
+| Canonical TunnelManager `get` schema and validation | high | M021 | blocked on M020 |
+| Non-atomic tunnel rename and secret handling | high | M021 | blocked on M020 |
+| AddressBook disconnected administrative shadow | high | M022 | blocked on M020/M021 |
+| Startup tunnel inventory and stale proxy state | high/medium | M023 | blocked on M021 |
+| Sticky SAM observation overflow | medium | M024 | blocked on M023 |
+| RouterInfo 43-selector source/claim contradictions | high claim defect | M025 | blocked on M020/M022/M023/M024 |
+| Feasible bounded core inspection sources | medium | M026 | blocked on M025 |
+| Literal external conformance and honest reclosure | high evidence defect | M027 | blocked on M020–M026 |
+
+The complete finding inventory and rationale are in `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`.
+
+## Scope guard
+
+The corrective sequence owns Proposal 170 and the existing I2PControl contract only.
+
+Allowed production scope:
+
+- `emissary-cli/src/i2pcontrol/**`;
+- one purpose-specific runtime AddressBook handle and composition wiring;
+- composition-time startup tunnel inventory;
+- existing generic client/server lifecycle handle only if already safely targetable without redesign;
+- passive HTTP/SOCKS task-exit observations;
+- correction to the existing bounded SAM observation seam;
+- bounded read-only RouterInfo snapshots adjacent to authoritative owners identified by M025.
+
+Prohibited:
+
+- implementation of missing HTTP, IRC, SOCKS-IRC, CONNECT, Streamr, bidirectional, or other tunnel data planes;
+- router, transport, NetDB, peer-selection, cryptographic, streaming, LeaseSet, resolver, or frontend redesign;
+- new historical telemetry samplers, polling loops, generic event buses, introspection frameworks, or task registries;
+- fabricated values for unavailable selectors;
+- new dependencies without explicit maintainer direction;
+- `.github/workflows/**`, CI, release, packaging, publishing, version, matrix, coverage, fuzz, soak, or generated-evidence machinery;
+- repository-wide formatting;
+- upstream contribution, review, submission, adoption, approval, merge, or maintainer-contact activity.
 
 ## Internal-only upstream boundary
 
@@ -65,18 +114,18 @@ No active or historical plan authorizes:
 
 - upstream issues, pull requests, merge requests, discussions, review requests, or patch submissions;
 - upstream review, feedback, adoption, approval, or merge solicitation;
-- pushes of branches, commits, tags, patches, or artifacts to an upstream remote;
+- pushes of branches, commits, tags, patches, artifacts, or releases to an upstream remote;
 - upstream maintainer outreach;
 - preparation of an upstream contribution package, patch series, submission checklist, or merge plan;
-- connector/API write actions against an upstream repository.
+- connector/API write actions against an upstream or third-party repository.
 
-External specifications, source trees, pull requests, commits, and discussions may be inspected read-only for internal verification and cited internally.
+External specifications and source trees may be inspected read-only and cited internally.
 
 All writes for this workstream must target `eggstack/emissary`. A future upstream contribution requires a new explicit maintainer directive that supersedes `plans/003-planning-process.md`; no current plan grants that authority.
 
-Any upstream write, submission, solicitation, or merge-preparation action is a stop condition and invalidates affected closure evidence.
+Any upstream write, solicitation, or contribution preparation is a stop condition and invalidates affected evidence.
 
-## Pinned Proposal 170 authority
+## Pinned authority
 
 Current internal work is pinned to:
 
@@ -84,58 +133,22 @@ Current internal work is pinned to:
 - status: `Open`;
 - created: `2026-05-20`;
 - last updated: `2026-05-20`;
-- canonical page: `https://i2p.net/en/proposals/170-i2pcontrol-expansion/`.
+- canonical page: `https://i2p.net/en/proposals/170-i2pcontrol-expansion/`;
+- existing I2PControl authentication/error documentation: `https://i2p.net/en/docs/api/i2pcontrol`.
 
-Because the proposal is Open, final status may only be `closed internally against pinned revision`. A changed proposal revision blocks internal closure until the manifest and fixtures are reconciled. It does not trigger or authorize upstream contact.
-
-## M018A scope guard
-
-M018A owns only:
-
-- forwarded/transmitted semantics for `i2p.router.net.total.transit.bytes`;
-- canonical TunnelManager operational-failure `result.status` envelopes;
-- canonical/base/compatibility manifest separation;
-- directly affected tests and documentation;
-- internal-only policy verification.
-
-M018A must not add:
-
-- `.github/workflows/**`, CI, platform, coverage, or evidence machinery;
-- release, publishing, packaging, or version automation;
-- upstream contribution or review activity;
-- missing tunnel data planes;
-- broad router, transport, NetDB, peer, tunnel, cryptographic, resolver, frontend, SAM, or I2CP redesign;
-- generic protocol/schema/fixture frameworks;
-- dependencies;
-- repository-wide formatting;
-- fabricated values.
-
-## Historical records and current authority
-
-M001–M004 remain historical implementation foundations. M005–M007 are superseded. M008–M014 and M016 contain retained implementation evidence. M015 remains an invalid historical closure. M017's component evidence is retained, but its broad closure is invalidated. The initial M018 implementation is retained but requires M018A correction.
-
-| Record | Current disposition |
-|---|---|
-| `plans/closure/i2pcontrol-proposal-170/014-closure.md` | implementation evidence retained |
-| `plans/closure/i2pcontrol-proposal-170/015-closure.md` | invalid historical closure |
-| `plans/closure/i2pcontrol-proposal-170/016-implementation-disposition.md` | bounded SAM implementation retained |
-| `plans/closure/i2pcontrol-proposal-170/017-closure.md` plus invalidation | historical component evidence only |
-| `plans/closure/i2pcontrol-proposal-170/018-implementation-disposition.md` | corrective pass required |
-| M018A plan | implementation frozen; closed-for-implementation disposition recorded |
-| original M019 plan | superseded and non-executable |
-| M019A plan | closed internally against pinned revision; `plans/closure/i2pcontrol-proposal-170/019a-closure.md` |
+A changed proposal revision blocks M027 until the contract matrix and fixtures are reconciled. It does not authorize upstream contact.
 
 ## Registry maintenance rules
 
-1. M018A is frozen and closed for implementation at `a3c4f46`; its disposition is the implementation evidence.
-2. M019A is closed internally against the pinned revision; its closure record is the final gate.
-3. Never execute the superseded M019 plan.
-4. Do not count base protocol, compatibility aliases, unavailable sources, or unsupported runtimes as canonical operational coverage.
-5. Preserve historical closure and invalidation records rather than rewriting them into passing evidence.
-6. If the Open proposal changes, rebase the internal contract manifest without contacting or submitting to upstream.
-7. M019A must use a distinct auditable internal reviewer and perform read-only source verification.
-8. Any future high/medium finding in this boundary requires a new corrective disposition; none remains unresolved.
-9. Final status is `closed internally against pinned revision`, with zero unresolved high/medium findings and a no-upstream compliance attestation.
-10. Verification remains local and package-scoped; remote CI is not required.
-11. No plan may initiate, prepare, request, or imply upstream submission, review, adoption, or merge.
-12. No future plan is dependency-blocked or newly unblocked; the subsystem has no registered successor.
+1. M020 is the only dependency-ready implementation plan at registration time.
+2. Move a successor to `ready` only after every named hard dependency has an accepted implementation disposition.
+3. Every implementation milestone must create a disposition before unblocking its successor.
+4. Never execute superseded M019 or treat invalidated M019A as current closure.
+5. Preserve historical closure/invalidation records rather than rewriting them.
+6. Do not count base protocol, compatibility aliases, unavailable sources, neutral values, or unsupported runtimes as canonical operational implementation.
+7. Missing tunnel data planes remain out of scope and explicit unsupported backends.
+8. Verification remains local and package-scoped; remote CI is not required.
+9. M027 requires a distinct auditable internal reviewer and read-only external source verification.
+10. Final status may be `closed internally against pinned revision`, `partial Proposal 170 support`, `corrective pass required`, or `blocked` according to M027 evidence.
+11. No final status implies upstream review, acceptance, certification, adoption, or merge.
+12. No plan may initiate, prepare, request, or imply upstream contribution activity.

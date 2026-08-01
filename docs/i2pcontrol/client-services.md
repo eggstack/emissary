@@ -281,6 +281,16 @@ Response size is bounded before dispatch:
 Complete results that exceed safe bounds fail explicitly with
 `INTERNAL_ERROR` and are never silently truncated.
 
+The core-owned SAM publisher uses an explicit `Complete`/`Incomplete` state.
+When a session or socket briefly exceeds a public bound, or required peer
+metadata is unavailable, the handle refuses partial data and retains the
+bounded recovery record until the corresponding authoritative close/removal
+event arrives. It then reconstructs a new complete generation only when every
+currently active record is again within the public bounds. Recovery capacity is
+finite and is not an event queue or a second SAM lifecycle registry; an
+unrecoverable invariant failure remains unavailable rather than returning
+stale or partial data.
+
 ## Failure and sanitization
 
 Proxy failures are recorded as `Failed(SanitizedFailure)`. The

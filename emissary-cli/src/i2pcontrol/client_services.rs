@@ -424,7 +424,7 @@ fn resolve_sam(
                     .to_string()
             })?;
             let snapshot = observation.snapshot().map_err(|_| {
-                "SAM observation source overflowed; refusing an incomplete snapshot".to_string()
+                "SAM observation source is incomplete; refusing a partial snapshot".to_string()
             })?;
             if snapshot.sessions.len() > SAM_SESSION_OBSERVATION_LIMIT {
                 return Err("SAM observation source exceeded its session bound".to_string());

@@ -1,6 +1,6 @@
 # M024 — Recoverable Bounded SAM Observation
 
-Status: blocked
+Status: implemented
 
 Primary class: infrastructure/capability corrective pass
 

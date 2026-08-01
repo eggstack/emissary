@@ -338,7 +338,7 @@ impl<R: Runtime> SamSession<R> {
                     target: LOG_TARGET,
                     session_id = %self.session_id,
                     ?error,
-                    "SAM observation source overflowed while adding socket",
+                    "SAM observation source became incomplete while adding socket",
                 );
                 false
             }
@@ -351,11 +351,13 @@ impl<R: Runtime> SamSession<R> {
         }
     }
 
-    fn remove_observed_streams(&mut self, destination_id: &DestinationId) {
-        if let Some(socket_ids) = self.observed_stream_sockets.remove(destination_id) {
-            for socket_id in socket_ids {
-                self.remove_observed_socket(socket_id);
-            }
+    fn remove_tracked_stream_socket(&mut self, destination_id: &DestinationId, socket_id: u64) {
+        let Some(socket_ids) = self.observed_stream_sockets.get_mut(destination_id) else {
+            return;
+        };
+        socket_ids.retain(|tracked_socket_id| *tracked_socket_id != socket_id);
+        if socket_ids.is_empty() {
+            self.observed_stream_sockets.remove(destination_id);
         }
     }
 
@@ -453,11 +455,20 @@ impl<R: Runtime> SamSession<R> {
         }
 
         let socket_id = socket.observation_id();
-        if self.observe_socket(&socket, 2) {
+        let observed = self.observe_socket(&socket, 2);
+        if self.observation_publisher.is_some() {
             self.observed_stream_sockets
                 .entry(destination_id.clone())
                 .or_default()
                 .push(socket_id);
+        }
+        if !observed {
+            tracing::debug!(
+                target: LOG_TARGET,
+                session_id = %self.session_id,
+                socket_id,
+                "retaining an unpublishable stream socket for bounded recovery",
+            );
         }
 
         tracing::info!(
@@ -1354,18 +1365,28 @@ impl<R: Runtime> Future for SamSession<R> {
                         self.pending_outbound.remove(&destination_id);
                     }
                 },
-                Poll::Ready(Some(StreamManagerEvent::StreamRejected { destination_id })) => {
+                Poll::Ready(Some(StreamManagerEvent::StreamRejected {
+                    destination_id,
+                    socket_id,
+                })) => {
                     self.pending_outbound.remove(&destination_id);
-                    self.remove_observed_streams(&destination_id);
+                    self.remove_observed_socket(socket_id);
+                    self.remove_tracked_stream_socket(&destination_id, socket_id);
                 }
-                Poll::Ready(Some(StreamManagerEvent::StreamClosed { destination_id })) => {
+                Poll::Ready(Some(StreamManagerEvent::StreamClosed {
+                    destination_id,
+                    socket_id,
+                })) => {
                     tracing::debug!(
                         target: LOG_TARGET,
                         session_id = ?self.session_id,
                         ?destination_id,
                         "stream closed",
                     );
-                    self.remove_observed_streams(&destination_id);
+                    if let Some(socket_id) = socket_id {
+                        self.remove_observed_socket(socket_id);
+                        self.remove_tracked_stream_socket(&destination_id, socket_id);
+                    }
                 }
                 Poll::Ready(Some(StreamManagerEvent::ShutDown)) => {
                     tracing::info!(

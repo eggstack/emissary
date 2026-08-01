@@ -112,12 +112,18 @@ pub enum StreamManagerEvent {
     StreamClosed {
         /// ID of remote destination.
         destination_id: DestinationId,
+
+        /// SAM socket observation ID, when the stream owns one.
+        socket_id: Option<u64>,
     },
 
     /// Outbound stream rejected.
     StreamRejected {
         /// ID of remote destination.
         destination_id: DestinationId,
+
+        /// SAM socket observation ID for the rejected outbound stream.
+        socket_id: u64,
     },
 
     /// Send packet.
@@ -243,7 +249,7 @@ pub struct StreamManager<R: Runtime> {
     /// TX channels for sending [`Packet`]'s to active streams.
     ///
     /// Indexed with receive stream ID.
-    active: HashMap<u32, (DestinationId, Sender<StreamEvent>)>,
+    active: HashMap<u32, (DestinationId, Sender<StreamEvent>, Option<u64>)>,
 
     /// Destination of the session the stream manager is bound to.
     destination: Destination,
@@ -436,6 +442,7 @@ impl<R: Runtime> StreamManager<R> {
                 SocketKind::Connect {
                     routing_path_handle,
                     silent,
+                    observation_id: socket.observation_id(),
                     socket: socket.into_inner(),
                 },
                 recv_stream_id,
@@ -594,7 +601,12 @@ impl<R: Runtime> StreamManager<R> {
         //
         // `StreamManager` sends all inbound messages with `recv_stream_id` to this stream and all
         // outbound messages from the stream to remote peer are send through `event_tx`
-        self.active.insert(recv_stream_id, (destination_id.clone(), tx));
+        let socket_id = match &socket {
+            SocketKind::Connect { observation_id, .. }
+            | SocketKind::Accept { observation_id, .. } => Some(*observation_id),
+            SocketKind::Forwarded { .. } => None,
+        };
+        self.active.insert(recv_stream_id, (destination_id.clone(), tx, socket_id));
         self.destination_streams
             .entry(destination_id.clone())
             .or_default()
@@ -803,7 +815,7 @@ impl<R: Runtime> StreamManager<R> {
         );
 
         // forward received packet to an active handler if it exists
-        if let Some((_, tx)) = self.active.get(&packet.recv_stream_id()) {
+        if let Some((_, tx, _)) = self.active.get(&packet.recv_stream_id()) {
             if let Err(error) = tx.try_send(StreamEvent::Packet { packet: payload }) {
                 tracing::debug!(
                     target: LOG_TARGET,
@@ -1041,7 +1053,7 @@ impl<R: Runtime> StreamManager<R> {
             "shut down stream manager",
         );
 
-        self.active.values().for_each(|(_, tx)| {
+        self.active.values().for_each(|(_, tx, _)| {
             if let Err(error) = tx.try_send(StreamEvent::ShutDown) {
                 tracing::error!(
                     target: LOG_TARGET,
@@ -1119,7 +1131,8 @@ impl<R: Runtime> futures::Stream for StreamManager<R> {
 
                     // active stream may not exist if it was removed by calling
                     // `StreamManager::remove_session()`
-                    let Some((destination_id, _)) = self.active.remove(&stream_id) else {
+                    let Some((destination_id, _, socket_id)) = self.active.remove(&stream_id)
+                    else {
                         tracing::debug!(
                             target: LOG_TARGET,
                             local = %self.destination_id,
@@ -1140,7 +1153,10 @@ impl<R: Runtime> futures::Stream for StreamManager<R> {
                         self.pending_events.push_back(StreamManagerEvent::ShutDown);
                     }
 
-                    return Poll::Ready(Some(StreamManagerEvent::StreamClosed { destination_id }));
+                    return Poll::Ready(Some(StreamManagerEvent::StreamClosed {
+                        destination_id,
+                        socket_id,
+                    }));
                 }
             }
         }
@@ -1226,6 +1242,7 @@ impl<R: Runtime> futures::Stream for StreamManager<R> {
                             mut socket,
                             ..
                         } = self.pending_outbound.remove(&stream_id).expect("to exist");
+                        let socket_id = socket.observation_id();
 
                         tracing::debug!(
                             target: LOG_TARGET,
@@ -1246,6 +1263,7 @@ impl<R: Runtime> futures::Stream for StreamManager<R> {
 
                         return Poll::Ready(Some(StreamManagerEvent::StreamRejected {
                             destination_id,
+                            socket_id,
                         }));
                     }
                 }
@@ -2051,7 +2069,8 @@ mod tests {
             .expect("no timeout")
             .expect("to succeed")
         {
-            StreamManagerEvent::StreamRejected { destination_id } if destination_id == remote => {}
+            StreamManagerEvent::StreamRejected { destination_id, .. }
+                if destination_id == remote => {}
             _ => panic!("invalid event"),
         }
 
@@ -3151,7 +3170,7 @@ mod tests {
             .expect("no timeout")
             .expect("to succeed")
         {
-            StreamManagerEvent::StreamClosed { destination_id } => {
+            StreamManagerEvent::StreamClosed { destination_id, .. } => {
                 assert_eq!(destination_id, manager2_dest)
             }
             _ => panic!("invalid event"),
@@ -3189,7 +3208,8 @@ mod tests {
             .expect("no timeout")
             .expect("to succeed")
         {
-            StreamManagerEvent::StreamRejected { destination_id } if destination_id == remote => {}
+            StreamManagerEvent::StreamRejected { destination_id, .. }
+                if destination_id == remote => {}
             _ => panic!("invalid event"),
         }
 

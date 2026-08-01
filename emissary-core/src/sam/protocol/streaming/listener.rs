@@ -98,6 +98,9 @@ impl<R: Runtime> fmt::Debug for ListenerKind<R> {
 pub enum SocketKind<R: Runtime> {
     /// Direct connection opened with `STREAM CONNECT`.
     Connect {
+        /// Stable SAM observation ID for this socket.
+        observation_id: u64,
+
         /// Underlying TCP stream of the SAMv3 socket.
         socket: R::TcpStream,
 
@@ -110,6 +113,9 @@ pub enum SocketKind<R: Runtime> {
 
     /// Direct connection opened with `STREAM ACCEPT`.
     Accept {
+        /// Stable SAM observation ID for this socket.
+        observation_id: u64,
+
         /// Pending routing path handle.
         pending_routing_path_handle: PendingRoutingPathHandle,
 
@@ -282,6 +288,7 @@ impl<R: Runtime> StreamListener<R> {
                 }
 
                 Some(SocketKind::Accept {
+                    observation_id: socket.observation_id(),
                     pending_routing_path_handle,
                     silent,
                     socket: socket.into_inner(),

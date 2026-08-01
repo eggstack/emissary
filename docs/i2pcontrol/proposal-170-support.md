@@ -14,7 +14,7 @@ Current corrective roadmap:
 
 Next executable handoff:
 
-- M024, `plans/implementation/i2pcontrol-proposal-170/024-recoverable-bounded-sam-observation.md`
+- M025, `plans/implementation/i2pcontrol-proposal-170/025-routerinfo-contract-and-source-reconciliation.md`
 
 ## Status model
 
@@ -48,7 +48,7 @@ Retained candidate implementation includes:
 - live event counters and log ring sources;
 - explicit unavailable/unsupported behavior in several paths.
 
-Material corrective work remains in M024–M027; M023's scoped startup/client-service correction is closed.
+Material corrective work remains in M025–M027; M023's scoped startup/client-service correction and M024's SAM source correction are closed.
 
 ## Base I2PControl/JSON-RPC
 
@@ -132,19 +132,19 @@ Owner: M022, with final matrix integration in M025.
 
 ## ClientServicesInfo
 
-Current status: direct wire scaffold retained; source/lifecycle correction required
+Current status: direct wire scaffold retained; bounded SAM source correction closed; final source matrix remains
 
 | Selector | Retained behavior | Corrective requirement |
 |---|---|---|
 | `I2PTunnel` | shared live startup/control-plane inventory | M023 implemented ownership, collision, bound, and address provenance rules |
 | `HTTPProxy` | bind/listening observation | M023 publishes inactive state on task exit |
 | `SOCKS` | bind/listening observation | M023 publishes inactive state on task exit |
-| `SAM` | bounded active-session source | recover from transient incomplete/overflow state without restart |
+| `SAM` | bounded active-session source | recovered incomplete-state semantics; final matrix review remains |
 | `BOB` | exact boolean `false` | retained |
 | `I2CP` | actual listener state | revalidate in final source matrix |
 
 Owner: M024 for recoverable SAM observation; M023's tunnel/proxy source work is
-implemented.
+implemented. M025 owns final selector/source reconciliation.
 
 ## RouterInfo
 
@@ -190,8 +190,8 @@ Owners: M022, rechecked by M027.
 | M021 | closed | TunnelManager exact wire, atomic persistence, secret boundary |
 | M022 | closed internally against pinned revision | actual AddressBook runtime authority and source objects |
 | M023 | closed internally against pinned revision | startup tunnel inventory and client-service lifecycle/address truthfulness |
-| M024 | ready | recoverable bounded SAM observation |
-| M025 | blocked | exact RouterInfo contract/source matrix |
+| M024 | closed internally against pinned revision | recoverable bounded SAM observation |
+| M025 | ready | exact RouterInfo contract/source matrix |
 | M026 | blocked | feasible bounded read-only router inspection sources |
 | M027 | blocked | literal conformance, documentation reconciliation, independent closure |
 

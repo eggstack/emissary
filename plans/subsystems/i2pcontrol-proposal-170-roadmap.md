@@ -155,9 +155,9 @@ M026 bounded core inspection for feasible remaining selectors
 M027 conformance and independent reclosure
 ```
 
-M020 through M023 are closed. M024 is now dependency-ready and may
-execute against M023's final ClientServicesInfo ownership. M025
-depends on M020, M022, and M023. M026 depends on M025's exact source matrix.
+M020 through M024 are closed internally against the pinned revision. M025 is
+now dependency-ready and may execute against M024's recovered SAM source
+evidence. M026 depends on M025's exact source matrix.
 M027 depends on every implementation milestone reaching a frozen disposition.
 
 ## 8. Milestones
@@ -222,7 +222,7 @@ Exit: successful mutations are observable through both the API and normal runtim
 
 Plan: `023-startup-tunnel-inventory-and-client-services.md`
 
-Status: ready
+Status: closed internally against pinned revision
 
 Objective:
 
@@ -241,7 +241,7 @@ Exit: current startup inventory is visible and immutable, task exit clears enabl
 
 Plan: `024-recoverable-bounded-sam-observation.md`
 
-Status: ready
+Status: closed internally against pinned revision
 
 Objective:
 
@@ -259,7 +259,7 @@ Exit: transient bound pressure can recover without router restart, no private ke
 
 Plan: `025-routerinfo-contract-and-source-reconciliation.md`
 
-Status: blocked on M020, M022, M023, and M024
+Status: ready
 
 Objective:
 
@@ -379,8 +379,8 @@ Use focused test filters named in each plan before broad package tests. Use touc
 | M021 | closed | `plans/closure/i2pcontrol-proposal-170/021-closure.md` |
 | M022 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/022-closure.md` |
 | M023 | closed | hard dependency M021 is closed |
-| M024 | ready | hard dependency M023 is closed |
-| M025 | blocked | hard dependencies M020, M022, M023, M024 |
+| M024 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/024-closure.md` |
+| M025 | ready | hard dependencies M020, M022, M023, M024 are closed |
 | M026 | blocked | hard dependency M025 |
 | M027 | blocked | hard dependencies M020–M026 |
 

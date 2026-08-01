@@ -259,7 +259,7 @@ Exit: transient bound pressure can recover without router restart, no private ke
 
 Plan: `025-routerinfo-contract-and-source-reconciliation.md`
 
-Status: ready
+Status: implemented; M026 dependency-ready
 
 Objective:
 
@@ -277,7 +277,7 @@ Exit: one machine-readable matrix drives validation, dispatch, documentation, an
 
 Plan: `026-bounded-router-inspection-sources.md`
 
-Status: blocked on M025
+Status: ready
 
 Objective:
 
@@ -380,8 +380,8 @@ Use focused test filters named in each plan before broad package tests. Use touc
 | M022 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/022-closure.md` |
 | M023 | closed | hard dependency M021 is closed |
 | M024 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/024-closure.md` |
-| M025 | ready | hard dependencies M020, M022, M023, M024 are closed |
-| M026 | blocked | hard dependency M025 |
+| M025 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/025-closure.md` |
+| M026 | ready | hard dependency M025 is closed; no feasible fields currently identified |
 | M027 | blocked | hard dependencies M020–M026 |
 
 ## 14. Completion definition

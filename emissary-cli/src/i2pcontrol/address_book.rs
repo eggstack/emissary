@@ -61,6 +61,10 @@ const MAX_LIST_ENTRIES: usize = 10000;
 /// Maximum total byte size of a List result.
 const MAX_LIST_BYTES: usize = 4 * 1024 * 1024;
 
+/// RouterInfo uses the same bounded list contract as the direct List method.
+const MAX_ROUTER_INFO_SELECTOR_ENTRIES: usize = MAX_LIST_ENTRIES;
+const MAX_ROUTER_INFO_SELECTOR_BYTES: usize = MAX_LIST_BYTES;
+
 /// Maximum number of subscriptions in a SetSubscriptions request.
 const MAX_SUBSCRIPTIONS: usize = 1000;
 
@@ -968,7 +972,8 @@ pub async fn resolve_address_book_selectors(
             continue;
         }
         let entries = control.list(book_type).await?;
-        let value = serde_json::json!(entries_to_json(&entries));
+        let entries = entries_to_json(&entries);
+        let value = bounded_selector_value(serde_json::Value::Array(entries))?;
         for key in requested {
             result.insert((*key).to_string(), value.clone());
         }
@@ -977,18 +982,20 @@ pub async fn resolve_address_book_selectors(
     if requested_keys.contains(&rpc::router_info_keys::ADDRESS_BOOK_SUBSCRIPTIONS) {
         let subs = control.subscriptions().await?;
         let urls: Vec<&str> = subs.as_slice().iter().map(|s| s.as_str()).collect();
+        let value = bounded_selector_value(serde_json::json!({"path": null, "entries": urls}))?;
         result.insert(
             rpc::router_info_keys::ADDRESS_BOOK_SUBSCRIPTIONS.to_string(),
-            serde_json::json!({"path": null, "entries": urls}),
+            value,
         );
     }
     if requested_keys.contains(&rpc::router_info_keys::ADDRESS_BOOK_CONFIG) {
         let config = control.configuration().await?;
         let map: serde_json::Map<String, serde_json::Value> =
             config.as_map().iter().map(|(k, v)| (k.clone(), serde_json::json!(v))).collect();
+        let value = bounded_selector_value(serde_json::json!({"path": null, "entries": map}))?;
         result.insert(
             rpc::router_info_keys::ADDRESS_BOOK_CONFIG.to_string(),
-            serde_json::json!({"path": null, "entries": map}),
+            value,
         );
     }
 
@@ -1006,6 +1013,31 @@ fn entries_to_json(entries: &[AddressBookEntry]) -> Vec<serde_json::Value> {
             })
         })
         .collect()
+}
+
+fn bounded_selector_value(value: serde_json::Value) -> Result<serde_json::Value, String> {
+    let item_count = match &value {
+        serde_json::Value::Array(items) => items.len(),
+        serde_json::Value::Object(object) =>
+            object.get("entries").and_then(serde_json::Value::as_array).map_or_else(
+                || {
+                    object
+                        .get("entries")
+                        .and_then(serde_json::Value::as_object)
+                        .map_or(0, |m| m.len())
+                },
+                Vec::len,
+            ),
+        _ => 0,
+    };
+    let serialized = serde_json::to_vec(&value)
+        .map_err(|_| "failed to serialize address book selector".to_string())?;
+    if item_count > MAX_ROUTER_INFO_SELECTOR_ENTRIES
+        || serialized.len() > MAX_ROUTER_INFO_SELECTOR_BYTES
+    {
+        return Err("address book selector result exceeds its bound".to_string());
+    }
+    Ok(value)
 }
 
 #[cfg(test)]

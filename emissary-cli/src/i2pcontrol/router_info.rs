@@ -83,6 +83,11 @@ impl fmt::Display for InspectionGroup {
 pub enum InspectionError {
     /// Source group not wired or not yet implemented.
     Unavailable { group: InspectionGroup },
+    /// A canonical selector is unavailable for a named, stable reason.
+    UnavailableReason {
+        group: InspectionGroup,
+        reason: &'static str,
+    },
     /// Source temporarily unavailable (e.g. transient query failure).
     TemporarilyUnavailable { group: InspectionGroup },
     /// Source query failed.
@@ -103,6 +108,9 @@ impl fmt::Display for InspectionError {
         match self {
             Self::Unavailable { group } => {
                 write!(f, "{group} data unavailable")
+            }
+            Self::UnavailableReason { group, reason } => {
+                write!(f, "{group} data unavailable: {reason}")
             }
             Self::TemporarilyUnavailable { group } => {
                 write!(f, "{group} temporarily unavailable")

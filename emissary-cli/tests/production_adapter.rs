@@ -37,7 +37,7 @@ use emissary_cli::i2pcontrol::{
         EventMetrics, ProductionAddressBookControl, ProductionControlPlane,
         ProductionRouterInfoControl, ProductionTunnelManagerControl,
     },
-    router_info::{NetworkStatus, RouterInfoControl},
+    router_info::{InspectionError, InspectionGroup, NetworkStatus, RouterInfoControl},
     stores::{address_book_store::AddressBookStore, tunnel_store::TunnelStore},
 };
 
@@ -589,7 +589,7 @@ async fn production_router_info_tcp_snapshot_returns_unavailable() {
 // --- Static guards ---
 
 #[test]
-fn production_router_info_returns_no_router_news() {
+fn production_router_info_returns_router_news_unavailable() {
     let metrics = make_metrics();
     let tunnel_mgr = make_tunnel_manager();
     let log_ring = Arc::new(LogRing::default());
@@ -603,7 +603,13 @@ fn production_router_info_returns_no_router_news() {
         log_ring,
         tunnel_mgr,
     );
-    assert_eq!(ri.router_news().unwrap(), "");
+    assert!(matches!(
+        ri.router_news(),
+        Err(InspectionError::UnavailableReason {
+            group: InspectionGroup::Retained,
+            reason: "no router news owner"
+        })
+    ));
 }
 
 #[test]

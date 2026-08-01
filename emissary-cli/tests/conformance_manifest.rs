@@ -523,6 +523,104 @@ fn router_info_selector_count() {
 }
 
 #[test]
+fn router_info_contract_manifest_has_exact_types_and_source_counts() {
+    use rpc::router_info_keys::{JsonType::*, SourceDisposition};
+
+    let expected_types = [
+        String,
+        NullableString,
+        NullableInteger,
+        NullableString,
+        ArrayOfStrings,
+        String,
+        Integer,
+        Integer,
+        Integer,
+        Integer,
+        Number,
+        ArrayOfObjects,
+        ArrayOfObjects,
+        Integer,
+        Integer,
+        ArrayOfObjects,
+        Integer,
+        Integer,
+        ArrayOfObjects,
+        Integer,
+        Integer,
+        Integer,
+        Integer,
+        Integer,
+        Number,
+        Number,
+        Integer,
+        Integer,
+        ArrayOfStrings,
+        ArrayOfStrings,
+        Integer,
+        Integer,
+        ObjectMapOfObjects,
+        ArrayOfStrings,
+        ArrayOfStrings,
+        ArrayOfStrings,
+        ArrayOfObjects,
+        ArrayOfStringMaps,
+        ArrayOfStringMaps,
+        ArrayOfStringMaps,
+        ArrayOfStringMaps,
+        ObjectWithPathAndEntries,
+        ObjectWithPathAndEntries,
+    ];
+    let contract = rpc::router_info_keys::PROPOSAL_170_CONTRACT;
+    assert_eq!(contract.len(), 43);
+    assert_eq!(
+        contract.iter().map(|row| row.json_type).collect::<Vec<_>>(),
+        expected_types
+    );
+    assert_eq!(
+        contract
+            .iter()
+            .filter(|row| matches!(row.source, SourceDisposition::Available { .. }))
+            .count(),
+        16
+    );
+    assert_eq!(
+        contract
+            .iter()
+            .filter(|row| matches!(row.source, SourceDisposition::Neutral { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(
+        contract
+            .iter()
+            .filter(|row| matches!(row.source, SourceDisposition::Unavailable { .. }))
+            .count(),
+        26
+    );
+    assert!(contract.iter().all(|row| row.direct_presence && !row.fixture.is_empty()));
+}
+
+#[test]
+fn router_info_source_map_documents_every_canonical_key_once() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let source_map =
+        std::fs::read_to_string(root.join("../docs/i2pcontrol/router-info-source-map.md"))
+            .expect("RouterInfo source map must exist");
+    for row in rpc::router_info_keys::PROPOSAL_170_CONTRACT {
+        let marker = format!("| `{}` |", row.key);
+        assert_eq!(
+            source_map.matches(&marker).count(),
+            1,
+            "missing or duplicate {}",
+            row.key
+        );
+    }
+    assert!(source_map
+        .contains("43 total, 16 available, 1 protocol-permitted neutral, and 26 unavailable"));
+}
+
+#[test]
 fn router_info_selector_partition_integrity() {
     let all: HashSet<&str> = rpc::router_info_keys::ALL.iter().copied().collect();
     let core: HashSet<&str> = rpc::router_info_keys::CORE_KEYS.iter().copied().collect();

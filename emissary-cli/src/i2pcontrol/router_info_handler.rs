@@ -46,7 +46,15 @@ const MAX_LOG_ENTRIES: usize = 10000;
 /// Maximum number of banned peers.
 const MAX_BANNED_PEERS: usize = 10000;
 
-/// UDP selectors that have no truthful source yet (awaiting M010).
+/// Maximum number of entries exposed by the shared startup tunnel inventory.
+const MAX_I2PTUNNEL_INFO_ENTRIES: usize = 1000;
+
+/// Maximum serialized RouterInfo response size, including the JSON-RPC
+/// envelope. The final response is checked after actual serialization.
+const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
+
+/// Base UDP selectors that have no truthful source yet. Canonical additions
+/// are adjudicated by `PROPOSAL_170_CONTRACT`.
 /// If any of these are requested, the entire request fails with Unavailable.
 const UDP_UNSUPPORTED: &[&str] = &[
     rpc::router_info_keys::UDP_COOKIE_ACTIVE,
@@ -67,7 +75,7 @@ const UDP_UNSUPPORTED: &[&str] = &[
     rpc::router_info_keys::UDP_CURRENT_PEERS,
 ];
 
-/// NetDB selectors that have no truthful source yet (awaiting M010).
+/// Base NetDB selectors that have no truthful source yet.
 /// If any of these are requested, the entire request fails with Unavailable.
 const NETDB_UNSUPPORTED: &[&str] = &[
     rpc::router_info_keys::NETDB_ALREADY_EXPERIENCED_PEERS,
@@ -101,7 +109,7 @@ const NETDB_UNSUPPORTED: &[&str] = &[
     rpc::router_info_keys::NETDB_ADDRESS_BOOK_UPDATES,
 ];
 
-/// Tunnel selectors that have no truthful source yet (awaiting M010).
+/// Base tunnel selectors that have no truthful source yet.
 const TUNNEL_UNSUPPORTED: &[&str] = &[
     rpc::router_info_keys::TUNNELS_EXPLORATORY_IN,
     rpc::router_info_keys::TUNNELS_EXPLORATORY_OUT,
@@ -117,6 +125,9 @@ fn inspection_error_message(err: &InspectionError) -> String {
     match err {
         InspectionError::Unavailable { group } => {
             format!("{group} data unavailable")
+        }
+        InspectionError::UnavailableReason { group, reason } => {
+            format!("{group} data unavailable: {reason}")
         }
         InspectionError::TemporarilyUnavailable { group } => {
             format!("{group} temporarily unavailable")
@@ -188,8 +199,8 @@ fn estimate_response_budget(key_set: &HashSet<&str>) -> Result<(), String> {
         estimated_bytes += MAX_LOG_ENTRIES * 256;
     }
 
-    // Total response cap (10 MB)
-    const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
+    // Coarse pre-query response cap. Actual serialized output is checked after
+    // assembly because source payload sizes are not predictable.
     if estimated_bytes > MAX_RESPONSE_BYTES {
         return Err(format!(
             "Estimated response size ({estimated_bytes} bytes) exceeds maximum ({MAX_RESPONSE_BYTES} bytes)"
@@ -296,8 +307,32 @@ pub async fn handle_router_info(
     // Dispatch and assemble response
     match assemble_response(state, &requested_keys, peer_ri_id).await {
         Ok(result) => {
-            let response = JsonRpcSuccess::new(id, serde_json::Value::Object(result));
-            serde_json::to_value(&response).unwrap()
+            let response = JsonRpcSuccess::new(id.clone(), serde_json::Value::Object(result));
+            let serialized = match serde_json::to_vec(&response) {
+                Ok(serialized) => serialized,
+                Err(_) =>
+                    return error_response(
+                        id,
+                        rpc::error_codes::INTERNAL_ERROR,
+                        "RouterInfo response serialization failed",
+                    ),
+            };
+            if serialized.len() > MAX_RESPONSE_BYTES {
+                return error_response(
+                    id,
+                    rpc::error_codes::INTERNAL_ERROR,
+                    format!(
+                        "RouterInfo response exceeds serialized bound of {MAX_RESPONSE_BYTES} bytes"
+                    ),
+                );
+            }
+            serde_json::from_slice(&serialized).unwrap_or_else(|_| {
+                error_response(
+                    id,
+                    rpc::error_codes::INTERNAL_ERROR,
+                    "RouterInfo response serialization failed",
+                )
+            })
         }
         Err(e) => {
             let code = inspection_error_code(&e);
@@ -337,13 +372,49 @@ async fn assemble_response(
             .iter()
             .find(|field| field.key == *key)
         {
-            if field.source != rpc::router_info_keys::SourceState::Available {
-                return Err(InspectionError::Unavailable {
+            if !field.source.is_requestable() {
+                return Err(InspectionError::UnavailableReason {
                     group: canonical_group_for_key(key),
+                    reason: field.source.reason().unwrap_or("source unavailable"),
                 });
             }
         }
     }
+
+    // Per-owner snapshots are acquired once for the duration of one request.
+    // This prevents canonical/compatibility aliases from querying the same
+    // source twice and keeps paired counters coherent enough for the request.
+    let clock_skew_snapshot = if key_set.contains(rpc::router_info_keys::P170_CLOCKSKEW)
+        || key_set.contains(rpc::router_info_keys::CLOCK_SKEW)
+    {
+        Some(router_info.clock_skew().await?)
+    } else {
+        None
+    };
+    let transport_bytes_snapshot = if key_set
+        .contains(rpc::router_info_keys::P170_NET_TOTAL_RECEIVED_BYTES)
+        || key_set.contains(rpc::router_info_keys::P170_NET_TOTAL_SENT_BYTES)
+        || key_set.contains(rpc::router_info_keys::BW_INBOUND_TOTAL)
+        || key_set.contains(rpc::router_info_keys::BW_OUTBOUND_TOTAL)
+    {
+        Some(router_info.transport_bytes().await?)
+    } else {
+        None
+    };
+    let share_ratio_snapshot = if key_set
+        .contains(rpc::router_info_keys::P170_NET_TUNNELS_SHARE_RATIO)
+        || key_set.contains(rpc::router_info_keys::SHARE_RATIO)
+    {
+        Some(router_info.share_ratio().await?)
+    } else {
+        None
+    };
+    let tunnel_build_stats_snapshot =
+        if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_TOTAL_SUCCESS_RATE) {
+            Some(router_info.tunnel_build_stats().await?)
+        } else {
+            None
+        };
 
     // Exact Proposal 170 retained and metric fields.
     if key_set.contains(rpc::router_info_keys::P170_ID) {
@@ -369,7 +440,7 @@ async fn assemble_response(
         );
     }
     if key_set.contains(rpc::router_info_keys::P170_CLOCKSKEW) {
-        let skew = router_info.clock_skew().await?;
+        let skew = clock_skew_snapshot.as_ref().expect("clock skew was queried");
         result.insert(
             rpc::router_info_keys::P170_CLOCKSKEW.to_string(),
             skew.skew_seconds
@@ -379,7 +450,7 @@ async fn assemble_response(
     if key_set.contains(rpc::router_info_keys::P170_NET_TOTAL_RECEIVED_BYTES)
         || key_set.contains(rpc::router_info_keys::P170_NET_TOTAL_SENT_BYTES)
     {
-        let bytes = router_info.transport_bytes().await?;
+        let bytes = transport_bytes_snapshot.as_ref().expect("transport bytes were queried");
         if key_set.contains(rpc::router_info_keys::P170_NET_TOTAL_RECEIVED_BYTES) {
             result.insert(
                 rpc::router_info_keys::P170_NET_TOTAL_RECEIVED_BYTES.to_string(),
@@ -401,7 +472,7 @@ async fn assemble_response(
         );
     }
     if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_SHARE_RATIO) {
-        let ratio = router_info.share_ratio().await?;
+        let ratio = share_ratio_snapshot.as_ref().expect("share ratio was queried");
         result.insert(
             rpc::router_info_keys::P170_NET_TUNNELS_SHARE_RATIO.to_string(),
             serde_json::json!(ratio),
@@ -411,17 +482,29 @@ async fn assemble_response(
         let definitions = state.tunnel_list().await.map_err(|_| InspectionError::QueryFailed {
             group: crate::i2pcontrol::router_info::InspectionGroup::I2PTunnel,
         })?;
+        if definitions.len() > MAX_I2PTUNNEL_INFO_ENTRIES {
+            return Err(InspectionError::ResultTooLarge {
+                group: crate::i2pcontrol::router_info::InspectionGroup::I2PTunnel,
+                limit: MAX_I2PTUNNEL_INFO_ENTRIES,
+            });
+        }
         let infos: Vec<serde_json::Value> = definitions
             .iter()
             .map(crate::i2pcontrol::tunnel_manager::tunnel_definition_to_get_result)
             .collect();
+        if serde_json::to_vec(&infos).map_or(true, |bytes| bytes.len() > 4 * 1024 * 1024) {
+            return Err(InspectionError::ResultTooLarge {
+                group: crate::i2pcontrol::router_info::InspectionGroup::I2PTunnel,
+                limit: MAX_I2PTUNNEL_INFO_ENTRIES,
+            });
+        }
         result.insert(
             rpc::router_info_keys::P170_NET_TUNNELS_I2PTUNNEL.to_string(),
             serde_json::Value::Array(infos),
         );
     }
     if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_TOTAL_SUCCESS_RATE) {
-        let stats = router_info.tunnel_build_stats().await?;
+        let stats = tunnel_build_stats_snapshot.as_ref().expect("tunnel build stats were queried");
         let total = stats.successes.saturating_add(stats.failures);
         let rate: f64 = if total == 0 {
             0.0
@@ -477,7 +560,7 @@ async fn assemble_response(
 
     // --- Clock skew ---
     if key_set.contains(rpc::router_info_keys::CLOCK_SKEW) {
-        let skew = router_info.clock_skew().await?;
+        let skew = clock_skew_snapshot.as_ref().expect("clock skew was queried");
         let value = match skew.skew_seconds {
             Some(s) => serde_json::json!(s),
             None => serde_json::json!(null),
@@ -506,7 +589,7 @@ async fn assemble_response(
 
     // --- Share ratio and configured BW ---
     if key_set.contains(rpc::router_info_keys::SHARE_RATIO) {
-        let ratio = router_info.share_ratio().await?;
+        let ratio = share_ratio_snapshot.as_ref().expect("share ratio was queried");
         result.insert(
             rpc::router_info_keys::SHARE_RATIO.to_string(),
             serde_json::json!(ratio),
@@ -564,7 +647,7 @@ async fn assemble_response(
         let transport = if key_set.contains(rpc::router_info_keys::BW_INBOUND_TOTAL)
             || key_set.contains(rpc::router_info_keys::BW_OUTBOUND_TOTAL)
         {
-            Some(router_info.transport_bytes().await?)
+            transport_bytes_snapshot.clone()
         } else {
             None
         };
@@ -1283,7 +1366,14 @@ fn error_response(id: RequestId, code: i32, message: impl Into<String>) -> serde
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::i2pcontrol::{router_info::*, rpc::JsonRpcRequest};
+    use crate::i2pcontrol::{
+        domain::address_book::{
+            AddressBookConfiguration, AddressBookEntry, AdministrativeAddressBookType,
+            SubscriptionSet,
+        },
+        router_info::*,
+        rpc::JsonRpcRequest,
+    };
 
     fn test_request(selectors: serde_json::Value) -> JsonRpcRequest {
         JsonRpcRequest {
@@ -1390,7 +1480,6 @@ mod tests {
     #[tokio::test]
     async fn canonical_logs_and_presence_semantics_are_literal() {
         let ri = FakeRouterInfoControl::new();
-        ri.set_router_news("news".into());
         ri.add_log_entry(LogEntry {
             timestamp_ms: 1,
             level: "INFO".into(),
@@ -1399,15 +1488,25 @@ mod tests {
         });
         let state = test_state(ri);
         let req = direct_request(serde_json::json!({
-            "i2p.router.news": false,
             "i2p.router.logs": true,
             "i2p.router.logs.clear": null,
         }));
         let resp = handle_router_info(&state, &req).await;
         let result = resp["result"].as_object().unwrap();
-        assert_eq!(result["i2p.router.news"], "news");
         assert_eq!(result["i2p.router.logs"], serde_json::json!(["hello"]));
         assert_eq!(result["i2p.router.logs.clear"], "success");
+    }
+
+    #[tokio::test]
+    async fn router_news_without_an_owner_is_unavailable() {
+        let state = test_state(FakeRouterInfoControl::new());
+        let resp = handle_router_info(
+            &state,
+            &direct_request(serde_json::json!({rpc::router_info_keys::ROUTER_NEWS: true})),
+        )
+        .await;
+        assert_eq!(resp["error"]["code"], -32603);
+        assert!(resp["error"]["message"].as_str().unwrap().contains("no router news owner"));
     }
 
     #[tokio::test]
@@ -1418,6 +1517,73 @@ mod tests {
         }));
         let resp = handle_router_info(&state, &req).await;
         assert_eq!(resp["error"]["code"], -32603);
+        assert!(resp["result"].is_null());
+    }
+
+    #[tokio::test]
+    async fn canonical_address_book_shapes_are_literal_and_requested_only() {
+        let state = test_state(FakeRouterInfoControl::new());
+        state
+            .address_book_add(
+                AdministrativeAddressBookType::Private,
+                AddressBookEntry::new("private.i2p", "destination"),
+            )
+            .await
+            .unwrap();
+        let mut subscriptions = SubscriptionSet::new();
+        subscriptions.push("https://example.i2p/hosts.txt".to_string());
+        state.address_book_set_subscriptions(subscriptions).await.unwrap();
+        let mut config = AddressBookConfiguration::new();
+        config.insert("updateInterval".to_string(), "3600".to_string());
+        state.address_book_set_configuration(config).await.unwrap();
+
+        let resp = handle_router_info(
+            &state,
+            &direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_ADDRESS_BOOK_PRIVATE_LIST: null,
+                rpc::router_info_keys::P170_ADDRESS_BOOK_SUBSCRIPTIONS: false,
+                rpc::router_info_keys::P170_ADDRESS_BOOK_CONFIG: true,
+            })),
+        )
+        .await;
+        let result = resp["result"].as_object().unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(
+            result["i2p.router.addressbook.private.list"],
+            serde_json::json!([{
+                "name": "private.i2p",
+                "value": "destination"
+            }])
+        );
+        assert_eq!(
+            result["i2p.router.addressbook.subscriptions"],
+            serde_json::json!({"path": null, "entries": ["https://example.i2p/hosts.txt"]})
+        );
+        assert_eq!(
+            result["i2p.router.addressbook.config"],
+            serde_json::json!({"path": null, "entries": {"updateInterval": "3600"}})
+        );
+    }
+
+    #[tokio::test]
+    async fn actual_serialized_response_bound_rejects_underestimated_log_payload() {
+        let ri = FakeRouterInfoControl::new();
+        for index in 0..10_000 {
+            ri.add_log_entry(LogEntry {
+                timestamp_ms: index,
+                level: "INFO".to_string(),
+                target: "test".to_string(),
+                message: "x".repeat(1_100),
+            });
+        }
+        let state = test_state(ri);
+        let resp = handle_router_info(
+            &state,
+            &direct_request(serde_json::json!({rpc::router_info_keys::P170_LOGS: true})),
+        )
+        .await;
+        assert_eq!(resp["error"]["code"], -32603);
+        assert!(resp["error"]["message"].as_str().unwrap().contains("serialized bound"));
         assert!(resp["result"].is_null());
     }
 

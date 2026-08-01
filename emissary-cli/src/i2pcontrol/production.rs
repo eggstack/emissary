@@ -1013,7 +1013,10 @@ impl RouterInfoControl for ProductionRouterInfoControl {
     }
 
     fn router_news(&self) -> Result<String, InspectionError> {
-        Ok(String::new())
+        Err(InspectionError::UnavailableReason {
+            group: InspectionGroup::Retained,
+            reason: "no router news owner",
+        })
     }
 
     async fn share_ratio(&self) -> Result<f64, InspectionError> {

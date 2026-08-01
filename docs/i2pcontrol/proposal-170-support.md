@@ -14,7 +14,7 @@ Current corrective roadmap:
 
 Next executable handoff:
 
-- M025, `plans/implementation/i2pcontrol-proposal-170/025-routerinfo-contract-and-source-reconciliation.md`
+- M026, `plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md`
 
 ## Status model
 
@@ -115,8 +115,8 @@ Their API definitions may persist and round-trip. Start/restart must return dete
 
 ## AddressBook
 
-Current status: runtime authority bridged; final source-matrix review remains
-owned by M025.
+Current status: runtime authority bridged; final source-matrix review is closed
+in M025.
 
 The runtime `AddressBookHandle` is now the single durable/mutable authority for
 the four books, metadata, and lookup publication. Successful mutations are
@@ -128,7 +128,7 @@ Subscription/config selectors now return the pinned `{path, entries}` object
 shape. Emissary has no actual path-backed source for these metadata objects, so
 `path: null` is returned rather than a fabricated filesystem path.
 
-Owner: M022, with final matrix integration in M025.
+Owner: M022, with final matrix integration closed in M025.
 
 ## ClientServicesInfo
 
@@ -148,11 +148,13 @@ implemented. M025 owns final selector/source reconciliation.
 
 ## RouterInfo
 
-Current status: exact 43-key inventory scaffold retained; source/claim reconciliation required
+Current status: M025 matrix frozen; source dimensions are explicit.
 
-The repository currently recognizes exactly 43 Proposal 170 additions, but many are unavailable and several source/type classifications contradict serializers or documentation. Unqualified completion is therefore invalid.
-
-M025 will freeze one exact matrix containing key, JSON type, source owner, source status, serializer, and fixture.
+The repository recognizes exactly 43 Proposal 170 additions. The reviewed
+matrix contains 16 available fields, 1 protocol-permitted neutral field, and
+26 explicitly unavailable fields, with exact JSON types, owner/reason,
+serializer, bound, and fixture metadata. Availability is not inferred from
+adjacent counters or from fake/test sources.
 
 M026 may add bounded read-only snapshots only where the authoritative state already exists. It must not add new historical samplers, polling loops, algorithms, peer categories, or fabricated defaults.
 
@@ -191,8 +193,8 @@ Owners: M022, rechecked by M027.
 | M022 | closed internally against pinned revision | actual AddressBook runtime authority and source objects |
 | M023 | closed internally against pinned revision | startup tunnel inventory and client-service lifecycle/address truthfulness |
 | M024 | closed internally against pinned revision | recoverable bounded SAM observation |
-| M025 | ready | exact RouterInfo contract/source matrix |
-| M026 | blocked | feasible bounded read-only router inspection sources |
+| M025 | closed internally against pinned revision | exact RouterInfo contract/source matrix |
+| M026 | ready | feasible bounded read-only router inspection sources |
 | M027 | blocked | literal conformance, documentation reconciliation, independent closure |
 
 See `plans/implementation/i2pcontrol-proposal-170/README.md` for dependencies and handoff rules.

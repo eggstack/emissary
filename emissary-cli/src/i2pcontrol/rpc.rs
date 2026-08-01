@@ -625,23 +625,107 @@ pub mod router_info_keys {
         Number,
         ArrayOfStrings,
         ArrayOfObjects,
-        Object,
+        ArrayOfStringMaps,
+        ObjectMapOfObjects,
+        ObjectWithPathAndEntries,
     }
 
-    /// Truthful current-source state for a canonical RouterInfo addition.
+    impl JsonType {
+        /// Human-readable contract spelling used by the source-map guard.
+        pub const fn as_str(self) -> &'static str {
+            match self {
+                Self::String => "string",
+                Self::NullableString => "string|null",
+                Self::NullableInteger => "integer|null",
+                Self::Integer => "integer",
+                Self::Number => "number",
+                Self::ArrayOfStrings => "array<string>",
+                Self::ArrayOfObjects => "array<object>",
+                Self::ArrayOfStringMaps => "array<map<string,string>>",
+                Self::ObjectMapOfObjects => "map<string,map<string,object>>",
+                Self::ObjectWithPathAndEntries => "object{path,entries}",
+            }
+        }
+    }
+
+    /// Whether a selector is read-only or is the one permitted log mutation.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub enum SourceState {
-        Available,
-        Unavailable,
-        ProtocolAmbiguity,
+    pub enum Mutation {
+        ReadOnly,
+        ClearLogBuffer,
     }
 
-    /// Machine-checkable contract inventory for the pinned revision.
+    /// Result bound recorded in the canonical source matrix.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum Bound {
+        None,
+        Items(usize),
+        Bytes(usize),
+        ItemsAndBytes { items: usize, bytes: usize },
+    }
+
+    /// Truthful current-source disposition for a canonical RouterInfo addition.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum SourceDisposition {
+        Available {
+            owner: &'static str,
+        },
+        Neutral {
+            owner: &'static str,
+            reason: &'static str,
+        },
+        Unavailable {
+            owner: &'static str,
+            reason: &'static str,
+        },
+    }
+
+    impl SourceDisposition {
+        /// Whether this disposition may be serialized for a request.
+        pub const fn is_requestable(self) -> bool {
+            matches!(self, Self::Available { .. } | Self::Neutral { .. })
+        }
+
+        /// Stable source classification used in documentation and tests.
+        pub const fn class(self) -> &'static str {
+            match self {
+                Self::Available { .. } => "available",
+                Self::Neutral { .. } => "protocol-permitted neutral",
+                Self::Unavailable { .. } => "unavailable",
+            }
+        }
+
+        /// The authoritative owner or the owner group that must implement it.
+        pub const fn owner(self) -> &'static str {
+            match self {
+                Self::Available { owner }
+                | Self::Neutral { owner, .. }
+                | Self::Unavailable { owner, .. } => owner,
+            }
+        }
+
+        /// The adjudication reason for neutral or unavailable fields.
+        pub const fn reason(self) -> Option<&'static str> {
+            match self {
+                Self::Available { .. } => None,
+                Self::Neutral { reason, .. } | Self::Unavailable { reason, .. } => Some(reason),
+            }
+        }
+    }
+
+    /// Machine-checkable contract/source inventory for the pinned revision.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct ContractField {
         pub key: &'static str,
         pub json_type: JsonType,
-        pub source: SourceState,
+        pub direct_presence: bool,
+        pub mutation: Mutation,
+        pub source: SourceDisposition,
+        pub serializer: &'static str,
+        pub fixture: &'static str,
+        pub bound: Bound,
+        /// Exact base selector spelling when this canonical key is also a base key.
+        pub base_alias: Option<&'static str>,
     }
 
     /// The exact 43-key Proposal 170 RouterInfo addition set.
@@ -691,223 +775,625 @@ pub mod router_info_keys {
         P170_ADDRESS_BOOK_CONFIG,
     ];
 
-    /// Types and source states for every canonical addition.
+    macro_rules! field {
+        ($key:expr, $json_type:expr, $source:expr, $serializer:literal, $fixture:literal,
+            $mutation:expr, $bound:expr, $base_alias:expr) => {
+            ContractField {
+                key: $key,
+                json_type: $json_type,
+                direct_presence: true,
+                mutation: $mutation,
+                source: $source,
+                serializer: $serializer,
+                fixture: $fixture,
+                bound: $bound,
+                base_alias: $base_alias,
+            }
+        };
+    }
+
+    /// Types, source dispositions, serializers, fixtures, and bounds for every
+    /// canonical addition. This is the reviewed M025 matrix; the handler and
+    /// documentation tests consume this table rather than maintaining a second
+    /// availability list.
     pub const PROPOSAL_170_CONTRACT: &[ContractField; 43] = &[
-        ContractField {
-            key: ROUTER_NEWS,
-            json_type: JsonType::String,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_ID,
-            json_type: JsonType::NullableString,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_CLOCKSKEW,
-            json_type: JsonType::NullableInteger,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_INFO,
-            json_type: JsonType::NullableString,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_LOGS,
-            json_type: JsonType::ArrayOfStrings,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_LOGS_CLEAR,
-            json_type: JsonType::String,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_NET_TOTAL_RECEIVED_BYTES,
-            json_type: JsonType::Integer,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_NET_TOTAL_SENT_BYTES,
-            json_type: JsonType::Integer,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_NET_TOTAL_TRANSIT_BYTES,
-            json_type: JsonType::Integer,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_NET_BW_TRANSIT_15S,
-            json_type: JsonType::Integer,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_SHARE_RATIO,
-            json_type: JsonType::Number,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_PARTICIPATING_INFO,
-            json_type: JsonType::ArrayOfObjects,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_I2PTUNNEL,
-            json_type: JsonType::ArrayOfObjects,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_EXPLORATORY_INBOUND,
-            json_type: JsonType::Integer,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_EXPLORATORY_OUTBOUND,
-            json_type: JsonType::Integer,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_EXPLORATORY_INFO_LIST,
-            json_type: JsonType::ArrayOfObjects,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_CLIENT_INBOUND,
-            json_type: JsonType::Integer,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_CLIENT_OUTBOUND,
-            json_type: JsonType::Integer,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_CLIENT_INFO_LIST,
-            json_type: JsonType::ArrayOfObjects,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_STATUS_V6,
-            json_type: JsonType::Integer,
-            source: SourceState::ProtocolAmbiguity,
-        },
-        ContractField {
-            key: P170_NET_ERROR,
-            json_type: JsonType::Integer,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_ERROR_V6,
-            json_type: JsonType::Integer,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_TESTING,
-            json_type: JsonType::Integer,
-            source: SourceState::ProtocolAmbiguity,
-        },
-        ContractField {
-            key: P170_NET_TESTING_V6,
-            json_type: JsonType::Integer,
-            source: SourceState::ProtocolAmbiguity,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_SUCCESS_RATE,
-            json_type: JsonType::Number,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_TOTAL_SUCCESS_RATE,
-            json_type: JsonType::Number,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_QUEUE,
-            json_type: JsonType::Integer,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NET_TUNNELS_TBM_QUEUE,
-            json_type: JsonType::Integer,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NETDB_PEERS,
-            json_type: JsonType::ArrayOfStrings,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NETDB_ACTIVE_PEERS_INFO,
-            json_type: JsonType::ArrayOfStrings,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NETDB_NTCP_LIMIT,
-            json_type: JsonType::Integer,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NETDB_SSU_LIMIT,
-            json_type: JsonType::Integer,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NETDB_BANNED_PEERS,
-            json_type: JsonType::Object,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NETDB_ACTIVE_PEERS_LIST,
-            json_type: JsonType::ArrayOfStrings,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NETDB_PEERS_LIST,
-            json_type: JsonType::ArrayOfStrings,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NETDB_PEERS_INFO,
-            json_type: JsonType::ArrayOfStrings,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_NETDB_ACTIVE_PEERS_STATS,
-            json_type: JsonType::ArrayOfObjects,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_ADDRESS_BOOK_PRIVATE_LIST,
-            json_type: JsonType::ArrayOfObjects,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_ADDRESS_BOOK_LOCAL_LIST,
-            json_type: JsonType::ArrayOfObjects,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_ADDRESS_BOOK_ROUTER_LIST,
-            json_type: JsonType::ArrayOfObjects,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_ADDRESS_BOOK_PUBLISHED_LIST,
-            json_type: JsonType::ArrayOfObjects,
-            source: SourceState::Available,
-        },
-        ContractField {
-            key: P170_ADDRESS_BOOK_SUBSCRIPTIONS,
-            json_type: JsonType::Object,
-            source: SourceState::Unavailable,
-        },
-        ContractField {
-            key: P170_ADDRESS_BOOK_CONFIG,
-            json_type: JsonType::Object,
-            source: SourceState::Unavailable,
-        },
+        field!(
+            ROUTER_NEWS,
+            JsonType::String,
+            SourceDisposition::Unavailable {
+                owner: "router-news",
+                reason: "no router news owner"
+            },
+            "serialize_router_news",
+            "p170.router_news.string",
+            Mutation::ReadOnly,
+            Bound::None,
+            Some(ROUTER_NEWS)
+        ),
+        field!(
+            P170_ID,
+            JsonType::NullableString,
+            SourceDisposition::Available {
+                owner: "startup-retained"
+            },
+            "serialize_router_id",
+            "p170.router_id.nullable_string",
+            Mutation::ReadOnly,
+            Bound::Bytes(4 * 1024),
+            None
+        ),
+        field!(
+            P170_CLOCKSKEW,
+            JsonType::NullableInteger,
+            SourceDisposition::Neutral {
+                owner: "router-info-control",
+                reason: "protocol permits null when no peer estimate exists"
+            },
+            "serialize_clockskew",
+            "p170.clockskew.nullable_integer",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_INFO,
+            JsonType::NullableString,
+            SourceDisposition::Available {
+                owner: "startup-retained"
+            },
+            "serialize_router_info",
+            "p170.router_info.nullable_string",
+            Mutation::ReadOnly,
+            Bound::Bytes(4 * 1024 * 1024),
+            None
+        ),
+        field!(
+            P170_LOGS,
+            JsonType::ArrayOfStrings,
+            SourceDisposition::Available {
+                owner: "i2pcontrol-log-ring"
+            },
+            "serialize_log_messages",
+            "p170.logs.string_list",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 10 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_LOGS_CLEAR,
+            JsonType::String,
+            SourceDisposition::Available {
+                owner: "i2pcontrol-log-ring"
+            },
+            "serialize_log_clear",
+            "p170.logs_clear.success",
+            Mutation::ClearLogBuffer,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TOTAL_RECEIVED_BYTES,
+            JsonType::Integer,
+            SourceDisposition::Available {
+                owner: "event-metrics"
+            },
+            "serialize_total_received_bytes",
+            "p170.total_received.integer",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TOTAL_SENT_BYTES,
+            JsonType::Integer,
+            SourceDisposition::Available {
+                owner: "event-metrics"
+            },
+            "serialize_total_sent_bytes",
+            "p170.total_sent.integer",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TOTAL_TRANSIT_BYTES,
+            JsonType::Integer,
+            SourceDisposition::Available {
+                owner: "event-metrics"
+            },
+            "serialize_total_transit_bytes",
+            "p170.total_transit.integer",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_BW_TRANSIT_15S,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "traffic-metrics",
+                reason: "no rolling 15s transit source"
+            },
+            "serialize_transit_bandwidth_15s",
+            "p170.transit_15s.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_SHARE_RATIO,
+            JsonType::Number,
+            SourceDisposition::Available {
+                owner: "retained-configuration"
+            },
+            "serialize_tunnel_share_ratio",
+            "p170.share_ratio.number",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_PARTICIPATING_INFO,
+            JsonType::ArrayOfObjects,
+            SourceDisposition::Unavailable {
+                owner: "tunnel-pool",
+                reason: "no bounded participating tunnel detail snapshot"
+            },
+            "serialize_participating_tunnel_info",
+            "p170.participating_info.unavailable",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_I2PTUNNEL,
+            JsonType::ArrayOfObjects,
+            SourceDisposition::Available {
+                owner: "startup-tunnel-inventory"
+            },
+            "serialize_i2ptunnel_quick_info",
+            "p170.i2ptunnel.quick_info",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 1_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_EXPLORATORY_INBOUND,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "tunnel-pool",
+                reason: "no bounded exploratory tunnel count source"
+            },
+            "serialize_exploratory_inbound",
+            "p170.exploratory_inbound.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_EXPLORATORY_OUTBOUND,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "tunnel-pool",
+                reason: "no bounded exploratory tunnel count source"
+            },
+            "serialize_exploratory_outbound",
+            "p170.exploratory_outbound.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_EXPLORATORY_INFO_LIST,
+            JsonType::ArrayOfObjects,
+            SourceDisposition::Unavailable {
+                owner: "tunnel-pool",
+                reason: "no bounded exploratory tunnel detail snapshot"
+            },
+            "serialize_exploratory_info_list",
+            "p170.exploratory_info.unavailable",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_CLIENT_INBOUND,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "tunnel-pool",
+                reason: "no bounded client tunnel count source"
+            },
+            "serialize_client_inbound",
+            "p170.client_inbound.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_CLIENT_OUTBOUND,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "tunnel-pool",
+                reason: "no bounded client tunnel count source"
+            },
+            "serialize_client_outbound",
+            "p170.client_outbound.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_CLIENT_INFO_LIST,
+            JsonType::ArrayOfObjects,
+            SourceDisposition::Unavailable {
+                owner: "tunnel-pool",
+                reason: "no bounded client tunnel detail snapshot"
+            },
+            "serialize_client_info_list",
+            "p170.client_info.unavailable",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_NET_STATUS_V6,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "network",
+                reason: "no transport-specific v6 status code mapping"
+            },
+            "serialize_network_status_v6",
+            "p170.status_v6.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_ERROR,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "network",
+                reason: "no transport-specific v4 error code mapping"
+            },
+            "serialize_network_error",
+            "p170.error_v4.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_ERROR_V6,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "network",
+                reason: "no transport-specific v6 error code mapping"
+            },
+            "serialize_network_error_v6",
+            "p170.error_v6.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TESTING,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "network",
+                reason: "no canonical v4 testing-state source"
+            },
+            "serialize_network_testing",
+            "p170.testing_v4.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TESTING_V6,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "network",
+                reason: "no canonical v6 testing-state source"
+            },
+            "serialize_network_testing_v6",
+            "p170.testing_v6.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_SUCCESS_RATE,
+            JsonType::Number,
+            SourceDisposition::Unavailable {
+                owner: "tunnel-build-metrics",
+                reason: "no rolling tunnel build success-rate source"
+            },
+            "serialize_tunnel_success_rate",
+            "p170.success_rate.recent.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_TOTAL_SUCCESS_RATE,
+            JsonType::Number,
+            SourceDisposition::Available {
+                owner: "event-metrics"
+            },
+            "serialize_total_tunnel_success_rate",
+            "p170.success_rate.total.percent",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_QUEUE,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "tunnel-pool",
+                reason: "no bounded tunnel build queue snapshot"
+            },
+            "serialize_tunnel_queue",
+            "p170.tunnel_queue.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NET_TUNNELS_TBM_QUEUE,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "tunnel-pool",
+                reason: "no bounded tunnel build message queue snapshot"
+            },
+            "serialize_tbm_queue",
+            "p170.tbm_queue.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NETDB_PEERS,
+            JsonType::ArrayOfStrings,
+            SourceDisposition::Unavailable {
+                owner: "netdb",
+                reason: "no bounded known-peer hash snapshot"
+            },
+            "serialize_netdb_peer_hashes",
+            "p170.netdb.peers.unavailable",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_NETDB_ACTIVE_PEERS_INFO,
+            JsonType::ArrayOfStrings,
+            SourceDisposition::Unavailable {
+                owner: "netdb",
+                reason: "no bounded active-peer RouterInfo snapshot"
+            },
+            "serialize_active_peer_router_infos",
+            "p170.netdb.active_peer_info.unavailable",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_NETDB_NTCP_LIMIT,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "peer-limits",
+                reason: "no authoritative NTCP limit owner"
+            },
+            "serialize_ntcp_limit",
+            "p170.netdb.ntcp_limit.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NETDB_SSU_LIMIT,
+            JsonType::Integer,
+            SourceDisposition::Unavailable {
+                owner: "peer-limits",
+                reason: "no authoritative SSU limit owner"
+            },
+            "serialize_ssu_limit",
+            "p170.netdb.ssu_limit.unavailable",
+            Mutation::ReadOnly,
+            Bound::None,
+            None
+        ),
+        field!(
+            P170_NETDB_BANNED_PEERS,
+            JsonType::ObjectMapOfObjects,
+            SourceDisposition::Unavailable {
+                owner: "ban-list",
+                reason: "no authoritative ban owner"
+            },
+            "serialize_banned_peers",
+            "p170.netdb.banned_peers.unavailable",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_NETDB_ACTIVE_PEERS_LIST,
+            JsonType::ArrayOfStrings,
+            SourceDisposition::Unavailable {
+                owner: "peer-list",
+                reason: "no bounded active peer RouterInfo snapshot"
+            },
+            "serialize_active_peer_hashes",
+            "p170.netdb.active_peers.unavailable",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_NETDB_PEERS_LIST,
+            JsonType::ArrayOfStrings,
+            SourceDisposition::Unavailable {
+                owner: "peer-list",
+                reason: "no bounded known peer RouterInfo snapshot"
+            },
+            "serialize_known_peer_hashes",
+            "p170.netdb.peer_list.unavailable",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_NETDB_PEERS_INFO,
+            JsonType::ArrayOfStrings,
+            SourceDisposition::Unavailable {
+                owner: "peer-list",
+                reason: "no bounded peer RouterInfo snapshot"
+            },
+            "serialize_peer_router_infos",
+            "p170.netdb.peer_info.unavailable",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_NETDB_ACTIVE_PEERS_STATS,
+            JsonType::ArrayOfObjects,
+            SourceDisposition::Unavailable {
+                owner: "peer-stats",
+                reason: "no bounded active peer statistics snapshot"
+            },
+            "serialize_active_peer_stats",
+            "p170.netdb.active_peer_stats.unavailable",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_ADDRESS_BOOK_PRIVATE_LIST,
+            JsonType::ArrayOfStringMaps,
+            SourceDisposition::Available {
+                owner: "runtime-address-book-handle"
+            },
+            "serialize_address_book_private_list",
+            "p170.addressbook.private.list",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_ADDRESS_BOOK_LOCAL_LIST,
+            JsonType::ArrayOfStringMaps,
+            SourceDisposition::Available {
+                owner: "runtime-address-book-handle"
+            },
+            "serialize_address_book_local_list",
+            "p170.addressbook.local.list",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_ADDRESS_BOOK_ROUTER_LIST,
+            JsonType::ArrayOfStringMaps,
+            SourceDisposition::Available {
+                owner: "runtime-address-book-handle"
+            },
+            "serialize_address_book_router_list",
+            "p170.addressbook.router.list",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_ADDRESS_BOOK_PUBLISHED_LIST,
+            JsonType::ArrayOfStringMaps,
+            SourceDisposition::Available {
+                owner: "runtime-address-book-handle"
+            },
+            "serialize_address_book_published_list",
+            "p170.addressbook.published.list",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 10_000,
+                bytes: 4 * 1024 * 1024
+            },
+            None
+        ),
+        field!(
+            P170_ADDRESS_BOOK_SUBSCRIPTIONS,
+            JsonType::ObjectWithPathAndEntries,
+            SourceDisposition::Available {
+                owner: "runtime-address-book-handle"
+            },
+            "serialize_address_book_subscriptions",
+            "p170.addressbook.subscriptions.object",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 1_000,
+                bytes: 4 * 1024 * 1024
+            },
+            Some(ADDRESS_BOOK_SUBSCRIPTIONS)
+        ),
+        field!(
+            P170_ADDRESS_BOOK_CONFIG,
+            JsonType::ObjectWithPathAndEntries,
+            SourceDisposition::Available {
+                owner: "runtime-address-book-handle"
+            },
+            "serialize_address_book_config",
+            "p170.addressbook.config.object",
+            Mutation::ReadOnly,
+            Bound::ItemsAndBytes {
+                items: 1_000,
+                bytes: 4 * 1024 * 1024
+            },
+            Some(ADDRESS_BOOK_CONFIG)
+        ),
     ];
 
     /// True when a selector belongs to the exact Proposal 170 addition set.
@@ -924,6 +1410,16 @@ pub mod router_info_keys {
         ADDRESS_BOOK_SUBSCRIPTIONS,
         ADDRESS_BOOK_CONFIG,
     ];
+
+    /// Existing I2PControl RouterInfo inventories, kept separate from the
+    /// Proposal 170 additions. These aliases make the partition explicit to
+    /// callers and static guards without changing the established key sets.
+    pub const BASE_ROUTER_INFO_CORE_KEYS: &[&str] = CORE_KEYS;
+    pub const BASE_ROUTER_INFO_ADDRESS_BOOK_KEYS: &[&str] = ADDRESS_BOOK_KEYS;
+
+    /// Emissary compatibility form; it is a request envelope, not a canonical
+    /// selector and must never be counted as one of the 43 additions.
+    pub const COMPATIBILITY_ROUTER_INFO_FORMS: &[&str] = &["Selector"];
 
     /// All legacy/base and exact Proposal 170 RouterInfo selector keys.
     pub const ALL: &[&str] = &[
@@ -1374,6 +1870,133 @@ mod tests {
             assert!(is_valid_router_info_selector(key));
         }
         assert!(!is_valid_router_info_selector("unknown.selector"));
+    }
+
+    #[test]
+    fn conformance_manifest_has_exact_keys_types_and_metadata() {
+        use std::collections::HashSet;
+
+        let keys: HashSet<&str> =
+            router_info_keys::PROPOSAL_170_ADDITIONS.iter().copied().collect();
+        let fields: HashSet<&str> =
+            router_info_keys::PROPOSAL_170_CONTRACT.iter().map(|field| field.key).collect();
+        assert_eq!(keys, fields);
+        assert_eq!(fields.len(), 43);
+        for field in router_info_keys::PROPOSAL_170_CONTRACT {
+            assert!(
+                field.direct_presence,
+                "{} is not direct-presence selected",
+                field.key
+            );
+            assert!(
+                !field.serializer.is_empty(),
+                "{} has no serializer",
+                field.key
+            );
+            assert!(!field.fixture.is_empty(), "{} has no fixture", field.key);
+            assert!(
+                !field.source.class().is_empty(),
+                "{} has no source class",
+                field.key
+            );
+            assert!(
+                !field.source.owner().is_empty(),
+                "{} has no source owner",
+                field.key
+            );
+            if matches!(
+                field.source,
+                router_info_keys::SourceDisposition::Unavailable { .. }
+            ) {
+                assert!(
+                    field.source.reason().is_some(),
+                    "{} has no unavailable reason",
+                    field.key
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn conformance_manifest_has_literal_type_table() {
+        use router_info_keys::{JsonType::*, PROPOSAL_170_CONTRACT as C};
+
+        let expected = [
+            String,
+            NullableString,
+            NullableInteger,
+            NullableString,
+            ArrayOfStrings,
+            String,
+            Integer,
+            Integer,
+            Integer,
+            Integer,
+            Number,
+            ArrayOfObjects,
+            ArrayOfObjects,
+            Integer,
+            Integer,
+            ArrayOfObjects,
+            Integer,
+            Integer,
+            ArrayOfObjects,
+            Integer,
+            Integer,
+            Integer,
+            Integer,
+            Integer,
+            Number,
+            Number,
+            Integer,
+            Integer,
+            ArrayOfStrings,
+            ArrayOfStrings,
+            Integer,
+            Integer,
+            ObjectMapOfObjects,
+            ArrayOfStrings,
+            ArrayOfStrings,
+            ArrayOfStrings,
+            ArrayOfObjects,
+            ArrayOfStringMaps,
+            ArrayOfStringMaps,
+            ArrayOfStringMaps,
+            ArrayOfStringMaps,
+            ObjectWithPathAndEntries,
+            ObjectWithPathAndEntries,
+        ];
+        assert_eq!(
+            C.iter().map(|field| field.json_type).collect::<Vec<_>>(),
+            expected
+        );
+    }
+
+    #[test]
+    fn base_canonical_and_compatibility_inventories_are_separate() {
+        use std::collections::HashSet;
+
+        let canonical: HashSet<&str> =
+            router_info_keys::PROPOSAL_170_ADDITIONS.iter().copied().collect();
+        let base: HashSet<&str> = router_info_keys::BASE_ROUTER_INFO_CORE_KEYS
+            .iter()
+            .chain(router_info_keys::BASE_ROUTER_INFO_ADDRESS_BOOK_KEYS.iter())
+            .copied()
+            .collect();
+        let overlap: HashSet<&str> = canonical.intersection(&base).copied().collect();
+        assert_eq!(
+            overlap,
+            HashSet::from([
+                router_info_keys::ROUTER_NEWS,
+                router_info_keys::ADDRESS_BOOK_SUBSCRIPTIONS,
+                router_info_keys::ADDRESS_BOOK_CONFIG,
+            ])
+        );
+        assert_eq!(
+            router_info_keys::COMPATIBILITY_ROUTER_INFO_FORMS,
+            &["Selector"]
+        );
+        assert_eq!(canonical.len(), 43);
     }
 
     #[test]

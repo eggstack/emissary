@@ -1,6 +1,6 @@
 # M026 — Bounded Router Inspection Sources
 
-Status: blocked
+Status: ready
 
 Primary class: infrastructure/capability corrective pass
 
@@ -38,6 +38,12 @@ M025 must provide, for every candidate field:
 - focused fixture expectation.
 
 Any candidate lacking one of these is not ready and remains unavailable.
+
+M025's frozen input currently marks every unavailable field as `deferred
+unavailable` or `out of scope`; there are no `M026 feasible` fields. The
+owner-grouped audit input and exact reasons are recorded in section 13 of the
+M025 plan and its implementation disposition. M026 must preserve that result
+unless new authoritative state is demonstrated without expanding scope.
 
 ## 3. Required invariants
 

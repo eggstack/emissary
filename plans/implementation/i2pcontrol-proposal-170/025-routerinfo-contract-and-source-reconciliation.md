@@ -1,6 +1,6 @@
 # M025 — RouterInfo Contract and Source Reconciliation
 
-Status: blocked
+Status: implemented
 
 Primary class: invariant/evidence corrective pass
 
@@ -257,5 +257,29 @@ Stop if:
 - local reconciliation expands into core inspection implementation;
 - documentation pressure encourages counting unavailable/compatibility items as complete;
 - any missing tunnel data plane, CI, or upstream activity enters scope.
+
+## 13. Frozen M026 source worklist
+
+M025 adjudicated all 26 unavailable additions. No field currently meets the
+`M026 feasible` definition because every candidate requires either a missing
+bounded owner snapshot, a new historical sampler, or semantic mapping that is
+not present in Emissary. M026 is therefore unblocked for a bounded owner audit
+and may close the fields as deferred/out of scope without adding production
+sources.
+
+| Owner group | Fields | M026 disposition |
+|---|---|---|
+| `traffic-metrics` | `net.bw.transit.15s`, `net.tunnels.successrate` | deferred unavailable; exact rolling windows are not tracked and adding history is out of scope |
+| `network` | `net.status.v6`, `net.error`, `net.error.v6`, `net.testing`, `net.testing.v6` | deferred unavailable; existing firewall statuses do not provide the pinned integer/error/testing mappings |
+| `tunnel-pool` | participating details, exploratory/client counts/details, `queue`, `tbmqueue` | out of scope; no bounded pool/queue owner is exposed and adding one would change ownership boundaries |
+| `netdb` | `netdb.peers`, `activepeers.info` | deferred unavailable; no bounded current NetDB/RouterInfo snapshot owner exists |
+| `peer-limits` | `netdb.ntcp.limit`, `netdb.ssu.limit` | deferred unavailable; no authoritative transport-limit owner is exposed |
+| `ban-list` | `netdb.bannedpeers` | deferred unavailable; no authoritative ban owner exists |
+| `peer-list` | active/known peer lists and peer info | deferred unavailable; no bounded peer snapshot owner exists |
+| `peer-stats` | `netdb.activepeers.stats` | deferred unavailable; no bounded per-peer statistics owner exists |
+
+There are no M026-feasible fields in the frozen matrix. Any future source
+implementation requires a new owner-specific plan or an explicit update to
+M026; it must not be inferred from aggregate metrics or fabricated defaults.
 
 M025 closure unblocks M026.

@@ -1,214 +1,90 @@
 # RouterInfo Selector Source Map
 
-Status: closed internally against the pinned Proposal 170 revision by M019A
+Status: M025 implementation disposition frozen; final subsystem closure remains M027
 
-This document is the single source of truth for every Proposal 170 RouterInfo
-selector's wire key, output type, nullability, semantic definition, canonical
-Emissary source, snapshot group, bounds, availability, and M010 work-package.
+This is the reviewed source map for the pinned Proposal 170 revision created and
+last updated on `2026-08-01`. The machine-readable authority is
+`router_info_keys::PROPOSAL_170_CONTRACT` in `emissary-cli/src/i2pcontrol/rpc.rs`.
+Summary: 43 total, 16 available, 1 protocol-permitted neutral, and 26 unavailable.
+The table below is intentionally one row per canonical addition. Base selectors and
+the nested `Selector` compatibility form are not counted in those totals.
 
-Proposal 170 is Open and pinned here to the 2026-05-20 revision. The exact
-canonical addition set is the 43-key `PROPOSAL_170_ADDITIONS` manifest in
-`rpc.rs`; the legacy/base catalog is separate. Each canonical addition is
-classified in `PROPOSAL_170_CONTRACT` as `Available`, `Unavailable`, or
-`ProtocolAmbiguity`. Unavailable and ambiguous fields are rejected explicitly,
-not populated from semantically different legacy values.
+## Disposition vocabulary
 
-## Source classes
-
-| Class | Description |
+| Disposition | Meaning |
 |---|---|
-| `retained` | Identity, serialized local RouterInfo, version, configured values, startup time |
-| `event-metric` | Existing atomic counters or cached statuses from `EventMetrics` |
-| `administrative-store` | Shared `AddressBook` or `TunnelManager` state |
-| `core-inspection` | Bounded runtime/NetDB/transport/tunnel snapshot required from M010; now unused in production adapter after M014 removed startup-owned snapshot |
-| `protocol-defined-empty` | Protocol semantics explicitly define absence as empty |
-| `nullable-unavailable` | Protocol permits null where value is unknown |
-| `unsupported-inspection` | Selector validated but no truthful source exists; fails explicitly |
+| `available` | A truthful current production owner is wired and covered by a focused fixture. |
+| `protocol-permitted neutral` | The proposal permits the exact neutral value, here `null` for an absent clock-skew estimate. |
+| `unavailable` | No authoritative bounded source exists; the request fails with a sanitized deterministic error. |
 
-## Selector source map
+All canonical fields use direct parameter presence: the parameter value is
+ignored, including `false`, `null`, and non-boolean values. `logs.clear` is the
+only mutating selector and clears only the I2PControl log ring. Every other row
+is read-only. Actual serialized response size is checked after assembly.
 
-### Retained group
+## Canonical Proposal 170 additions
 
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
+| Wire key | JSON type | Disposition | Owner / reason | Serializer | Fixture | Bound | Base alias |
 |---|---|---|---|---|---|---|---|
-| `i2p.router.identity` | string | non-null | `retained` | — | implemented | error | — |
-| `i2p.router.version` | string | non-null | `retained` | — | implemented | error | — |
-| `i2p.router.uptime` | integer | non-null | `retained` | — | implemented | error | — |
-| `i2p.router.news` | string | non-null | `retained` | — | implemented (empty string) | error | — |
-| `i2p.router.shareRatio` | number | non-null | `retained` | — | implemented | error | — |
-| `i2p.router.configuredBwInbound` | integer | non-null | `retained` | — | implemented | error | — |
-| `i2p.router.configuredBwOutbound` | integer | non-null | `retained` | — | implemented | error | — |
+| `i2p.router.news` | string | unavailable | router-news: no router news owner | `serialize_router_news` | `p170.router_news.string` | — | base Router news (same wire key) |
+| `i2p.router.id` | string or null | available | startup-retained | `serialize_router_id` | `p170.router_id.nullable_string` | 4 KiB | — |
+| `i2p.router.clockskew` | integer or null | protocol-permitted neutral | router-info-control: null when no peer estimate exists | `serialize_clockskew` | `p170.clockskew.nullable_integer` | — | — |
+| `i2p.router.info` | string or null | available | startup-retained | `serialize_router_info` | `p170.router_info.nullable_string` | 4 MiB | — |
+| `i2p.router.logs` | array&lt;string&gt; | available | i2pcontrol-log-ring | `serialize_log_messages` | `p170.logs.string_list` | 10,000 / 10 MiB | — |
+| `i2p.router.logs.clear` | string | available | i2pcontrol-log-ring | `serialize_log_clear` | `p170.logs_clear.success` | — | — |
+| `i2p.router.net.total.received.bytes` | integer | available | event-metrics | `serialize_total_received_bytes` | `p170.total_received.integer` | — | — |
+| `i2p.router.net.total.sent.bytes` | integer | available | event-metrics | `serialize_total_sent_bytes` | `p170.total_sent.integer` | — | — |
+| `i2p.router.net.total.transit.bytes` | integer | available | event-metrics | `serialize_total_transit_bytes` | `p170.total_transit.integer` | — | — |
+| `i2p.router.net.bw.transit.15s` | integer | unavailable | traffic-metrics: no rolling 15s transit source | `serialize_transit_bandwidth_15s` | `p170.transit_15s.unavailable` | — | — |
+| `i2p.router.net.tunnels.shareratio` | number | available | retained-configuration | `serialize_tunnel_share_ratio` | `p170.share_ratio.number` | — | — |
+| `i2p.router.net.tunnels.participating.info` | array&lt;object&gt; | unavailable | tunnel-pool: no bounded participating tunnel detail snapshot | `serialize_participating_tunnel_info` | `p170.participating_info.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.net.tunnels.i2ptunnel` | array&lt;object&gt; | available | startup-tunnel-inventory | `serialize_i2ptunnel_quick_info` | `p170.i2ptunnel.quick_info` | 1,000 / 4 MiB | — |
+| `i2p.router.net.tunnels.exploratory.inbound` | integer | unavailable | tunnel-pool: no bounded exploratory tunnel count source | `serialize_exploratory_inbound` | `p170.exploratory_inbound.unavailable` | — | — |
+| `i2p.router.net.tunnels.exploratory.outbound` | integer | unavailable | tunnel-pool: no bounded exploratory tunnel count source | `serialize_exploratory_outbound` | `p170.exploratory_outbound.unavailable` | — | — |
+| `i2p.router.net.tunnels.exploratory.info.list` | array&lt;object&gt; | unavailable | tunnel-pool: no bounded exploratory tunnel detail snapshot | `serialize_exploratory_info_list` | `p170.exploratory_info.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.net.tunnels.client.inbound` | integer | unavailable | tunnel-pool: no bounded client tunnel count source | `serialize_client_inbound` | `p170.client_inbound.unavailable` | — | — |
+| `i2p.router.net.tunnels.client.outbound` | integer | unavailable | tunnel-pool: no bounded client tunnel count source | `serialize_client_outbound` | `p170.client_outbound.unavailable` | — | — |
+| `i2p.router.net.tunnels.client.info.list` | array&lt;object&gt; | unavailable | tunnel-pool: no bounded client tunnel detail snapshot | `serialize_client_info_list` | `p170.client_info.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.net.status.v6` | integer | unavailable | network: no transport-specific v6 status code mapping | `serialize_network_status_v6` | `p170.status_v6.unavailable` | — | — |
+| `i2p.router.net.error` | integer | unavailable | network: no transport-specific v4 error code mapping | `serialize_network_error` | `p170.error_v4.unavailable` | — | — |
+| `i2p.router.net.error.v6` | integer | unavailable | network: no transport-specific v6 error code mapping | `serialize_network_error_v6` | `p170.error_v6.unavailable` | — | — |
+| `i2p.router.net.testing` | integer | unavailable | network: no canonical v4 testing-state source | `serialize_network_testing` | `p170.testing_v4.unavailable` | — | — |
+| `i2p.router.net.testing.v6` | integer | unavailable | network: no canonical v6 testing-state source | `serialize_network_testing_v6` | `p170.testing_v6.unavailable` | — | — |
+| `i2p.router.net.tunnels.successrate` | number | unavailable | tunnel-build-metrics: no rolling tunnel build success-rate source | `serialize_tunnel_success_rate` | `p170.success_rate.recent.unavailable` | — | — |
+| `i2p.router.net.tunnels.totalsuccessrate` | number | available | event-metrics | `serialize_total_tunnel_success_rate` | `p170.success_rate.total.percent` | — | — |
+| `i2p.router.net.tunnels.queue` | integer | unavailable | tunnel-pool: no bounded tunnel build queue snapshot | `serialize_tunnel_queue` | `p170.tunnel_queue.unavailable` | — | — |
+| `i2p.router.net.tunnels.tbmqueue` | integer | unavailable | tunnel-pool: no bounded tunnel build message queue snapshot | `serialize_tbm_queue` | `p170.tbm_queue.unavailable` | — | — |
+| `i2p.router.netdb.peers` | array&lt;string&gt; | unavailable | netdb: no bounded known-peer hash snapshot | `serialize_netdb_peer_hashes` | `p170.netdb.peers.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.activepeers.info` | array&lt;string&gt; | unavailable | netdb: no bounded active-peer RouterInfo snapshot | `serialize_active_peer_router_infos` | `p170.netdb.active_peer_info.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.ntcp.limit` | integer | unavailable | peer-limits: no authoritative NTCP limit owner | `serialize_ntcp_limit` | `p170.netdb.ntcp_limit.unavailable` | — | — |
+| `i2p.router.netdb.ssu.limit` | integer | unavailable | peer-limits: no authoritative SSU limit owner | `serialize_ssu_limit` | `p170.netdb.ssu_limit.unavailable` | — | — |
+| `i2p.router.netdb.bannedpeers` | map&lt;string,map&lt;string,object&gt;&gt; | unavailable | ban-list: no authoritative ban owner | `serialize_banned_peers` | `p170.netdb.banned_peers.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.activepeers.list` | array&lt;string&gt; | unavailable | peer-list: no bounded active peer RouterInfo snapshot | `serialize_active_peer_hashes` | `p170.netdb.active_peers.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.peers.list` | array&lt;string&gt; | unavailable | peer-list: no bounded known peer RouterInfo snapshot | `serialize_known_peer_hashes` | `p170.netdb.peer_list.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.peers.info` | array&lt;string&gt; | unavailable | peer-list: no bounded peer RouterInfo snapshot | `serialize_peer_router_infos` | `p170.netdb.peer_info.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.activepeers.stats` | array&lt;object&gt; | unavailable | peer-stats: no bounded active peer statistics snapshot | `serialize_active_peer_stats` | `p170.netdb.active_peer_stats.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.addressbook.private.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_private_list` | `p170.addressbook.private.list` | 10,000 / 4 MiB | — |
+| `i2p.router.addressbook.local.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_local_list` | `p170.addressbook.local.list` | 10,000 / 4 MiB | — |
+| `i2p.router.addressbook.router.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_router_list` | `p170.addressbook.router.list` | 10,000 / 4 MiB | — |
+| `i2p.router.addressbook.published.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_published_list` | `p170.addressbook.published.list` | 10,000 / 4 MiB | — |
+| `i2p.router.addressbook.subscriptions` | object `{path,entries}` | available | runtime-address-book-handle | `serialize_address_book_subscriptions` | `p170.addressbook.subscriptions.object` | 1,000 / 4 MiB | base subscriptions (same wire key) |
+| `i2p.router.addressbook.config` | object `{path,entries}` | available | runtime-address-book-handle | `serialize_address_book_config` | `p170.addressbook.config.object` | 1,000 / 4 MiB | base config (same wire key) |
 
-### Network group
+## Base and compatibility separation
 
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.net.bw.inbound` | string | non-null | `event-metric` | — | implemented | error | — |
-| `i2p.router.net.bw.outbound` | string | non-null | `event-metric` | — | implemented | error | — |
-| `i2p.router.clock.skew` | integer/null | nullable | `retained` | — | implemented (no estimate) | null (protocol-permitted) | — |
+The existing base inventory remains `CORE_KEYS` (115 selectors) plus
+`ADDRESS_BOOK_KEYS` (6 selectors), for 121 unique names. The canonical set is
+the 43-row table above. The intentional exact-name overlap is limited to
+Router news and the two address-book object selectors; the source matrix records those aliases
+explicitly. The compatibility nested `Selector` form is an envelope and is
+never counted as a selector addition.
 
-### UDP transport group
+## Request and failure rules
 
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.udp.active` | boolean | non-null | `unsupported-inspection` | — | unavailable (no transport-specific source) | error | M014 |
-| `i2p.router.udp.cookie.active` | boolean | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.integratedPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.firewalled` | boolean | non-null | `unsupported-inspection` | — | unavailable (no transport-specific source) | error | M014 |
-| `i2p.router.udp.hidden` | boolean | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.coinficientPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.criticalPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.fastPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.highCapacityPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.interleavedPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.litPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.lowCapacityPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.onDemandPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.peerStats` | object | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.standardPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.unreachablePeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.udp.totalPeers` | integer | non-null | `unsupported-inspection` | — | unavailable (no transport-specific source) | error | M014 |
-| `i2p.router.udp.currentPeers` | integer | non-null | `unsupported-inspection` | — | unavailable (no transport-specific source) | error | M014 |
-
-### TCP transport group
-
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.tcp.active` | boolean | non-null | `unsupported-inspection` | — | unavailable (no transport-specific source) | error | M014 |
-| `i2p.router.tcp.integratedPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.tcp.firewalled` | boolean | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.tcp.hosts` | string | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.tcp.status` | string | non-null | `unsupported-inspection` | — | unavailable | error | — |
-| `i2p.router.tcp.version` | string | non-null | `unsupported-inspection` | — | unavailable | error | — |
-
-### NetDB group
-
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.netdb.active` | boolean | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.activeProfiles` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.highestVersion` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.knownProfiles` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.newProfiles` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.activeRouters` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.alreadyExperiencedPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.banlistSize` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.exploratoryPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.fastPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.highCapacityPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.isBacklogged` | boolean | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.knownActive` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.knownIdle` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.knownUsed` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.knownVanilla` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.knownVolatile` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.lastExplored` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.lastProfileLookup` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.lastRouterLookup` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.lastUnsaved` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.leaseSets` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.newActive` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.newIdle` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.oldActive` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.oldIdle` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.peerProfiles` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.plaintextPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reserveActive` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reserveActivePeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reserveHighCapacity` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reserveIntegrated` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reserveKnown` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reserveLookup` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reservePending` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reserveReserved` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reserveStandard` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reserveTier2` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reserveUsed` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.reserveVolatile` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.standardPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.lowCapacityPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.tunnels` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.usedPeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.volatilePeers` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.addressBooks` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.addressBookEntries` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.addressBookSources` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.addressBookSubscriptions` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-| `i2p.router.netdb.addressBookUpdates` | integer | non-null | `unsupported-inspection` | — | unavailable | error | M010 |
-
-### Traffic metrics group
-
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.bw.inbound.total` | integer | non-null | `event-metric` | — | implemented | — | — |
-| `i2p.router.bw.outbound.total` | integer | non-null | `event-metric` | — | implemented | — | — |
-| `i2p.router.bw.inbound.1s` | integer | non-null | `event-metric` | — | implemented | — | — |
-| `i2p.router.bw.outbound.1s` | integer | non-null | `event-metric` | — | implemented | — | — |
-| `i2p.router.bw.inbound.15s` | integer | non-null | `event-metric` | — | implemented | — | — |
-| `i2p.router.bw.outbound.15s` | integer | non-null | `event-metric` | — | implemented | — | — |
-| `i2p.router.bw.inbound.1m` | integer | non-null | `event-metric` | — | implemented | — | — |
-| `i2p.router.bw.outbound.1m` | integer | non-null | `event-metric` | — | implemented | — | — |
-| `i2p.router.bw.inbound.1h` | integer | non-null | `event-metric` | — | implemented | — | — |
-| `i2p.router.bw.outbound.1h` | integer | non-null | `event-metric` | — | implemented | — | — |
-| `i2p.router.bw.inbound.1d` | integer | non-null | `event-metric` | — | implemented | — | — |
-| `i2p.router.bw.outbound.1d` | integer | non-null | `event-metric` | — | implemented | — | — |
-
-### Tunnel summary group
-
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.tunnels.participating` | integer | non-null | `event-metric` | — | implemented (live transit tunnel count) | error | M014 |
-| `i2p.router.tunnels.exploratoryIn` | integer | non-null | `unsupported-inspection` | — | unavailable (no live source) | error | M014 |
-| `i2p.router.tunnels.exploratoryOut` | integer | non-null | `unsupported-inspection` | — | unavailable (no live source) | error | M014 |
-| `i2p.router.tunnels.clientIn` | integer | non-null | `unsupported-inspection` | — | unavailable (no live source) | error | M014 |
-| `i2p.router.tunnels.clientOut` | integer | non-null | `unsupported-inspection` | — | unavailable (no live source) | error | M014 |
-| `i2p.router.tunnels.configured` | integer | non-null | `administrative-store` | — | implemented | error | — |
-| `i2p.router.tunnels.queue` | integer | non-null | `unsupported-inspection` | — | unavailable (no live source) | error | M014 |
-
-### I2PTunnel group
-
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.net.i2ptunnels` | integer | non-null | `administrative-store` | — | implemented | error | — |
-
-### Peer list group
-
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.peers.knownCount` | integer | non-null | `unsupported-inspection` | — | unavailable (no live source) | error | M014 |
-| `i2p.router.peers.known` | array | non-null | `unsupported-inspection` | 10,000 | unavailable (no live source) | error | M014 |
-| `i2p.router.peers.activeCount` | integer | non-null | `unsupported-inspection` | — | unavailable (no live source) | error | M014 |
-| `i2p.router.peers.active` | array | non-null | `unsupported-inspection` | 10,000 | unavailable (no live source) | error | M014 |
-| `i2p.router.peers.banned` | array | non-null | `unsupported-inspection` | 10,000 | unavailable (no canonical ban owner) | error | — |
-| `i2p.router.peers.bannedCount` | integer | non-null | `unsupported-inspection` | — | unavailable (no canonical ban owner) | error | — |
-
-### Peer lookup group
-
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.peers.routerInfo` | string/null | nullable | `unsupported-inspection` | 4 MB | unavailable (no live source) | error | M014 |
-
-### Peer stats group
-
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.peers.limits` | object | non-null | `unsupported-inspection` | — | unavailable (no canonical limit owner) | error | — |
-| `i2p.router.peers.activeStats` | array | non-null | `unsupported-inspection` | 10,000 | unavailable (no per-peer transport stats) | error | — |
-
-### Log group
-
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.log` | array | non-null | `event-metric` | 10,000 | implemented | — | — |
-| `i2p.router.log.clear` | boolean | non-null | `event-metric` | — | implemented | — | — |
-
-### Address book group
-
-| Wire key | JSON type | Nullability | Source | Bound | Current availability | Unavailable behavior | M010 owner |
-|---|---|---|---|---|---|---|---|
-| `i2p.router.addressbook.private` | array | non-null | `administrative-store` | — | implemented | error | — |
-| `i2p.router.addressbook.local` | array | non-null | `administrative-store` | — | implemented | error | — |
-| `i2p.router.addressbook.router` | array | non-null | `administrative-store` | — | implemented | error | — |
-| `i2p.router.addressbook.published` | array | non-null | `administrative-store` | — | implemented | error | — |
-| `i2p.router.addressbook.subscriptions` | array | non-null | `administrative-store` | — | implemented | error | — |
-| `i2p.router.addressbook.config` | object | non-null | `administrative-store` | — | implemented | error | — |
+All requested canonical keys are validated against this matrix before any
+source query. If any requested canonical field is unavailable, the entire
+request returns one sanitized internal error and no partial result. Neutral
+fields serialize only their protocol-permitted neutral value. Available empty
+lists and zero counters are valid only when the authoritative source was
+queried successfully. No aggregate counter substitutes for a transport,
+peer, queue, or tunnel-pool field.

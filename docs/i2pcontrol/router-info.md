@@ -1,6 +1,6 @@
 # RouterInfo Method
 
-Status: closed internally against the pinned Proposal 170 revision by M019A
+Status: M025 contract/source reconciliation implemented; final subsystem closure remains M027
 
 This document describes the Proposal 170 `RouterInfo` JSON-RPC method implementation in Emissary.
 
@@ -10,23 +10,24 @@ The `RouterInfo` method allows authenticated callers to request specific router 
 
 ## Selector registry
 
-`rpc.rs` contains 121 legacy/base selectors plus the exact 43-key Proposal 170
-addition manifest. The 121-key catalog is not counted as Proposal 170
-coverage. The machine-checkable manifest declares the JSON type and source
-state (`available`, `unavailable`, or `protocol ambiguity`) for every addition.
+`rpc.rs` contains 121 unique legacy/base selectors plus the exact 43-key
+Proposal 170 addition manifest. The 121-key catalog is not counted as Proposal
+170 coverage. The machine-readable manifest declares exact nested JSON types,
+direct-presence semantics, mutation, owner, serializer, fixture, bound, and
+source disposition for every addition: 16 available, 1 protocol-permitted
+neutral, and 26 unavailable.
 
 Canonical Proposal 170 additions are selected by direct parameter presence and
-are returned under the exact same key. Values are ignored. The four available
-address-book list additions end in `.private.list`, `.local.list`,
-`.router.list`, and `.published.list`; the subscription/config additions are
-recognized but unavailable because their canonical source shape is not wired.
+are returned under the exact same key. Values are ignored. All four address-book
+list additions and the subscription/config objects consume the shared runtime
+address-book owner established by M022.
 
 ### Legacy/base selector groups
 
 | Group | Prefix | Count | Source |
 |---|---|---|---|
 | Identity/static | `i2p.router.identity`, `i2p.router.version`, `i2p.router.uptime` | 3 | Startup-retained values |
-| Router news | `i2p.router.news` | 1 | RouterInfo control source |
+| Router news | `i2p.router.news` | 1 | Unavailable: no router news owner |
 | Clock skew | `i2p.router.clock.skew` | 1 | Compatibility alias; RouterInfo control source |
 | Network status | `i2p.router.net.bw.*` | 2 | EventMetrics firewall status |
 | Share ratio | `i2p.router.shareRatio` | 1 | Retained configuration |
@@ -123,16 +124,19 @@ Per-selector item bounds enforce limits on returned collections.
 
 ## Canonical source status
 
-Available canonical fields include retained identity/info/clock skew, cumulative
-byte counters, share ratio, I2PTunnel controller info list, total success rate, router news,
-logs, log clear, and the four address-book lists. Canonical fields without a
-truthful current source return the established JSON-RPC unavailable error;
-Emissary never substitutes zero, false, or an empty collection.
+Available canonical fields include retained identity/info, cumulative byte
+counters, share ratio, I2PTunnel controller info, total success rate, logs,
+log clear, and all six address-book objects/lists. Clock skew is the one
+protocol-permitted neutral field and returns `null` when no estimate exists.
+Router news, recent transit rate, transport-specific status/error/testing,
+tunnel-pool, NetDB, and peer fields without an authoritative bounded source
+return the established JSON-RPC unavailable error; Emissary never substitutes
+zero, false, or an empty collection.
 
 ## Null/unavailable behavior
 
 - Clock skew: `null` when not yet determined (protocol-permitted nullable)
-- Router news: source-provided string
+- Router news: unavailable because Emissary has no news owner
 - Peer RouterInfo: `null` when no peer ID specified
 - Network status: exact string codes ("OK", "Firewalled", "Testing", etc.)
 - Share ratio: from retained configuration

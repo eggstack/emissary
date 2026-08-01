@@ -2,6 +2,11 @@
 
 Proposal 170 `ClientServicesInfo` method implementation in Emissary.
 
+M027 independently revalidated the six direct selector keys and their exact
+response shapes. Source and runtime availability remains selector-specific;
+explicit `BOB: false` and unavailable-source errors are contract behavior, not
+claims of an active service.
+
 ## Overview
 
 `ClientServicesInfo` is an observation-only JSON-RPC method that returns

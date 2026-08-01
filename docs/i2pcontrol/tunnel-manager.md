@@ -1,10 +1,12 @@
 # I2PControl TunnelManager
 
-Status: M021 implemented; implementation closure is recorded in
-`plans/closure/i2pcontrol-proposal-170/021-closure.md`. The subsystem remains
-`corrective pass required` until M027 performs final conformance closure.
+Status: M021 wire/persistence boundary closed; M027 independently revalidated
+the final wire and failure evidence. The missing data planes remain explicit
+runtime-unsupported behavior. See
+`plans/closure/i2pcontrol-proposal-170/027-closure.md`.
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
+Wire/CRUD/persistence evidence is distinct from runtime data-plane support.
 
 ## Overview
 

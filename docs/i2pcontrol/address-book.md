@@ -1,7 +1,7 @@
 # Proposal 170 AddressBook Administrative API
 
-Status: M022 closed internally against the pinned Proposal 170 revision; final
-43-selector conformance remains owned by M025–M027.
+Status: M022 runtime authority closed; M027 independently revalidated final
+wire/source evidence. See `plans/closure/i2pcontrol-proposal-170/027-closure.md`.
 
 This document describes the Proposal 170 AddressBook API for Emissary's
 I2PControl service and its runtime ownership boundary.

@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: corrective pass required
+Status: partial Proposal 170 support
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -12,9 +12,9 @@ Current corrective roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 
-Next executable handoff:
+Final closure:
 
-- M027, `plans/implementation/i2pcontrol-proposal-170/027-proposal-170-conformance-and-reclosure.md`
+- M027, `plans/closure/i2pcontrol-proposal-170/027-closure.md`
 
 ## Status model
 
@@ -32,7 +32,12 @@ Parser acceptance, compatibility aliases, administrative shadow state, unavailab
 
 ## Current overall disposition
 
-The repository contains substantial retained Proposal 170 infrastructure, but it is not currently considered complete.
+M027 is closed as `partial Proposal 170 support`. The canonical wire
+surfaces, available sources, persistence dimensions, and required negative
+behavior have internal evidence. The disposition is intentionally partial:
+26 of the 43 pinned RouterInfo additions remain unavailable because no bounded
+authoritative Emissary owner exists, and missing tunnel data planes remain
+explicitly unsupported under ADR-0001.
 
 Retained candidate implementation includes:
 
@@ -48,9 +53,10 @@ Retained candidate implementation includes:
 - live event counters and log ring sources;
 - explicit unavailable/unsupported behavior in several paths.
 
-Material corrective work remains in M027; M023's scoped startup/client-service
-correction, M024's SAM source correction, M025's source reconciliation, and
-M026's bounded-source audit are closed.
+M023's scoped startup/client-service correction, M024's SAM source correction,
+M025's source reconciliation, M026's bounded-source audit, and M027's final
+conformance/reclosure are closed. No successor handoff is currently blocked on
+M027.
 
 ## Base I2PControl/JSON-RPC
 
@@ -62,8 +68,9 @@ an unambiguous compatibility path, distinct I2PControl authentication and
 version errors, notification execution with response suppression, strict
 request-ID validation, and direct base RouterInfo selector compatibility.
 
-The subsystem remains open while M027 completes method-specific conformance
-and final source truthfulness review.
+M027 independently rechecked this surface. The base contract is wire- and
+evidence-supported; token state remains intentionally in-memory and therefore
+does not claim persistence.
 
 ## TunnelManager
 
@@ -134,7 +141,8 @@ Owner: M022, with final matrix integration closed in M025.
 
 ## ClientServicesInfo
 
-Current status: direct wire scaffold retained; bounded SAM source correction closed; final source matrix remains
+Current status: direct wire contract and bounded source behavior closed in M027;
+runtime availability remains selector-specific.
 
 | Selector | Retained behavior | Corrective requirement |
 |---|---|---|
@@ -145,8 +153,8 @@ Current status: direct wire scaffold retained; bounded SAM source correction clo
 | `BOB` | exact boolean `false` | retained |
 | `I2CP` | actual listener state | revalidate in final source matrix |
 
-Owner: M024 for recoverable SAM observation; M023's tunnel/proxy source work is
-implemented. M025 owns final selector/source reconciliation.
+Owner: M024 for recoverable SAM observation; M023 owns tunnel/proxy source
+truthfulness. M027 independently rechecked selector shape and failure behavior.
 
 ## RouterInfo
 
@@ -199,13 +207,13 @@ Owners: M022, rechecked by M027.
 | M024 | closed internally against pinned revision | recoverable bounded SAM observation |
 | M025 | closed internally against pinned revision | exact RouterInfo contract/source matrix |
 | M026 | closed internally against pinned revision | no feasible authoritative source existed in the frozen matrix |
-| M027 | ready | literal conformance, documentation reconciliation, independent closure |
+| M027 | partial Proposal 170 support | literal conformance, documentation reconciliation, independent closure |
 
 See `plans/implementation/i2pcontrol-proposal-170/README.md` for dependencies and handoff rules.
 
 ## Final-status rule
 
-Only M027 may restore a final status.
+M027 restored the final internal status.
 
 Possible dispositions:
 

@@ -16,14 +16,17 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-//! Golden fixtures for Proposal 170 — sanitized request/response corpus.
+//! Compatibility/parser fixtures — sanitized request/response corpus.
 //!
 //! Every fixture:
 //! - uses no real secrets, private keys, credentials, or personal destinations
 //! - is deterministic across platforms where the protocol permits
 //! - separates variable runtime values from exact structural assertions
 //! - asserts exact absence of extension fields
-//! - records the contract source/reference and manifest row IDs
+//! - records the historical compatibility/parser source and manifest row IDs
+//!
+//! These fixtures are intentionally not canonical Proposal 170 evidence.
+//! Canonical literal fixtures live in `m027_literal_fixtures.rs`.
 
 #![cfg(feature = "i2pcontrol")]
 

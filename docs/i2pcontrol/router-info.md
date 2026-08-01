@@ -1,6 +1,6 @@
 # RouterInfo Method
 
-Status: M026 bounded-source audit closed; final subsystem closure remains M027
+Status: M027 final source review closed as partial Proposal 170 support
 
 This document describes the Proposal 170 `RouterInfo` JSON-RPC method implementation in Emissary.
 

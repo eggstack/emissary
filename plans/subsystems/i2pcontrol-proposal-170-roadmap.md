@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Corrective Roadmap
 
-Status: corrective pass required
+Status: partial Proposal 170 support
 
 Corrective baseline: `a3c4f469f4877e5ff4a0bb4230da298f0b367ed2`
 
@@ -295,7 +295,7 @@ unqualified full-completion claims.
 
 Plan: `027-proposal-170-conformance-and-reclosure.md`
 
-Status: ready
+Status: closed; final disposition: partial Proposal 170 support
 
 Objective:
 
@@ -383,7 +383,7 @@ Use focused test filters named in each plan before broad package tests. Use touc
 | M024 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/024-closure.md` |
 | M025 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/025-closure.md` |
 | M026 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/026-closure.md` |
-| M027 | ready | hard dependencies M020–M026 are closed |
+| M027 | partial Proposal 170 support | `plans/closure/i2pcontrol-proposal-170/027-closure.md` |
 
 ## 14. Completion definition
 

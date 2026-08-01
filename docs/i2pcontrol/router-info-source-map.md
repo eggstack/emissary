@@ -1,9 +1,10 @@
 # RouterInfo Selector Source Map
 
-Status: M026 bounded-source disposition accepted; final subsystem closure remains M027
+Status: M027 source review closed; partial Proposal 170 support
 
 This is the reviewed source map for the pinned Proposal 170 revision created and
-last updated on `2026-08-01`. The machine-readable authority is
+last updated on `2026-08-01`. M027 independently revalidated the matrix against
+the external revision. The machine-readable authority is
 `router_info_keys::PROPOSAL_170_CONTRACT` in `emissary-cli/src/i2pcontrol/rpc.rs`.
 Summary: 43 total, 16 available, 1 protocol-permitted neutral, and 26 unavailable.
 The table below is intentionally one row per canonical addition. Base selectors and

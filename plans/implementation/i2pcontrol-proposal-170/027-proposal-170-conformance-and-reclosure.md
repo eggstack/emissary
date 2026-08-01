@@ -1,6 +1,6 @@
 # M027 — Proposal 170 Exact Conformance and Independent Reclosure
 
-Status: ready
+Status: closed; final disposition: partial Proposal 170 support
 
 Primary class: evidence/closure gate
 

@@ -1,21 +1,24 @@
 # I2PControl for Emissary
 
-Status: corrective pass required
+Status: partial Proposal 170 support
 
 Proposal 170 is still **Open**. This documentation is pinned to the
 2026-05-20 revision (created and last updated 2026-05-20).
 
 The prior M019A `closed internally against pinned revision` disposition is
-invalidated by:
+historical and invalidated by:
 
 - `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`
 
-Current roadmap and support classification:
+Final internal roadmap and support classification:
 
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 - [proposal-170-support.md](proposal-170-support.md)
+- `plans/closure/i2pcontrol-proposal-170/027-closure.md`
 
-This document describes the current I2PControl HTTPS JSON-RPC service foundation in Emissary. It must not be read as a claim that Proposal 170 is complete.
+This document describes Emissary's exact supported Proposal 170 wire surfaces
+and their separate source/runtime/persistence dimensions. It does not claim
+that every pinned source exists or that every tunnel data plane is available.
 
 ## Compile feature
 
@@ -61,7 +64,8 @@ password = "your-secure-password"
 - **Default binding is loopback only** (`127.0.0.1:7650`). Non-loopback binding requires explicit configuration and produces a security warning.
 - **Empty password is rejected** when I2PControl is enabled.
 - **Existing configurations without `[i2pcontrol]`** parse unchanged and preserve prior behavior.
-- Authentication, token placement, secret persistence, and response-redaction behavior are under corrective review in M020/M021. Do not rely on the prior completion claim.
+- Authentication, token placement, secret persistence, and response-redaction
+  behavior are closed in M020/M021 and independently rechecked by M027.
 
 ## HTTPS certificate behavior
 
@@ -144,7 +148,8 @@ The exact error-code and conflict behavior is part of M020 and must not be treat
 
 ## Foundation status
 
-The repository contains a substantial I2PControl foundation:
+The repository contains a substantial I2PControl implementation with M027
+literal conformance evidence:
 
 - feature-gated HTTPS serving;
 - bounded request bodies, connection tasks, and concurrent requests;
@@ -156,7 +161,8 @@ The repository contains a substantial I2PControl foundation:
 - RouterInfo contract/source adapters;
 - production composition and focused tests.
 
-These components are retained candidate implementation, not proof of complete Proposal 170 conformance.
+These components are not all operational Proposal 170 capability: unavailable
+RouterInfo sources and unsupported tunnel data planes remain explicit.
 
 ## Corrective sequence
 
@@ -169,7 +175,7 @@ These components are retained candidate implementation, not proof of complete Pr
 | M024 | recoverable bounded SAM observation |
 | M025 | exact RouterInfo contract/source matrix |
 | M026 | closed bounded-source audit; no additional authoritative sources identified |
-| M027 | ready: literal conformance, documentation reconciliation, and independent closure |
+| M027 | closed: partial Proposal 170 support; literal conformance and independent reclosure |
 
 See `plans/implementation/i2pcontrol-proposal-170/README.md` for dependencies and handoff rules.
 

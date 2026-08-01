@@ -27,18 +27,17 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M027 ready | M020–M026 closed; final conformance/reclosure remains |
+| I2PControl Proposal 170 | partial Proposal 170 support | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M027 closed | 26 RouterInfo sources remain unavailable; missing tunnel data planes remain unsupported |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M027 — Exact conformance and independent reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/027-proposal-170-conformance-and-reclosure.md` | M020–M026 dispositions accepted |
+| — | None | — | — | — |
 
 ## Registered successor handoffs
 
-There are currently no registered successor handoffs behind the dependency-ready
-M027 plan.
+There are currently no registered successor handoffs behind closed M027.
 
 | Subsystem | Handoff | Status | Implementation plan | Hard dependency |
 |---|---|---|---|---|
@@ -61,6 +60,7 @@ M027 plan.
 | I2PControl Proposal 170 | M024 — Recoverable bounded SAM observation | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/024-closure.md` |
 | I2PControl Proposal 170 | M025 — RouterInfo contract and source reconciliation | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/025-closure.md` |
 | I2PControl Proposal 170 | M026 — Bounded router inspection sources | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/026-closure.md` |
+| I2PControl Proposal 170 | M027 — Exact conformance and independent reclosure | partial Proposal 170 support | `plans/closure/i2pcontrol-proposal-170/027-closure.md` |
 
 ## Historical invalidation and supersession
 
@@ -84,7 +84,7 @@ M027 plan.
 | Sticky SAM observation overflow | medium | M024 | resolved; bounded incomplete state recovers from lifecycle events |
 | RouterInfo 43-selector source/claim contradictions | high claim defect | M025 | resolved; exact matrix and truthful counts frozen |
 | Feasible bounded core inspection sources | medium | M026 | resolved; frozen matrix has no feasible fields and 26 explicit deferred/out-of-scope fields |
-| Literal external conformance and honest reclosure | high evidence defect | M027 | ready after M020–M026 closure |
+| Literal external conformance and honest reclosure | high evidence defect | M027 | resolved; final status is partial Proposal 170 support |
 
 The complete finding inventory and rationale are in `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`.
 

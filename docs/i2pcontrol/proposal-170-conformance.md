@@ -1,6 +1,6 @@
 # Proposal 170 Conformance Matrix
 
-Status: invalidated historical matrix; corrective rebuild required
+Status: final internal conformance record; partial Proposal 170 support
 
 Proposal 170 remains Open. This workstream is pinned to the revision created
 and last updated on `2026-05-20`.
@@ -23,9 +23,14 @@ Matrix rebuild owner:
 
 - M025, `plans/implementation/i2pcontrol-proposal-170/025-routerinfo-contract-and-source-reconciliation.md`
 
-Final literal conformance and independent review owner:
+Final literal conformance and independent review record:
 
 - M027, `plans/implementation/i2pcontrol-proposal-170/027-proposal-170-conformance-and-reclosure.md`
+- Closure: `plans/closure/i2pcontrol-proposal-170/027-closure.md`
+
+M027's replacement literal fixture suite is
+`emissary-cli/tests/m027_literal_fixtures.rs`. Compatibility fixtures remain
+in separately named modules and are not included in canonical fixture counts.
 
 ## Why the prior matrix is invalid
 
@@ -56,10 +61,11 @@ insufficiently evidenced, including:
 The former detailed rows remain available in repository history as historical
 evidence. They must not be copied forward without revalidation.
 
-## Required replacement matrix
+## Final replacement matrix
 
-M025 must create one reviewed machine-readable contract/source table covering
-exactly the 43 Proposal 170 RouterInfo additions. For every selector it must
+M025 created, and M027 independently revalidated, one reviewed machine-readable
+contract/source table covering exactly the 43 Proposal 170 RouterInfo additions.
+For every selector it records
 record:
 
 - exact key;
@@ -129,8 +135,7 @@ implementation.
 
 ## Final-status rule
 
-Only M027 may restore a normative conformance matrix and final subsystem
-status.
+M027 restored the normative conformance matrix and final subsystem status.
 
 Possible dispositions are:
 
@@ -141,8 +146,10 @@ Possible dispositions are:
 - `corrective pass required` for unresolved high/medium defects;
 - `blocked` when necessary evidence cannot be obtained.
 
-No status implies upstream review, acceptance, certification, adoption,
-approval, or merge.
+The selected status is `partial Proposal 170 support`: exact wire behavior and
+claimed source/runtime/persistence dimensions are evidenced, while unavailable
+sources and unsupported data planes are listed explicitly. No status implies
+upstream review, acceptance, certification, adoption, approval, or merge.
 
 ## Internal-only boundary
 

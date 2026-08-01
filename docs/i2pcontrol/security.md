@@ -1,6 +1,6 @@
 # I2PControl Security
 
-Status: M021 secret-boundary and atomic-publication requirements implemented
+Status: M027 security recheck passed; M021 secret-boundary and atomic-publication requirements closed
 
 This document describes the security properties and considerations for the I2PControl administrative state in Emissary.
 

@@ -1,6 +1,6 @@
 # RouterInfo Method
 
-Status: M025 contract/source reconciliation implemented; final subsystem closure remains M027
+Status: M026 bounded-source audit closed; final subsystem closure remains M027
 
 This document describes the Proposal 170 `RouterInfo` JSON-RPC method implementation in Emissary.
 
@@ -130,7 +130,8 @@ log clear, and all six address-book objects/lists. Clock skew is the one
 protocol-permitted neutral field and returns `null` when no estimate exists.
 Router news, recent transit rate, transport-specific status/error/testing,
 tunnel-pool, NetDB, and peer fields without an authoritative bounded source
-return the established JSON-RPC unavailable error; Emissary never substitutes
+  return the established JSON-RPC unavailable error; M026 found no adjacent
+  authoritative bounded owner to add, and Emissary never substitutes
 zero, false, or an empty collection.
 
 ## Null/unavailable behavior

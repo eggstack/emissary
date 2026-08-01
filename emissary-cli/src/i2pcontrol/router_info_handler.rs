@@ -1521,6 +1521,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn every_frozen_m026_unavailable_field_fails_without_fabricated_result() {
+        for field in rpc::router_info_keys::PROPOSAL_170_CONTRACT.iter().filter(|field| {
+            matches!(
+                field.source,
+                rpc::router_info_keys::SourceDisposition::Unavailable { .. }
+            )
+        }) {
+            let mut params = serde_json::Map::new();
+            params.insert(field.key.to_string(), serde_json::Value::Bool(false));
+            let response = handle_router_info(
+                &test_state(FakeRouterInfoControl::new()),
+                &direct_request(serde_json::Value::Object(params)),
+            )
+            .await;
+
+            assert_eq!(response["error"]["code"], -32603, "selector: {}", field.key);
+            assert!(response["result"].is_null(), "selector: {}", field.key);
+            assert!(
+                response["error"]["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains(field.source.reason().unwrap())),
+                "selector: {}",
+                field.key
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn canonical_address_book_shapes_are_literal_and_requested_only() {
         let state = test_state(FakeRouterInfoControl::new());
         state

@@ -1918,6 +1918,26 @@ mod tests {
     }
 
     #[test]
+    fn conformance_manifest_has_frozen_m026_source_counts() {
+        use router_info_keys::{SourceDisposition, PROPOSAL_170_CONTRACT as C};
+
+        let available = C
+            .iter()
+            .filter(|field| matches!(field.source, SourceDisposition::Available { .. }))
+            .count();
+        let neutral = C
+            .iter()
+            .filter(|field| matches!(field.source, SourceDisposition::Neutral { .. }))
+            .count();
+        let unavailable = C
+            .iter()
+            .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
+            .count();
+
+        assert_eq!((available, neutral, unavailable), (16, 1, 26));
+    }
+
+    #[test]
     fn conformance_manifest_has_literal_type_table() {
         use router_info_keys::{JsonType::*, PROPOSAL_170_CONTRACT as C};
 

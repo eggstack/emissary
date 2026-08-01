@@ -14,7 +14,7 @@ Current corrective roadmap:
 
 Next executable handoff:
 
-- M026, `plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md`
+- M027, `plans/implementation/i2pcontrol-proposal-170/027-proposal-170-conformance-and-reclosure.md`
 
 ## Status model
 
@@ -48,7 +48,9 @@ Retained candidate implementation includes:
 - live event counters and log ring sources;
 - explicit unavailable/unsupported behavior in several paths.
 
-Material corrective work remains in M025–M027; M023's scoped startup/client-service correction and M024's SAM source correction are closed.
+Material corrective work remains in M027; M023's scoped startup/client-service
+correction, M024's SAM source correction, M025's source reconciliation, and
+M026's bounded-source audit are closed.
 
 ## Base I2PControl/JSON-RPC
 
@@ -60,8 +62,8 @@ an unambiguous compatibility path, distinct I2PControl authentication and
 version errors, notification execution with response suppression, strict
 request-ID validation, and direct base RouterInfo selector compatibility.
 
-The subsystem remains open while M023–M027 complete method-specific and source
-truthfulness work.
+The subsystem remains open while M027 completes method-specific conformance
+and final source truthfulness review.
 
 ## TunnelManager
 
@@ -156,7 +158,9 @@ matrix contains 16 available fields, 1 protocol-permitted neutral field, and
 serializer, bound, and fixture metadata. Availability is not inferred from
 adjacent counters or from fake/test sources.
 
-M026 may add bounded read-only snapshots only where the authoritative state already exists. It must not add new historical samplers, polling loops, algorithms, peer categories, or fabricated defaults.
+M026 audited bounded read-only snapshots only where authoritative state already
+exists. No candidate met that threshold, so no new source was added. The 26
+remaining fields stay explicitly unavailable or out of scope.
 
 Fields that cannot be sourced without invasive redesign will remain explicitly unavailable and require a final `partial Proposal 170 support` disposition rather than a false complete claim.
 
@@ -194,8 +198,8 @@ Owners: M022, rechecked by M027.
 | M023 | closed internally against pinned revision | startup tunnel inventory and client-service lifecycle/address truthfulness |
 | M024 | closed internally against pinned revision | recoverable bounded SAM observation |
 | M025 | closed internally against pinned revision | exact RouterInfo contract/source matrix |
-| M026 | ready | feasible bounded read-only router inspection sources |
-| M027 | blocked | literal conformance, documentation reconciliation, independent closure |
+| M026 | closed internally against pinned revision | no feasible authoritative source existed in the frozen matrix |
+| M027 | ready | literal conformance, documentation reconciliation, independent closure |
 
 See `plans/implementation/i2pcontrol-proposal-170/README.md` for dependencies and handoff rules.
 

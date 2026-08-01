@@ -27,21 +27,22 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M026 ready | M020–M025 closed; remaining source work is explicitly adjudicated |
+| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M027 ready | M020–M026 closed; final conformance/reclosure remains |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M026 — Bounded router inspection sources | ready | `plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md` | M025 implementation disposition accepted |
+| I2PControl Proposal 170 | M027 — Exact conformance and independent reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/027-proposal-170-conformance-and-reclosure.md` | M020–M026 dispositions accepted |
 
 ## Registered successor handoffs
 
-These plans are complete handoffs but are not executable until their hard dependencies close.
+There are currently no registered successor handoffs behind the dependency-ready
+M027 plan.
 
 | Subsystem | Handoff | Status | Implementation plan | Hard dependency |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M027 — Exact conformance and independent reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/027-proposal-170-conformance-and-reclosure.md` | M020–M026 |
+| — | None | — | — | — |
 
 ## Active closure work
 
@@ -59,6 +60,7 @@ These plans are complete handoffs but are not executable until their hard depend
 | I2PControl Proposal 170 | M023 — Startup tunnel inventory and ClientServicesInfo truthfulness | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/023-closure.md` |
 | I2PControl Proposal 170 | M024 — Recoverable bounded SAM observation | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/024-closure.md` |
 | I2PControl Proposal 170 | M025 — RouterInfo contract and source reconciliation | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/025-closure.md` |
+| I2PControl Proposal 170 | M026 — Bounded router inspection sources | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/026-closure.md` |
 
 ## Historical invalidation and supersession
 
@@ -81,8 +83,8 @@ These plans are complete handoffs but are not executable until their hard depend
 | Startup tunnel inventory and stale proxy state | high/medium | M023 | resolved; M024 consumes final service-source evidence |
 | Sticky SAM observation overflow | medium | M024 | resolved; bounded incomplete state recovers from lifecycle events |
 | RouterInfo 43-selector source/claim contradictions | high claim defect | M025 | resolved; exact matrix and truthful counts frozen |
-| Feasible bounded core inspection sources | medium | M026 | ready; no feasible fields currently identified |
-| Literal external conformance and honest reclosure | high evidence defect | M027 | blocked on M020–M026 |
+| Feasible bounded core inspection sources | medium | M026 | resolved; frozen matrix has no feasible fields and 26 explicit deferred/out-of-scope fields |
+| Literal external conformance and honest reclosure | high evidence defect | M027 | ready after M020–M026 closure |
 
 The complete finding inventory and rationale are in `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`.
 

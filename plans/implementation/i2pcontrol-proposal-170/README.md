@@ -83,8 +83,8 @@ See `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`.
 | M023 — Startup tunnel inventory and ClientServicesInfo truthfulness | closed | `023-startup-tunnel-inventory-and-client-services.md` | M021 closed |
 | M024 — Recoverable bounded SAM observation | closed internally against pinned revision | `024-recoverable-bounded-sam-observation.md` | M023 closed |
 | M025 — RouterInfo contract and source reconciliation | implemented | `025-routerinfo-contract-and-source-reconciliation.md` | M020, M022, M023, M024 closed |
-| M026 — Bounded router inspection sources | ready | `026-bounded-router-inspection-sources.md` | M025 disposition accepted |
-| M027 — Exact conformance and independent reclosure | blocked | `027-proposal-170-conformance-and-reclosure.md` | M020–M026 |
+| M026 — Bounded router inspection sources | closed internally against pinned revision | `026-bounded-router-inspection-sources.md` | M025 disposition accepted |
+| M027 — Exact conformance and independent reclosure | ready | `027-proposal-170-conformance-and-reclosure.md` | M020–M026 closed |
 
 Earlier plans remain historical as recorded in the subsystem roadmap. M019 remains superseded and non-executable.
 
@@ -115,8 +115,8 @@ M026 feasible bounded owner snapshots
 M027 exact conformance and independent reclosure
 ```
 
-M026 is now the dependency-ready handoff. M027 remains a complete handoff but
-must not execute before M026 closes.
+M026 is closed with no newly feasible authoritative source. M027 is now the
+dependency-ready handoff for final conformance and independent reclosure.
 
 ## Handoff discipline
 

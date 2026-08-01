@@ -155,8 +155,8 @@ M026 bounded core inspection for feasible remaining selectors
 M027 conformance and independent reclosure
 ```
 
-M020 through M025 are closed internally against the pinned revision. M026 is
-now dependency-ready against M025's exact source matrix. M027 depends on every
+M020 through M026 are closed internally against the pinned revision. M027 is
+now dependency-ready against the frozen source matrix and depends on every
 implementation milestone reaching a frozen disposition.
 
 ## 8. Milestones
@@ -258,7 +258,7 @@ Exit: transient bound pressure can recover without router restart, no private ke
 
 Plan: `025-routerinfo-contract-and-source-reconciliation.md`
 
-Status: implemented; M026 dependency-ready
+Status: closed internally against pinned revision
 
 Objective:
 
@@ -276,7 +276,7 @@ Exit: one machine-readable matrix drives validation, dispatch, documentation, an
 
 Plan: `026-bounded-router-inspection-sources.md`
 
-Status: ready
+Status: closed internally against pinned revision
 
 Objective:
 
@@ -287,13 +287,15 @@ Objective:
 
 External changes: adjacent snapshot DTO/handle methods only; no mutation, no single-owner receiver consumption, no task spawning for polling.
 
-Exit: every newly available selector has bounded source and failure tests; remaining unavailable fields have precise reasons and block unqualified full-completion claims.
+Exit: no M026-feasible owner group was present in the frozen matrix; all 26
+remaining unavailable fields retain precise reasons, fail closed, and block
+unqualified full-completion claims.
 
 ### M027 — Exact conformance, documentation, and independent reclosure
 
 Plan: `027-proposal-170-conformance-and-reclosure.md`
 
-Status: blocked on M020–M026
+Status: ready
 
 Objective:
 
@@ -380,8 +382,8 @@ Use focused test filters named in each plan before broad package tests. Use touc
 | M023 | closed | hard dependency M021 is closed |
 | M024 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/024-closure.md` |
 | M025 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/025-closure.md` |
-| M026 | ready | hard dependency M025 is closed; no feasible fields currently identified |
-| M027 | blocked | hard dependencies M020–M026 |
+| M026 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/026-closure.md` |
+| M027 | ready | hard dependencies M020–M026 are closed |
 
 ## 14. Completion definition
 

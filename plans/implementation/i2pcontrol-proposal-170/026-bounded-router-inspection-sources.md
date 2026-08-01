@@ -1,6 +1,6 @@
 # M026 — Bounded Router Inspection Sources
 
-Status: ready
+Status: implemented
 
 Primary class: infrastructure/capability corrective pass
 

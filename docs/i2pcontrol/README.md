@@ -168,8 +168,8 @@ These components are retained candidate implementation, not proof of complete Pr
 | M023 | startup tunnel inventory and ClientServicesInfo lifecycle/address truthfulness |
 | M024 | recoverable bounded SAM observation |
 | M025 | exact RouterInfo contract/source matrix |
-| M026 | feasible bounded read-only router inspection sources |
-| M027 | literal conformance, documentation reconciliation, and independent closure |
+| M026 | closed bounded-source audit; no additional authoritative sources identified |
+| M027 | ready: literal conformance, documentation reconciliation, and independent closure |
 
 See `plans/implementation/i2pcontrol-proposal-170/README.md` for dependencies and handoff rules.
 

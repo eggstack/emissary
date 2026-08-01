@@ -1,6 +1,6 @@
 # M027 — Proposal 170 Exact Conformance and Independent Reclosure
 
-Status: blocked
+Status: ready
 
 Primary class: evidence/closure gate
 

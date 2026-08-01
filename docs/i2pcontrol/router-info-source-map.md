@@ -1,6 +1,6 @@
 # RouterInfo Selector Source Map
 
-Status: M025 implementation disposition frozen; final subsystem closure remains M027
+Status: M026 bounded-source disposition accepted; final subsystem closure remains M027
 
 This is the reviewed source map for the pinned Proposal 170 revision created and
 last updated on `2026-08-01`. The machine-readable authority is

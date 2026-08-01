@@ -14,7 +14,8 @@ Repository baseline reviewed: `c58f3d1`
 
 Implementation commits or pull requests:
 
-- Implementation commit: recorded after the implementation commit is created.
+- `63afb65` — implement the exact RouterInfo contract/source reconciliation,
+  tests, bounds, adapter behavior, and documentation.
 - Closure commit: records this status and the dependency handoff.
 
 ## 1. Executive finding

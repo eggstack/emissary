@@ -2,8 +2,7 @@
 
 Status: implemented
 
-Implementation commit: recorded by the companion M025 closure after the
-implementation commit on this branch.
+Implementation commit: `63afb65`
 
 ## Disposition
 
@@ -79,5 +78,4 @@ No upstream repository, issue, pull request, review, maintainer channel, or
 third-party write was used or prepared. All repository changes remain within
 the user-authorized `eggstack/emissary` repository.
 
-Frozen implementation/test head: recorded by the companion M025 closure after
-the implementation commit.
+Frozen implementation/test head: `63afb65`

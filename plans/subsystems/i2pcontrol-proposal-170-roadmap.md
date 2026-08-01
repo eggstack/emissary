@@ -155,10 +155,9 @@ M026 bounded core inspection for feasible remaining selectors
 M027 conformance and independent reclosure
 ```
 
-M020 through M024 are closed internally against the pinned revision. M025 is
-now dependency-ready and may execute against M024's recovered SAM source
-evidence. M026 depends on M025's exact source matrix.
-M027 depends on every implementation milestone reaching a frozen disposition.
+M020 through M025 are closed internally against the pinned revision. M026 is
+now dependency-ready against M025's exact source matrix. M027 depends on every
+implementation milestone reaching a frozen disposition.
 
 ## 8. Milestones
 

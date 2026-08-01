@@ -14,7 +14,7 @@ Repository baseline reviewed: `f44d70e`
 
 Implementation commits or pull requests:
 
-- `42c2204` — source-count and exhaustive unavailable-field regression guards, documentation, and planning closure.
+- `fd8cf21` — source-count and exhaustive unavailable-field regression guards, documentation, and planning closure.
 - No pull request was created or prepared.
 
 ## 1. Executive finding
@@ -153,4 +153,4 @@ The pinned external specification was inspected read-only. No upstream or
 third-party repository, issue, pull request, review, maintainer channel, or
 other external write was made or prepared.
 
-Frozen implementation/test head: `42c2204`
+Frozen implementation/test head: `fd8cf21`

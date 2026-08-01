@@ -2,7 +2,7 @@
 
 Status: closed for implementation; M026 closure accepted; M027 ready
 
-Implementation commit: `42c2204`
+Implementation commit: `fd8cf21`
 
 ## Disposition
 
@@ -73,4 +73,4 @@ third-party write was used or prepared. No missing tunnel data plane, router
 algorithm, dependency, CI, frontend, sampler, or upstream contribution work
 was added.
 
-Frozen implementation/test head: `42c2204`
+Frozen implementation/test head: `fd8cf21`

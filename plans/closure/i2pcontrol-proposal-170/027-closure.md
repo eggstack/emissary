@@ -65,8 +65,7 @@ The corrected implementation baseline reviewed by M027 is the M020–M026 head
 
 Compatibility/parser fixtures remain separately named in
 `emissary-cli/tests/golden_fixtures.rs` and are not counted as canonical
-fixtures. The final evidence and planning commit is recorded in the git
-history alongside this record.
+fixtures. M027 evidence/test/documentation commit: `ef5fadf`.
 
 ## 4. Requirement-to-evidence matrix
 

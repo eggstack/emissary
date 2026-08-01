@@ -88,5 +88,4 @@ repository, issue, pull request, review, maintainer channel, submission,
 adoption request, merge solicitation, or contribution artifact was created or
 prepared. Repository writes remained within `eggstack/emissary`.
 
-Frozen M027 implementation/test head: recorded by the M027 evidence commit in
-the repository history.
+Frozen M027 implementation/test head: `ef5fadf`.

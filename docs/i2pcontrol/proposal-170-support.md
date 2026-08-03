@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support
+Status: closed against the pinned 2026-05-20 Proposal 170 revision
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -200,32 +200,22 @@ Owners: M022, rechecked by M027.
 
 | Milestone | Status | Scope |
 |---|---|---|
-| M020 | closed | base I2PControl authentication/token/error and JSON-RPC correctness |
-| M021 | closed | TunnelManager exact wire, atomic persistence, secret boundary |
-| M022 | closed internally against pinned revision | actual AddressBook runtime authority and source objects |
-| M023 | closed internally against pinned revision | startup tunnel inventory and client-service lifecycle/address truthfulness |
-| M024 | closed internally against pinned revision | recoverable bounded SAM observation |
-| M025 | closed internally against pinned revision | exact RouterInfo contract/source matrix |
-| M026 | closed internally against pinned revision | no feasible authoritative source existed in the frozen matrix |
-| M027 | partial Proposal 170 support | literal conformance, documentation reconciliation, independent closure |
-
-See `plans/implementation/i2pcontrol-proposal-170/README.md` for dependencies and handoff rules.
-
-## Final-status rule
-
-M027 restored the final internal status.
-
-Possible dispositions:
-
-- `closed internally against pinned revision` when exact wire behavior and every claimed source/runtime dimension have evidence;
-- `partial Proposal 170 support` when one or more pinned sources remain truthfully unavailable;
-- `corrective pass required` for unresolved high/medium defects;
-- `blocked` when necessary evidence cannot be obtained.
-
-No internal status implies upstream review, acceptance, certification, adoption, approval, or merge.
-
-## Internal-only boundary
-
-All work is internal to `eggstack/emissary`.
-
-No corrective plan authorizes upstream issues, pull requests, reviews, discussions, submissions, patches, maintainer outreach, merge preparation, or writes to any upstream/third-party repository. External sources may be inspected read-only for internal correctness only.
+| M001 | Closed | Base protocol, auth, JSON-RPC |
+| M002 | Closed | Tunnel domain, persistence, backend trait |
+| M003 | Closed | AddressBook handler |
+| M004 | Closed | TunnelManager contract and stubs |
+| M005 | Superseded | RouterInfo inspection (superseded by M009/M010) |
+| M006 | Superseded | ClientServicesInfo (superseded by M011) |
+| M007 | Superseded | Conformance and strict closure (superseded by M012/M013) |
+| M008 | Closed | Production composition and durable-state integrity |
+| M009 | Closed | RouterInfo availability and truthfulness |
+| M010 | Closed | Bounded core router inspection |
+| M011 | Closed | ClientServicesInfo live state |
+| M012 | Closed | Real TLS and request resource hardening |
+| M013 | Closed | Production conformance and independent reclosure |
+| M014 | Closed | Spec-constrained truthfulness and local hardening |
+| M015 | Superseded | Historical reclosure; superseded by M017 |
+| M016 | Closed | Bounded SAM session observation corrective pass |
+| M017 | Invalidated | Historical final-head review; broad closure superseded by M018/M019 |
+| M018 | Closed | Exact wire-contract reconciliation implementation |
+| M019 | Closed against pinned revision | Pinned-revision independent reclosure |

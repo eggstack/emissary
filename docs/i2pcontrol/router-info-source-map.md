@@ -1,6 +1,6 @@
 # RouterInfo Selector Source Map
 
-Status: M027 source review closed; partial Proposal 170 support
+Status: exact-wire source inventory for the pinned-revision closure
 
 This is the reviewed source map for the pinned Proposal 170 revision created and
 last updated on `2026-08-01`. M027 independently revalidated the matrix against

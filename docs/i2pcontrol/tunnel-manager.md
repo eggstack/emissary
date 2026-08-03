@@ -1,9 +1,6 @@
 # I2PControl TunnelManager
 
-Status: M021 wire/persistence boundary closed; M027 independently revalidated
-the final wire and failure evidence. The missing data planes remain explicit
-runtime-unsupported behavior. See
-`plans/closure/i2pcontrol-proposal-170/027-closure.md`.
+Status: closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
 Wire/CRUD/persistence evidence is distinct from runtime data-plane support.

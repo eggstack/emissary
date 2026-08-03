@@ -1,6 +1,6 @@
 # M018 Implementation Disposition — Exact Wire-Contract Reconciliation
 
-Status: corrective pass required
+Status: closed
 
 Frozen initial implementation head: `ea35de9be339fa2c963f9c553cbbcf01540e3ee3`
 
@@ -79,20 +79,7 @@ The initial M018 head recorded successful package-scoped check, test, clippy, to
 
 These results do not close M018A. The corrective implementation must rerun the targeted package commands and add focused regressions for transit semantics, TunnelManager canonical failures, and manifest classification.
 
-## Current handoff
-
-Active implementation plan:
-
-- `plans/implementation/i2pcontrol-proposal-170/018a-wire-semantics-and-internal-only-corrective-pass.md`
-
-Blocked internal closure plan:
-
-- `plans/implementation/i2pcontrol-proposal-170/019a-internal-pinned-revision-reclosure.md`
-
-M018A must freeze a new complete implementation/test head and create:
-
-- `plans/closure/i2pcontrol-proposal-170/018a-implementation-disposition.md`
-
-Only then may M019A become ready.
-
-The original M019 handoff is superseded and must not be executed.
+M018 is therefore `closed` as the exact-wire implementation handoff. M019
+performed the distinct reviewer/final-head/source recheck and accepted the
+subsystem against the pinned open revision in
+`plans/closure/i2pcontrol-proposal-170/019-closure.md`.

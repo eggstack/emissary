@@ -1,6 +1,6 @@
 # I2PControl for Emissary
 
-Status: partial Proposal 170 support
+Status: closed against the pinned 2026-05-20 Proposal 170 revision
 
 Proposal 170 is still **Open**. This documentation is pinned to the
 2026-05-20 revision (created and last updated 2026-05-20).
@@ -181,7 +181,9 @@ See `plans/implementation/i2pcontrol-proposal-170/README.md` for dependencies an
 
 ## Support dimensions
 
-Every claim is separated into:
+M018 reconciled the wire contract and M019 independently accepted the final
+head against the pinned revision. See the planning records for the bounded
+closure statement and source metadata.
 
 - **Wire** — exact names, casing, parameter-presence rules, response fields, and JSON types.
 - **Source** — a truthful current Emissary data source exists.

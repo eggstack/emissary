@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Corrective Roadmap
 
-Status: partial Proposal 170 support
+Status: closed against pinned revision
 
 Corrective baseline: `a3c4f469f4877e5ff4a0bb4230da298f0b367ed2`
 
@@ -114,7 +114,7 @@ emissary-core/src/sam/**
 
 No external seam may grant I2PControl generic mutation authority over router internals. Mutation must remain behind a purpose-specific trait whose implementation is owned by the existing subsystem.
 
-## 6. Capability and evidence dimensions
+Status: closed
 
 Every Proposal 170 item is classified independently:
 
@@ -195,7 +195,14 @@ Objective:
 - prevent secret duplication, logging, and accidental response disclosure while retaining only the storage necessary for future backends;
 - enforce persistence permissions or fail closed where the platform supports them.
 
-Primary boundary: `i2pcontrol` handler/domain/store/backend modules.
+- all applicable M018 acceptance criteria pass;
+- exact source decisions and ambiguities are recorded;
+- literal official-example fixtures pass;
+- M017 is consistently marked invalidated;
+- final implementation head is frozen;
+- M018 moved to `closing` and M019 became `ready` after the implementation
+  head was frozen;
+- M019 independently accepted the head and recorded final closure.
 
 Exit: all seven actions have literal success/failure fixtures, rename failure injection preserves the original definition, and unsupported runtimes remain explicit stubs.
 
@@ -203,7 +210,7 @@ Exit: all seven actions have literal success/failure fixtures, rename failure in
 
 Plan: `022-addressbook-runtime-bridge.md`
 
-Status: closed
+Status: closed against pinned revision
 
 Objective:
 
@@ -373,21 +380,18 @@ Use focused test filters named in each plan before broad package tests. Use touc
 
 | Milestone | Status | Disposition |
 |---|---|---|
-| M001–M018A | historical implementation evidence | retained only as referenced |
-| M019 | superseded | non-executable |
-| M019A | invalidated closure | historical evidence; see `019a-closure-invalidation.md` |
-| M020 | closed | `plans/closure/i2pcontrol-proposal-170/020-closure.md` |
-| M021 | closed | `plans/closure/i2pcontrol-proposal-170/021-closure.md` |
-| M022 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/022-closure.md` |
-| M023 | closed | hard dependency M021 is closed |
-| M024 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/024-closure.md` |
-| M025 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/025-closure.md` |
-| M026 | closed internally against pinned revision | `plans/closure/i2pcontrol-proposal-170/026-closure.md` |
-| M027 | partial Proposal 170 support | `plans/closure/i2pcontrol-proposal-170/027-closure.md` |
+| 001–004 | historical implementation foundations | retained |
+| 005–007 | superseded | retained as history |
+| 008–014 | implementation evidence retained | final broad closure reopened |
+| 015 | invalid historical closure | superseded |
+| 016 | bounded SAM implementation retained | accepted component |
+| 017 | corrective pass required | closure invalidated by exact-contract findings |
+| 018 | closed | exact wire-contract reconciliation accepted at `ea35de9` |
+| 019 | closed against pinned revision | final pinned-revision closure accepted at `db5e067` |
 
 ## 14. Completion definition
 
-The corrective workstream is complete only when M027 records a disposition supported by:
+The Proposal 170 workstream is marked `closed against pinned revision` because M019 confirmed:
 
 - standard I2PControl authentication and token interoperability;
 - correct JSON-RPC execution and request-ID behavior;

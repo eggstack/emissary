@@ -1,9 +1,10 @@
 # Proposal 170 Conformance Matrix
 
-Status: final internal conformance record; partial Proposal 170 support
+Status: normative inventory for the pinned-revision closure
 
-Proposal 170 remains Open. This workstream is pinned to the revision created
-and last updated on `2026-05-20`.
+Proposal 170 remains Open and this inventory is pinned to the revision created
+and last updated on 2026-05-20. M017's broad closure is invalidated historical
+evidence; M019 independently accepted the final head against that revision.
 
 The matrix previously stored in this file was used by the M019A internal
 closure. That closure and matrix are no longer normative because later audit

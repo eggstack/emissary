@@ -58,6 +58,13 @@ const RETRY_BACKOFF: Duration = Duration::from_secs(30);
 /// How many times each subscription is tried before giving up.
 const SUBSCRIPTION_NUM_RETRIES: usize = 5usize;
 
+#[cfg(feature = "i2pcontrol")]
+const MAX_LEGACY_DESTINATION_ENTRIES: usize = 10_000;
+#[cfg(feature = "i2pcontrol")]
+const MAX_LEGACY_DESTINATION_FILE_BYTES: usize = 64 * 1024;
+#[cfg(feature = "i2pcontrol")]
+const MAX_LEGACY_DESTINATION_BYTES: usize = 1024 * 1024;
+
 /// Administrative address-book source selected by Proposal 170.
 #[cfg(feature = "i2pcontrol")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,7 +85,7 @@ pub enum RuntimeAddressBookType {
 pub struct RuntimeAddressBookEntry {
     /// Hostname used for lookup.
     pub hostname: String,
-    /// Full or legacy base32 destination representation.
+    /// Full, structurally validated Base64 destination.
     pub destination: String,
 }
 
@@ -173,20 +180,10 @@ impl RuntimeAddressBookOwner {
             if authority_present {
                 initialization_error = Some("address book state is corrupt".to_string());
             }
-            let mut state = RuntimeAddressBookSnapshot {
+            RuntimeAddressBookSnapshot {
                 subscriptions: initial_subscriptions_for_fallback,
                 ..RuntimeAddressBookSnapshot::default()
-            };
-            for (hostname, destination) in addresses.read().iter() {
-                state.published.insert(
-                    hostname.clone(),
-                    RuntimeAddressBookEntry {
-                        hostname: hostname.clone(),
-                        destination: destination.clone(),
-                    },
-                );
             }
-            state
         });
         let owner = Arc::new(Self {
             path,
@@ -241,6 +238,36 @@ impl RuntimeAddressBookOwner {
 
     fn entries(&self, book_type: RuntimeAddressBookType) -> Vec<RuntimeAddressBookEntry> {
         self.state.read().book(book_type).values().cloned().collect()
+    }
+
+    fn resolve_base32(&self, hostname: &str) -> Option<String> {
+        let state = self.state.read();
+        for book in [
+            &state.private,
+            &state.local,
+            &state.router,
+            &state.published,
+        ] {
+            if let Some(entry) = book.get(hostname) {
+                return Some(base32_for_destination(&entry.destination));
+            }
+        }
+        None
+    }
+
+    fn resolve_base64(&self, hostname: &str) -> Option<String> {
+        let state = self.state.read();
+        for book in [
+            &state.private,
+            &state.local,
+            &state.router,
+            &state.published,
+        ] {
+            if let Some(entry) = book.get(hostname) {
+                return Some(entry.destination.clone());
+            }
+        }
+        None
     }
 
     async fn persist(&self, state: &RuntimeAddressBookSnapshot) -> Result<(), String> {
@@ -339,47 +366,75 @@ impl RuntimeAddressBookOwner {
         Ok(result)
     }
 
-    async fn import_legacy(&self, legacy: RuntimeAddressBookSnapshot) -> Result<(), String> {
+    async fn import_legacy(
+        &self,
+        legacy: RuntimeAddressBookSnapshot,
+        destinations: BTreeMap<String, RuntimeAddressBookEntry>,
+    ) -> Result<(), String> {
         if self.authority_present() {
             return Ok(());
         }
         let current = self.snapshot();
-        for book in [
-            &legacy.private,
-            &legacy.local,
-            &legacy.router,
-            &legacy.published,
-        ] {
-            for hostname in book.keys() {
-                if current.published.contains_key(hostname)
-                    || current.private.contains_key(hostname)
-                    || current.local.contains_key(hostname)
-                    || current.router.contains_key(hostname)
-                {
-                    return Err("address book migration collision".to_string());
-                }
-            }
-        }
         let mut merged = current;
         merged.private = legacy.private;
         merged.local = legacy.local;
         merged.router = legacy.router;
         merged.published.extend(legacy.published);
-        merged.subscriptions = legacy.subscriptions;
-        merged.configuration = legacy.configuration;
+        if !legacy.subscriptions.is_empty() {
+            merged.subscriptions = legacy.subscriptions;
+        }
+        if !legacy.configuration.is_empty() {
+            merged.configuration = legacy.configuration;
+        }
+        for (hostname, entry) in &destinations {
+            merged
+                .published
+                .entry(hostname.clone())
+                .or_insert_with(|| entry.clone());
+        }
+        repair_published_entries(&mut merged, &destinations)?;
+        validate_runtime_snapshot(&merged)?;
         self.commit(merged).await
+    }
+
+    async fn repair_published(
+        &self,
+        destinations: BTreeMap<String, RuntimeAddressBookEntry>,
+    ) -> Result<(), String> {
+        let mut state = self.snapshot();
+        let repaired = repair_published_entries(&mut state, &destinations)?;
+        validate_runtime_snapshot(&state)?;
+        if repaired {
+            self.commit(state).await
+        } else {
+            Ok(())
+        }
     }
 
     async fn merge_downloaded(&self, addresses: HashMap<String, (String, String)>) {
         let _guard = self.mutation.lock().await;
         let mut state = self.snapshot();
-        for (hostname, (_, destination)) in addresses {
-            state.published.entry(hostname.clone()).or_insert(RuntimeAddressBookEntry {
-                hostname,
-                destination,
-            });
+        for (hostname, (base32, destination)) in addresses {
+            match state.published.get_mut(&hostname) {
+                None => {
+                    state.published.insert(
+                        hostname.clone(),
+                        RuntimeAddressBookEntry {
+                            hostname,
+                            destination,
+                        },
+                    );
+                }
+                Some(existing)
+                    if !is_valid_full_destination(&existing.destination)
+                        && existing.destination == base32 =>
+                {
+                    existing.destination = destination;
+                }
+                Some(_) => {}
+            }
         }
-        if self.persist(&state).await.is_ok() {
+        if validate_runtime_snapshot(&state).is_ok() && self.persist(&state).await.is_ok() {
             *self.state.write() = state;
             self.authority_present.store(true, Ordering::Release);
             self.rebuild_runtime_indexes();
@@ -388,11 +443,180 @@ impl RuntimeAddressBookOwner {
 }
 
 #[cfg(feature = "i2pcontrol")]
+fn repair_published_entries(
+    state: &mut RuntimeAddressBookSnapshot,
+    destinations: &BTreeMap<String, RuntimeAddressBookEntry>,
+) -> Result<bool, String> {
+    let mut repaired = false;
+    for (hostname, entry) in &mut state.published {
+        if is_valid_full_destination(&entry.destination) {
+            continue;
+        }
+        let Some(legacy) = destinations.get(hostname) else {
+            return Err("address book state contains an unrepairable destination".to_string());
+        };
+        if !is_base32_seed(&entry.destination)
+            || base32_for_destination(&legacy.destination) != entry.destination
+        {
+            return Err("address book state contains an unrepairable destination".to_string());
+        }
+        entry.destination = legacy.destination.clone();
+        repaired = true;
+    }
+    Ok(repaired)
+}
+
+#[cfg(feature = "i2pcontrol")]
 fn base32_for_destination(destination: &str) -> String {
     base64_decode(destination)
         .and_then(|decoded| Destination::parse(&decoded).ok())
         .map(|destination| base32_encode(destination.id().to_vec()))
         .unwrap_or_else(|| destination.to_string())
+}
+
+#[cfg(feature = "i2pcontrol")]
+fn is_valid_full_destination(destination: &str) -> bool {
+    let Some(decoded) = base64_decode(destination) else {
+        return false;
+    };
+    Destination::parse(&decoded).is_ok()
+}
+
+#[cfg(feature = "i2pcontrol")]
+fn is_base32_seed(destination: &str) -> bool {
+    destination.len() == 52
+        && destination
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || matches!(byte, b'2'..=b'7'))
+}
+
+#[cfg(feature = "i2pcontrol")]
+fn validate_runtime_entry(key: &str, entry: &RuntimeAddressBookEntry) -> Result<(), String> {
+    if key != entry.hostname || entry.hostname.is_empty() || entry.hostname.len() > 254 {
+        return Err("address book state contains an invalid hostname".to_string());
+    }
+    if entry.hostname.contains('/')
+        || entry.hostname.contains('\\')
+        || entry.hostname.chars().any(|character| character.is_control())
+    {
+        return Err("address book state contains an invalid hostname".to_string());
+    }
+    if !is_valid_full_destination(&entry.destination) {
+        return Err("address book state contains an invalid destination".to_string());
+    }
+    Ok(())
+}
+
+#[cfg(feature = "i2pcontrol")]
+fn validate_runtime_snapshot(state: &RuntimeAddressBookSnapshot) -> Result<(), String> {
+    let books = [
+        &state.private,
+        &state.local,
+        &state.router,
+        &state.published,
+    ];
+    let total_entries = books.iter().map(|book| book.len()).sum::<usize>();
+    if total_entries > MAX_LEGACY_DESTINATION_ENTRIES {
+        return Err("address book state exceeds its entry limit".to_string());
+    }
+
+    let mut hostnames = std::collections::BTreeSet::new();
+    for book in books {
+        for (hostname, entry) in book {
+            validate_runtime_entry(hostname, entry)?;
+            if !hostnames.insert(hostname) {
+                return Err("address book state contains a hostname collision".to_string());
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "i2pcontrol")]
+fn validate_legacy_hostname(hostname: &str) -> bool {
+    !hostname.is_empty()
+        && hostname.len() <= 254
+        && hostname != "."
+        && hostname != ".."
+        && !hostname.contains('/')
+        && !hostname.contains('\\')
+        && !hostname.chars().any(|character| character.is_control())
+}
+
+#[cfg(feature = "i2pcontrol")]
+async fn load_legacy_destinations(
+    path: &Path,
+) -> Result<BTreeMap<String, RuntimeAddressBookEntry>, String> {
+    let metadata = match tokio::fs::symlink_metadata(path).await {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(BTreeMap::new()),
+        Err(_) => return Err("legacy destination source is unavailable".to_string()),
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err("legacy destination source is unavailable".to_string());
+    }
+
+    let mut entries = tokio::fs::read_dir(path)
+        .await
+        .map_err(|_| "legacy destination source is unavailable".to_string())?;
+    let mut snapshot = BTreeMap::new();
+    let mut total_bytes = 0usize;
+
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|_| "legacy destination source is unavailable".to_string())?
+    {
+        let file_type = entry
+            .file_type()
+            .await
+            .map_err(|_| "legacy destination source is unavailable".to_string())?;
+        if !file_type.is_file() {
+            continue;
+        }
+        let file_name = entry
+            .file_name()
+            .into_string()
+            .map_err(|_| "legacy destination source contains an invalid filename".to_string())?;
+        let Some(hostname) = file_name.strip_suffix(".txt") else {
+            continue;
+        };
+        if !validate_legacy_hostname(hostname) {
+            return Err("legacy destination source contains an invalid filename".to_string());
+        }
+
+        let metadata = entry
+            .metadata()
+            .await
+            .map_err(|_| "legacy destination source is unavailable".to_string())?;
+        let file_bytes = usize::try_from(metadata.len()).unwrap_or(usize::MAX);
+        if file_bytes > MAX_LEGACY_DESTINATION_FILE_BYTES
+            || snapshot.len() >= MAX_LEGACY_DESTINATION_ENTRIES
+            || total_bytes.saturating_add(file_bytes) > MAX_LEGACY_DESTINATION_BYTES
+        {
+            return Err("legacy destination source exceeds its limit".to_string());
+        }
+
+        let destination = tokio::fs::read_to_string(entry.path())
+            .await
+            .map_err(|_| "legacy destination source contains an invalid destination".to_string())?;
+        let destination = destination.trim().to_string();
+        if destination.len() > MAX_LEGACY_DESTINATION_FILE_BYTES
+            || !is_valid_full_destination(&destination)
+        {
+            return Err("legacy destination source contains an invalid destination".to_string());
+        }
+        total_bytes = total_bytes.saturating_add(destination.len());
+        snapshot.insert(
+            hostname.to_string(),
+            RuntimeAddressBookEntry {
+                hostname: hostname.to_string(),
+                destination,
+            },
+        );
+    }
+
+    Ok(snapshot)
 }
 
 /// Used when requesting address books from servers. This should reduce load to servers whose
@@ -944,7 +1168,7 @@ impl AddressBookManager {
                 ?error,
                 "failed to create directory for destinations",
             ),
-            Ok(_) =>
+            Ok(_) => {
                 for (hostname, destination) in destinations {
                     if let Err(error) = tokio::fs::write(
                         self.address_book_path.join("destinations").join(format!("{hostname}.txt")),
@@ -959,7 +1183,8 @@ impl AddressBookManager {
                             "failed to store destination to disk",
                         );
                     }
-                },
+                }
+            }
         }
 
         #[cfg(feature = "i2pcontrol")]
@@ -1029,6 +1254,7 @@ impl RuntimeAddressBookHandle {
         book_type: RuntimeAddressBookType,
         entry: RuntimeAddressBookEntry,
     ) -> Result<(), String> {
+        validate_runtime_entry(&entry.hostname, &entry)?;
         self.owner
             .mutate(|state| {
                 if state.book(book_type).contains_key(&entry.hostname) {
@@ -1058,6 +1284,7 @@ impl RuntimeAddressBookHandle {
         book_type: RuntimeAddressBookType,
         entry: RuntimeAddressBookEntry,
     ) -> Result<bool, String> {
+        validate_runtime_entry(&entry.hostname, &entry)?;
         self.owner
             .mutate(|state| {
                 if !state.book(book_type).contains_key(&entry.hostname) {
@@ -1137,8 +1364,24 @@ impl RuntimeAddressBookHandle {
     pub async fn import_legacy_runtime_state(
         &self,
         snapshot: RuntimeAddressBookSnapshot,
+        destinations: BTreeMap<String, RuntimeAddressBookEntry>,
     ) -> Result<(), String> {
-        self.owner.import_legacy(snapshot).await
+        self.owner.import_legacy(snapshot, destinations).await
+    }
+
+    /// Validate and repair historical Base32-seeded published entries.
+    pub async fn repair_published_runtime_state(
+        &self,
+        destinations: BTreeMap<String, RuntimeAddressBookEntry>,
+    ) -> Result<(), String> {
+        self.owner.repair_published(destinations).await
+    }
+
+    /// Load the bounded, path-confined legacy full-destination source.
+    pub async fn legacy_destinations(
+        &self,
+    ) -> Result<BTreeMap<String, RuntimeAddressBookEntry>, String> {
+        load_legacy_destinations(&self.owner.path.join("destinations")).await
     }
 }
 
@@ -1168,12 +1411,7 @@ impl AddressBookHandle {
             }
         }
         #[cfg(feature = "i2pcontrol")]
-        if let Some(owner) = &self.owner {
-            owner.legacy_publish_sync(RuntimeAddressBookEntry {
-                hostname: host,
-                destination: address,
-            });
-        }
+        let _ = address;
     }
 
     /// Add new host to address book.
@@ -1275,28 +1513,25 @@ impl AddressBook for AddressBookHandle {
         let owner = self.owner.as_ref().map(Arc::clone);
 
         Box::pin(async move {
+            #[cfg(feature = "i2pcontrol")]
+            if let Some(owner) = owner {
+                return owner.resolve_base64(&host);
+            }
             if let Ok(destination) =
                 tokio::fs::read_to_string(format!("{path}/destinations/{host}.txt")).await
             {
                 return Some(destination);
-            }
-            #[cfg(feature = "i2pcontrol")]
-            if let Some(owner) = owner {
-                let state = owner.state.read();
-                return state
-                    .private
-                    .get(&host)
-                    .or_else(|| state.local.get(&host))
-                    .or_else(|| state.router.get(&host))
-                    .or_else(|| state.published.get(&host))
-                    .map(|entry| entry.destination.clone());
             }
             None
         })
     }
 
     fn resolve_base32(&self, host: &str) -> Option<String> {
-        self.addresses.write().get(host).cloned()
+        #[cfg(feature = "i2pcontrol")]
+        if let Some(owner) = &self.owner {
+            return owner.resolve_base32(host);
+        }
+        self.addresses.read().get(host).cloned()
     }
 }
 
@@ -1304,6 +1539,17 @@ impl AddressBook for AddressBookHandle {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[cfg(feature = "i2pcontrol")]
+    fn valid_destination(seed: u8) -> String {
+        use emissary_core::crypto::SigningPrivateKey;
+        use emissary_util::runtime::tokio::Runtime as TokioRuntime;
+
+        let key = SigningPrivateKey::from_bytes(&[seed; 32]).unwrap();
+        base64_encode(
+            emissary_core::primitives::Destination::new::<TokioRuntime>(key.public()).serialize(),
+        )
+    }
 
     #[tokio::test]
     async fn save_only_destination() {
@@ -2194,7 +2440,24 @@ mod tests {
     #[cfg(feature = "i2pcontrol")]
     #[tokio::test]
     async fn runtime_owner_rejects_persistence_failure_without_runtime_change() {
+        use emissary_core::crypto::SigningPrivateKey;
+        use emissary_util::runtime::tokio::Runtime as TokioRuntime;
+
         let dir = tempdir().unwrap().keep();
+        let stable_destination = {
+            let key = SigningPrivateKey::from_bytes(&[0xb; 32]).unwrap();
+            base64_encode(
+                emissary_core::primitives::Destination::new::<TokioRuntime>(key.public())
+                    .serialize(),
+            )
+        };
+        let new_destination = {
+            let key = SigningPrivateKey::from_bytes(&[0xc; 32]).unwrap();
+            base64_encode(
+                emissary_core::primitives::Destination::new::<TokioRuntime>(key.public())
+                    .serialize(),
+            )
+        };
         let manager = AddressBookManager::new_with_control_owner(
             dir.clone(),
             AddressBookConfig {
@@ -2210,7 +2473,7 @@ mod tests {
                 RuntimeAddressBookType::Private,
                 RuntimeAddressBookEntry {
                     hostname: "stable.i2p".to_string(),
-                    destination: "stable-destination".to_string(),
+                    destination: stable_destination.clone(),
                 },
             )
             .await
@@ -2224,14 +2487,14 @@ mod tests {
                 RuntimeAddressBookType::Private,
                 RuntimeAddressBookEntry {
                     hostname: "stable.i2p".to_string(),
-                    destination: "new-destination".to_string(),
+                    destination: new_destination,
                 },
             )
             .await;
         assert!(result.is_err());
         assert_eq!(
             handle.resolve_base64("stable.i2p".to_string()).await,
-            Some("stable-destination".to_string())
+            Some(stable_destination)
         );
     }
 
@@ -2277,7 +2540,17 @@ mod tests {
     #[cfg(feature = "i2pcontrol")]
     #[tokio::test]
     async fn control_state_survives_disable_and_restores_on_reenable() {
+        use emissary_core::crypto::SigningPrivateKey;
+        use emissary_util::runtime::tokio::Runtime as TokioRuntime;
+
         let dir = tempdir().unwrap().keep();
+        let retained_destination = {
+            let key = SigningPrivateKey::from_bytes(&[0xd; 32]).unwrap();
+            base64_encode(
+                emissary_core::primitives::Destination::new::<TokioRuntime>(key.public())
+                    .serialize(),
+            )
+        };
         let manager = AddressBookManager::new_with_control_owner(
             dir.clone(),
             AddressBookConfig {
@@ -2292,7 +2565,7 @@ mod tests {
                 RuntimeAddressBookType::Private,
                 RuntimeAddressBookEntry {
                     hostname: "retained.i2p".to_string(),
-                    destination: "retained-destination".to_string(),
+                    destination: retained_destination.clone(),
                 },
             )
             .await
@@ -2331,11 +2604,115 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .destination,
-            "retained-destination"
+            retained_destination
         );
         assert_eq!(
             enabled_handle.resolve_base64("retained.i2p".to_string()).await,
-            Some("retained-destination".to_string())
+            Some(retained_destination)
+        );
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    #[tokio::test]
+    async fn active_owner_update_and_delete_override_legacy_destination_file() {
+        let dir = tempdir().unwrap().keep();
+        let old_destination = valid_destination(20);
+        let new_destination = valid_destination(21);
+        let old_base32 = base32_for_destination(&old_destination);
+        let new_base32 = base32_for_destination(&new_destination);
+        let manager = AddressBookManager::new_with_control_owner(
+            dir.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        manager
+            .save_to_disk(HashMap::from([(
+                "coherent.i2p".to_string(),
+                (old_base32, old_destination.clone()),
+            )]))
+            .await;
+        let handle = manager.handle();
+        let control = manager.control_handle().unwrap();
+
+        control
+            .runtime_update(
+                RuntimeAddressBookType::Published,
+                RuntimeAddressBookEntry {
+                    hostname: "coherent.i2p".to_string(),
+                    destination: new_destination.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            handle.resolve_base64("coherent.i2p".to_string()).await,
+            Some(new_destination)
+        );
+        assert_eq!(handle.resolve_base32("coherent.i2p"), Some(new_base32));
+
+        assert!(control
+            .runtime_delete(RuntimeAddressBookType::Published, "coherent.i2p")
+            .await
+            .unwrap());
+        assert_eq!(
+            handle.resolve_base64("coherent.i2p".to_string()).await,
+            None
+        );
+        assert_eq!(handle.resolve_base32("coherent.i2p"), None);
+        assert!(dir.join("addressbook/destinations/coherent.i2p.txt").exists());
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    #[tokio::test]
+    async fn active_download_repairs_a_persisted_base32_seed() {
+        let dir = tempdir().unwrap().keep();
+        let destination = valid_destination(22);
+        let base32 = base32_for_destination(&destination);
+        let state = RuntimeAddressBookSnapshot {
+            published: BTreeMap::from([(
+                "download.i2p".to_string(),
+                RuntimeAddressBookEntry {
+                    hostname: "download.i2p".to_string(),
+                    destination: base32.clone(),
+                },
+            )]),
+            ..RuntimeAddressBookSnapshot::default()
+        };
+        tokio::fs::create_dir_all(dir.join("addressbook")).await.unwrap();
+        tokio::fs::write(
+            dir.join("addressbook/control-state.json"),
+            serde_json::to_vec(&state).unwrap(),
+        )
+        .await
+        .unwrap();
+
+        let manager = AddressBookManager::new_with_control_owner(
+            dir,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        manager
+            .save_to_disk(HashMap::from([(
+                "download.i2p".to_string(),
+                (base32, destination.clone()),
+            )]))
+            .await;
+        assert_eq!(
+            manager
+                .control_handle()
+                .unwrap()
+                .runtime_lookup(RuntimeAddressBookType::Published, "download.i2p")
+                .await
+                .unwrap()
+                .unwrap()
+                .destination,
+            destination
         );
     }
 

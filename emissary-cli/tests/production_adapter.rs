@@ -43,6 +43,16 @@ use emissary_cli::i2pcontrol::{
 
 use emissary_core::FirewallStatus;
 
+fn valid_destination(seed: u8) -> String {
+    use emissary_core::crypto::{base64_encode, SigningPrivateKey};
+    use emissary_util::runtime::tokio::Runtime as TokioRuntime;
+
+    let key = SigningPrivateKey::from_bytes(&[seed; 32]).unwrap();
+    base64_encode(
+        emissary_core::primitives::Destination::new::<TokioRuntime>(key.public()).serialize(),
+    )
+}
+
 // --- In-memory EventMetrics for tests ---
 
 #[derive(Default)]
@@ -195,7 +205,7 @@ async fn production_address_book_control_crud() {
 
     ab.add(
         AdministrativeAddressBookType::Private,
-        AddressBookEntry::new("test.i2p", "dest"),
+        AddressBookEntry::new("test.i2p", valid_destination(1)),
     )
     .await
     .unwrap();
@@ -209,7 +219,7 @@ async fn production_address_book_control_crud() {
     let updated = ab
         .update(
             AdministrativeAddressBookType::Private,
-            AddressBookEntry::new("test.i2p", "new-dest"),
+            AddressBookEntry::new("test.i2p", valid_destination(2)),
         )
         .await
         .unwrap();
@@ -243,13 +253,13 @@ async fn production_address_book_persistence_round_trip() {
         };
         ab.add(
             AdministrativeAddressBookType::Private,
-            AddressBookEntry::new("p.i2p", "p-dest"),
+            AddressBookEntry::new("p.i2p", valid_destination(3)),
         )
         .await
         .unwrap();
         ab.add(
             AdministrativeAddressBookType::Local,
-            AddressBookEntry::new("l.i2p", "l-dest"),
+            AddressBookEntry::new("l.i2p", valid_destination(4)),
         )
         .await
         .unwrap();

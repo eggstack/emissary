@@ -368,18 +368,14 @@ impl ProductionAddressBookControl {
         if let Some(error) = self.runtime.runtime_initialization_error() {
             return Err(error);
         }
+
+        let destinations = self.runtime.legacy_destinations().await?;
         if self.runtime.runtime_authority_present() {
-            return Ok(());
+            return self.runtime.repair_published_runtime_state(destinations).await;
         }
 
         let mut store = AddressBookStore::new(self.legacy_dir.clone(), 1024 * 1024);
         store.load().await.map_err(|e| format!("legacy store load: {e}"))?;
-        if store.total_entries() == 0
-            && store.subscriptions().is_empty()
-            && store.configuration().is_empty()
-        {
-            return Ok(());
-        }
 
         let mut snapshot = RuntimeAddressBookSnapshot::default();
         for (source, target) in [
@@ -406,7 +402,7 @@ impl ProductionAddressBookControl {
         }
         snapshot.subscriptions = store.subscriptions().as_slice().to_vec();
         snapshot.configuration = store.configuration().as_map().clone();
-        self.runtime.import_legacy_runtime_state(snapshot).await
+        self.runtime.import_legacy_runtime_state(snapshot, destinations).await
     }
 }
 
@@ -701,8 +697,9 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         let backend = self.registry.get(def.tunnel_type);
         match backend.start(&def).await {
             Ok(()) => Ok("ok".to_string()),
-            Err(BackendError::NotImplemented { tunnel_type }) =>
-                Ok(format!("error - {} not implemented", tunnel_type.as_str())),
+            Err(BackendError::NotImplemented { tunnel_type }) => {
+                Ok(format!("error - {} not implemented", tunnel_type.as_str()))
+            }
             Err(e) => Ok(format!("error - {e}")),
         }
     }
@@ -740,8 +737,9 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         let _ = backend.stop(&def).await;
         match backend.start(&def).await {
             Ok(()) => Ok("ok".to_string()),
-            Err(BackendError::NotImplemented { tunnel_type }) =>
-                Ok(format!("error - {} not implemented", tunnel_type.as_str())),
+            Err(BackendError::NotImplemented { tunnel_type }) => {
+                Ok(format!("error - {} not implemented", tunnel_type.as_str()))
+            }
             Err(e) => Ok(format!("error - {e}")),
         }
     }
@@ -1036,6 +1034,16 @@ mod tests {
         config::AddressBookConfig,
     };
 
+    fn valid_destination(seed: u8) -> String {
+        use emissary_core::crypto::{base64_encode, SigningPrivateKey};
+        use emissary_util::runtime::tokio::Runtime as TokioRuntime;
+
+        let key = SigningPrivateKey::from_bytes(&[seed; 32]).unwrap();
+        base64_encode(
+            emissary_core::primitives::Destination::new::<TokioRuntime>(key.public()).serialize(),
+        )
+    }
+
     #[tokio::test]
     async fn legacy_address_book_state_migrates_into_runtime_owner_once() {
         let base = tempfile::tempdir().unwrap().keep();
@@ -1044,7 +1052,7 @@ mod tests {
         legacy
             .add(
                 AdministrativeAddressBookType::Private,
-                AddressBookEntry::new("legacy.i2p", "legacy-destination"),
+                AddressBookEntry::new("legacy.i2p", valid_destination(1)),
             )
             .await
             .unwrap();
@@ -1093,7 +1101,14 @@ mod tests {
         tokio::fs::create_dir_all(base.join("addressbook")).await.unwrap();
         tokio::fs::write(
             base.join("addressbook/addresses"),
-            "collision.i2p=published-destination\n",
+            "collision.i2p=collision-base32\n",
+        )
+        .await
+        .unwrap();
+        tokio::fs::create_dir_all(base.join("addressbook/destinations")).await.unwrap();
+        tokio::fs::write(
+            base.join("addressbook/destinations/collision.i2p.txt"),
+            valid_destination(3),
         )
         .await
         .unwrap();
@@ -1102,7 +1117,7 @@ mod tests {
         legacy
             .add(
                 AdministrativeAddressBookType::Private,
-                AddressBookEntry::new("collision.i2p", "private-destination"),
+                AddressBookEntry::new("collision.i2p", valid_destination(2)),
             )
             .await
             .unwrap();
@@ -1122,5 +1137,234 @@ mod tests {
             .unwrap_err();
         assert!(error.contains("collision"));
         assert!(control.runtime_list(RuntimeAddressBookType::Private).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn first_activation_imports_full_destinations_for_api_and_router_info() {
+        use crate::i2pcontrol::{
+            address_book::resolve_address_book_selectors, control_plane::AddressBookControl,
+        };
+        use emissary_core::crypto::{base32_encode, base64_decode};
+
+        let base = tempfile::tempdir().unwrap().keep();
+        let destination = valid_destination(10);
+        let base32 = base32_encode(
+            emissary_core::primitives::Destination::parse(base64_decode(&destination).unwrap())
+                .unwrap()
+                .id()
+                .to_vec(),
+        );
+        tokio::fs::create_dir_all(base.join("addressbook/destinations")).await.unwrap();
+        tokio::fs::write(
+            base.join("addressbook/addresses"),
+            format!("first.i2p={base32}\n"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::write(
+            base.join("addressbook/destinations/first.i2p.txt"),
+            &destination,
+        )
+        .await
+        .unwrap();
+
+        let manager = AddressBookManager::new_with_control_owner(
+            base.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+        let adapter = ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"));
+        adapter.load().await.unwrap();
+
+        assert_eq!(
+            adapter
+                .lookup(AdministrativeAddressBookType::Published, "first.i2p")
+                .await
+                .unwrap()
+                .unwrap()
+                .destination,
+            destination
+        );
+        let selectors = resolve_address_book_selectors(
+            &adapter,
+            &[crate::i2pcontrol::rpc::router_info_keys::ADDRESS_BOOK_PUBLISHED],
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            selectors[crate::i2pcontrol::rpc::router_info_keys::ADDRESS_BOOK_PUBLISHED][0]["value"],
+            destination
+        );
+    }
+
+    #[tokio::test]
+    async fn persisted_base32_seed_is_repaired_from_matching_destination_file() {
+        use emissary_core::crypto::{base32_encode, base64_decode};
+
+        let base = tempfile::tempdir().unwrap().keep();
+        let destination = valid_destination(11);
+        let base32 = base32_encode(
+            emissary_core::primitives::Destination::parse(base64_decode(&destination).unwrap())
+                .unwrap()
+                .id()
+                .to_vec(),
+        );
+        let state = RuntimeAddressBookSnapshot {
+            published: BTreeMap::from([(
+                "repair.i2p".to_string(),
+                RuntimeAddressBookEntry {
+                    hostname: "repair.i2p".to_string(),
+                    destination: base32,
+                },
+            )]),
+            ..RuntimeAddressBookSnapshot::default()
+        };
+        tokio::fs::create_dir_all(base.join("addressbook/destinations")).await.unwrap();
+        tokio::fs::write(
+            base.join("addressbook/control-state.json"),
+            serde_json::to_vec(&state).unwrap(),
+        )
+        .await
+        .unwrap();
+        tokio::fs::write(
+            base.join("addressbook/destinations/repair.i2p.txt"),
+            &destination,
+        )
+        .await
+        .unwrap();
+
+        let manager = AddressBookManager::new_with_control_owner(
+            base.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+        ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"))
+            .load()
+            .await
+            .unwrap();
+        assert_eq!(
+            control
+                .runtime_lookup(RuntimeAddressBookType::Published, "repair.i2p")
+                .await
+                .unwrap()
+                .unwrap()
+                .destination,
+            destination
+        );
+    }
+
+    #[tokio::test]
+    async fn unrepairable_published_seed_fails_without_mutating_state() {
+        let base = tempfile::tempdir().unwrap().keep();
+        let state = serde_json::json!({
+            "private": {},
+            "local": {},
+            "router": {},
+            "published": {
+                "broken.i2p": {
+                    "hostname": "broken.i2p",
+                    "destination": "not-a-destination"
+                }
+            },
+            "subscriptions": [],
+            "configuration": {}
+        });
+        tokio::fs::create_dir_all(base.join("addressbook")).await.unwrap();
+        let state_bytes = serde_json::to_vec(&state).unwrap();
+        tokio::fs::write(base.join("addressbook/control-state.json"), &state_bytes)
+            .await
+            .unwrap();
+
+        let manager = AddressBookManager::new_with_control_owner(
+            base.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+        let error = ProductionAddressBookControl::new(control, base.join("addressbooks"))
+            .load()
+            .await
+            .unwrap_err();
+        assert!(error.contains("unrepairable"));
+        assert_eq!(
+            tokio::fs::read(base.join("addressbook/control-state.json")).await.unwrap(),
+            state_bytes
+        );
+    }
+
+    #[tokio::test]
+    async fn reenable_does_not_resurrect_deleted_published_entry() {
+        use emissary_core::crypto::base32_encode;
+
+        let base = tempfile::tempdir().unwrap().keep();
+        let destination = valid_destination(12);
+        let base32 = base32_encode(
+            emissary_core::primitives::Destination::parse(
+                emissary_core::crypto::base64_decode(&destination).unwrap(),
+            )
+            .unwrap()
+            .id()
+            .to_vec(),
+        );
+        tokio::fs::create_dir_all(base.join("addressbook/destinations")).await.unwrap();
+        tokio::fs::write(
+            base.join("addressbook/addresses"),
+            format!("deleted.i2p={base32}\n"),
+        )
+        .await
+        .unwrap();
+        tokio::fs::write(
+            base.join("addressbook/destinations/deleted.i2p.txt"),
+            &destination,
+        )
+        .await
+        .unwrap();
+
+        let manager = AddressBookManager::new_with_control_owner(
+            base.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+        let adapter = ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"));
+        adapter.load().await.unwrap();
+        assert!(control
+            .runtime_delete(RuntimeAddressBookType::Published, "deleted.i2p")
+            .await
+            .unwrap());
+        drop(manager);
+
+        let manager = AddressBookManager::new_with_control_owner(
+            base.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+        ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"))
+            .load()
+            .await
+            .unwrap();
+        assert!(control
+            .runtime_lookup(RuntimeAddressBookType::Published, "deleted.i2p")
+            .await
+            .unwrap()
+            .is_none());
     }
 }

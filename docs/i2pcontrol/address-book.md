@@ -7,13 +7,14 @@ Current corrective owner:
 - M028, `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 
 The enabled-mode Proposal 170 wire, mutation, source, and persistence behavior
-implemented by M022 remains retained evidence. The current defect is narrower:
-the runtime control owner is constructed and used by ordinary AddressBook
-execution even when I2PControl is not runtime-enabled.
+implemented by M022 remains retained evidence. M028 corrected the narrower
+defect: the runtime control owner was constructed and used by ordinary
+AddressBook execution even when I2PControl was not runtime-enabled.
 
-M028 must prove that no-feature and runtime-disabled execution preserve legacy
-AddressBook behavior without reading, writing, migrating, or consulting Proposal
-170 control state. M029 will independently review the corrected final head.
+M028 now provides focused proof that no-feature and runtime-disabled execution
+preserve legacy AddressBook behavior without reading, writing, migrating, or
+consulting Proposal 170 control state. M029 will independently review the
+corrected final head.
 
 ## Overview
 
@@ -143,7 +144,7 @@ Former I2PControl administrative generations may be one-time migration input
 only when no runtime control authority exists. They must never remain a second
 authority.
 
-## Disabled/default behavior owned by M028
+## Disabled/default behavior implemented by M028
 
 Target behavior when the feature is absent or runtime-disabled:
 
@@ -159,7 +160,8 @@ Target behavior when the feature is absent or runtime-disabled:
 When I2PControl is re-enabled, retained control state is loaded again under the
 enabled-mode precedence and migration rules.
 
-The current baseline does not yet satisfy this disabled/default boundary.
+The corrected M028 implementation satisfies this disabled/default boundary;
+final subsystem closure remains pending M029.
 
 ## Security
 
@@ -190,7 +192,7 @@ paths.
 
 ## Closure rule
 
-M028 must implement and close the activation boundary with focused no-feature,
+M028 implemented the activation boundary with focused no-feature,
 runtime-disabled, enabled, restart, and disable/re-enable evidence. M029 must
 independently review the actual final head.
 

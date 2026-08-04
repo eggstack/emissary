@@ -13,13 +13,13 @@ Current implementation correction:
 
 - M028, `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 
-Blocked final review:
+Ready final review:
 
 - M029, `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained evidence, but
-M027's final subsystem disposition is invalidated until M028 is implemented and
-M029 reviews the actual final head.
+M027's final subsystem disposition is invalidated until M029 reviews the actual
+final head. M028 is implemented and closed with the required boundary evidence.
 
 ## Retained machine-readable matrix
 
@@ -107,7 +107,7 @@ Retained enabled-mode M022 evidence covers:
 - restart and current/backup recovery;
 - exact RouterInfo source objects.
 
-M028 must add the missing negative boundary evidence:
+M028 added and tested the missing negative boundary evidence:
 
 - no compile-time feature: no control-state read/write/influence;
 - feature compiled but runtime disabled: same no-control-state behavior;

@@ -11,10 +11,10 @@ Current invalidation and corrective sequence:
 - `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 - `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
 
-M020–M027 implementation/evidence remains retained, but no final closure is
-currently controlling. The post-M027 merge that revived M019 is historical and
-superseded. M028 must restore strict AddressBook feature/runtime isolation, and
-M029 must review the actual corrected head.
+M020–M027 implementation/evidence remains retained, but no final subsystem
+closure is currently controlling. The post-M027 merge that revived M019 is
+historical and superseded. M028 has restored strict AddressBook feature/runtime
+isolation; M029 must independently review the actual corrected head.
 
 The expected bounded final status remains `partial Proposal 170 support` while
 26 RouterInfo selectors lack bounded authoritative sources and missing tunnel
@@ -69,8 +69,8 @@ password = "your-secure-password"
 - Existing configurations without `[i2pcontrol]` remain valid.
 - Authentication, token placement, secret persistence, and response redaction
   were corrected in M020/M021 and remain retained evidence.
-- Disabled/default AddressBook isolation is under M028 correction and must not
-  be treated as closed before M029.
+- Disabled/default AddressBook isolation is corrected by M028 and remains
+  pending independent M029 review.
 
 ## HTTPS certificate behavior
 
@@ -168,8 +168,8 @@ M028 does not reopen these areas except for the AddressBook activation boundary.
 | Milestone | Status | Scope |
 |---|---|---|
 | M020–M027 | retained evidence | base/wire/persistence/source corrections and literal review |
-| M028 | ready | restore status chronology and isolate AddressBook control state behind compile-time/runtime enablement |
-| M029 | blocked | independent final-head conformance review |
+| M028 | closed for implementation | status chronology and AddressBook control-state isolation |
+| M029 | ready | independent final-head conformance review |
 
 ## Support dimensions
 
@@ -206,7 +206,7 @@ runtime resource.
 
 ## AddressBook enabled/disabled boundary
 
-Target behavior owned by M028:
+M028 implementation evidence now covers:
 
 - without the compile-time feature, Proposal 170 control state is absent;
 - with the feature compiled but runtime-disabled, control state is not read or
@@ -217,8 +217,8 @@ Target behavior owned by M028:
 - ordinary legacy address files and downloads remain authoritative while the
   control plane is inactive.
 
-The current baseline does not yet satisfy this boundary; that is why status is
-`corrective pass required`.
+The subsystem remains `corrective pass required` until M029 independently
+reviews this corrected implementation head.
 
 ## No frontend controls
 

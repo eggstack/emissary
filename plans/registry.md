@@ -27,36 +27,42 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M028 ready | M027 final status invalidated by post-merge chronology regression and AddressBook feature-boundary leak |
+| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M029 ready | M028 closed; independent final-head review remains |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M028 — Post-M027 status and AddressBook feature isolation | ready | `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md` | none |
+| I2PControl Proposal 170 | M029 — In-scope Proposal 170 conformance reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md` | M028 closed with frozen implementation/test head |
 
 ## Registered successor handoffs
 
 | Subsystem | Handoff | Status | Implementation plan | Hard dependency |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M029 — In-scope Proposal 170 conformance reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md` | M028 closed with frozen implementation/test head |
+| — | None | — | — | — |
 
 ## Active closure work
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| — | None | — | — | M029 remains blocked until M028 closes |
+| I2PControl Proposal 170 | M029 final-head reclosure | ready | M028 closure records and frozen implementation/test head | independent review pending |
+
+## Recently closed milestones
+
+| Subsystem | Handoff | Status | Evidence |
+|---|---|---|---|
+| I2PControl Proposal 170 | M028 — Post-M027 status and AddressBook feature isolation | closed | `plans/closure/i2pcontrol-proposal-170/028-closure.md` |
 
 ## Current corrective findings
 
 | Finding | Severity | Owner | State |
 |---|---|---|---|
-| Post-M027 merge revived superseded M019 as controlling closure | high claim/governance defect | M028 | ready |
-| Top-level support documents overstate closed status while M027 records partial support | high claim defect | M028 | ready |
-| Proposal 170 AddressBook control owner is constructed without compile-time/runtime enablement isolation | medium compatibility/scope defect | M028 | ready |
-| Disabled/default address-book execution can read, publish, and persist `control-state.json` | medium behavior defect | M028 | ready |
-| `serde_json` became unconditional for the CLI after the control-state bridge | low/medium dependency-footprint defect | M028 | ready |
-| Final-head independent review after correction | high evidence gate | M029 | blocked on M028 |
+| Post-M027 merge revived superseded M019 as controlling closure | high claim/governance defect | M028 | resolved; M029 review |
+| Top-level support documents overstate closed status while M027 records partial support | high claim defect | M028 | resolved; M029 review |
+| Proposal 170 AddressBook control owner is constructed without compile-time/runtime enablement isolation | medium compatibility/scope defect | M028 | resolved; M029 review |
+| Disabled/default address-book execution can read, publish, and persist `control-state.json` | medium behavior defect | M028 | resolved; M029 review |
+| `serde_json` became unconditional for the CLI after the control-state bridge | low/medium dependency-footprint defect | M028 | resolved; M029 review |
+| Final-head independent review after correction | high evidence gate | M029 | ready |
 
 Authoritative invalidation:
 

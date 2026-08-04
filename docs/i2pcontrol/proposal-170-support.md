@@ -14,12 +14,13 @@ Current roadmap:
 
 Current handoffs:
 
-- M028 ready: `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
-- M029 blocked: `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
+- M028 closed for implementation: `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
+- M029 ready: `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained corrective
-evidence, but M027's final disposition is invalidated pending the M028
-feature-isolation correction and M029 final-head review.
+evidence, but M027's final disposition is invalidated pending M029's final-head
+review. M028's implementation disposition and closure record contain the
+feature-isolation correction evidence.
 
 ## Status model
 
@@ -40,18 +41,14 @@ implementation.
 
 ## Current overall disposition
 
-The repository is not currently closed because:
+The repository is not currently finally closed because:
 
-1. the post-M027 merge restored superseded M019 status language; and
-2. the Proposal 170 AddressBook control owner is currently constructed and used
-   by normal address-book execution even when the service is not runtime-enabled.
+1. M027's final disposition was invalidated by the post-M027 chronology and
+   AddressBook boundary findings; and
+2. M029 must independently review the corrected M028 head.
 
-The second issue allows default/disabled execution to consult and persist
-`addressbook/control-state.json`, and it made `serde_json` unconditional in the
-CLI dependency set.
-
-M028 owns only this status/feature-boundary correction. M029 will perform the
-independent final-head review.
+M028 owns and implements the status/feature-boundary correction. M029 will
+perform the independent final-head review.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because 26 of the 43 RouterInfo additions lack
@@ -133,16 +130,16 @@ Retained enabled-mode status: M022 established one runtime/durable authority for
 private, local, router, and published books, subscription/config metadata, and
 normal lookup publication.
 
-Current reopened defect:
+M028-corrected defect:
 
-- the control owner is not isolated from no-feature and runtime-disabled
+- the control owner had not been isolated from no-feature and runtime-disabled
   execution;
-- normal startup may read retained control state and rebuild legacy lookup from
-  it;
-- normal downloads may update control state even when no I2PControl service is
-  active.
+- normal startup could read retained control state and rebuild legacy lookup
+  from it;
+- normal downloads could update control state even when no I2PControl service
+  was active.
 
-M028 target:
+M028 result:
 
 - no-feature and runtime-disabled execution use legacy address files only and
   do not touch control state;
@@ -150,8 +147,8 @@ M028 target:
 - disabling preserves but ignores control-state files;
 - re-enabling restores them;
 - no second authority or schema migration is introduced;
-- `serde_json` returns to feature ownership if no independent unconditional
-  consumer requires it.
+- `serde_json` returned to feature ownership because no independent
+  unconditional consumer requires it.
 
 ## ClientServicesInfo
 
@@ -206,8 +203,8 @@ be influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | Milestone | Status | Scope |
 |---|---|---|
 | M020–M027 | retained evidence | base/wire/persistence/source corrections and literal review |
-| M028 | ready | post-M027 status repair and AddressBook compile/runtime feature isolation |
-| M029 | blocked on M028 | independent final-head in-scope conformance review |
+| M028 | closed for implementation | post-M027 status repair and AddressBook compile/runtime feature isolation |
+| M029 | ready | independent final-head in-scope conformance review |
 
 ## Final-status rule
 

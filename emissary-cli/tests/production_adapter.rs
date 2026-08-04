@@ -171,7 +171,7 @@ fn production_control_plane_identity_and_uptime() {
 async fn production_address_book_control_crud() {
     let dir = tempfile::tempdir().unwrap();
     let base = dir.keep();
-    let manager = emissary_cli::address_book::AddressBookManager::new(
+    let manager = emissary_cli::address_book::AddressBookManager::new_with_control_owner(
         base.clone(),
         emissary_cli::config::AddressBookConfig {
             default: None,
@@ -179,7 +179,10 @@ async fn production_address_book_control_crud() {
         },
     )
     .await;
-    let ab = ProductionAddressBookControl::new(manager.handle(), base.join("addressbooks"));
+    let ab = ProductionAddressBookControl::new(
+        manager.control_handle().unwrap(),
+        base.join("addressbooks"),
+    );
     ab.load().await.unwrap();
 
     use emissary_cli::i2pcontrol::{
@@ -221,7 +224,7 @@ async fn production_address_book_persistence_round_trip() {
     let dir = tempfile::tempdir().unwrap();
     let base = dir.path().to_path_buf();
     {
-        let manager = emissary_cli::address_book::AddressBookManager::new(
+        let manager = emissary_cli::address_book::AddressBookManager::new_with_control_owner(
             base.clone(),
             emissary_cli::config::AddressBookConfig {
                 default: None,
@@ -229,7 +232,10 @@ async fn production_address_book_persistence_round_trip() {
             },
         )
         .await;
-        let ab = ProductionAddressBookControl::new(manager.handle(), base.join("addressbooks"));
+        let ab = ProductionAddressBookControl::new(
+            manager.control_handle().unwrap(),
+            base.join("addressbooks"),
+        );
         ab.load().await.unwrap();
         use emissary_cli::i2pcontrol::{
             control_plane::AddressBookControl,
@@ -249,7 +255,7 @@ async fn production_address_book_persistence_round_trip() {
         .unwrap();
     }
     {
-        let manager = emissary_cli::address_book::AddressBookManager::new(
+        let manager = emissary_cli::address_book::AddressBookManager::new_with_control_owner(
             base.clone(),
             emissary_cli::config::AddressBookConfig {
                 default: None,
@@ -257,7 +263,10 @@ async fn production_address_book_persistence_round_trip() {
             },
         )
         .await;
-        let ab = ProductionAddressBookControl::new(manager.handle(), base.join("addressbooks"));
+        let ab = ProductionAddressBookControl::new(
+            manager.control_handle().unwrap(),
+            base.join("addressbooks"),
+        );
         ab.load().await.unwrap();
         use emissary_cli::i2pcontrol::{
             control_plane::AddressBookControl, domain::address_book::AdministrativeAddressBookType,

@@ -35,16 +35,19 @@ use reqwest::{
 };
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     future::Future,
-    path::PathBuf,
+    path::{Path, PathBuf},
     pin::Pin,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
     time::Duration,
 };
+
+#[cfg(feature = "i2pcontrol")]
+use std::collections::BTreeMap;
+
+#[cfg(feature = "i2pcontrol")]
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Logging target for the file
 const LOG_TARGET: &str = "emissary::address-book";
@@ -56,6 +59,7 @@ const RETRY_BACKOFF: Duration = Duration::from_secs(30);
 const SUBSCRIPTION_NUM_RETRIES: usize = 5usize;
 
 /// Administrative address-book source selected by Proposal 170.
+#[cfg(feature = "i2pcontrol")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeAddressBookType {
     /// Private entries.
@@ -69,6 +73,7 @@ pub enum RuntimeAddressBookType {
 }
 
 /// A bounded entry owned by the runtime address-book authority.
+#[cfg(feature = "i2pcontrol")]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RuntimeAddressBookEntry {
     /// Hostname used for lookup.
@@ -78,6 +83,7 @@ pub struct RuntimeAddressBookEntry {
 }
 
 /// Complete runtime address-book state exchanged with the I2PControl adapter.
+#[cfg(feature = "i2pcontrol")]
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RuntimeAddressBookSnapshot {
     /// Private entries.
@@ -94,6 +100,7 @@ pub struct RuntimeAddressBookSnapshot {
     pub configuration: BTreeMap<String, String>,
 }
 
+#[cfg(feature = "i2pcontrol")]
 impl RuntimeAddressBookSnapshot {
     fn book(
         &self,
@@ -121,6 +128,7 @@ impl RuntimeAddressBookSnapshot {
 }
 
 /// Runtime address-book owner shared by the router and I2PControl.
+#[cfg(feature = "i2pcontrol")]
 struct RuntimeAddressBookOwner {
     path: PathBuf,
     addresses: Arc<RwLock<HashMap<String, String>>>,
@@ -131,6 +139,7 @@ struct RuntimeAddressBookOwner {
     initialization_error: Option<String>,
 }
 
+#[cfg(feature = "i2pcontrol")]
 impl RuntimeAddressBookOwner {
     async fn new(
         path: PathBuf,
@@ -378,6 +387,7 @@ impl RuntimeAddressBookOwner {
     }
 }
 
+#[cfg(feature = "i2pcontrol")]
 fn base32_for_destination(destination: &str) -> String {
     base64_decode(destination)
         .and_then(|decoded| Destination::parse(&decoded).ok())
@@ -450,18 +460,90 @@ pub struct AddressBookManager {
     /// Additional subscriptions.
     subscriptions: Vec<String>,
 
-    /// Shared runtime authority used by the router and I2PControl.
-    owner: Arc<RuntimeAddressBookOwner>,
+    /// Optional Proposal 170 authority. It is constructed only by the
+    /// runtime-enabled I2PControl composition path.
+    #[cfg(feature = "i2pcontrol")]
+    owner: Option<Arc<RuntimeAddressBookOwner>>,
 }
 
 impl AddressBookManager {
     /// Create new [`AddressBookManager`].
     pub async fn new(base_path: PathBuf, config: AddressBookConfig) -> Self {
+        #[cfg(feature = "i2pcontrol")]
+        return Self::new_with_owner(base_path, config, None).await;
+
+        #[cfg(not(feature = "i2pcontrol"))]
+        Self::new_with_owner(base_path, config).await
+    }
+
+    /// Create an address book with its Proposal 170 authority active.
+    #[cfg(feature = "i2pcontrol")]
+    pub async fn new_with_control_owner(base_path: PathBuf, config: AddressBookConfig) -> Self {
+        let path = base_path.join("addressbook");
+        let (addresses, serialized) = Self::load_legacy_state(&path).await;
+        let addresses = Arc::new(RwLock::new(addresses));
+        let serialized = Arc::new(RwLock::new(serialized));
+        let subscriptions = config.subscriptions.unwrap_or_default();
+        let owner = RuntimeAddressBookOwner::new(
+            path.clone(),
+            Arc::clone(&addresses),
+            Arc::clone(&serialized),
+            subscriptions.clone(),
+        )
+        .await;
+
+        Self {
+            address_book_path: path,
+            addresses,
+            hosts_url: config.default,
+            serialized,
+            subscriptions,
+            owner: Some(owner),
+        }
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    async fn new_with_owner(
+        base_path: PathBuf,
+        config: AddressBookConfig,
+        owner: Option<Arc<RuntimeAddressBookOwner>>,
+    ) -> Self {
         let path = base_path.join("addressbook");
 
         // load (hostname, base32 address) mappings from disk
-        let (addresses, serialized) = match tokio::fs::read_to_string(path.join("addresses")).await
-        {
+        let (addresses, serialized) = Self::load_legacy_state(&path).await;
+
+        let addresses = Arc::new(RwLock::new(addresses));
+        let serialized = Arc::new(RwLock::new(serialized));
+        let subscriptions = config.subscriptions.unwrap_or_default();
+
+        Self {
+            address_book_path: path,
+            addresses,
+            hosts_url: config.default,
+            serialized,
+            subscriptions,
+            owner,
+        }
+    }
+
+    #[cfg(not(feature = "i2pcontrol"))]
+    async fn new_with_owner(base_path: PathBuf, config: AddressBookConfig) -> Self {
+        let path = base_path.join("addressbook");
+        let (addresses, serialized) = Self::load_legacy_state(&path).await;
+        let addresses = Arc::new(RwLock::new(addresses));
+        let serialized = Arc::new(RwLock::new(serialized));
+        Self {
+            address_book_path: path,
+            addresses,
+            hosts_url: config.default,
+            serialized,
+            subscriptions: config.subscriptions.unwrap_or_default(),
+        }
+    }
+
+    async fn load_legacy_state(path: &Path) -> (HashMap<String, String>, String) {
+        match tokio::fs::read_to_string(path.join("addresses")).await {
             Err(error) => {
                 tracing::warn!(
                     target: LOG_TARGET,
@@ -481,26 +563,6 @@ impl AddressBookManager {
                     .collect(),
                 content,
             ),
-        };
-
-        let addresses = Arc::new(RwLock::new(addresses));
-        let serialized = Arc::new(RwLock::new(serialized));
-        let subscriptions = config.subscriptions.unwrap_or_default();
-        let owner = RuntimeAddressBookOwner::new(
-            path.clone(),
-            Arc::clone(&addresses),
-            Arc::clone(&serialized),
-            subscriptions.clone(),
-        )
-        .await;
-
-        Self {
-            address_book_path: path,
-            addresses,
-            hosts_url: config.default,
-            serialized,
-            subscriptions,
-            owner,
         }
     }
 
@@ -510,7 +572,18 @@ impl AddressBookManager {
             address_book_path: Arc::from(self.address_book_path.to_str().expect("to succeed")),
             addresses: Arc::clone(&self.addresses),
             serialized: Arc::clone(&self.serialized),
-            owner: Arc::clone(&self.owner),
+            #[cfg(feature = "i2pcontrol")]
+            owner: self.owner.as_ref().map(Arc::clone),
+        })
+    }
+
+    /// Get the dedicated Proposal 170 control handle, if runtime control is active.
+    #[cfg(feature = "i2pcontrol")]
+    pub fn control_handle(&self) -> Option<Arc<RuntimeAddressBookHandle>> {
+        self.owner.as_ref().map(|owner| {
+            Arc::new(RuntimeAddressBookHandle {
+                owner: Arc::clone(owner),
+            })
         })
     }
 
@@ -826,6 +899,7 @@ impl AddressBookManager {
     /// addresses along with their hostnames into a file and stores all .Base64-encoded destinations
     /// into a separate directory where each destination is indexed by their hostname.
     async fn save_to_disk(&self, addresses: HashMap<String, (String, String)>) {
+        #[cfg(feature = "i2pcontrol")]
         let persisted_addresses = addresses.clone();
         let (addresses, destinations): (HashMap<_, _>, HashMap<_, _>) = addresses
             .into_iter()
@@ -888,7 +962,10 @@ impl AddressBookManager {
                 },
         }
 
-        self.owner.merge_downloaded(persisted_addresses).await;
+        #[cfg(feature = "i2pcontrol")]
+        if let Some(owner) = &self.owner {
+            owner.merge_downloaded(persisted_addresses).await;
+        }
     }
 }
 
@@ -905,19 +982,26 @@ pub struct AddressBookHandle {
     #[allow(dead_code)]
     serialized: Arc<RwLock<String>>,
 
-    /// Shared runtime owner and durable state.
+    /// Read-only runtime lookup state, present only while I2PControl is active.
+    #[cfg(feature = "i2pcontrol")]
+    owner: Option<Arc<RuntimeAddressBookOwner>>,
+}
+
+/// Dedicated Proposal 170 mutation and administrative-state handle.
+#[cfg(feature = "i2pcontrol")]
+#[derive(Clone)]
+pub struct RuntimeAddressBookHandle {
     owner: Arc<RuntimeAddressBookOwner>,
 }
 
-impl AddressBookHandle {
-    /// Return a sanitized initialization failure, if the newest runtime state
-    /// and its rollback copy were both unusable.
+#[cfg(feature = "i2pcontrol")]
+impl RuntimeAddressBookHandle {
+    /// Return a sanitized initialization failure, if both state generations are unusable.
     pub fn runtime_initialization_error(&self) -> Option<String> {
         self.owner.initialization_error()
     }
 
-    /// Whether a runtime-owned control state already exists. Legacy
-    /// administrative generations must not be re-imported after this point.
+    /// Whether a runtime-owned control state already exists.
     pub fn runtime_authority_present(&self) -> bool {
         self.owner.authority_present()
     }
@@ -1048,15 +1132,17 @@ impl AddressBookHandle {
             .await
     }
 
-    /// Import the old administrative generation store once, before it can
-    /// become a second authority.
+    /// Import the old administrative generation store once, before it can become a second
+    /// authority.
     pub async fn import_legacy_runtime_state(
         &self,
         snapshot: RuntimeAddressBookSnapshot,
     ) -> Result<(), String> {
         self.owner.import_legacy(snapshot).await
     }
+}
 
+impl AddressBookHandle {
     /// Add new host to address book.
     ///
     /// Only the base32 address of the host is stored on disk.
@@ -1081,10 +1167,13 @@ impl AddressBookHandle {
                 );
             }
         }
-        self.owner.legacy_publish_sync(RuntimeAddressBookEntry {
-            hostname: host,
-            destination: address,
-        });
+        #[cfg(feature = "i2pcontrol")]
+        if let Some(owner) = &self.owner {
+            owner.legacy_publish_sync(RuntimeAddressBookEntry {
+                hostname: host,
+                destination: address,
+            });
+        }
     }
 
     /// Add new host to address book.
@@ -1125,10 +1214,13 @@ impl AddressBookHandle {
                 "failed to write base64-encoded destination on disk",
             );
         }
-        self.owner.legacy_publish_sync(RuntimeAddressBookEntry {
-            hostname: host,
-            destination: base64_encode(destination.serialize()),
-        });
+        #[cfg(feature = "i2pcontrol")]
+        if let Some(owner) = &self.owner {
+            owner.legacy_publish_sync(RuntimeAddressBookEntry {
+                hostname: host,
+                destination: base64_encode(destination.serialize()),
+            });
+        }
     }
 
     /// Remove `host` from address book.
@@ -1169,14 +1261,18 @@ impl AddressBookHandle {
                 "failed to remove destination for host",
             );
         }
-        self.owner.legacy_remove_sync(host);
+        #[cfg(feature = "i2pcontrol")]
+        if let Some(owner) = &self.owner {
+            owner.legacy_remove_sync(host);
+        }
     }
 }
 
 impl AddressBook for AddressBookHandle {
     fn resolve_base64(&self, host: String) -> Pin<Box<dyn Future<Output = Option<String>> + Send>> {
         let path = Arc::clone(&self.address_book_path);
-        let owner = Arc::clone(&self.owner);
+        #[cfg(feature = "i2pcontrol")]
+        let owner = self.owner.as_ref().map(Arc::clone);
 
         Box::pin(async move {
             if let Ok(destination) =
@@ -1184,14 +1280,18 @@ impl AddressBook for AddressBookHandle {
             {
                 return Some(destination);
             }
-            let state = owner.state.read();
-            state
-                .private
-                .get(&host)
-                .or_else(|| state.local.get(&host))
-                .or_else(|| state.router.get(&host))
-                .or_else(|| state.published.get(&host))
-                .map(|entry| entry.destination.clone())
+            #[cfg(feature = "i2pcontrol")]
+            if let Some(owner) = owner {
+                let state = owner.state.read();
+                return state
+                    .private
+                    .get(&host)
+                    .or_else(|| state.local.get(&host))
+                    .or_else(|| state.router.get(&host))
+                    .or_else(|| state.published.get(&host))
+                    .map(|entry| entry.destination.clone());
+            }
+            None
         })
     }
 
@@ -2023,6 +2123,7 @@ mod tests {
         assert_eq!(loaded, saved);
     }
 
+    #[cfg(feature = "i2pcontrol")]
     #[tokio::test]
     async fn runtime_control_mutation_is_visible_and_restart_safe() {
         use emissary_core::crypto::SigningPrivateKey;
@@ -2039,7 +2140,7 @@ mod tests {
         let expected_base32 = base32_encode(
             Destination::parse(base64_decode(&destination).unwrap()).unwrap().id().to_vec(),
         );
-        let manager = AddressBookManager::new(
+        let manager = AddressBookManager::new_with_control_owner(
             dir.clone(),
             AddressBookConfig {
                 default: None,
@@ -2048,7 +2149,8 @@ mod tests {
         )
         .await;
         let handle = manager.handle();
-        handle
+        let control = manager.control_handle().unwrap();
+        control
             .runtime_add(
                 RuntimeAddressBookType::Private,
                 RuntimeAddressBookEntry {
@@ -2060,7 +2162,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            handle.runtime_list(RuntimeAddressBookType::Private).await.unwrap().len(),
+            control.runtime_list(RuntimeAddressBookType::Private).await.unwrap().len(),
             1
         );
         assert_eq!(
@@ -2070,7 +2172,7 @@ mod tests {
         assert_eq!(handle.resolve_base32("runtime.i2p"), Some(expected_base32));
 
         drop(manager);
-        let manager = AddressBookManager::new(
+        let manager = AddressBookManager::new_with_control_owner(
             dir,
             AddressBookConfig {
                 default: None,
@@ -2079,19 +2181,21 @@ mod tests {
         )
         .await;
         let handle = manager.handle();
+        let control = manager.control_handle().unwrap();
         assert!(handle.resolve_base32("runtime.i2p").is_some());
         assert!(handle.resolve_base64("runtime.i2p".to_string()).await.is_some());
-        handle
+        control
             .runtime_delete(RuntimeAddressBookType::Private, "runtime.i2p")
             .await
             .unwrap();
         assert!(handle.resolve_base32("runtime.i2p").is_none());
     }
 
+    #[cfg(feature = "i2pcontrol")]
     #[tokio::test]
     async fn runtime_owner_rejects_persistence_failure_without_runtime_change() {
         let dir = tempdir().unwrap().keep();
-        let manager = AddressBookManager::new(
+        let manager = AddressBookManager::new_with_control_owner(
             dir.clone(),
             AddressBookConfig {
                 default: None,
@@ -2100,7 +2204,8 @@ mod tests {
         )
         .await;
         let handle = manager.handle();
-        handle
+        let control = manager.control_handle().unwrap();
+        control
             .runtime_add(
                 RuntimeAddressBookType::Private,
                 RuntimeAddressBookEntry {
@@ -2114,7 +2219,7 @@ mod tests {
         let state_path = dir.join("addressbook/control-state.json");
         tokio::fs::remove_file(&state_path).await.unwrap();
         tokio::fs::create_dir(&state_path).await.unwrap();
-        let result = handle
+        let result = control
             .runtime_update(
                 RuntimeAddressBookType::Private,
                 RuntimeAddressBookEntry {
@@ -2128,5 +2233,119 @@ mod tests {
             handle.resolve_base64("stable.i2p".to_string()).await,
             Some("stable-destination".to_string())
         );
+    }
+
+    #[tokio::test]
+    async fn inactive_address_book_ignores_and_preserves_control_state() {
+        let dir = tempdir().unwrap().keep();
+        let addressbook = dir.join("addressbook");
+        tokio::fs::create_dir_all(&addressbook).await.unwrap();
+        let control_state = addressbook.join("control-state.json");
+        let stale_state = br#"{"private":{"stale.i2p":{"hostname":"stale.i2p","destination":"stale-destination"}},"local":{},"router":{},"published":{},"subscriptions":[],"configuration":{}}"#;
+        tokio::fs::write(&control_state, stale_state).await.unwrap();
+
+        let manager = AddressBookManager::new(
+            dir.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let handle = manager.handle();
+
+        assert!(handle.resolve_base32("stale.i2p").is_none());
+        assert_eq!(handle.resolve_base64("stale.i2p".to_string()).await, None);
+
+        let downloaded = HashMap::from_iter([(
+            "legacy.i2p".to_string(),
+            (
+                "legacy-base32".to_string(),
+                "legacy-destination".to_string(),
+            ),
+        )]);
+        manager.save_to_disk(downloaded).await;
+
+        assert_eq!(tokio::fs::read(&control_state).await.unwrap(), stale_state);
+        assert!(!addressbook.join(".control-state.json.tmp").exists());
+        assert_eq!(
+            handle.resolve_base32("legacy.i2p"),
+            Some("legacy-base32".to_string())
+        );
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    #[tokio::test]
+    async fn control_state_survives_disable_and_restores_on_reenable() {
+        let dir = tempdir().unwrap().keep();
+        let manager = AddressBookManager::new_with_control_owner(
+            dir.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+        control
+            .runtime_add(
+                RuntimeAddressBookType::Private,
+                RuntimeAddressBookEntry {
+                    hostname: "retained.i2p".to_string(),
+                    destination: "retained-destination".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+        let state_path = dir.join("addressbook/control-state.json");
+        let retained = tokio::fs::read(&state_path).await.unwrap();
+        drop(manager);
+
+        let disabled = AddressBookManager::new(
+            dir.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let disabled_handle = disabled.handle();
+        assert!(disabled_handle.resolve_base32("retained.i2p").is_none());
+        assert_eq!(tokio::fs::read(&state_path).await.unwrap(), retained);
+        drop(disabled);
+
+        let enabled = AddressBookManager::new_with_control_owner(
+            dir,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let enabled_handle = enabled.handle();
+        let enabled_control = enabled.control_handle().unwrap();
+        assert_eq!(
+            enabled_control
+                .runtime_lookup(RuntimeAddressBookType::Private, "retained.i2p")
+                .await
+                .unwrap()
+                .unwrap()
+                .destination,
+            "retained-destination"
+        );
+        assert_eq!(
+            enabled_handle.resolve_base64("retained.i2p".to_string()).await,
+            Some("retained-destination".to_string())
+        );
+    }
+
+    #[test]
+    fn serde_json_is_feature_owned() {
+        let manifest =
+            std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml")).unwrap();
+        assert!(manifest.contains("serde_json = { version = \"1.0.140\", optional = true }"));
+        assert!(manifest
+            .lines()
+            .any(|line| line.starts_with("i2pcontrol = [") && line.contains("\"serde_json\"")));
     }
 }

@@ -52,8 +52,8 @@ It also must not add RouterInfo telemetry, polling, peer classifications, NetDB 
 
 | Handoff | Status | Plan | Dependency |
 |---|---|---|---|
-| M028 — Post-M027 status and AddressBook feature isolation | ready | `028-post-m027-status-and-addressbook-feature-isolation.md` | none |
-| M029 — In-scope Proposal 170 conformance reclosure | blocked | `029-in-scope-conformance-reclosure.md` | M028 closed with frozen head |
+| M028 — Post-M027 status and AddressBook feature isolation | closed | `028-post-m027-status-and-addressbook-feature-isolation.md` | closure records accepted |
+| M029 — In-scope Proposal 170 conformance reclosure | ready | `029-in-scope-conformance-reclosure.md` | M028 closed with frozen head |
 
 ## Execution order
 
@@ -64,7 +64,8 @@ M028 status and AddressBook feature-isolation corrective pass
 M029 independent final-head reclosure
 ```
 
-Only M028 is dependency-ready.
+M029 is now dependency-ready; M028's closure records freeze the implementation
+and test head for independent review.
 
 ## Retained history
 
@@ -95,8 +96,8 @@ Missing tunnel types remain explicit unsupported runtimes under ADR-0001.
 - M019 is superseded and non-executable; the post-M027 merge that revived it does not make it controlling.
 - M020–M027 contain the retained corrective implementation and evidence.
 - M027's final subsystem disposition is invalidated by `027-closure-invalidation.md` because the AddressBook feature boundary and post-merge status state require correction.
-- M028 owns the implementation correction.
-- M029 will be the controlling final-head review if accepted.
+- M028 owns and has completed the implementation correction.
+- M029 is the dependency-ready controlling final-head review handoff.
 
 Historical files are retained for traceability and must not be rewritten into current authority.
 

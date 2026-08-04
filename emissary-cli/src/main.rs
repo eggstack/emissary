@@ -247,16 +247,23 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
     let router_config = config.config.take().expect("to exist");
     let base_path = config.base_path.clone();
 
-    let address_book_config = config.address_book.take().or_else(|| {
+    #[cfg(feature = "i2pcontrol")]
+    let i2pcontrol_enabled = router_config.i2pcontrol.as_ref().is_some_and(|config| config.enabled);
+
+    let default_address_book_config = {
         #[cfg(feature = "i2pcontrol")]
-        if router_config.i2pcontrol.as_ref().is_some_and(|config| config.enabled) {
-            return Some(crate::config::AddressBookConfig {
+        {
+            i2pcontrol_enabled.then_some(crate::config::AddressBookConfig {
                 default: None,
                 subscriptions: None,
-            });
+            })
         }
-        None
-    });
+        #[cfg(not(feature = "i2pcontrol"))]
+        {
+            None
+        }
+    };
+    let address_book_config = config.address_book.take().or(default_address_book_config);
 
     let (router, events, local_router_info, address_book_manager) = match address_book_config {
         None => Router::<TokioRuntime>::new(config.into(), None, Some(Arc::new(storage)))
@@ -265,6 +272,17 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
 
         Some(address_book_config) => {
             // create address book, allocate address book handle and pass it to `Router`
+            #[cfg(feature = "i2pcontrol")]
+            let address_book_manager = if i2pcontrol_enabled {
+                AddressBookManager::new_with_control_owner(
+                    config.base_path.clone(),
+                    address_book_config,
+                )
+                .await
+            } else {
+                AddressBookManager::new(config.base_path.clone(), address_book_config).await
+            };
+            #[cfg(not(feature = "i2pcontrol"))]
             let address_book_manager =
                 AddressBookManager::new(config.base_path.clone(), address_book_config).await;
             let address_book_handle = address_book_manager.handle();
@@ -284,10 +302,10 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
 
     #[cfg(feature = "i2pcontrol")]
     let address_book_handle_for_control =
-        address_book_manager.as_ref().map(|manager| manager.handle());
+        address_book_manager.as_ref().and_then(|manager| manager.control_handle());
 
     #[cfg(feature = "i2pcontrol")]
-    if router_config.i2pcontrol.as_ref().is_some_and(|config| config.enabled) {
+    if i2pcontrol_enabled {
         let handle = address_book_handle_for_control
             .as_ref()
             .expect("I2PControl address book is composed with the router");

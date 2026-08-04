@@ -1,6 +1,6 @@
 # M028 — Post-M027 Status and AddressBook Feature-Isolation Corrective Pass
 
-Status: ready
+Status: closed
 
 Source roadmap:
 

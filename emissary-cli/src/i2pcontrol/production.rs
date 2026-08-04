@@ -35,7 +35,7 @@ use async_trait::async_trait;
 
 use crate::{
     address_book::{
-        AddressBookHandle, RuntimeAddressBookEntry, RuntimeAddressBookSnapshot,
+        RuntimeAddressBookEntry, RuntimeAddressBookHandle, RuntimeAddressBookSnapshot,
         RuntimeAddressBookType,
     },
     i2pcontrol::{
@@ -349,13 +349,13 @@ impl ControlPlane for ProductionControlPlane {
 /// [`AddressBookHandle`]. The old I2PControl generation store is accepted only
 /// as one-time migration input and is never retained as a second authority.
 pub struct ProductionAddressBookControl {
-    runtime: Arc<AddressBookHandle>,
+    runtime: Arc<RuntimeAddressBookHandle>,
     legacy_dir: PathBuf,
 }
 
 impl ProductionAddressBookControl {
     /// Create a production adapter for the already-composed runtime owner.
-    pub fn new(runtime: Arc<AddressBookHandle>, legacy_dir: PathBuf) -> Self {
+    pub fn new(runtime: Arc<RuntimeAddressBookHandle>, legacy_dir: PathBuf) -> Self {
         Self {
             runtime,
             legacy_dir,
@@ -1049,7 +1049,7 @@ mod tests {
             .await
             .unwrap();
 
-        let manager = AddressBookManager::new(
+        let manager = AddressBookManager::new_with_control_owner(
             base.clone(),
             AddressBookConfig {
                 default: None,
@@ -1057,17 +1057,17 @@ mod tests {
             },
         )
         .await;
-        let runtime = manager.handle();
-        let adapter = ProductionAddressBookControl::new(runtime.clone(), legacy_dir.clone());
+        let control = manager.control_handle().unwrap();
+        let adapter = ProductionAddressBookControl::new(control.clone(), legacy_dir.clone());
         adapter.load().await.unwrap();
         assert_eq!(
-            runtime.runtime_list(RuntimeAddressBookType::Private).await.unwrap()[0].hostname,
+            control.runtime_list(RuntimeAddressBookType::Private).await.unwrap()[0].hostname,
             "legacy.i2p"
         );
-        assert!(runtime.runtime_authority_present());
+        assert!(control.runtime_authority_present());
 
         drop(manager);
-        let manager = AddressBookManager::new(
+        let manager = AddressBookManager::new_with_control_owner(
             base,
             AddressBookConfig {
                 default: None,
@@ -1075,13 +1075,13 @@ mod tests {
             },
         )
         .await;
-        let runtime = manager.handle();
-        ProductionAddressBookControl::new(runtime.clone(), legacy_dir)
+        let control = manager.control_handle().unwrap();
+        ProductionAddressBookControl::new(control.clone(), legacy_dir)
             .load()
             .await
             .unwrap();
         assert_eq!(
-            runtime.runtime_list(RuntimeAddressBookType::Private).await.unwrap().len(),
+            control.runtime_list(RuntimeAddressBookType::Private).await.unwrap().len(),
             1
         );
     }
@@ -1107,7 +1107,7 @@ mod tests {
             .await
             .unwrap();
 
-        let manager = AddressBookManager::new(
+        let manager = AddressBookManager::new_with_control_owner(
             base,
             AddressBookConfig {
                 default: None,
@@ -1115,12 +1115,12 @@ mod tests {
             },
         )
         .await;
-        let runtime = manager.handle();
-        let error = ProductionAddressBookControl::new(runtime.clone(), legacy_dir)
+        let control = manager.control_handle().unwrap();
+        let error = ProductionAddressBookControl::new(control.clone(), legacy_dir)
             .load()
             .await
             .unwrap_err();
         assert!(error.contains("collision"));
-        assert!(runtime.runtime_list(RuntimeAddressBookType::Private).await.unwrap().is_empty());
+        assert!(control.runtime_list(RuntimeAddressBookType::Private).await.unwrap().is_empty());
     }
 }

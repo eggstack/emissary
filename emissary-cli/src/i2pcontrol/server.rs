@@ -53,7 +53,7 @@ use super::{
     tls::TlsConfig,
 };
 
-use crate::address_book::AddressBookHandle;
+use crate::address_book::RuntimeAddressBookHandle;
 
 use emissary_core::{crypto::base64_encode, SamSessionObservationHandle};
 
@@ -624,8 +624,8 @@ pub struct ServerInitContext {
     pub sam_session_observation: Option<SamSessionObservationHandle>,
     /// Whether the core router actually bound the SAM listener.
     pub sam_listener_enabled: bool,
-    /// The runtime address-book owner composed into the router.
-    pub address_book_handle: Option<Arc<AddressBookHandle>>,
+    /// The dedicated Proposal 170 address-book control handle.
+    pub address_book_handle: Option<Arc<RuntimeAddressBookHandle>>,
     /// Startup-configured generic tunnel definitions shared with production
     /// TunnelManager and the existing tunnel managers.
     pub startup_tunnel_inventory: Option<StartupTunnelInventory>,
@@ -700,8 +700,8 @@ impl ServerInitContext {
         self
     }
 
-    /// Inject the real runtime address-book owner.
-    pub fn with_address_book_handle(mut self, handle: Arc<AddressBookHandle>) -> Self {
+    /// Inject the dedicated Proposal 170 address-book control handle.
+    pub fn with_address_book_handle(mut self, handle: Arc<RuntimeAddressBookHandle>) -> Self {
         self.address_book_handle = Some(handle);
         self
     }
@@ -1912,7 +1912,7 @@ mod tests {
                 private_key: None,
             },
         };
-        let manager = crate::address_book::AddressBookManager::new(
+        let manager = crate::address_book::AddressBookManager::new_with_control_owner(
             tmp.path().to_owned(),
             crate::config::AddressBookConfig {
                 default: None,
@@ -1920,8 +1920,8 @@ mod tests {
             },
         )
         .await;
-        let ctx =
-            ServerInitContext::new("id".into(), vec![]).with_address_book_handle(manager.handle());
+        let ctx = ServerInitContext::new("id".into(), vec![])
+            .with_address_book_handle(manager.control_handle().unwrap());
 
         let _ = init_server(&config, tmp.path(), ctx).await.unwrap();
 

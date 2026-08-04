@@ -208,8 +208,8 @@ M028 post-M027 status and AddressBook feature isolation
 M029 independent in-scope conformance reclosure
 ```
 
-M028 is ready. M029 is blocked until M028 closes with a frozen implementation
-and test head.
+M028 is closed for implementation with a frozen implementation and test head.
+M029 is ready for independent review.
 
 ## 8. Milestones
 
@@ -236,7 +236,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 
-Status: ready
+Status: closed
 
 Objective:
 
@@ -263,7 +263,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
 
-Status: blocked on M028
+Status: ready
 
 Objective:
 
@@ -369,8 +369,8 @@ evidence infrastructure.
 | 025 | retained closed evidence | RouterInfo matrix |
 | 026 | retained closed evidence | no feasible additional sources |
 | 027 | final disposition invalidated; evidence retained | literal fixtures and partial-support review |
-| 028 | ready | status and AddressBook feature-isolation corrective pass |
-| 029 | blocked | independent final-head reclosure |
+| 028 | closed | status and AddressBook feature-isolation corrective pass |
+| 029 | ready | independent final-head reclosure |
 
 ## 14. Completion definition
 

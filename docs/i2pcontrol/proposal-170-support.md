@@ -195,8 +195,8 @@ Retained strengths:
 - redacted diagnostics and response filtering;
 - explicit resource-free unsupported backends.
 
-M028 additionally must prove that disabled/default AddressBook execution cannot
-be influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
+M028 additionally proved that disabled/default AddressBook execution cannot be
+influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 
 ## Corrective sequence
 

@@ -35,7 +35,7 @@ cargo build -p emissary-cli --no-default-features --features i2pcontrol
 cargo build -p emissary-cli --all-features
 ```
 
-M028 specifically owns proof that a build without `i2pcontrol`, and a build
+M028 specifically provides proof that a build without `i2pcontrol`, and a build
 where the feature is compiled but runtime configuration is disabled, do not
 read, write, migrate, or consult Proposal 170 AddressBook control state.
 

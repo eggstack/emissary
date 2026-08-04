@@ -27,62 +27,57 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | partial Proposal 170 support | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M029 closed | Exact in-scope dimensions closed; unavailable sources and unsupported runtimes remain |
+| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M030 ready | M029 invalidated by enabled AddressBook destination/lookup owner-coherence defects |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| — | None | — | — | — |
+| I2PControl Proposal 170 | M030 — AddressBook destination and owner coherence | ready | `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md` | none |
 
 ## Registered successor handoffs
 
-| Subsystem | Handoff | Status | Implementation plan | Hard dependency |
+| Subsystem | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|---|
-| — | None | — | — | — |
+| — | None | — | — | A distinct reclosure plan may be registered only after M030 freezes and closes |
 
 ## Active closure work
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| — | None | — | — | — |
-
-## Recently closed milestones
-
-| Subsystem | Handoff | Status | Evidence |
-|---|---|---|---|
-| I2PControl Proposal 170 | M028 — Post-M027 status and AddressBook feature isolation | closed | `plans/closure/i2pcontrol-proposal-170/028-closure.md` |
-| I2PControl Proposal 170 | M029 — In-scope Proposal 170 conformance reclosure | partial Proposal 170 support | `plans/closure/i2pcontrol-proposal-170/029-closure.md` |
+| — | None | — | — | M030 has not landed |
 
 ## Current corrective findings
 
 | Finding | Severity | Owner | State |
 |---|---|---|---|
-| Post-M027 merge revived superseded M019 as controlling closure | high claim/governance defect | M028 | resolved; M029 accepted |
-| Top-level support documents overstate closed status while M027 records partial support | high claim defect | M028 | resolved; M029 accepted |
-| Proposal 170 AddressBook control owner is constructed without compile-time/runtime enablement isolation | medium compatibility/scope defect | M028 | resolved; M029 accepted |
-| Disabled/default address-book execution can read, publish, and persist `control-state.json` | medium behavior defect | M028 | resolved; M029 accepted |
-| `serde_json` became unconditional for the CLI after the control-state bridge | low/medium dependency-footprint defect | M028 | resolved; M029 accepted |
-| Final-head independent review after correction | high evidence gate | M029 | resolved; partial Proposal 170 support accepted |
+| Active Base64 lookup reads a legacy destination file before the active control owner | high owner-coherence defect | M030 | ready |
+| Published control-state seeding copies Base32 cache values as destinations | high source/type defect | M030 | ready |
+| Active download `or_insert` can retain an incomplete Base32-seeded value | medium persistence/source defect | M030 | ready |
+| Update/delete regressions do not check Base64 lookup with a stale legacy file | high evidence defect | M030 | ready |
+| First activation and repair paths lack full-destination structural evidence | medium evidence/security defect | M030 | ready |
+| Independent final-head reclosure after M030 | high evidence gate | future, unregistered | blocked on M030 closure |
 
 Authoritative invalidation:
 
-- `plans/closure/i2pcontrol-proposal-170/027-closure-invalidation.md`
+- `plans/closure/i2pcontrol-proposal-170/029-closure-invalidation.md`
 
 ## Retained corrective evidence
 
-The following implementation work remains retained candidate evidence and must not be reimplemented without a new defect:
+The following work remains retained and must not be reimplemented without a new direct defect:
 
 | Milestone | Retained scope | Current evidence status |
 |---|---|---|
 | M020 | base I2PControl auth/token/errors, JSON-RPC notifications and IDs, base RouterInfo compatibility | retained |
 | M021 | exact TunnelManager wire, validation, atomic persistence, secret boundary | retained |
-| M022 | enabled-mode runtime AddressBook authority | retained but feature-isolation boundary reopened by M028 |
+| M022 | enabled-mode runtime AddressBook authority | retained except destination/lookup coherence reopened by M030 |
 | M023 | startup tunnel inventory and ClientServicesInfo lifecycle/address truthfulness | retained |
 | M024 | recoverable bounded SAM observation | retained |
 | M025 | exact 43-selector RouterInfo contract/source matrix | retained |
 | M026 | bounded-source audit; no feasible additional authoritative sources | retained |
-| M027 | literal fixtures and partial-support disposition | retained evidence; final closure historically invalidated |
+| M027 | literal fixtures and partial-support disposition | retained evidence; final disposition historically invalidated |
+| M028 | compile-time/runtime AddressBook feature isolation and optional dependency ownership | retained |
+| M029 | independent review evidence | historical invalidated closure; non-AddressBook evidence retained |
 
 RouterInfo source classification remains:
 
@@ -90,38 +85,37 @@ RouterInfo source classification remains:
 - 1 protocol-permitted neutral;
 - 26 unavailable.
 
-Missing tunnel data planes remain explicit unsupported runtimes and are not reopened by M028/M029.
+Missing tunnel data planes remain explicit unsupported runtimes and are not reopened by M030.
 
 ## Historical invalidation and supersession
 
 | Subsystem | Record | Status | Document | Disposition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M029 final reclosure | closed; partial Proposal 170 support | `plans/closure/i2pcontrol-proposal-170/029-closure.md` | exact in-scope closure accepted; unavailable sources/runtime remain explicit |
-| I2PControl Proposal 170 | M027 final internal reclosure | invalidated final disposition; evidence retained | `plans/closure/i2pcontrol-proposal-170/027-closure-invalidation.md` | feature-isolation and post-merge status defects require M028/M029 |
-| I2PControl Proposal 170 | M019 closure revived by `03a384a` | superseded/non-controlling | `plans/closure/i2pcontrol-proposal-170/019-closure.md` | historical evidence only; predates M020–M027 correction |
-| I2PControl Proposal 170 | M019 original implementation plan | superseded/non-executable | `plans/implementation/i2pcontrol-proposal-170/019-pinned-revision-independent-reclosure.md` | must not be executed |
-| I2PControl Proposal 170 | M019A final internal closure | invalidated | `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md` | historical evidence retained |
-| I2PControl Proposal 170 | M017 broad closure | invalidated historical closure | `plans/closure/i2pcontrol-proposal-170/017-closure-invalidation.md` | component evidence only |
+| I2PControl Proposal 170 | M029 final reclosure | invalidated final disposition; evidence retained | `plans/closure/i2pcontrol-proposal-170/029-closure-invalidation.md` | active Base64 and published-destination coherence defects require M030 |
+| I2PControl Proposal 170 | M027 final reclosure | invalidated final disposition; evidence retained | `plans/closure/i2pcontrol-proposal-170/027-closure-invalidation.md` | historical |
+| I2PControl Proposal 170 | M019 closure revived by `03a384a` | superseded/non-controlling | `plans/closure/i2pcontrol-proposal-170/019-closure.md` | historical only |
+| I2PControl Proposal 170 | M019A final closure | invalidated | `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md` | historical only |
+| I2PControl Proposal 170 | M017 broad closure | invalidated | `plans/closure/i2pcontrol-proposal-170/017-closure-invalidation.md` | component evidence only |
 
-## Scope guard
+## M030 scope guard
 
-M028/M029 own only Proposal 170 status correctness and the existing AddressBook control-state feature boundary.
+Primary production work should remain in:
 
-Allowed production scope:
+- `emissary-cli/src/i2pcontrol/production.rs`;
+- directly affected `emissary-cli/src/i2pcontrol/**` tests/adapters.
 
-- `emissary-cli/src/address_book.rs`;
-- `emissary-cli/src/main.rs` and `emissary-cli/src/lib.rs` composition only;
-- `emissary-cli/Cargo.toml` optional dependency ownership;
-- directly affected `emissary-cli/src/i2pcontrol/**` adapter files;
-- focused tests and directly affected documentation/planning.
+Permitted changes outside the I2PControl crate are limited to:
+
+- `emissary-cli/src/address_book.rs` for owner-aware lookup precedence, bounded full-destination loading/validation, one purpose-specific import/repair seam, and focused tests;
+- `emissary-cli/src/main.rs` only for one narrow activation input/call if required.
 
 Prohibited:
 
-- implementation of missing HTTP, IRC, SOCKS-IRC, CONNECT, Streamr, bidirectional, or other tunnel data planes;
+- `emissary-core/**` changes;
+- missing HTTP, IRC, SOCKS-IRC, CONNECT, Streamr, bidirectional, or other tunnel data planes;
 - new RouterInfo sources, samplers, polling, peer classifications, NetDB inspection, or fabricated values;
-- router, transport, peer-selection, cryptographic, streaming, LeaseSet, SAM, resolver, downloader-policy, or frontend redesign;
-- generic event buses, task registries, plugin systems, schema frameworks, or second AddressBook authorities;
-- persistence schema migration hidden inside M028;
+- router, transport, streaming, LeaseSet, cryptographic, SAM, frontend, or general resolver redesign;
+- a second AddressBook authority, bidirectional synchronization framework, provenance/tombstone schema, generic migration engine, event bus, or background reconciler;
 - new dependencies without explicit maintainer direction;
 - `.github/workflows/**`, CI, release, packaging, publishing, version, matrix, coverage, fuzz, soak, or generated-evidence machinery;
 - repository-wide formatting;
@@ -138,16 +132,17 @@ Current work is pinned to:
 - canonical page: `https://i2p.net/en/proposals/170-i2pcontrol-expansion/`;
 - existing I2PControl authentication/error documentation: `https://i2p.net/en/docs/api/i2pcontrol`.
 
-A changed proposal revision blocks M029 and requires a new contract-rebase plan.
+A changed proposal revision blocks M030 and requires a contract-rebase plan.
 
 ## Registry maintenance rules
 
-1. M028 is the completed implementation correction and M029 is the accepted controlling closure.
-2. No dependency-ready implementation handoff remains for this workstream.
-3. M019 is superseded and must never again be treated as current closure.
-4. M020–M027 evidence is retained; do not reopen unrelated work.
-5. Disabled/default AddressBook execution must not consult Proposal 170 control state.
-6. Final expected in-scope disposition remains `partial Proposal 170 support` while 26 RouterInfo sources and missing tunnel data planes remain unavailable/unsupported.
-7. Do not count compatibility aliases, unavailable sources, stored definitions, or unsupported stubs as operational coverage.
-8. Verification remains local and package-scoped.
-9. No upstream interaction is authorized.
+1. M030 is the only dependency-ready implementation handoff.
+2. M029 is historical invalidated evidence and must not be represented as controlling closure.
+3. Do not register a reclosure successor until M030 has a frozen implementation/test head and accepted implementation closure.
+4. Preserve M020–M028 unrelated evidence; do not reopen method families without a demonstrated defect.
+5. Active owner lookup must be coherent across administrative, RouterInfo, Base32, and Base64 views.
+6. Published Proposal 170 entries must contain validated full destinations, not Base32 cache values.
+7. Disabled/default behavior and M028 feature isolation must remain unchanged.
+8. Final expected in-scope disposition remains `partial Proposal 170 support` after correction and independent review.
+9. Verification remains local and package-scoped.
+10. No upstream interaction is authorized.

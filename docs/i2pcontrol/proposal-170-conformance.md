@@ -1,156 +1,195 @@
 # Proposal 170 Conformance Matrix
 
-Status: normative inventory for the pinned-revision closure
+Status: corrective pass required; retained matrix pending M029 revalidation
 
-Proposal 170 remains Open and this inventory is pinned to the revision created
-and last updated on 2026-05-20. M017's broad closure is invalidated historical
-evidence; M019 independently accepted the final head against that revision.
+Proposal 170 remains Open. This workstream is pinned to the revision created
+and last updated on `2026-05-20`.
 
-The matrix previously stored in this file was used by the M019A internal
-closure. That closure and matrix are no longer normative because later audit
-found material defects in the base I2PControl contract, method schemas,
-runtime ownership, persistence atomicity, source classification, and fixture
-selection.
+Current invalidation:
 
-Authoritative invalidation:
+- `plans/closure/i2pcontrol-proposal-170/027-closure-invalidation.md`
 
-- `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`
+Current implementation correction:
 
-Corrective roadmap:
+- M028, `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 
-- `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
+Blocked final review:
 
-Matrix rebuild owner:
+- M029, `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
 
-- M025, `plans/implementation/i2pcontrol-proposal-170/025-routerinfo-contract-and-source-reconciliation.md`
+M019 is superseded and non-controlling. M020–M027 remain retained evidence, but
+M027's final subsystem disposition is invalidated until M028 is implemented and
+M029 reviews the actual final head.
 
-Final literal conformance and independent review record:
+## Retained machine-readable matrix
 
-- M027, `plans/implementation/i2pcontrol-proposal-170/027-proposal-170-conformance-and-reclosure.md`
-- Closure: `plans/closure/i2pcontrol-proposal-170/027-closure.md`
+The machine-readable Proposal 170 RouterInfo authority remains:
 
-M027's replacement literal fixture suite is
-`emissary-cli/tests/m027_literal_fixtures.rs`. Compatibility fixtures remain
-in separately named modules and are not included in canonical fixture counts.
+- `emissary-cli/src/i2pcontrol/rpc.rs::router_info_keys::PROPOSAL_170_CONTRACT`
 
-## Why the prior matrix is invalid
-
-The prior matrix included or accepted claims now known to be incorrect or
-insufficiently evidenced, including:
-
-- nonstandard mandatory `Username` authentication;
-- string-valued authentication `API` response;
-- header-only token transport instead of standard `params.Token`;
-- incomplete I2PControl-specific authentication/version errors;
-- notifications discarded before execution;
-- invalid request-ID coercion;
-- direct base RouterInfo compatibility not preserved cleanly;
-- a canonical TunnelManager `get` shape that did not match Proposal 170
-  `result.info` and nested `rawConfig`;
-- non-atomic tunnel rename persistence;
-- secret-bearing raw configuration handling without sufficient negative evidence;
-- AddressBook success backed by an administrative shadow disconnected from
-  runtime lookup;
-- no production startup-managed tunnel inventory;
-- proxy lifecycle state that could remain listening after task exit;
-- sticky SAM observation overflow;
-- RouterInfo source classifications and support claims that contradicted
-  unavailable production sources;
-- fixtures that proved current serializers rather than literal external wire
-  expectations.
-
-The former detailed rows remain available in repository history as historical
-evidence. They must not be copied forward without revalidation.
-
-## Final replacement matrix
-
-M025 created, and M027 independently revalidated, one reviewed machine-readable
-contract/source table covering exactly the 43 Proposal 170 RouterInfo additions.
-For every selector it records
-record:
+It contains exactly 43 Proposal 170 additions and records, for each selector:
 
 - exact key;
 - exact JSON type and nullability;
 - direct parameter-presence behavior;
-- authoritative production source owner;
-- source disposition: available, protocol-permitted neutral, or unavailable;
+- production source owner;
+- source disposition;
 - serializer;
-- result count/byte bounds;
-- literal fixture identifier;
+- result/byte bounds;
+- fixture identifier;
 - compatibility/base separation;
 - residual limitation.
 
-The replacement must also preserve a separate existing-I2PControl inventory
-and a separate Emissary compatibility inventory. Neither may be counted in the
-43 Proposal 170 additions.
+Retained counts:
 
-## Method-level conformance required before M027
+- 16 available;
+- 1 protocol-permitted neutral;
+- 26 unavailable.
+
+The separate existing-I2PControl and Emissary compatibility inventories are not
+counted in the 43 additions.
+
+## Why current closure is invalidated
+
+The retained method-level conformance work is not the current defect. The
+post-M027 review found:
+
+1. a later merge revived superseded M019 closure language over M027;
+2. top-level documentation overstates the final support disposition; and
+3. the Proposal 170 AddressBook control owner is active in ordinary
+   no-feature/runtime-disabled AddressBook execution.
+
+The third item is a conformance-boundary defect because an optional
+administrative API must not silently change router lookup/persistence behavior
+when the feature/service is inactive.
+
+## Retained method-level conformance
 
 ### Base I2PControl and JSON-RPC
 
-M020 must establish exact authentication, token placement, error codes,
-notification execution, request IDs, and direct base RouterInfo compatibility.
+Retained M020 evidence covers:
+
+- standard `API`/`Password` authentication;
+- numeric `API` response and opaque token;
+- standard `params.Token` protected requests;
+- compatibility-only header token with conflict rejection;
+- exact I2PControl authentication/version errors;
+- notification execution and response suppression;
+- explicit-null and strict request-ID behavior;
+- direct base RouterInfo compatibility.
 
 ### TunnelManager
 
-M021 must establish exact action parameters, option validation, structured
-operation results, canonical `info/rawConfig`, atomic persistence, secret
-handling, and explicit unsupported runtime behavior. M023 must add truthful
-startup-managed inventory and only narrowly justified existing lifecycle
-adapters.
+Retained M021/M023 evidence covers:
+
+- seven lowercase canonical actions;
+- twelve exact tunnel types;
+- exact action-specific parameters and validation;
+- exact structured operation results;
+- exact canonical `info` and nested `rawConfig` output;
+- one-publication mutation and failure atomicity;
+- secret-safe persistence and output;
+- startup-managed inventory and ownership collision rules;
+- explicit resource-free unsupported runtime behavior.
+
+Missing tunnel data planes are not implemented and are not counted as runtime
+coverage.
 
 ### AddressBook
 
-M022 must establish one coherent actual runtime/durable owner, exact canonical
-entry/subscription/config behavior, destination validation, restart/failure
-atomicity, and exact RouterInfo source objects.
+Retained enabled-mode M022 evidence covers:
+
+- four exact book identities;
+- canonical add/replace/delete and subscription/config behavior;
+- destination/hostname validation;
+- one coherent runtime/durable owner;
+- immediate lookup visibility;
+- restart and current/backup recovery;
+- exact RouterInfo source objects.
+
+M028 must add the missing negative boundary evidence:
+
+- no compile-time feature: no control-state read/write/influence;
+- feature compiled but runtime disabled: same no-control-state behavior;
+- enabled: retained M022 behavior;
+- disable/re-enable: preserve/ignore/restore state without duplicate authority.
 
 ### ClientServicesInfo
 
-M023/M024 must establish actual listener/task lifecycle, truthful I2PTunnel
-address provenance, startup inventory, and recoverable bounded SAM session
-observation.
+Retained M023/M024 evidence covers:
+
+- six direct selectors by presence;
+- truthful startup/control-plane I2PTunnel inventory;
+- actual destination provenance;
+- proxy listener exit updates;
+- bounded recoverable SAM sessions;
+- actual I2CP listener state;
+- exact `BOB: false`.
 
 ### RouterInfo
 
-M025 must freeze exact wire/source classification. M026 may add only feasible
-bounded read-only snapshots for authoritative state that already exists.
-Unavailable fields must remain explicit and cannot be replaced by fabricated
-zero/empty values.
+Retained M025/M026 evidence covers:
+
+- exact 43 keys and types;
+- direct selection and requested-only results;
+- source preflight before assembly;
+- bounded available sources;
+- protocol-permitted clock-skew null;
+- exhaustive sanitized unavailable behavior;
+- no fabricated zero/false/empty/adjacent values;
+- no partial result on source or response-bound failure.
+
+M028 does not alter this matrix. M029 must revalidate the counts and focused
+fixtures after the AddressBook feature-boundary correction.
 
 ## Support dimensions
 
-Every replacement row and final claim must separate:
+Every conformance claim remains separated into:
 
 | Dimension | Meaning |
 |---|---|
 | Wire | exact request/response contract |
-| Source | truthful current production source |
-| Runtime | real operational backend |
+| Source | truthful current production owner |
+| Runtime | real operational backend/service |
 | Persistence | durable and failure-atomic mutation |
-| Evidence | literal fixture plus failure/restart/composition proof |
+| Feature isolation | inactive feature/service does not alter ordinary router behavior |
+| Evidence | literal fixture plus failure/restart/composition/transition proof |
 
-Compatibility aliases, parser acceptance, administrative shadow state,
-unsupported runtime stubs, and unavailable sources are not full operational
-implementation.
+Compatibility aliases, parser acceptance, stored definitions, unsupported
+runtime stubs, and unavailable sources are not full operational implementation.
 
-## Final-status rule
+## M028 acceptance effect
 
-M027 restored the normative conformance matrix and final subsystem status.
+M028 may change only the AddressBook activation/composition boundary and
+directly affected dependency/docs/tests. It must not change:
 
-Possible dispositions are:
+- canonical wire forms;
+- RouterInfo source counts;
+- SAM behavior;
+- tunnel runtime support;
+- control-state schema;
+- resolver precedence;
+- missing-data-plane scope.
 
-- `closed internally against pinned revision` when exact wire behavior and
-  every claimed source/runtime dimension have evidence;
-- `partial Proposal 170 support` when one or more pinned sources remain
-  truthfully unavailable;
+A change to any of those areas requires a new recorded defect and separate plan.
+
+## M029 final-status rule
+
+M029 may select:
+
+- `partial Proposal 170 support` when every implemented/claimed dimension is
+  exact and evidenced but one or more sources/runtimes remain unavailable;
+- `closed internally against pinned revision` only when every source/runtime
+  dimension is actually available and evidenced;
 - `corrective pass required` for unresolved high/medium defects;
-- `blocked` when necessary evidence cannot be obtained.
+- `blocked` when the external revision changed or required evidence cannot be
+  obtained.
 
-The selected status is `partial Proposal 170 support`: exact wire behavior and
-claimed source/runtime/persistence dimensions are evidenced, while unavailable
-sources and unsupported data planes are listed explicitly. No status implies
-upstream review, acceptance, certification, adoption, approval, or merge.
+Under the current scope and retained 16/1/26 matrix, the expected honest status
+is `partial Proposal 170 support`.
+
+No status implies upstream review, acceptance, certification, adoption,
+approval, or merge.
 
 ## Internal-only boundary
 
@@ -158,6 +197,6 @@ All work is internal to `eggstack/emissary`.
 
 No corrective plan authorizes upstream issues, pull requests, merge requests,
 reviews, discussions, submissions, patches, maintainer outreach, contribution
-packages, or writes to any upstream or third-party repository. External
-specifications and reference sources may be inspected read-only solely for
-internal correctness.
+packages, adoption requests, or writes to any upstream or third-party
+repository. External specifications and reference sources may be inspected
+read-only solely for internal correctness.

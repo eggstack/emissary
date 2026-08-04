@@ -1,6 +1,6 @@
 # M029 — In-Scope Proposal 170 Conformance Reclosure
 
-Status: blocked
+Status: closed
 
 Source roadmap:
 

@@ -1,20 +1,21 @@
 # I2PControl for Emissary
 
-Status: corrective pass required
+Status: partial Proposal 170 support
 
 Proposal 170 remains **Open**. This documentation is pinned to the revision
 created and last updated on `2026-05-20`.
 
-Current invalidation and corrective sequence:
+Historical invalidation and completed corrective sequence:
 
 - `plans/closure/i2pcontrol-proposal-170/027-closure-invalidation.md`
 - `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 - `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
 
-M020–M027 implementation/evidence remains retained, but no final subsystem
-closure is currently controlling. The post-M027 merge that revived M019 is
-historical and superseded. M028 has restored strict AddressBook feature/runtime
-isolation; M029 must independently review the actual corrected head.
+M020–M027 implementation/evidence remains retained, but M027's final disposition
+is historical invalidated evidence. The post-M027 merge that revived M019 is
+historical and superseded. M028 restored strict AddressBook feature/runtime
+isolation, and M029 independently reviewed the corrected head and accepted the
+bounded result as the controlling partial-support closure.
 
 The expected bounded final status remains `partial Proposal 170 support` while
 26 RouterInfo selectors lack bounded authoritative sources and missing tunnel
@@ -69,8 +70,8 @@ password = "your-secure-password"
 - Existing configurations without `[i2pcontrol]` remain valid.
 - Authentication, token placement, secret persistence, and response redaction
   were corrected in M020/M021 and remain retained evidence.
-- Disabled/default AddressBook isolation is corrected by M028 and remains
-  pending independent M029 review.
+- Disabled/default AddressBook isolation was corrected by M028 and independently
+  revalidated by M029.
 
 ## HTTPS certificate behavior
 
@@ -169,7 +170,7 @@ M028 does not reopen these areas except for the AddressBook activation boundary.
 |---|---|---|
 | M020–M027 | retained evidence | base/wire/persistence/source corrections and literal review |
 | M028 | closed for implementation | status chronology and AddressBook control-state isolation |
-| M029 | ready | independent final-head conformance review |
+| M029 | closed; partial Proposal 170 support | independent final-head conformance review accepted |
 
 ## Support dimensions
 
@@ -217,8 +218,8 @@ M028 implementation evidence now covers:
 - ordinary legacy address files and downloads remain authoritative while the
   control plane is inactive.
 
-The subsystem remains `corrective pass required` until M029 independently
-reviews this corrected implementation head.
+M029 independently reviewed this corrected implementation head. The accepted
+subsystem status is `partial Proposal 170 support`.
 
 ## No frontend controls
 

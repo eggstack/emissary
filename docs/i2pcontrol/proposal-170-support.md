@@ -1,10 +1,10 @@
 # Proposal 170 Support Status
 
-Status: corrective pass required
+Status: partial Proposal 170 support
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
-Current invalidation:
+Historical invalidation:
 
 - `plans/closure/i2pcontrol-proposal-170/027-closure-invalidation.md`
 
@@ -12,15 +12,16 @@ Current roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 
-Current handoffs:
+Closed handoffs:
 
 - M028 closed for implementation: `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
-- M029 ready: `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
+- M029 closed: `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/029-closure.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained corrective
-evidence, but M027's final disposition is invalidated pending M029's final-head
-review. M028's implementation disposition and closure record contain the
-feature-isolation correction evidence.
+evidence, while M027's final disposition is historical invalidated evidence.
+M028's implementation disposition and closure record contain the
+feature-isolation correction evidence; M029's closure is now controlling.
 
 ## Status model
 
@@ -41,14 +42,12 @@ implementation.
 
 ## Current overall disposition
 
-The repository is not currently finally closed because:
+The repository is closed for the authorized in-scope dimensions. M029 reviewed
+the corrected M028 head and accepted the final disposition as partial Proposal
+170 support.
 
-1. M027's final disposition was invalidated by the post-M027 chronology and
-   AddressBook boundary findings; and
-2. M029 must independently review the corrected M028 head.
-
-M028 owns and implements the status/feature-boundary correction. M029 will
-perform the independent final-head review.
+M028 owns and implemented the status/feature-boundary correction. M029
+performed the independent final-head review.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because 26 of the 43 RouterInfo additions lack
@@ -90,7 +89,8 @@ Behavior includes:
 - explicit-null request IDs and strict invalid-ID rejection;
 - direct base RouterInfo compatibility.
 
-M029 must rerun the focused evidence after M028.
+M029 reran the focused evidence after M028; the exact command outcomes are
+recorded in `plans/closure/i2pcontrol-proposal-170/029-closure.md`.
 
 ## TunnelManager
 
@@ -163,7 +163,7 @@ Retained behavior:
 | `BOB` | exact `false` |
 | `I2CP` | actual listener state |
 
-M028 does not alter these sources. M029 revalidates them.
+M028 does not alter these sources. M029 revalidated them.
 
 ## RouterInfo
 
@@ -204,7 +204,7 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 |---|---|---|
 | M020–M027 | retained evidence | base/wire/persistence/source corrections and literal review |
 | M028 | closed for implementation | post-M027 status repair and AddressBook compile/runtime feature isolation |
-| M029 | ready | independent final-head in-scope conformance review |
+| M029 | closed; partial Proposal 170 support | independent final-head in-scope conformance review |
 
 ## Final-status rule
 

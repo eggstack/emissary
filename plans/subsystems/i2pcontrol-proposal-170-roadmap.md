@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Corrective Roadmap
 
-Status: corrective pass required
+Status: partial Proposal 170 support
 
 Current corrective baseline:
 
@@ -209,13 +209,13 @@ M029 independent in-scope conformance reclosure
 ```
 
 M028 is closed for implementation with a frozen implementation and test head.
-M029 is ready for independent review.
+M029 is formally closed by its accepted closure record.
 
 ## 8. Milestones
 
 ### M020–M027 — Retained corrective sequence
 
-Status: retained evidence; M027 final disposition invalidated pending M029
+Status: retained evidence; M027 final disposition historically invalidated; M029 closed
 
 Summary:
 
@@ -263,7 +263,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
 
-Status: ready
+Status: closed; partial Proposal 170 support
 
 Objective:
 
@@ -275,9 +275,13 @@ Objective:
 - reconcile documentation and registry chronology;
 - choose the truthful final status.
 
-Expected final disposition under current scope:
+Final disposition under current scope:
 
 - `partial Proposal 170 support` with zero unresolved high/medium defects.
+
+Closure record:
+
+- `plans/closure/i2pcontrol-proposal-170/029-closure.md`
 
 `closed internally against pinned revision` is allowed only if every source and
 runtime dimension is actually available and evidenced. M028/M029 do not

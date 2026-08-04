@@ -1,25 +1,26 @@
 # Proposal 170 Conformance Matrix
 
-Status: corrective pass required; retained matrix pending M029 revalidation
+Status: partial Proposal 170 support; M029 revalidated retained matrix
 
 Proposal 170 remains Open. This workstream is pinned to the revision created
 and last updated on `2026-05-20`.
 
-Current invalidation:
+Historical invalidation:
 
 - `plans/closure/i2pcontrol-proposal-170/027-closure-invalidation.md`
 
-Current implementation correction:
+Completed implementation correction:
 
 - M028, `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 
-Ready final review:
+Controlling final closure:
 
 - M029, `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
 
-M019 is superseded and non-controlling. M020–M027 remain retained evidence, but
-M027's final subsystem disposition is invalidated until M029 reviews the actual
-final head. M028 is implemented and closed with the required boundary evidence.
+M019 is superseded and non-controlling. M020–M027 remain retained evidence, and
+M027's final subsystem disposition remains historical invalidated evidence.
+M028 is implemented and closed with the required boundary evidence. M029
+reviewed the actual final head and accepted partial Proposal 170 support.
 
 ## Retained machine-readable matrix
 
@@ -139,7 +140,7 @@ Retained M025/M026 evidence covers:
 - no fabricated zero/false/empty/adjacent values;
 - no partial result on source or response-bound failure.
 
-M028 does not alter this matrix. M029 must revalidate the counts and focused
+M028 does not alter this matrix. M029 revalidated the counts and focused
 fixtures after the AddressBook feature-boundary correction.
 
 ## Support dimensions

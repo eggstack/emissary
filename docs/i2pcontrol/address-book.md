@@ -1,8 +1,8 @@
 # Proposal 170 AddressBook Administrative API
 
-Status: corrective pass required for compile-time/runtime feature isolation
+Status: partial Proposal 170 support; M029 closure accepted
 
-Current corrective owner:
+Historical corrective implementation:
 
 - M028, `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 
@@ -13,8 +13,8 @@ AddressBook execution even when I2PControl was not runtime-enabled.
 
 M028 now provides focused proof that no-feature and runtime-disabled execution
 preserve legacy AddressBook behavior without reading, writing, migrating, or
-consulting Proposal 170 control state. M029 will independently review the
-corrected final head.
+consulting Proposal 170 control state. M029 independently reviewed the
+corrected final head and accepted the bounded feature-isolation result.
 
 ## Overview
 
@@ -160,8 +160,8 @@ Target behavior when the feature is absent or runtime-disabled:
 When I2PControl is re-enabled, retained control state is loaded again under the
 enabled-mode precedence and migration rules.
 
-The corrected M028 implementation satisfies this disabled/default boundary;
-final subsystem closure remains pending M029.
+The corrected M028 implementation satisfies this disabled/default boundary, and
+M029 revalidated it against the final repository head.
 
 ## Security
 
@@ -193,7 +193,8 @@ paths.
 ## Closure rule
 
 M028 implemented the activation boundary with focused no-feature,
-runtime-disabled, enabled, restart, and disable/re-enable evidence. M029 must
-independently review the actual final head.
+runtime-disabled, enabled, restart, and disable/re-enable evidence. M029
+independently reviewed the actual final head and accepted this boundary.
 
-No AddressBook component document may return to a closed status before M029.
+No AddressBook document claims support for unavailable sources or unsupported
+tunnel runtimes; the feature-isolation boundary is closed by M029.

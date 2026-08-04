@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: corrective pass required
+Status: partial Proposal 170 support
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -53,7 +53,7 @@ It also must not add RouterInfo telemetry, polling, peer classifications, NetDB 
 | Handoff | Status | Plan | Dependency |
 |---|---|---|---|
 | M028 — Post-M027 status and AddressBook feature isolation | closed | `028-post-m027-status-and-addressbook-feature-isolation.md` | closure records accepted |
-| M029 — In-scope Proposal 170 conformance reclosure | ready | `029-in-scope-conformance-reclosure.md` | M028 closed with frozen head |
+| M029 — In-scope Proposal 170 conformance reclosure | closed | `029-in-scope-conformance-reclosure.md` | `029-closure.md` accepted; partial support remains for unavailable sources/runtimes |
 
 ## Execution order
 
@@ -64,8 +64,10 @@ M028 status and AddressBook feature-isolation corrective pass
 M029 independent final-head reclosure
 ```
 
-M029 is now dependency-ready; M028's closure records freeze the implementation
-and test head for independent review.
+M029 is formally closed by `plans/closure/i2pcontrol-proposal-170/029-closure.md`.
+Its exact implemented dimensions are accepted as partial Proposal 170 support;
+unavailable RouterInfo sources and unsupported tunnel data planes remain
+explicit and are not unblocked by this closure.
 
 ## Retained history
 
@@ -80,7 +82,7 @@ The following work remains candidate evidence and is not reopened unless M028 ex
 | M024 | recoverable bounded SAM observation |
 | M025 | exact 43-selector RouterInfo contract/source matrix |
 | M026 | no feasible additional bounded authoritative RouterInfo sources |
-| M027 | literal conformance evidence and partial-support disposition; final closure invalidated pending M029 |
+| M027 | literal conformance evidence and partial-support disposition; final closure historically invalidated |
 
 Current source matrix:
 
@@ -95,9 +97,9 @@ Missing tunnel types remain explicit unsupported runtimes under ADR-0001.
 - M017 and M019A are invalidated historical closures.
 - M019 is superseded and non-executable; the post-M027 merge that revived it does not make it controlling.
 - M020–M027 contain the retained corrective implementation and evidence.
-- M027's final subsystem disposition is invalidated by `027-closure-invalidation.md` because the AddressBook feature boundary and post-merge status state require correction.
+- M027's final subsystem disposition is historically invalidated by `027-closure-invalidation.md`; M029 now controls the corrected final status.
 - M028 owns and has completed the implementation correction.
-- M029 is the dependency-ready controlling final-head review handoff.
+- M029 is the controlling final-head review and partial-support closure.
 
 Historical files are retained for traceability and must not be rewritten into current authority.
 
@@ -118,19 +120,21 @@ M028 must not change canonical Proposal 170 wire behavior, source counts, SAM be
 
 ## M029 closure rule
 
-M029 is a distinct review only. It must:
+M029 was a distinct review only. It:
 
-- refetch the still-open external contract read-only;
-- identify the reviewer as distinct from the M028 implementation executor;
-- review the actual final M028 head and all later diffs;
-- verify all four AddressBook execution states;
-- rerun focused retained M020–M027 evidence;
-- classify the final changed-file scope;
-- verify no secret/path/resource regression;
-- reconcile registry, roadmap, support docs, and closure chronology;
-- choose an honest final disposition.
+- refetched the still-open external contract read-only;
+- identified the reviewer as distinct from the M028 implementation executor;
+- reviewed the actual final M028 head and all later diffs;
+- verified all four AddressBook execution states;
+- reran focused retained M020–M027 evidence;
+- classified the final changed-file scope;
+- verified no secret/path/resource regression;
+- reconciled registry, roadmap, support docs, and closure chronology;
+- selected the honest final disposition.
 
-Expected status under current scope is `partial Proposal 170 support` because 26 RouterInfo selectors remain unavailable and missing tunnel data planes remain explicit unsupported runtimes.
+The accepted status is `partial Proposal 170 support` because 26 RouterInfo
+selectors remain unavailable and missing tunnel data planes remain explicit
+unsupported runtimes.
 
 `closed internally against pinned revision` is allowed only if every source/runtime dimension is actually available and evidenced; M028/M029 do not authorize the implementation work required to reach that state.
 

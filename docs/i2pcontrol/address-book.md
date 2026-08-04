@@ -1,29 +1,35 @@
 # Proposal 170 AddressBook Administrative API
 
-Status: closed against the pinned Proposal 170 revision
+Status: corrective pass required for compile-time/runtime feature isolation
 
-This document describes the Proposal 170 AddressBook API for Emissary's
-I2PControl service and its runtime ownership boundary.
+Current corrective owner:
+
+- M028, `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
+
+The enabled-mode Proposal 170 wire, mutation, source, and persistence behavior
+implemented by M022 remains retained evidence. The current defect is narrower:
+the runtime control owner is constructed and used by ordinary AddressBook
+execution even when I2PControl is not runtime-enabled.
+
+M028 must prove that no-feature and runtime-disabled execution preserve legacy
+AddressBook behavior without reading, writing, migrating, or consulting Proposal
+170 control state. M029 will independently review the corrected final head.
 
 ## Overview
 
 The AddressBook API provides administrative management of four independent
-address books, a subscription set, and a configuration map. The four book
-identities remain independent at the API boundary, while successful entry
-mutations are committed by the running runtime `AddressBookHandle` and are
-immediately visible to normal destination lookup.
+address books, a subscription set, and a configuration map.
 
-Runtime precedence is unchanged: private, local, router, then published. A
-hostname collision across books is rejected instead of changing the router's
-existing resolution policy. The downloaded hosts source remains the published
-runtime source.
+When I2PControl is enabled, successful entry mutations must be committed by one
+runtime control owner and immediately visible to normal destination lookup.
+Runtime precedence remains private, local, router, then published. A hostname
+collision across books is rejected rather than silently changing precedence.
+The downloaded hosts source is the published source.
 
 Canonical Proposal 170 requests use one `AddressBook` method and select exactly
-one mode. The linked Java reference implementation returns operation details
-inside the JSON-RPC `result` object, so Emissary uses
-`result: {success, message}` for all three mutation modes. The proposal's
-top-level `success` example is treated as an inconsistent example, not a
-second canonical envelope.
+one mode. The linked reference implementation returns operation details inside
+the JSON-RPC `result` object, so Emissary uses
+`result: {success, message}` for all mutation modes.
 
 ### Canonical entry mutation
 
@@ -56,113 +62,136 @@ extensions and cannot be mixed with canonical parameters.
 
 ### Compatibility action-style AddressBook
 
-The `AddressBook` method performs CRUD operations on one of four administrative address books.
-
-**Parameters:**
+The compatibility form performs CRUD operations on one of four books.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `book` | string | yes | One of: `private`, `local`, `router`, `published` |
-| `request` | string | yes | One of: `List`, `Lookup`, `Add`, `Update`, `Delete` |
-| `name` | string | for Lookup/Add/Update/Delete | Hostname (e.g., `example.i2p`) |
-| `value` | string | for Add/Update | I2P destination (base64) |
+| `book` | string | yes | `private`, `local`, `router`, or `published` |
+| `request` | string | yes | `List`, `Lookup`, `Add`, `Update`, or `Delete` |
+| `name` | string | operation-specific | Hostname |
+| `value` | string | Add/Update | I2P destination |
 
-**Operations:**
+Operations:
 
-- **List**: Returns all entries in the specified book as `[{name, value}, ...]`
-- **Lookup**: Returns a single entry or `null` if not found
-- **Add**: Creates a new entry; fails if hostname already exists
-- **Update**: Updates an existing entry; fails if hostname not found
-- **Delete**: Deletes an entry by `name` presence; without `name`, deletes all entries in the book
+- **List** returns all entries in the selected book.
+- **Lookup** returns one entry or `null`.
+- **Add** creates a new entry and rejects duplicates.
+- **Update** replaces an existing entry and rejects a missing hostname.
+- **Delete** deletes the selected entry, or all entries in the compatibility
+  delete-all form.
 
-**Delete-by-presence semantics:**
-
-The `Delete` operation uses parameter presence, not boolean value. If `name` is present in the request (regardless of value), it selects deletion of that specific entry. If `name` is absent, it deletes all entries in the book.
+Compatibility forms do not count as canonical Proposal 170 coverage.
 
 ### Compatibility SetSubscriptions
 
-The `SetSubscriptions` method atomically replaces the subscription set.
+The compatibility method atomically replaces the stored subscription set.
+Subscriptions are not fetched synchronously by this API.
 
-**Parameters:**
+Bounds:
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `subscriptions` | array of strings | yes | Ordered list of subscription URLs |
-
-Subscriptions are stored but **not fetched** by this API. Maximum 1000 subscriptions, 2048 bytes each.
+- maximum 1000 subscriptions;
+- maximum 2048 bytes per URL.
 
 ### Compatibility SetConfig
 
-The `SetConfig` method atomically replaces the address book configuration.
+The compatibility method atomically replaces the configuration metadata.
+Values are inert strings and never choose files.
 
-**Parameters:**
+Bounds:
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `config` | object | yes | String-keyed configuration map |
+- maximum 1000 entries;
+- maximum 256-byte keys;
+- maximum 4096-byte values.
 
-Configuration values are stored as inert strings. Path-like values perform no filesystem operations. Maximum 1000 entries, 256-byte keys, 4096-byte values.
-
-## Address Books
+## Address books
 
 | Book | Description |
 |---|---|
 | `private` | Private administrative book |
 | `local` | Local administrative book |
 | `router` | Router administrative book |
-| `published` | Published administrative book |
+| `published` | Published administrative and downloaded source |
 
-Each book is independently persistent and isolated from the others.
+The four identities remain distinct at the API boundary.
 
-## RouterInfo Selectors
-
-The following selectors expose address-book state through the RouterInfo method:
+## RouterInfo selectors
 
 | Selector | Type | Description |
 |---|---|---|
-| `i2p.router.addressbook.private` | array | Private book entries |
-| `i2p.router.addressbook.local` | array | Local book entries |
-| `i2p.router.addressbook.router` | array | Router book entries |
-| `i2p.router.addressbook.published` | array | Published book entries |
-| `i2p.router.addressbook.private.list` | array | Canonical private book entries |
-| `i2p.router.addressbook.local.list` | array | Canonical local book entries |
-| `i2p.router.addressbook.router.list` | array | Canonical router book entries |
-| `i2p.router.addressbook.published.list` | array | Canonical published book entries |
-| `i2p.router.addressbook.subscriptions` | object | `{path, entries}`; `path` is `null` because Emissary has no path-backed subscription source |
-| `i2p.router.addressbook.config` | object | `{path, entries}`; `path` is `null` because configuration metadata is not a file authority |
+| `i2p.router.addressbook.private.list` | array | Canonical private entries |
+| `i2p.router.addressbook.local.list` | array | Canonical local entries |
+| `i2p.router.addressbook.router.list` | array | Canonical router entries |
+| `i2p.router.addressbook.published.list` | array | Canonical published entries |
+| `i2p.router.addressbook.subscriptions` | object | `{path, entries}` with truthful nullable path |
+| `i2p.router.addressbook.config` | object | `{path, entries}` with truthful nullable path |
 
-## Persistence
+Existing shorter selector aliases remain compatibility-only.
 
-The runtime owner persists one complete state in the address-book source with:
+## Enabled-mode persistence
 
-- bounded JSON state;
+When I2PControl is runtime-enabled, the target control owner persists one
+complete bounded state with:
+
+- JSON serialization;
 - write/sync/rename publication;
-- a last-known-good rollback copy;
-- serialized mutation ownership.
+- last-known-good rollback copy;
+- serialized mutation ownership;
+- current/backup recovery;
+- deterministic collision handling.
 
-The former I2PControl `addressbooks/` generations are migration input only.
-They are imported once when no runtime state exists, with deterministic
-collision failure, and are never used as a second authority or deleted
-automatically.
+Former I2PControl administrative generations may be one-time migration input
+only when no runtime control authority exists. They must never remain a second
+authority.
+
+## Disabled/default behavior owned by M028
+
+Target behavior when the feature is absent or runtime-disabled:
+
+- load normal `addressbook/addresses` and destination files;
+- run existing subscription download and modified-time behavior;
+- persist only normal legacy address sources;
+- do not construct a Proposal 170 control owner;
+- do not read, write, migrate, or consult `control-state.json`, its backup, or
+  its temporary file;
+- do not expose control-only entries through lookup;
+- do not delete or modify retained control-state files from prior enabled use.
+
+When I2PControl is re-enabled, retained control state is loaded again under the
+enabled-mode precedence and migration rules.
+
+The current baseline does not yet satisfy this disabled/default boundary.
 
 ## Security
 
-- Authentication required for all operations
-- No full destinations logged
-- No subscription values logged
-- No configuration values logged
-- No filesystem paths derived from input
-- Path-like configuration values are inert
+- Authentication is required for all Proposal 170 operations.
+- Full destinations, subscriptions, configuration values, and raw state are not
+  logged.
+- Input cannot select arbitrary filesystem paths.
+- Path-like configuration values are inert.
+- State and response sizes are bounded.
+- Failed publication leaves the prior state.
+- Disabled/default execution must not be influenced by stale, corrupt, or
+  attacker-planted control-state files.
+- Ordinary runtime lookup handles must not expose Proposal 170 mutation
+  authority to unrelated consumers.
 
-## Runtime source map
+## Target runtime source map
 
-| Source | Owner | Runtime role |
-|---|---|---|
-| Existing `addressbook/addresses` and destination files | `AddressBookManager` | Published downloaded source and compatibility lookup cache |
-| Private/local/router/published control entries | Shared runtime `AddressBookHandle` | Durable administrative entries and normal lookup input |
-| Subscription URLs | Runtime owner metadata | Stored only; `SetSubscriptions` never fetches synchronously |
-| Configuration map | Runtime owner metadata | Non-operative metadata; request values never select files |
+| Execution mode | Source | Owner | Role |
+|---|---|---|---|
+| no feature / runtime disabled | existing `addresses` and destination files | `AddressBookManager` legacy path | lookup and downloaded published entries |
+| I2PControl enabled | private/local/router/published control state plus downloaded published entries | one purpose-specific control owner sharing live lookup maps | Proposal 170 mutation, durability, and normal lookup publication |
+| I2PControl disabled after prior use | legacy sources only; retained control files ignored and untouched | legacy path | no control-only lookup influence |
+| I2PControl re-enabled | retained current/backup control state | control owner | restore enabled-mode authority |
 
-Startup constructs the runtime owner before Router and I2PControl composition.
-I2PControl receives only its bounded handle; it cannot replace the resolver,
-control downloading, cancel tasks, or write arbitrary paths.
+I2PControl must receive only the dedicated bounded control handle. It must not
+replace the resolver, control downloader task lifecycles, or write arbitrary
+paths.
+
+## Closure rule
+
+M028 must implement and close the activation boundary with focused no-feature,
+runtime-disabled, enabled, restart, and disable/re-enable evidence. M029 must
+independently review the actual final head.
+
+No AddressBook component document may return to a closed status before M029.

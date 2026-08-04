@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support
+Status: corrective pass required
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -9,7 +9,7 @@ Authoritative direction:
 - `plans/003-planning-process.md`
 - `plans/adrs/ADR-0001-proposal-170-contract-and-stub-boundary.md`
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
-- `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`
+- `plans/closure/i2pcontrol-proposal-170/027-closure-invalidation.md`
 
 Pinned external authority:
 
@@ -35,69 +35,103 @@ Violation is a stop condition and invalidates affected evidence.
 
 ## Scope rule
 
-The Proposal 170 corrective sequence owns API correctness and the smallest truthful source/ownership adapters.
+The current corrective sequence owns only:
 
-It must not implement missing tunnel data planes. The following remain separate security-focused work:
+- post-M027 status and chronology repair;
+- compile-time/runtime isolation of the existing Proposal 170 AddressBook control owner;
+- restoration of disabled/default legacy AddressBook behavior;
+- preservation of enabled-mode M022 semantics;
+- optional dependency ownership where directly affected;
+- focused regression evidence and independent final-head reclosure.
 
-- HTTP client/server and bidirectional server tunnels;
-- IRC client/server tunnels;
-- SOCKS-IRC and CONNECT variants;
-- Streamr client/server tunnels;
-- any other listener, destination, LeaseSet, or traffic path not already implemented by Emissary.
+It must not implement missing tunnel data planes. HTTP, IRC, SOCKS-IRC, CONNECT, Streamr, bidirectional, and other missing listener/destination/LeaseSet/traffic implementations remain separate security-focused work.
 
-Unsupported tunnel types remain explicit administrative definitions with deterministic inactive/not-implemented lifecycle behavior under ADR-0001.
+It also must not add RouterInfo telemetry, polling, peer classifications, NetDB inspection, core algorithms, lifecycle supervisors, generic frameworks, CI/release machinery, or upstream contribution activity.
 
-Changes outside `emissary-cli/src/i2pcontrol/**` are permitted only for:
+## Current handoffs
 
-- one purpose-specific runtime AddressBook handle;
-- composition-time startup tunnel inventory and existing-handle wiring;
-- passive proxy exit observations;
-- correction to the already-introduced bounded SAM observation seam;
-- bounded read-only RouterInfo snapshots adjacent to existing authoritative owners.
-
-No broad router, protocol, transport, NetDB, peer-selection, tunnel, cryptographic, streaming, resolver, frontend, CI, release, dependency, or formatting project is authorized.
-
-## Closure invalidation
-
-M019A is historical evidence only. Its internal-only/no-upstream attestation remains valid, but its implementation-completeness disposition is invalidated by:
-
-- base I2PControl authentication/token incompatibility;
-- JSON-RPC notification and request-ID defects;
-- incorrect canonical TunnelManager `get` schema;
-- non-atomic rename and secret-boundary defects;
-- disconnected AddressBook shadow state;
-- missing startup tunnel inventory and stale proxy lifecycle state;
-- sticky SAM observation overflow;
-- unresolved RouterInfo source/claim contradictions;
-- fixtures that validated repository output rather than the full pinned contract.
-
-See `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`.
-
-## Corrective handoffs
-
-| Handoff | Status | Plan | Hard dependency |
+| Handoff | Status | Plan | Dependency |
 |---|---|---|---|
-| 014 — Spec-constrained truthfulness and local hardening | implementation retained | `014-spec-constrained-truthfulness-and-local-hardening.md` | broad final acceptance reopened by M018/M019 |
-| 015 — Focused independent reclosure | invalid historical closure | `015-focused-independent-reclosure.md` | superseded |
-| 016 — Bounded SAM session observation corrective pass | implementation retained | `016-sam-fencing-and-connection-proof-corrective-pass.md` | bounded SAM component accepted |
-| 017 — Final-head independent reclosure | corrective pass required | `017-final-head-independent-reclosure.md` | closure invalidated by exact Proposal 170 contract findings |
-| 018 — Exact wire-contract reconciliation | closed | `018-exact-wire-contract-reconciliation.md` | implementation accepted at `ea35de9`; M019 closure recorded |
-| 019 — Pinned-revision independent reclosure | closed against pinned revision | `019-pinned-revision-independent-reclosure.md` | final source/head/SAM review accepted |
-
-Earlier plans remain historical as recorded in the subsystem roadmap. M019 remains superseded and non-executable.
+| M028 — Post-M027 status and AddressBook feature isolation | ready | `028-post-m027-status-and-addressbook-feature-isolation.md` | none |
+| M029 — In-scope Proposal 170 conformance reclosure | blocked | `029-in-scope-conformance-reclosure.md` | M028 closed with frozen head |
 
 ## Execution order
 
 ```text
-M018 exact wire-contract reconciliation (closed)
+M028 status and AddressBook feature-isolation corrective pass
     |
     v
-M019 pinned-revision independent reclosure (closed against pinned revision)
+M029 independent final-head reclosure
 ```
 
-M018 implementation was frozen at `ea35de9`; M019 independently reviewed the
-actual final head and recorded acceptance in
-`plans/closure/i2pcontrol-proposal-170/019-closure.md`.
+Only M028 is dependency-ready.
+
+## Retained history
+
+The following work remains candidate evidence and is not reopened unless M028 exposes a direct regression:
+
+| Milestone | Retained result |
+|---|---|
+| M020 | base I2PControl authentication/token/error and JSON-RPC correctness |
+| M021 | exact TunnelManager wire, validation, atomic persistence, secret boundary |
+| M022 | enabled-mode runtime AddressBook authority; feature boundary reopened by M028 |
+| M023 | startup tunnel inventory and ClientServicesInfo lifecycle/address truthfulness |
+| M024 | recoverable bounded SAM observation |
+| M025 | exact 43-selector RouterInfo contract/source matrix |
+| M026 | no feasible additional bounded authoritative RouterInfo sources |
+| M027 | literal conformance evidence and partial-support disposition; final closure invalidated pending M029 |
+
+Current source matrix:
+
+- 16 available;
+- 1 protocol-permitted neutral;
+- 26 unavailable.
+
+Missing tunnel types remain explicit unsupported runtimes under ADR-0001.
+
+## Closure chronology
+
+- M017 and M019A are invalidated historical closures.
+- M019 is superseded and non-executable; the post-M027 merge that revived it does not make it controlling.
+- M020–M027 contain the retained corrective implementation and evidence.
+- M027's final subsystem disposition is invalidated by `027-closure-invalidation.md` because the AddressBook feature boundary and post-merge status state require correction.
+- M028 owns the implementation correction.
+- M029 will be the controlling final-head review if accepted.
+
+Historical files are retained for traceability and must not be rewritten into current authority.
+
+## M028 handoff rule
+
+M028 owns one bounded corrective objective:
+
+- restore M027/M020–M027 planning authority;
+- ensure no-feature and runtime-disabled execution never reads, writes, migrates, or consults Proposal 170 AddressBook control state;
+- preserve legacy `addresses`, `destinations/`, subscription download, and modified-time behavior in disabled/default mode;
+- preserve one coherent control owner and immediate lookup visibility in enabled mode;
+- preserve control-state files while disabled and restore them on re-enable;
+- restore optional `serde_json` feature ownership if no independent unconditional consumer requires it;
+- add focused no-feature, runtime-disabled, enabled, restart, and transition regressions;
+- produce M028 disposition/closure and freeze the implementation/test head.
+
+M028 must not change canonical Proposal 170 wire behavior, source counts, SAM behavior, tunnel runtime support, or control-state schema.
+
+## M029 closure rule
+
+M029 is a distinct review only. It must:
+
+- refetch the still-open external contract read-only;
+- identify the reviewer as distinct from the M028 implementation executor;
+- review the actual final M028 head and all later diffs;
+- verify all four AddressBook execution states;
+- rerun focused retained M020–M027 evidence;
+- classify the final changed-file scope;
+- verify no secret/path/resource regression;
+- reconcile registry, roadmap, support docs, and closure chronology;
+- choose an honest final disposition.
+
+Expected status under current scope is `partial Proposal 170 support` because 26 RouterInfo selectors remain unavailable and missing tunnel data planes remain explicit unsupported runtimes.
+
+`closed internally against pinned revision` is allowed only if every source/runtime dimension is actually available and evidenced; M028/M029 do not authorize the implementation work required to reach that state.
 
 ## Handoff discipline
 
@@ -105,71 +139,28 @@ Each implementation plan must produce an implementation disposition containing:
 
 - implementation commits;
 - exact changed files;
-- requirement-to-evidence matrix for its bounded objective;
+- requirement-to-evidence matrix;
 - focused and broad command outcomes;
-- failure/restart/contention evidence;
+- failure/restart/cancellation/contention evidence;
 - compatibility and migration effects;
 - security review;
 - unresolved findings with severity;
 - scope/no-upstream attestation;
 - frozen implementation/test head.
 
-A successful implementation commit or broad test count is not closure by itself.
-
-See:
-
-- `plans/closure/i2pcontrol-proposal-170/017-closure-invalidation.md`.
-
-## M018 handoff rule
-
-M018 owns only exact wire reconciliation and directly affected evidence/documentation.
-
-Required areas:
-
-- exact 43-key RouterInfo manifest and direct parameter presence;
-- exact AddressBook canonical modes;
-- exact lowercase TunnelManager actions and structured results;
-- exact direct-parameter ClientServicesInfo requests;
-- compatibility aliases clearly separated from canonical behavior;
-- literal official-example fixtures;
-- strongest feasible production-composition SAM lifecycle evidence;
-- separate wire/source/runtime support claims.
-
-Compatibility forms may remain, but cannot substitute for canonical Proposal 170 forms or count toward canonical coverage.
-
-M018 must not add:
-
-- missing tunnel data planes;
-- broad router, transport, NetDB, peer, tunnel, cryptographic, resolver, frontend, SAM, or I2CP architecture;
-- generic protocol/schema/fixture/inspection frameworks;
-- repository-wide formatting;
-- CI, release, publishing, platform, coverage, or generated-evidence machinery;
-- fabricated values for unavailable sources.
-
-## M019 closure rule
-
-M019 must independently refetch the still-open Proposal 170 source and verify that the implementation matches the pinned revision.
-
-The reviewer must be distinct from the final M018 implementation executor and identify the separate agent/run.
-
-M019 independently checks:
-
-- exact 43 RouterInfo strings and types;
-- AddressBook primary-source response adjudication;
-- all seven lowercase TunnelManager actions and structured results;
-- direct ClientServicesInfo selection with any value;
-- compatibility extension isolation;
-- truthful unavailable and unsupported behavior;
-- SAM current-session/removal evidence;
-- final changed-file scope and targeted command outcomes.
-
-Any unresolved high/medium finding rejects closure and returns work to M018.
-
-Final status is `closed against pinned revision`, because Proposal 170 remains Open.
+A successful commit or broad test count is not closure by itself.
 
 ## Verification rule
 
-Default CLI package scope:
+M028 default/disabled scope:
+
+```bash
+cargo check -p emissary-cli --no-default-features
+cargo test -p emissary-cli --no-default-features address_book
+cargo clippy -p emissary-cli --no-default-features --all-targets -- -D warnings
+```
+
+M028 enabled scope:
 
 ```bash
 cargo check -p emissary-cli --no-default-features --features i2pcontrol
@@ -177,29 +168,17 @@ cargo test -p emissary-cli --no-default-features --features i2pcontrol
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 ```
 
-Run core package scope only for plans that touch the permitted runtime/SAM/inspection seams:
+M029 adds the focused TunnelManager, ClientServicesInfo, RouterInfo, production-composition, conformance-manifest, literal-fixture, and core SAM commands named in its plan.
 
-```bash
-cargo check -p emissary-core
-cargo test -p emissary-core
-cargo clippy -p emissary-core --all-targets -- -D warnings
-```
-
-Each plan lists focused filters to run first. Use touched-file formatting when unrelated workspace formatting differences remain.
-
-Remote CI, upstream CI, release checks, platform matrices, coverage gates, fuzz campaigns, network farms, long soak tests, submission checks, and generated evidence bundles are not required.
+Use touched-file formatting checks. Remote CI, upstream CI, release checks, platform matrices, coverage gates, fuzz campaigns, network farms, soak tests, submission checks, and generated evidence bundles are not required.
 
 ## Final-status rule
 
-M027 restored the final subsystem disposition.
+Possible outcomes after M029:
 
-Possible outcomes:
-
-- `closed internally against pinned revision` when exact wire behavior and every claimed source/runtime dimension have evidence;
-- `partial Proposal 170 support` when one or more pinned sources remain truthfully unavailable after bounded-source work;
+- `partial Proposal 170 support` when every implemented/claimed dimension is exact and evidenced but one or more sources/runtimes remain unavailable;
+- `closed internally against pinned revision` only with actual evidence for every source/runtime dimension;
 - `corrective pass required` for unresolved high/medium defects;
-- `blocked` when necessary evidence cannot be obtained.
-
-Missing tunnel data planes may remain explicit runtime-unsupported stubs without violating the API scope, but documentation must never count those stubs as real runtime implementation.
+- `blocked` when the proposal changed or required evidence cannot be obtained.
 
 No final status implies upstream review, acceptance, certification, adoption, or merge.

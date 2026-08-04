@@ -1,46 +1,48 @@
 # I2PControl for Emissary
 
-Status: closed against the pinned 2026-05-20 Proposal 170 revision
+Status: corrective pass required
 
-Proposal 170 is still **Open**. This documentation is pinned to the
-2026-05-20 revision (created and last updated 2026-05-20).
+Proposal 170 remains **Open**. This documentation is pinned to the revision
+created and last updated on `2026-05-20`.
 
-The prior M019A `closed internally against pinned revision` disposition is
-historical and invalidated by:
+Current invalidation and corrective sequence:
 
-- `plans/closure/i2pcontrol-proposal-170/019a-closure-invalidation.md`
+- `plans/closure/i2pcontrol-proposal-170/027-closure-invalidation.md`
+- `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
+- `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
 
-Final internal roadmap and support classification:
+M020–M027 implementation/evidence remains retained, but no final closure is
+currently controlling. The post-M027 merge that revived M019 is historical and
+superseded. M028 must restore strict AddressBook feature/runtime isolation, and
+M029 must review the actual corrected head.
 
-- `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
-- [proposal-170-support.md](proposal-170-support.md)
-- `plans/closure/i2pcontrol-proposal-170/027-closure.md`
-
-This document describes Emissary's exact supported Proposal 170 wire surfaces
-and their separate source/runtime/persistence dimensions. It does not claim
-that every pinned source exists or that every tunnel data plane is available.
+The expected bounded final status remains `partial Proposal 170 support` while
+26 RouterInfo selectors lack bounded authoritative sources and missing tunnel
+data planes remain explicit unsupported runtimes.
 
 ## Compile feature
 
 I2PControl is an independent Cargo feature in `emissary-cli`. It is **not** enabled by default.
 
 ```bash
-# Build without I2PControl (default)
-cargo build -p emissary-cli
+# Build without I2PControl
+cargo build -p emissary-cli --no-default-features
 
-# Build with I2PControl enabled
+# Build with I2PControl enabled as a compile-time feature
 cargo build -p emissary-cli --no-default-features --features i2pcontrol
 
-# Build with both UI and I2PControl
+# Build with UI and I2PControl
 cargo build -p emissary-cli --all-features
 ```
 
+M028 specifically owns proof that a build without `i2pcontrol`, and a build
+where the feature is compiled but runtime configuration is disabled, do not
+read, write, migrate, or consult Proposal 170 AddressBook control state.
+
 ## Runtime enablement
 
-Even when compiled with the `i2pcontrol` feature, the service is **disabled by default**.
-It only starts when explicitly enabled in the configuration.
-
-Add an `[i2pcontrol]` section to `router.toml`:
+Even when compiled with the `i2pcontrol` feature, the service is disabled by
+default. It starts only when explicitly enabled in configuration.
 
 ```toml
 [i2pcontrol]
@@ -53,38 +55,39 @@ password = "your-secure-password"
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `enabled` | boolean | `false` | Enable I2PControl listener |
+| `enabled` | boolean | `false` | Enable the I2PControl listener and Proposal 170 control owners |
 | `bind` | string | `"127.0.0.1:7650"` | Bind address |
 | `password` | string | `""` | Authentication password |
-| `certificate` | string | (managed) | Optional TLS certificate path |
-| `private_key` | string | (managed) | Optional TLS private key path |
+| `certificate` | string | managed | Optional TLS certificate path |
+| `private_key` | string | managed | Optional TLS private-key path |
 
 ### Security notes
 
-- **Default binding is loopback only** (`127.0.0.1:7650`). Non-loopback binding requires explicit configuration and produces a security warning.
-- **Empty password is rejected** when I2PControl is enabled.
-- **Existing configurations without `[i2pcontrol]`** parse unchanged and preserve prior behavior.
-- Authentication, token placement, secret persistence, and response-redaction
-  behavior are closed in M020/M021 and independently rechecked by M027.
+- Default binding is loopback only.
+- Non-loopback binding requires explicit configuration and produces a warning.
+- Empty password is rejected when the service is enabled.
+- Existing configurations without `[i2pcontrol]` remain valid.
+- Authentication, token placement, secret persistence, and response redaction
+  were corrected in M020/M021 and remain retained evidence.
+- Disabled/default AddressBook isolation is under M028 correction and must not
+  be treated as closed before M029.
 
 ## HTTPS certificate behavior
 
-I2PControl is served over HTTPS. Certificate behavior:
+I2PControl is served over HTTPS.
 
-1. **Operator-provided**: If `certificate` and `private_key` paths are configured, those files are loaded.
-2. **Managed self-signed**: If no paths are configured, a self-signed certificate is generated under `<base_path>/i2pcontrol-certs/`.
-   - Generated only when I2PControl is enabled.
-   - Written atomically; not regenerated on every start.
-   - Certificate identity is stable across restarts.
-   - Invalid existing material triggers regeneration.
+1. When `certificate` and `private_key` are configured, those files are loaded.
+2. Otherwise, a managed self-signed certificate is generated under
+   `<base_path>/i2pcontrol-certs/`.
+3. Managed material is generated only when I2PControl starts, is written
+   atomically, remains stable across restart, and is regenerated when invalid.
 
-**No plaintext HTTP fallback is supported.**
+There is no plaintext HTTP fallback.
 
 ## Authentication
 
-Emissary follows the I2PControl authentication flow: `Authenticate` accepts
-`API` and `Password`, returns a string `Token` and numeric `API`, and protected
-requests place that token in `params.Token`.
+`Authenticate` accepts `API` and `Password`, returns an opaque string `Token`
+and numeric `API`, and protected requests put the token in `params.Token`.
 
 ```json
 {
@@ -98,7 +101,7 @@ requests place that token in `params.Token`.
 }
 ```
 
-Current success response:
+Success:
 
 ```json
 {
@@ -111,7 +114,7 @@ Current success response:
 }
 ```
 
-Subsequent protected requests include `Token` with their method parameters:
+Protected request:
 
 ```json
 {
@@ -125,86 +128,107 @@ Subsequent protected requests include `Token` with their method parameters:
 }
 ```
 
-`X-I2PControl-Token` remains a compatibility-only transport. If both forms
-are present, they must match; the header never overrides `params.Token`.
+`X-I2PControl-Token` is compatibility-only. When both token forms are present,
+they must match.
 
-Authentication failures use the standard I2PControl-specific error inventory:
-missing password (`-32001`), missing token (`-32002`), unknown token
-(`-32003`), missing API version (`-32005`), and unsupported API version
-(`-32006`). Token state is in-memory only, so restart invalidates all tokens.
+Authentication failures use the I2PControl-specific error inventory:
 
-Notifications execute normal authentication, validation, and handler side
-effects but return HTTP `204 No Content`. An explicit `id: null` is retained as
-a response ID and is not treated as a notification.
+- invalid password: `-32001`;
+- missing token: `-32002`;
+- unknown token: `-32003`;
+- expired token: `-32004` when applicable;
+- missing API version: `-32005`;
+- unsupported API version: `-32006`.
 
-### Token behavior retained for review
+Tokens are cryptographically random, bounded, in-memory only, and invalidated
+on process restart.
 
-- Tokens are cryptographically random and opaque.
-- Tokens are stored in memory only.
-- Tokens are invalidated on process restart.
-- Token count is bounded.
+JSON-RPC notifications execute validation and side effects but suppress the
+response. An explicit `id: null` remains a request ID rather than a
+notification.
 
-The exact error-code and conflict behavior is part of M020 and must not be treated as closed before its implementation disposition.
+## Current retained implementation
 
-## Foundation status
+Retained implementation includes:
 
-The repository contains a substantial I2PControl implementation with M027
-literal conformance evidence:
+- feature-gated HTTPS serving with bounded connections, bodies, and requests;
+- standard authentication and JSON-RPC behavior;
+- exact Proposal 170 method/selector/action/type parsers and literal fixtures;
+- durable generation stores and atomic TunnelManager mutation;
+- explicit unsupported backends for missing tunnel data planes;
+- startup-managed tunnel inventory and service lifecycle observation;
+- bounded recoverable SAM observation;
+- RouterInfo source classification and no-fabrication behavior;
+- enabled-mode runtime AddressBook authority.
 
-- feature-gated HTTPS serving;
-- bounded request bodies, connection tasks, and concurrent requests;
-- typed Proposal 170 tunnel/action/domain models;
-- exhaustive explicit unsupported tunnel backend registry;
-- versioned generation-store persistence;
-- passive service registry;
-- bounded SAM observation handle;
-- RouterInfo contract/source adapters;
-- production composition and focused tests.
-
-These components are not all operational Proposal 170 capability: unavailable
-RouterInfo sources and unsupported tunnel data planes remain explicit.
+M028 does not reopen these areas except for the AddressBook activation boundary.
 
 ## Corrective sequence
 
-| Milestone | Scope |
-|---|---|
-| M020 | existing I2PControl authentication/token/error and JSON-RPC correctness |
-| M021 | exact TunnelManager wire, atomic persistence, and secret boundary |
-| M022 | actual runtime AddressBook authority and source objects |
-| M023 | startup tunnel inventory and ClientServicesInfo lifecycle/address truthfulness |
-| M024 | recoverable bounded SAM observation |
-| M025 | exact RouterInfo contract/source matrix |
-| M026 | closed bounded-source audit; no additional authoritative sources identified |
-| M027 | closed: partial Proposal 170 support; literal conformance and independent reclosure |
-
-See `plans/implementation/i2pcontrol-proposal-170/README.md` for dependencies and handoff rules.
+| Milestone | Status | Scope |
+|---|---|---|
+| M020–M027 | retained evidence | base/wire/persistence/source corrections and literal review |
+| M028 | ready | restore status chronology and isolate AddressBook control state behind compile-time/runtime enablement |
+| M029 | blocked | independent final-head conformance review |
 
 ## Support dimensions
 
-M018 reconciled the wire contract and M019 independently accepted the final
-head against the pinned revision. See the planning records for the bounded
-closure statement and source metadata.
+Claims are separated into:
 
-- **Wire** — exact names, casing, parameter-presence rules, response fields, and JSON types.
-- **Source** — a truthful current Emissary data source exists.
+- **Wire** — exact names, casing, presence rules, response fields, and JSON types.
+- **Source** — a truthful current Emissary source exists.
 - **Runtime** — a real backend performs the operation.
 - **Persistence** — mutation is durable and failure-atomic.
-- **Evidence** — literal external-contract, failure, restart, and production-composition proof exists.
+- **Feature isolation** — disabled/default execution is unaffected by the administrative feature.
+- **Evidence** — literal, failure, restart, composition, and transition proof exists.
 
-Compatibility aliases, unavailable fields, administrative shadow stores, and unsupported backend stubs are not counted as full operational implementation.
+Compatibility aliases, unavailable fields, stored definitions, and unsupported
+backend stubs are not operational coverage.
+
+## RouterInfo source status
+
+The retained matrix contains:
+
+- 16 available selectors;
+- 1 protocol-permitted neutral selector;
+- 26 unavailable selectors.
+
+Unavailable selectors fail explicitly and are never substituted with zero,
+false, empty, or semantically adjacent values.
 
 ## Missing tunnel data planes
 
-Proposal 170 corrective work does **not** implement missing tunnel data planes. HTTP, IRC, SOCKS-IRC, CONNECT, Streamr, bidirectional, and other missing listener/destination/LeaseSet/traffic implementations remain separate security-focused work.
+This workstream does not implement missing HTTP, IRC, SOCKS-IRC, CONNECT,
+Streamr, bidirectional, or other listener/destination/LeaseSet/traffic paths.
+Their definitions may parse and persist, but start/restart must fail explicitly,
+stop must remain safe, and no unsupported type may report running or allocate a
+runtime resource.
 
-The current API may retain their definitions and explicit unsupported runtime behavior. It must not report them running or simulate success.
+## AddressBook enabled/disabled boundary
+
+Target behavior owned by M028:
+
+- without the compile-time feature, Proposal 170 control state is absent;
+- with the feature compiled but runtime-disabled, control state is not read or
+  written;
+- enabled mode constructs one control owner shared with normal lookup;
+- disabling after prior use preserves but ignores control-state files;
+- re-enabling restores the retained state;
+- ordinary legacy address files and downloads remain authoritative while the
+  control plane is inactive.
+
+The current baseline does not yet satisfy this boundary; that is why status is
+`corrective pass required`.
 
 ## No frontend controls
 
-I2PControl does not add frontend controls, screens, views, or frontend-owned state. It runs independently of the UI. The corrective roadmap preserves this separation.
+I2PControl does not add frontend controls, views, or frontend-owned state.
 
 ## Internal-only boundary
 
 All work is internal to `eggstack/emissary`.
 
-No plan authorizes upstream issues, pull requests, reviews, discussions, submissions, patches, maintainer outreach, merge preparation, or writes to any upstream/third-party repository. External specifications and source trees may be inspected read-only for internal correctness only.
+No plan authorizes upstream issues, pull requests, reviews, discussions,
+submissions, patches, maintainer outreach, contribution preparation, adoption
+requests, or merge activity. External specifications and source trees may be
+inspected read-only solely for internal correctness.

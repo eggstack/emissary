@@ -1,6 +1,6 @@
 # M030 — AddressBook Destination and Owner-Coherence Corrective Pass
 
-Status: ready
+Status: closed
 
 Source roadmap:
 

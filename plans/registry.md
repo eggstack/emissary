@@ -27,36 +27,36 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M030 ready | M029 invalidated by enabled AddressBook destination/lookup owner-coherence defects |
+| I2PControl Proposal 170 | partial Proposal 170 support | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M030 closed | No in-scope blocker; unavailable sources/data planes remain outside this correction |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M030 — AddressBook destination and owner coherence | ready | `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md` | none |
+| I2PControl Proposal 170 | M030 — AddressBook destination and owner coherence | closed | `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md` | M029 invalidation corrected |
 
 ## Registered successor handoffs
 
 | Subsystem | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|---|
-| — | None | — | — | A distinct reclosure plan may be registered only after M030 freezes and closes |
+| — | None | — | — | No successor is currently authorized or dependency-ready; remaining unavailable capabilities require separately scoped plans |
 
 ## Active closure work
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| — | None | — | — | M030 has not landed |
+| — | None | — | — | M030 implementation and final closure records are complete |
 
 ## Current corrective findings
 
 | Finding | Severity | Owner | State |
 |---|---|---|---|
-| Active Base64 lookup reads a legacy destination file before the active control owner | high owner-coherence defect | M030 | ready |
-| Published control-state seeding copies Base32 cache values as destinations | high source/type defect | M030 | ready |
-| Active download `or_insert` can retain an incomplete Base32-seeded value | medium persistence/source defect | M030 | ready |
-| Update/delete regressions do not check Base64 lookup with a stale legacy file | high evidence defect | M030 | ready |
-| First activation and repair paths lack full-destination structural evidence | medium evidence/security defect | M030 | ready |
-| Independent final-head reclosure after M030 | high evidence gate | future, unregistered | blocked on M030 closure |
+| Active Base64 lookup reads a legacy destination file before the active control owner | high owner-coherence defect | M030 | closed |
+| Published control-state seeding copies Base32 cache values as destinations | high source/type defect | M030 | closed |
+| Active download `or_insert` can retain an incomplete Base32-seeded value | medium persistence/source defect | M030 | closed |
+| Update/delete regressions do not check Base64 lookup with a stale legacy file | high evidence defect | M030 | closed |
+| First activation and repair paths lack full-destination structural evidence | medium evidence/security defect | M030 | closed |
+| Independent final-head reclosure after M030 | high evidence gate | M030 | closed |
 
 Authoritative invalidation:
 
@@ -136,9 +136,9 @@ A changed proposal revision blocks M030 and requires a contract-rebase plan.
 
 ## Registry maintenance rules
 
-1. M030 is the only dependency-ready implementation handoff.
+1. No implementation handoff is currently dependency-ready.
 2. M029 is historical invalidated evidence and must not be represented as controlling closure.
-3. Do not register a reclosure successor until M030 has a frozen implementation/test head and accepted implementation closure.
+3. M030's frozen implementation/test head and distinct final-head closure are recorded in the 030 closure records.
 4. Preserve M020–M028 unrelated evidence; do not reopen method families without a demonstrated defect.
 5. Active owner lookup must be coherent across administrative, RouterInfo, Base32, and Base64 views.
 6. Published Proposal 170 entries must contain validated full destinations, not Base32 cache values.

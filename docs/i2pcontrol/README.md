@@ -10,12 +10,13 @@ Historical invalidation and completed corrective sequence:
 - `plans/closure/i2pcontrol-proposal-170/027-closure-invalidation.md`
 - `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 - `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
+- `plans/closure/i2pcontrol-proposal-170/030-closure.md`
 
 M020–M027 implementation/evidence remains retained, but M027's final disposition
 is historical invalidated evidence. The post-M027 merge that revived M019 is
 historical and superseded. M028 restored strict AddressBook feature/runtime
-isolation, and M029 independently reviewed the corrected head and accepted the
-bounded result as the controlling partial-support closure.
+isolation. M030 corrected destination/lookup owner coherence and independently
+closed the AddressBook dimension; the bounded result remains partial support.
 
 The expected bounded final status remains `partial Proposal 170 support` while
 26 RouterInfo selectors lack bounded authoritative sources and missing tunnel
@@ -39,6 +40,8 @@ cargo build -p emissary-cli --all-features
 M028 specifically provides proof that a build without `i2pcontrol`, and a build
 where the feature is compiled but runtime configuration is disabled, do not
 read, write, migrate, or consult Proposal 170 AddressBook control state.
+When enabled, one runtime owner is authoritative for administrative, RouterInfo,
+Base32, and Base64 AddressBook views.
 
 ## Runtime enablement
 
@@ -71,7 +74,7 @@ password = "your-secure-password"
 - Authentication, token placement, secret persistence, and response redaction
   were corrected in M020/M021 and remain retained evidence.
 - Disabled/default AddressBook isolation was corrected by M028 and independently
-  revalidated by M029.
+  revalidated in the M030 final-head review.
 
 ## HTTPS certificate behavior
 
@@ -170,7 +173,8 @@ M028 does not reopen these areas except for the AddressBook activation boundary.
 |---|---|---|
 | M020–M027 | retained evidence | base/wire/persistence/source corrections and literal review |
 | M028 | closed for implementation | status chronology and AddressBook control-state isolation |
-| M029 | closed; partial Proposal 170 support | independent final-head conformance review accepted |
+| M029 | historical invalidated closure | retained non-AddressBook evidence |
+| M030 | closed; partial Proposal 170 support | AddressBook destination/lookup coherence and final-head review accepted |
 
 ## Support dimensions
 
@@ -218,8 +222,10 @@ M028 implementation evidence now covers:
 - ordinary legacy address files and downloads remain authoritative while the
   control plane is inactive.
 
-M029 independently reviewed this corrected implementation head. The accepted
-subsystem status is `partial Proposal 170 support`.
+M030 independently reviewed this corrected implementation head. The accepted
+subsystem status is `partial Proposal 170 support`; enabled AddressBook
+administrative, RouterInfo, Base32, and Base64 views now share one validated
+full-destination owner.
 
 ## No frontend controls
 

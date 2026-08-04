@@ -1,20 +1,21 @@
 # Proposal 170 AddressBook Administrative API
 
-Status: partial Proposal 170 support; M029 closure accepted
+Status: partial Proposal 170 support; M030 closure accepted
 
 Historical corrective implementation:
 
 - M028, `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
+- M030, `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md`
 
 The enabled-mode Proposal 170 wire, mutation, source, and persistence behavior
 implemented by M022 remains retained evidence. M028 corrected the narrower
 defect: the runtime control owner was constructed and used by ordinary
 AddressBook execution even when I2PControl was not runtime-enabled.
 
-M028 now provides focused proof that no-feature and runtime-disabled execution
+M028 provides focused proof that no-feature and runtime-disabled execution
 preserve legacy AddressBook behavior without reading, writing, migrating, or
-consulting Proposal 170 control state. M029 independently reviewed the
-corrected final head and accepted the bounded feature-isolation result.
+consulting Proposal 170 control state. M030 corrected enabled-mode destination
+and lookup coherence and independently closed this AddressBook dimension.
 
 ## Overview
 
@@ -25,7 +26,12 @@ When I2PControl is enabled, successful entry mutations must be committed by one
 runtime control owner and immediately visible to normal destination lookup.
 Runtime precedence remains private, local, router, then published. A hostname
 collision across books is rejected rather than silently changing precedence.
-The downloaded hosts source is the published source.
+When enabled, the runtime owner is authoritative for both Base32 and Base64
+lookup; a missing owner entry never falls through to a stale legacy destination
+file. Published entries always contain validated full Base64 destinations.
+First activation imports bounded destination files, and established state is
+repaired only when a matching full destination exists. Re-enabling an
+established owner does not resurrect deleted entries from stale legacy files.
 
 Canonical Proposal 170 requests use one `AddressBook` method and select exactly
 one mode. The linked reference implementation returns operation details inside
@@ -144,6 +150,11 @@ Former I2PControl administrative generations may be one-time migration input
 only when no runtime control authority exists. They must never remain a second
 authority.
 
+The legacy runtime `addresses` cache is used only for derived Base32 lookup
+indexes. It is never stored or emitted as a Proposal 170 destination. Legacy
+destination files are read only through the bounded first-activation/repair
+seam described above.
+
 ## Disabled/default behavior implemented by M028
 
 Target behavior when the feature is absent or runtime-disabled:
@@ -161,7 +172,7 @@ When I2PControl is re-enabled, retained control state is loaded again under the
 enabled-mode precedence and migration rules.
 
 The corrected M028 implementation satisfies this disabled/default boundary, and
-M029 revalidated it against the final repository head.
+M030 revalidated it against the frozen final repository head.
 
 ## Security
 
@@ -192,9 +203,10 @@ paths.
 
 ## Closure rule
 
-M028 implemented the activation boundary with focused no-feature,
-runtime-disabled, enabled, restart, and disable/re-enable evidence. M029
-independently reviewed the actual final head and accepted this boundary.
+M028 implemented the feature boundary. M030 implemented and independently
+reviewed the destination-owner activation, repair, lookup, download, restart,
+and disable/re-enable evidence on the frozen final head.
 
 No AddressBook document claims support for unavailable sources or unsupported
-tunnel runtimes; the feature-isolation boundary is closed by M029.
+tunnel runtimes; the feature-isolation and destination-owner boundaries are
+closed by M030.

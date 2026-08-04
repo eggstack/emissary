@@ -1,6 +1,6 @@
 # I2PControl Security
 
-Status: M027 security recheck passed; M021 secret-boundary and atomic-publication requirements closed
+Status: M030 security recheck passed; M021 secret-boundary and atomic-publication requirements closed
 
 This document describes the security properties and considerations for the I2PControl administrative state in Emissary.
 
@@ -127,12 +127,15 @@ Each store has a configurable maximum size limit. State that exceeds this limit 
 - No tasks are launched from persisted state
 - Runtime adoption happens only through explicit handler calls
 
-### No runtime resolver integration
+### Runtime resolver owner coherence
 
-Administrative address books are independent from the runtime resolver:
-- Private, local, router, and published books are stored separately
-- No book entry affects destination resolution
-- Existing runtime address book files are untouched
+When I2PControl is disabled, administrative state remains independent from the
+runtime resolver and existing runtime files are untouched. When enabled, the
+single runtime AddressBook owner is intentionally authoritative for lookup:
+- Private, local, router, and published books remain stored separately
+- Base32 and Base64 lookup use the owner and never fall through to stale legacy files
+- Published entries are structurally validated full destinations
+- Legacy destination import/repair is bounded, filename-confined, and symlink-safe
 
 ### Configuration isolation
 

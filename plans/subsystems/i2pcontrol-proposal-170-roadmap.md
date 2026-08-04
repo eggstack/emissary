@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Corrective Roadmap
 
-Status: corrective pass required
+Status: partial Proposal 170 support
 
 Current corrective baseline:
 
@@ -82,7 +82,8 @@ At the M029 closure head:
 7. focused evidence checks Base32 deletion but not Base64 deletion with a stale
    file.
 
-The controlling subsystem status is `corrective pass required`.
+The controlling subsystem status is now `partial Proposal 170 support`; M030
+closed the demonstrated in-scope AddressBook defect.
 
 ## 4. Scope boundary
 
@@ -196,9 +197,9 @@ M030 AddressBook destination and owner coherence
 future distinct final-head reclosure
 ```
 
-Only M030 is dependency-ready and registered. A successor reclosure plan must
-not be registered until M030 has a frozen implementation/test head and accepted
-implementation closure.
+M030 is the only implementation handoff for this corrective slice. Its
+implementation and distinct final-head closure are recorded below; no successor
+is dependency-ready within the current scope.
 
 ## 8. Milestones
 
@@ -224,7 +225,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md`
 
-Status: ready
+Status: closed
 
 Objective:
 
@@ -247,6 +248,15 @@ Exit conditions:
 - production diff stays within the explicit file budget;
 - no high/medium M030 defect remains;
 - implementation disposition and closure are committed.
+
+M030 is closed by:
+
+- `plans/closure/i2pcontrol-proposal-170/030-implementation-disposition.md`;
+- `plans/closure/i2pcontrol-proposal-170/030-closure.md`.
+
+The final disposition remains `partial Proposal 170 support`: the corrected
+AddressBook dimension is closed, while unavailable RouterInfo sources and
+missing tunnel data planes remain explicit and out of scope.
 
 ## 9. Cross-cutting invariants
 

@@ -17,11 +17,14 @@ Closed handoffs:
 - M028 closed for implementation: `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 - M029 closed: `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`; closure:
   `plans/closure/i2pcontrol-proposal-170/029-closure.md`
+- M030 closed: `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/030-closure.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained corrective
 evidence, while M027's final disposition is historical invalidated evidence.
 M028's implementation disposition and closure record contain the
-feature-isolation correction evidence; M029's closure is now controlling.
+feature-isolation correction evidence; M030's implementation disposition and
+final-head closure are now controlling for AddressBook destination coherence.
 
 ## Status model
 
@@ -42,12 +45,13 @@ implementation.
 
 ## Current overall disposition
 
-The repository is closed for the authorized in-scope dimensions. M029 reviewed
-the corrected M028 head and accepted the final disposition as partial Proposal
-170 support.
+The repository is closed for the authorized in-scope dimensions. M030 reviewed
+the corrected AddressBook head and accepted the final disposition as partial
+Proposal 170 support.
 
-M028 owns and implemented the status/feature-boundary correction. M029
-performed the independent final-head review.
+M028 owns the status/feature-boundary correction. M030 owns the destination
+authority, lookup precedence, bounded import/repair, and independent final-head
+review.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because 26 of the 43 RouterInfo additions lack
@@ -204,11 +208,12 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 |---|---|---|
 | M020–M027 | retained evidence | base/wire/persistence/source corrections and literal review |
 | M028 | closed for implementation | post-M027 status repair and AddressBook compile/runtime feature isolation |
-| M029 | closed; partial Proposal 170 support | independent final-head in-scope conformance review |
+| M029 | historical invalidated closure | retained non-AddressBook evidence |
+| M030 | closed; partial Proposal 170 support | AddressBook destination/lookup coherence and final-head review |
 
 ## Final-status rule
 
-M029 may select:
+M030 selected:
 
 - `partial Proposal 170 support` when all implemented/claimed dimensions pass
   but one or more sources/runtimes remain unavailable;

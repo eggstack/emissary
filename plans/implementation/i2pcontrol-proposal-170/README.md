@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: corrective pass required
+Status: partial Proposal 170 support
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -9,7 +9,7 @@ Authoritative direction:
 - `plans/003-planning-process.md`
 - `plans/adrs/ADR-0001-proposal-170-contract-and-stub-boundary.md`
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
-- `plans/closure/i2pcontrol-proposal-170/029-closure-invalidation.md`
+- `plans/closure/i2pcontrol-proposal-170/030-closure.md`
 
 Pinned external authority:
 
@@ -37,9 +37,11 @@ Violation is a stop condition and invalidates affected evidence.
 
 | Handoff | Status | Plan | Dependency |
 |---|---|---|---|
-| M030 — AddressBook destination and owner coherence | ready | `030-addressbook-destination-owner-coherence.md` | none |
+| M030 — AddressBook destination and owner coherence | closed | `030-addressbook-destination-owner-coherence.md` | M029 invalidation corrected |
 
-No successor reclosure plan is registered. It may be created and registered only after M030 has a frozen implementation/test head and accepted implementation closure.
+No successor reclosure plan is registered. M030's distinct final-head closure is
+complete; unavailable RouterInfo sources and missing tunnel data planes remain
+outside this handoff and require separately authorized future plans.
 
 ## Current defect boundary
 

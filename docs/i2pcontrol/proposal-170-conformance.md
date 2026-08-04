@@ -1,6 +1,6 @@
 # Proposal 170 Conformance Matrix
 
-Status: partial Proposal 170 support; M029 revalidated retained matrix
+Status: partial Proposal 170 support; M030 AddressBook closure accepted
 
 Proposal 170 remains Open. This workstream is pinned to the revision created
 and last updated on `2026-05-20`.
@@ -12,6 +12,7 @@ Historical invalidation:
 Completed implementation correction:
 
 - M028, `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
+- M030, `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md`
 
 Controlling final closure:
 
@@ -19,8 +20,9 @@ Controlling final closure:
 
 M019 is superseded and non-controlling. M020–M027 remain retained evidence, and
 M027's final subsystem disposition remains historical invalidated evidence.
-M028 is implemented and closed with the required boundary evidence. M029
-reviewed the actual final head and accepted partial Proposal 170 support.
+M028 is implemented and closed with the required boundary evidence. M030
+reviewed the actual AddressBook final head and accepted partial Proposal 170
+support.
 
 ## Retained machine-readable matrix
 
@@ -115,6 +117,11 @@ M028 added and tested the missing negative boundary evidence:
 - enabled: retained M022 behavior;
 - disable/re-enable: preserve/ignore/restore state without duplicate authority.
 
+M030 additionally proves that enabled administrative, RouterInfo, Base32, and
+Base64 views share one full-destination owner, including first activation,
+historical seed repair, stale-file update/delete, download merge, and
+re-enable deletion semantics.
+
 ### ClientServicesInfo
 
 Retained M023/M024 evidence covers:
@@ -174,9 +181,9 @@ directly affected dependency/docs/tests. It must not change:
 
 A change to any of those areas requires a new recorded defect and separate plan.
 
-## M029 final-status rule
+## M030 final-status rule
 
-M029 may select:
+M030 selected:
 
 - `partial Proposal 170 support` when every implemented/claimed dimension is
   exact and evidenced but one or more sources/runtimes remain unavailable;

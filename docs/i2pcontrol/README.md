@@ -168,6 +168,8 @@ Retained implementation includes:
 - bounded recoverable SAM observation;
 - RouterInfo source classification and no-fabrication behavior;
 - enabled-mode runtime AddressBook authority.
+- reviewed constant-time authentication, bounded failed-login throttling, and
+  bounded publication with prior-generation recovery;
 
 M028 does not reopen these areas except for the AddressBook activation boundary.
 
@@ -187,7 +189,9 @@ Claims are separated into:
 - **Wire** — exact names, casing, presence rules, response fields, and JSON types.
 - **Source** — a truthful current Emissary source exists.
 - **Runtime** — a real backend performs the operation.
-- **Persistence** — mutation is durable and failure-atomic.
+- **Persistence** — mutation is process-crash atomic with prior-generation
+  recovery; where directory synchronization is supported and succeeds, the
+  documented power-loss durability point is also reached.
 - **Feature isolation** — disabled/default execution is unaffected by the administrative feature.
 - **Evidence** — literal, failure, restart, composition, and transition proof exists.
 

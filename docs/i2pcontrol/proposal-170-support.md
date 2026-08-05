@@ -47,7 +47,7 @@ Support is reported separately as:
 | Wire | exact public request/response names, casing, presence semantics, and JSON types |
 | Source | truthful current Emissary source exists |
 | Runtime | a real backend performs the requested operation |
-| Persistence | mutation is durable and failure-atomic |
+| Persistence | process-crash atomic/recoverable mutation; qualified power-loss durability |
 | Feature isolation | disabled/default execution is unaffected by the administrative feature |
 | Evidence | literal external-contract, failure, restart, composition, and transition proof exists |
 

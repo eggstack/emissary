@@ -43,6 +43,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::i2pcontrol::domain::revision::StateRevision;
+use crate::i2pcontrol::stores::publication::{ensure_directory, sync_directory, write_synced_file};
 
 /// Schema identifier for persistence envelopes.
 pub const SCHEMA_IDENTIFIER: &str = "emissary-i2pcontrol";
@@ -94,28 +95,6 @@ fn validate_confined_path(path: &Path, base: &Path) -> StoreResult<PathBuf> {
     }
 
     Ok(canonical)
-}
-
-/// Set restrictive file permissions (owner read/write only) on Unix.
-///
-/// On non-Unix platforms, this is a no-op since permission semantics differ.
-#[cfg(unix)]
-fn set_restrictive_permissions(path: &Path) -> StoreResult<()> {
-    use std::os::unix::fs::PermissionsExt;
-    let perms = std::fs::Permissions::from_mode(0o600);
-    std::fs::set_permissions(path, perms).map_err(|e| {
-        StoreError::Io(format!(
-            "failed to set permissions on {}: {}",
-            path.display(),
-            e
-        ))
-    })
-}
-
-#[cfg(not(unix))]
-fn set_restrictive_permissions(_path: &Path) -> StoreResult<()> {
-    // Non-Unix platforms: permission bits not applicable; rely on OS file permissions.
-    Ok(())
 }
 
 /// A versioned persistence envelope.
@@ -250,6 +229,9 @@ pub struct GenerationStore<T> {
 
     #[cfg(test)]
     fail_next_permission_change: bool,
+
+    #[cfg(test)]
+    fail_next_directory_sync: bool,
 }
 
 #[allow(dead_code)]
@@ -271,6 +253,8 @@ where
             fail_next_publication: false,
             #[cfg(test)]
             fail_next_permission_change: false,
+            #[cfg(test)]
+            fail_next_directory_sync: false,
         }
     }
 
@@ -284,6 +268,12 @@ where
     #[cfg(test)]
     pub fn fail_next_permission_change(&mut self) {
         self.fail_next_permission_change = true;
+    }
+
+    /// Cause the next publication to fail after the generation rename.
+    #[cfg(test)]
+    pub fn fail_next_directory_sync(&mut self) {
+        self.fail_next_directory_sync = true;
     }
 
     /// Validate that the store directory is safe (not a symlink, not escaping base).
@@ -358,36 +348,14 @@ where
             });
         }
 
-        // Ensure directory exists
-        tokio::fs::create_dir_all(&self.dir)
-            .await
-            .map_err(|e| StoreError::Io(e.to_string()))?;
+        // Ensure the fixed store directory exists and is not a symlink.
+        ensure_directory(&self.dir).await.map_err(StoreError::Io)?;
 
         // Generate unique filename
         let gen_name = format!("gen-{:020}.json", new_revision.value());
         let temp_name = format!(".tmp-{}", gen_name);
         let temp_path = self.dir.join(&temp_name);
         let final_path = self.dir.join(&gen_name);
-
-        // Write to temporary file
-        if let Err(e) = tokio::fs::write(&temp_path, &json).await {
-            let _ = tokio::fs::remove_file(&temp_path).await;
-            return Err(StoreError::Io(e.to_string()));
-        }
-
-        // Flush and sync to ensure durability before rename
-        let temp_file = match tokio::fs::File::open(&temp_path).await {
-            Ok(file) => file,
-            Err(e) => {
-                let _ = tokio::fs::remove_file(&temp_path).await;
-                return Err(StoreError::Io(e.to_string()));
-            }
-        };
-        if let Err(e) = temp_file.sync_all().await {
-            let _ = tokio::fs::remove_file(&temp_path).await;
-            return Err(StoreError::Io(format!("sync failed: {}", e)));
-        }
-        drop(temp_file);
 
         // Secret-bearing tunnel definitions must never be published without
         // restrictive permissions on platforms where those permissions exist.
@@ -399,9 +367,10 @@ where
                 "injected permission-setting failure".to_string(),
             ));
         }
-        if let Err(e) = set_restrictive_permissions(&temp_path) {
+
+        if let Err(error) = write_synced_file(&temp_path, &json, self.max_size).await {
             let _ = tokio::fs::remove_file(&temp_path).await;
-            return Err(e);
+            return Err(StoreError::Io(error));
         }
 
         #[cfg(test)]
@@ -416,6 +385,16 @@ where
             let _ = tokio::fs::remove_file(&temp_path).await;
             return Err(StoreError::Io(e.to_string()));
         }
+
+        #[cfg(test)]
+        if self.fail_next_directory_sync {
+            self.fail_next_directory_sync = false;
+            let _ = tokio::fs::remove_file(&final_path).await;
+            return Err(StoreError::Io(
+                "injected directory-sync failure".to_string(),
+            ));
+        }
+        sync_directory(&self.dir).await.map_err(StoreError::Io)?;
 
         // Update in-memory state
         self.current = Some(state);
@@ -457,7 +436,7 @@ where
                 );
                 continue;
             }
-            if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
+            if is_generation_file(&path) {
                 entries.push(path);
             }
             if entries.len() >= MAX_GENERATION_SCAN {
@@ -533,7 +512,7 @@ where
         if let Ok(mut dir_entries) = tokio::fs::read_dir(&self.dir).await {
             while let Ok(Some(entry)) = dir_entries.next_entry().await {
                 let path = entry.path();
-                if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
+                if is_generation_file(&path) {
                     entries.push(path);
                 }
             }
@@ -550,6 +529,14 @@ where
             let _ = tokio::fs::remove_file(path).await;
         }
     }
+}
+
+fn is_generation_file(path: &Path) -> bool {
+    path.is_file()
+        && path.extension().is_some_and(|ext| ext == "json")
+        && !path
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy().starts_with('.'))
 }
 
 #[cfg(test)]
@@ -972,6 +959,68 @@ mod tests {
         let loaded = store2.load().await.unwrap();
         assert_eq!(loaded, Some(StateRevision::new(1)));
 
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn publication_failure_preserves_prior_live_generation() {
+        let dir = test_store_dir();
+        let mut store = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        store
+            .publish(
+                TestPayload {
+                    value: "prior".to_string(),
+                },
+                |_| Ok(()),
+            )
+            .await
+            .unwrap();
+        store.fail_next_publication();
+        assert!(store
+            .publish(
+                TestPayload {
+                    value: "rejected".to_string(),
+                },
+                |_| Ok(()),
+            )
+            .await
+            .is_err());
+        assert_eq!(store.current().unwrap().value, "prior");
+
+        let mut restarted = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        restarted.load().await.unwrap();
+        assert_eq!(restarted.current().unwrap().value, "prior");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn directory_sync_failure_does_not_update_live_state() {
+        let dir = test_store_dir();
+        let mut store = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        store
+            .publish(
+                TestPayload {
+                    value: "prior".to_string(),
+                },
+                |_| Ok(()),
+            )
+            .await
+            .unwrap();
+        store.fail_next_directory_sync();
+        assert!(store
+            .publish(
+                TestPayload {
+                    value: "rejected".to_string(),
+                },
+                |_| Ok(()),
+            )
+            .await
+            .is_err());
+        assert_eq!(store.current().unwrap().value, "prior");
+
+        let mut restarted = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        restarted.load().await.unwrap();
+        assert_eq!(restarted.current().unwrap().value, "prior");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -1,7 +1,7 @@
 # I2PControl Security
 
-Status: M034 setter-truthfulness review passed; M021/M030/M032 requirements
-retained
+Status: M036 authentication and publication hardening implemented; M021/M030/M032
+requirements retained
 
 This document describes the security properties and considerations for the I2PControl administrative state in Emissary.
 
@@ -9,10 +9,14 @@ This document describes the security properties and considerations for the I2PCo
 
 I2PControl uses JSON-RPC authentication with opaque tokens:
 
-- Passwords are compared timing-resistantly
+- Passwords use the reviewed `subtle` constant-time primitive with fixed-size
+  padding and explicit length handling
 - Tokens are cryptographically random (32 bytes, hex-encoded)
 - Tokens are stored in-memory only; no persistence
 - Maximum concurrent tokens bounded at 1024
+- Failed authentication is throttled per accepted TCP peer with a fixed-capacity
+  monotonic-window table and bounded delay; successful authentication clears
+  that peer's failure state
 - Credentials are never logged or included in Debug output
 
 See [README.md](README.md) for authentication details.
@@ -86,6 +90,14 @@ State updates use atomic rename to prevent corruption:
 1. Write to a temporary file (`.tmp-gen-NNNNNN.json`)
 2. Flush and sync the file
 3. Rename to the final path (`gen-NNNNNN.json`)
+4. Sync the containing directory where supported
+5. Update the in-memory snapshot only after the selected publication point
+
+This establishes process-crash atomicity and prior-generation recovery. Where
+directory synchronization is available and succeeds, it also establishes the
+documented power-loss durability point. Platforms without an equivalent API
+retain the atomicity/recovery guarantee but are not described as power-loss
+durable.
 
 If the process crashes during publication:
 - Temporary files are detected and skipped on next load
@@ -98,9 +110,10 @@ in-memory snapshot.
 
 The server destination store publishes bounded `current.json` and
 `backup.json` files. It writes and syncs a temporary file, applies owner-only
-permissions where supported, and atomically rotates current to backup before
-publishing the new current state. Corrupt current state falls back to a valid
-backup; corrupt state files and irregular/symlink files fail closed.
+permissions where supported, atomically rotates current to backup, publishes
+the new current state, and syncs the containing directory where supported.
+Corrupt current state falls back to a valid backup; corrupt state files and
+irregular/symlink files fail closed.
 
 ### Symlink rejection
 
@@ -205,9 +218,13 @@ This ensures the core router remains independent of administrative concerns.
 
 ## Known limitations
 
-### fsync not yet implemented
+### Platform-specific durability
 
-The generation store does not call `fsync` before rename. The atomic rename provides sufficient durability for most use cases, but `fsync` can be added later for stronger guarantees.
+Files are synced before rename and containing directories are synced after
+rename on Unix-like platforms that expose the directory through the standard
+filesystem API. On platforms without equivalent directory synchronization,
+success means process-crash atomicity and prior-generation recovery only; it is
+not an unqualified power-loss durability claim.
 
 ### Platform-specific permissions
 

@@ -100,7 +100,9 @@ coalesces refresh work to the newest complete generation. A successful result
 means the active source set and durable control state were both updated and one
 refresh was accepted; remote download success is not part of the setter's
 success condition. If the downloader is unavailable, the request fails and the
-previous set remains active and durable.
+previous set remains active and recoverable. On platforms with directory
+synchronization, the publication also reaches the documented power-loss
+durability point; other platforms retain process-crash atomicity only.
 
 Bounds:
 

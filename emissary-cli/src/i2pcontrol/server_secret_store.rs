@@ -14,6 +14,8 @@ use emissary_core::crypto::base64_decode;
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
 
+use crate::i2pcontrol::stores::publication::publish_with_backup;
+
 const STORE_DIRECTORY: &str = "server-destinations";
 const CURRENT_FILE: &str = "current.json";
 const BACKUP_FILE: &str = "backup.json";
@@ -69,6 +71,7 @@ struct StoreState {
 pub struct ServerDestinationStore {
     root: PathBuf,
     state: std::sync::Arc<tokio::sync::Mutex<StoreState>>,
+    mutation: std::sync::Arc<tokio::sync::Mutex<()>>,
 }
 
 impl fmt::Debug for ServerDestinationStore {
@@ -89,6 +92,7 @@ impl ServerDestinationStore {
             state: std::sync::Arc::new(tokio::sync::Mutex::new(StoreState {
                 entries: BTreeMap::new(),
             })),
+            mutation: std::sync::Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 
@@ -100,6 +104,7 @@ impl ServerDestinationStore {
 
     /// Load the newest valid current/backup state.
     pub async fn load(&self) -> Result<(), String> {
+        let _guard = self.mutation.lock().await;
         self.validate_root().await?;
         let current = self.read_file(CURRENT_FILE).await?;
         let backup = self.read_file(BACKUP_FILE).await?;
@@ -127,6 +132,7 @@ impl ServerDestinationStore {
     pub async fn put(&self, identity: &str, destination: StoredDestination) -> Result<(), String> {
         validate_identity(identity)?;
         validate_destination(destination.as_str())?;
+        let _guard = self.mutation.lock().await;
         let entries = {
             let state = self.state.lock().await;
             let mut entries = state.entries.clone();
@@ -144,6 +150,7 @@ impl ServerDestinationStore {
     /// Remove one identity after its owning definition has been removed.
     pub async fn remove(&self, identity: &str) -> Result<bool, String> {
         validate_identity(identity)?;
+        let _guard = self.mutation.lock().await;
         let entries = {
             let state = self.state.lock().await;
             if !state.entries.contains_key(identity) {
@@ -160,6 +167,7 @@ impl ServerDestinationStore {
 
     /// Remove crash leftovers that are no longer claimed by a definition.
     pub async fn prune_unreferenced(&self, referenced: &BTreeSet<String>) -> Result<(), String> {
+        let _guard = self.mutation.lock().await;
         let entries = {
             let state = self.state.lock().await;
             state
@@ -269,47 +277,15 @@ impl ServerDestinationStore {
             return Err("server destination state is oversized".to_string());
         }
 
-        let nonce: u64 = rand::rng().random();
-        let temp = self.root.join(format!(".tmp-{nonce:016x}"));
-        let current = self.root.join(CURRENT_FILE);
-        let backup = self.root.join(BACKUP_FILE);
-        tokio::fs::write(&temp, &bytes)
-            .await
-            .map_err(|_| "failed to write server destination state".to_string())?;
-        let file = tokio::fs::File::open(&temp)
-            .await
-            .map_err(|_| "failed to open server destination state".to_string())?;
-        if file.sync_all().await.is_err() {
-            let _ = tokio::fs::remove_file(&temp).await;
-            return Err("failed to sync server destination state".to_string());
-        }
-        drop(file);
-        set_restrictive_permissions(&temp).await?;
-
-        for path in [&current, &backup] {
-            if tokio::fs::symlink_metadata(path)
-                .await
-                .is_ok_and(|metadata| metadata.file_type().is_symlink())
-            {
-                let _ = tokio::fs::remove_file(&temp).await;
-                return Err("server destination state file is a symlink".to_string());
-            }
-        }
-        if tokio::fs::symlink_metadata(&current).await.is_ok() {
-            let _ = tokio::fs::remove_file(&backup).await;
-            if tokio::fs::rename(&current, &backup).await.is_err() {
-                let _ = tokio::fs::remove_file(&temp).await;
-                return Err("failed to publish server destination backup".to_string());
-            }
-        }
-        if tokio::fs::rename(&temp, &current).await.is_err() {
-            let _ = tokio::fs::remove_file(&temp).await;
-            if tokio::fs::symlink_metadata(&backup).await.is_ok() {
-                let _ = tokio::fs::rename(&backup, &current).await;
-            }
-            return Err("failed to publish server destination state".to_string());
-        }
-        Ok(())
+        publish_with_backup(
+            &self.root,
+            CURRENT_FILE,
+            BACKUP_FILE,
+            ".tmp-current.json",
+            &bytes,
+            MAX_STORE_SIZE,
+        )
+        .await
     }
 }
 
@@ -345,19 +321,6 @@ fn validate_entries(entries: &BTreeMap<String, String>) -> Result<(), String> {
         validate_identity(identity)?;
         validate_destination(destination)?;
     }
-    Ok(())
-}
-
-#[cfg(unix)]
-async fn set_restrictive_permissions(path: &Path) -> Result<(), String> {
-    use std::os::unix::fs::PermissionsExt;
-    tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
-        .await
-        .map_err(|_| "failed to set server destination permissions".to_string())
-}
-
-#[cfg(not(unix))]
-async fn set_restrictive_permissions(_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
@@ -404,5 +367,40 @@ mod tests {
             let restarted = ServerDestinationStore::new(root.path());
             assert!(restarted.load().await.is_err());
         }
+    }
+
+    #[tokio::test]
+    async fn stale_temp_does_not_override_current() {
+        let root = tempfile::tempdir().unwrap();
+        let store = ServerDestinationStore::new(root.path());
+        store.load().await.unwrap();
+        let identity = ServerDestinationStore::new_identity();
+        store.put(&identity, secret()).await.unwrap();
+        tokio::fs::write(store.directory().join(".tmp-current.json"), b"broken")
+            .await
+            .unwrap();
+
+        let restarted = ServerDestinationStore::new(root.path());
+        restarted.load().await.unwrap();
+        assert!(restarted.get(&identity).await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn concurrent_publications_retain_complete_generations() {
+        let root = tempfile::tempdir().unwrap();
+        let store = ServerDestinationStore::new(root.path());
+        store.load().await.unwrap();
+        let first = ServerDestinationStore::new_identity();
+        let second = ServerDestinationStore::new_identity();
+        let (left, right) = tokio::join!(store.put(&first, secret()), store.put(&second, secret()));
+        left.unwrap();
+        right.unwrap();
+
+        assert!(store.get(&first).await.unwrap().is_some());
+        assert!(store.get(&second).await.unwrap().is_some());
+        let restarted = ServerDestinationStore::new(root.path());
+        restarted.load().await.unwrap();
+        assert!(restarted.get(&first).await.unwrap().is_some());
+        assert!(restarted.get(&second).await.unwrap().is_some());
     }
 }

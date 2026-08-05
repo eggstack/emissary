@@ -19,5 +19,6 @@
 pub mod address_book_store;
 pub mod fakes;
 pub mod generation_store;
+pub(crate) mod publication;
 pub mod subscription_store;
 pub mod tunnel_store;

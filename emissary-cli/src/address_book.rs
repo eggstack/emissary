@@ -52,6 +52,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(feature = "i2pcontrol")]
 use tokio::sync::mpsc;
 
+#[cfg(feature = "i2pcontrol")]
+use crate::i2pcontrol::stores::publication::{publish_with_backup, publish_with_backup_sync};
+
 /// Logging target for the file
 const LOG_TARGET: &str = "emissary::address-book";
 
@@ -286,51 +289,30 @@ impl RuntimeAddressBookOwner {
         if raw.len() > 1024 * 1024 {
             return Err("address book state exceeds its size limit".to_string());
         }
-        tokio::fs::create_dir_all(&self.path)
-            .await
-            .map_err(|_| "address book persistence failed".to_string())?;
-        let temp = self.path.join(".control-state.json.tmp");
-        let current = self.path.join("control-state.json");
-        let backup = self.path.join("control-state.json.bak");
-        tokio::fs::write(&temp, &raw)
-            .await
-            .map_err(|_| "address book persistence failed".to_string())?;
-        let file = tokio::fs::File::open(&temp)
-            .await
-            .map_err(|_| "address book persistence failed".to_string())?;
-        file.sync_all()
-            .await
-            .map_err(|_| "address book persistence failed".to_string())?;
-        drop(file);
-        if current.exists() {
-            tokio::fs::copy(&current, &backup)
-                .await
-                .map_err(|_| "address book persistence failed".to_string())?;
-        }
-        tokio::fs::rename(&temp, &current)
-            .await
-            .map_err(|_| "address book persistence failed".to_string())?;
-        Ok(())
+        publish_with_backup(
+            &self.path,
+            "control-state.json",
+            "control-state.json.bak",
+            ".control-state.json.tmp",
+            &raw,
+            1024 * 1024,
+        )
+        .await
+        .map_err(|_| "address book persistence failed".to_string())
     }
 
     fn persist_sync(&self, state: &RuntimeAddressBookSnapshot) {
         let Ok(raw) = serde_json::to_vec(state) else {
             return;
         };
-        if std::fs::create_dir_all(&self.path).is_err() {
-            return;
-        }
-        let temp = self.path.join(".control-state.json.tmp");
-        let current = self.path.join("control-state.json");
-        let backup = self.path.join("control-state.json.bak");
-        if std::fs::write(&temp, raw).is_err() {
-            return;
-        }
-        if current.exists() && std::fs::copy(&current, &backup).is_err() {
-            let _ = std::fs::remove_file(&temp);
-            return;
-        }
-        let _ = std::fs::rename(&temp, &current);
+        let _ = publish_with_backup_sync(
+            &self.path,
+            "control-state.json",
+            "control-state.json.bak",
+            ".control-state.json.tmp",
+            &raw,
+            1024 * 1024,
+        );
     }
 
     fn legacy_publish_sync(&self, entry: RuntimeAddressBookEntry) {

@@ -105,6 +105,8 @@ Retained M021/M023 evidence covers:
 - exact structured operation results;
 - exact canonical `info` and nested `rawConfig` output;
 - one-publication mutation and failure atomicity;
+- process-crash atomicity and prior-generation recovery, with qualified
+  power-loss durability where directory synchronization is available;
 - secret-safe persistence and output;
 - startup-managed inventory and ownership collision rules;
 - explicit resource-free unsupported runtime behavior.
@@ -142,6 +144,12 @@ all non-empty configuration mutations are rejected before persistence. The
 Proposal 170 configuration inventory is explicitly classified into
 request-selected paths and unsupported runtime fields; no inert metadata is
 reported as a successful mutation.
+
+M036 closes the remaining authentication and publication-hardening gap:
+password comparison uses a reviewed constant-time primitive, failed
+authentication has bounded peer-keyed throttling, and I2PControl-owned
+publication syncs containing directories where supported before updating live
+state. Existing current/backup and generation recovery formats remain readable.
 
 ### ClientServicesInfo
 
@@ -186,7 +194,7 @@ Every conformance claim remains separated into:
 | Wire | exact request/response contract |
 | Source | truthful current production owner |
 | Runtime | real operational backend/service |
-| Persistence | durable and failure-atomic mutation |
+| Persistence | process-crash atomic/recoverable mutation; qualified power-loss durability |
 | Feature isolation | inactive feature/service does not alter ordinary router behavior |
 | Evidence | literal fixture plus failure/restart/composition/transition proof |
 

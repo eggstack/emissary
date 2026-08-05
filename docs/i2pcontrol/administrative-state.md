@@ -84,9 +84,10 @@ State updates follow this sequence:
 5. Flush and sync the file
 6. Set restrictive permissions (0o600 on Unix)
 7. Rename to the final generation path (`gen-NNNNNN.json`)
-8. Update the in-memory snapshot
+8. Sync the containing directory where supported
+9. Update the in-memory snapshot only after publication succeeds
 
-The rename is atomic on the same filesystem. If the process crashes between steps 4-6, the temporary file is detected and skipped on next load. If the process crashes between step 7 and 8, the new generation is loaded on next startup.
+The rename is atomic on the same filesystem. If the process crashes between steps 4-6, the temporary file is detected and skipped on next load. If the process crashes between step 7 and 9, the new generation is loaded on next startup. Directory synchronization provides the documented power-loss durability point where supported; other platforms are qualified as process-crash atomic and recoverable.
 
 ### Loading and corruption recovery
 
@@ -99,7 +100,7 @@ On load, the store:
 5. Falls back to the previous valid generation on corruption
 6. Returns an actionable error if all generations are corrupt
 
-The newest corrupt generation does not prevent loading a prior valid generation. A diagnostic is emitted for each failed generation.
+The newest corrupt generation does not prevent loading a prior valid generation. A diagnostic is emitted for each failed generation. Temporary files are never considered generations.
 
 ### Retention
 

@@ -19,7 +19,7 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::{
-    extract::State,
+    extract::{Extension, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::post,
@@ -37,7 +37,7 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tracing;
 
 use super::{
-    auth::{self, TokenService},
+    auth::{self, AuthThrottle, TokenService},
     control_plane::{AddressBookControl, ControlPlane, TunnelManagerControl},
     errors::I2pControlError,
     production::{
@@ -122,6 +122,7 @@ impl I2pControlConfig {
 /// retained only for internal composition in `init_server`.
 pub struct I2pControlState {
     token_service: TokenService,
+    auth_throttle: AuthThrottle,
     #[allow(dead_code)]
     password: String,
     #[allow(dead_code)]
@@ -168,6 +169,7 @@ impl I2pControlState {
         let log_ring = Arc::new(super::observability::LogRing::default());
         Self {
             token_service: TokenService::new(),
+            auth_throttle: AuthThrottle::new(),
             password,
             control_plane: controls.control_plane,
             address_book_control: controls.address_books,
@@ -197,6 +199,7 @@ impl I2pControlState {
         let log_ring = Arc::new(super::observability::LogRing::default());
         Self {
             token_service: TokenService::new(),
+            auth_throttle: AuthThrottle::new(),
             password,
             control_plane: Arc::new(FakeControlPlane::new()),
             address_book_control: Arc::new(FakeAddressBookControl::new()),
@@ -226,6 +229,7 @@ impl I2pControlState {
         let log_ring = Arc::new(super::observability::LogRing::default());
         Self {
             token_service: TokenService::new(),
+            auth_throttle: AuthThrottle::new(),
             password,
             control_plane: Arc::new(FakeControlPlane::new()),
             address_book_control: Arc::new(FakeAddressBookControl::new()),
@@ -283,6 +287,10 @@ impl I2pControlState {
     /// Get a reference to the token service.
     pub fn token_service(&self) -> &TokenService {
         &self.token_service
+    }
+
+    pub(crate) fn auth_throttle(&self) -> &AuthThrottle {
+        &self.auth_throttle
     }
 
     /// Get a reference to the router info control.
@@ -956,7 +964,7 @@ pub async fn serve(
         tokio::select! {
             accept_result = listener.accept() => {
                 match accept_result {
-                    Ok((tcp_stream, _peer_addr)) => {
+                    Ok((tcp_stream, peer_addr)) => {
                         // Try to acquire a connection permit. If saturated,
                         // drop the accepted socket immediately.
                         let permit = match connection_semaphore.clone().try_acquire_owned() {
@@ -1011,7 +1019,8 @@ pub async fn serve(
 
 
                             let svc = app
-                                .map_request(|req: http::Request<hyper::body::Incoming>| {
+                                .map_request(move |mut req: http::Request<hyper::body::Incoming>| {
+                                    req.extensions_mut().insert(peer_addr);
                                     req.map(axum::body::Body::new)
                                 });
 
@@ -1055,6 +1064,7 @@ fn resolve_id(id: &Option<RequestId>) -> RequestId {
 pub(crate) async fn handle_jsonrpc(
     State(state): State<Arc<I2pControlState>>,
     headers: HeaderMap,
+    Extension(peer_addr): Extension<SocketAddr>,
     body: String,
 ) -> Response {
     // Acquire concurrency permit
@@ -1102,7 +1112,7 @@ pub(crate) async fn handle_jsonrpc(
     // Authenticate before method-specific selector/config parsing. The
     // protected dispatcher receives a sanitized request with Token removed.
     let response = if request.method == rpc::methods::AUTHENTICATE {
-        handle_authenticate(&state, &request).await
+        handle_authenticate_with_source(&state, &request, Some(peer_addr)).await
     } else {
         match authenticate_protected_request(&state, &headers, &request) {
             Ok(request) => dispatch_protected(&state, &request).await,
@@ -1165,9 +1175,18 @@ async fn dispatch_protected(
 /// Handle the Authenticate method.
 ///
 /// Returns a `serde_json::Value` that is either a success or error JSON-RPC response.
+#[cfg(test)]
 async fn handle_authenticate(
     state: &I2pControlState,
     request: &JsonRpcRequest,
+) -> serde_json::Value {
+    handle_authenticate_with_source(state, request, None).await
+}
+
+async fn handle_authenticate_with_source(
+    state: &I2pControlState,
+    request: &JsonRpcRequest,
+    source: Option<SocketAddr>,
 ) -> serde_json::Value {
     let id = resolve_id(&request.id);
 
@@ -1223,23 +1242,15 @@ async fn handle_authenticate(
     let password = match params.password.as_deref() {
         Some(p) => p,
         None => {
-            return serde_json::to_value(JsonRpcErrorResponse::new(
-                id,
-                rpc::error_codes::INVALID_PASSWORD,
-                rpc::error_codes::INVALID_PASSWORD_MESSAGE,
-            ))
-            .unwrap();
+            return invalid_password_response(state, source, id).await;
         }
     };
 
     if !auth::compare_passwords(password, &state.password) {
-        return serde_json::to_value(JsonRpcErrorResponse::new(
-            id,
-            rpc::error_codes::INVALID_PASSWORD,
-            rpc::error_codes::INVALID_PASSWORD_MESSAGE,
-        ))
-        .unwrap();
+        return invalid_password_response(state, source, id).await;
     }
+
+    state.auth_throttle().clear(source);
 
     // Issue token
     let token = state.token_service.issue();
@@ -1256,6 +1267,26 @@ async fn handle_authenticate(
             API: api_version,
         })
         .unwrap(),
+    ))
+    .unwrap()
+}
+
+async fn invalid_password_response(
+    state: &I2pControlState,
+    source: Option<SocketAddr>,
+    id: RequestId,
+) -> serde_json::Value {
+    let delay = state.auth_throttle().delay_for_failure(source);
+    // The throttle lock is released before this await. Cancellation here does
+    // not mutate throttle state; the failure is recorded only after the delay.
+    if !delay.is_zero() {
+        tokio::time::sleep(delay).await;
+    }
+    state.auth_throttle().record_failure(source);
+    serde_json::to_value(JsonRpcErrorResponse::new(
+        id,
+        rpc::error_codes::INVALID_PASSWORD,
+        rpc::error_codes::INVALID_PASSWORD_MESSAGE,
     ))
     .unwrap()
 }
@@ -1456,6 +1487,47 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn failed_authentication_is_bounded_and_throttled() {
+        let state = I2pControlState::new_test("testpass".to_string());
+        let source = Some("127.0.0.1:7650".parse().unwrap());
+        let wrong = request(
+            rpc::methods::AUTHENTICATE,
+            serde_json::json!({"API": 2, "Password": "wrong"}),
+            Some(RequestId::Number(1)),
+        );
+
+        let first = handle_authenticate_with_source(&state, &wrong, source).await;
+        assert_eq!(first["error"]["code"], rpc::error_codes::INVALID_PASSWORD);
+        assert_eq!(state.auth_throttle().count(), 1);
+        let delay = state.auth_throttle().delay_for_failure(source);
+        assert!(delay <= auth::THROTTLE_MAX_DELAY);
+
+        let second = handle_authenticate_with_source(&state, &wrong, source).await;
+        assert_eq!(second["error"]["code"], rpc::error_codes::INVALID_PASSWORD);
+        assert_eq!(state.auth_throttle().count(), 1);
+    }
+
+    #[tokio::test]
+    async fn successful_authentication_resets_failure_state() {
+        let state = I2pControlState::new_test("testpass".to_string());
+        let source = Some("127.0.0.1:7651".parse().unwrap());
+        let wrong = request(
+            rpc::methods::AUTHENTICATE,
+            serde_json::json!({"API": 2, "Password": "wrong"}),
+            Some(RequestId::Number(1)),
+        );
+        let correct = request(
+            rpc::methods::AUTHENTICATE,
+            serde_json::json!({"API": 2, "Password": "testpass"}),
+            Some(RequestId::Number(2)),
+        );
+        let _ = handle_authenticate_with_source(&state, &wrong, source).await;
+        let response = handle_authenticate_with_source(&state, &correct, source).await;
+        assert!(response["result"]["Token"].is_string());
+        assert_eq!(state.auth_throttle().count(), 0);
+    }
+
+    #[tokio::test]
     async fn protected_authentication_sanitizes_params_and_supports_base_router_info() {
         let router_info = FakeRouterInfoControl::new();
         router_info.set_version("Emissary test".to_string());
@@ -1480,9 +1552,15 @@ mod tests {
     async fn unsupported_base_methods_return_method_not_found() {
         let state = I2pControlState::new_test("testpass".to_string());
         for method in rpc::methods::UNSUPPORTED_BASE {
-            let response = dispatch_protected(&state, &request(method, serde_json::json!({}), Some(RequestId::Number(1))))
-                .await;
-            assert_eq!(response["error"]["code"], rpc::error_codes::METHOD_NOT_FOUND);
+            let response = dispatch_protected(
+                &state,
+                &request(method, serde_json::json!({}), Some(RequestId::Number(1))),
+            )
+            .await;
+            assert_eq!(
+                response["error"]["code"],
+                rpc::error_codes::METHOD_NOT_FOUND
+            );
             assert!(response["result"].is_null(), "method: {method}");
         }
     }
@@ -1535,6 +1613,7 @@ mod tests {
         let success = handle_jsonrpc(
             State(Arc::clone(&state)),
             HeaderMap::new(),
+            Extension("127.0.0.1:7650".parse().unwrap()),
             r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Password":"testpass"}}"#
                 .to_string(),
         )
@@ -1545,6 +1624,7 @@ mod tests {
         let error = handle_jsonrpc(
             State(Arc::clone(&state)),
             HeaderMap::new(),
+            Extension("127.0.0.1:7650".parse().unwrap()),
             r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Password":"wrong"}}"#
                 .to_string(),
         )

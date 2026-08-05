@@ -31,8 +31,8 @@
 //! - Hostnames are bounded and validated before persistence.
 //! - Destinations are decoded and structurally parsed through existing Emissary primitives.
 //! - Invalid destinations never reach the store.
-//! - Add/update is durable before success is returned.
-//! - Delete is durable before success is returned.
+//! - Add/update reaches the documented publication point before success is returned.
+//! - Delete reaches the documented publication point before success is returned.
 //! - Each mutation affects exactly one administrative book.
 //! - All four books remain independent across restart.
 //! - Listing/lookup follows the exact result shape and deterministic ordering.

@@ -1,6 +1,6 @@
 # M036 — Authentication and Persistent Publication Hardening
 
-Status: blocked on M035
+Status: ready
 
 Source roadmap:
 
@@ -13,7 +13,7 @@ Applicable governance:
 
 Repository baseline:
 
-- accepted M035 implementation/closure head, to be recorded before execution
+- `5620cb8` — accepted M035 implementation/closure head
 
 Hard dependency:
 

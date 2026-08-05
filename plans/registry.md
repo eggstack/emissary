@@ -70,8 +70,8 @@ Canonical direction:
 |---|---|---|---|
 | Ten non-client/server tunnel families remain unsupported | high runtime capability gap | roadmap future work | retained explicit disposition |
 | Base I2PControl dispatcher/overlapping RouterInfo names require explicit compatibility boundary | medium compatibility gap | M035 | closed; mode-specific inventory and tests added |
-| Hand-written password comparison and no failed-auth throttle | medium security gap | M036 | blocked on M035 |
-| Publication documentation may overstate power-loss durability | medium persistence-claim gap | M036 | blocked on M035 |
+| Hand-written password comparison and no failed-auth throttle | medium security gap | M036 | ready |
+| Publication documentation may overstate power-loss durability | medium persistence-claim gap | M036 | ready |
 | Proposal 170 AddressBook/SAM policy remains broader than desired outside i2pcontrol | medium containment gap | M037 | blocked on M036 |
 | No bounded live production-composition interoperability run | medium evidence gap | M038 | blocked on M031–M037 |
 | Independent final-head operational review | high evidence gate | M039 | blocked on M038 |

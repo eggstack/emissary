@@ -27,13 +27,13 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | partial Proposal 170 support; final-head review ready | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M039 ready | M030–M038 closed; M039 is unblocked |
+| I2PControl Proposal 170 | partial Proposal 170 support; M039 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | — | M030–M039 closed; deferred capability work remains unregistered |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M039 — Operational final-head reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/039-operational-reclosure.md` | M038 closure accepted; ADR-0002 accepted |
+| I2PControl Proposal 170 | — | — | — | No dependency-ready successor; deferred capability work requires a new authorized plan |
 
 ## Registered successor handoffs
 
@@ -46,13 +46,13 @@ Canonical direction:
 | I2PControl Proposal 170 | M036 — Authentication and publication hardening | closed | `plans/implementation/i2pcontrol-proposal-170/036-auth-and-publication-hardening.md` | M035 closed |
 | I2PControl Proposal 170 | M037 — Containment boundary reduction | closed | `plans/implementation/i2pcontrol-proposal-170/037-containment-boundary-reduction.md` | M036 closed |
 | I2PControl Proposal 170 | M038 — Live-runtime interoperability | closed | `plans/implementation/i2pcontrol-proposal-170/038-live-runtime-interoperability.md` | M031–M037 closed |
-| I2PControl Proposal 170 | M039 — Operational final-head reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/039-operational-reclosure.md` | M038 closed |
+| I2PControl Proposal 170 | M039 — Operational final-head reclosure | closed | `plans/implementation/i2pcontrol-proposal-170/039-operational-reclosure.md` | M038 closed |
 
 ## Active closure work
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M038 — Live-runtime interoperability | closed | live child-process evidence and closure accepted | `plans/closure/i2pcontrol-proposal-170/038-closure.md` |
+| I2PControl Proposal 170 | M039 — Operational final-head reclosure | closed | independent final-head review and partial-support disposition accepted | `plans/closure/i2pcontrol-proposal-170/039-closure.md` |
 
 ## Recently closed milestones
 
@@ -65,6 +65,7 @@ Canonical direction:
 | I2PControl Proposal 170 | M035 — Base compatibility and selector overlap | closed | `plans/closure/i2pcontrol-proposal-170/035-closure.md` | `plans/closure/i2pcontrol-proposal-170/035-implementation-disposition.md` |
 | I2PControl Proposal 170 | M036 — Authentication and publication hardening | closed | `plans/closure/i2pcontrol-proposal-170/036-closure.md` | `plans/closure/i2pcontrol-proposal-170/036-implementation-disposition.md` |
 | I2PControl Proposal 170 | M037 — Containment boundary reduction | closed | `plans/closure/i2pcontrol-proposal-170/037-closure.md` | `plans/closure/i2pcontrol-proposal-170/037-implementation-disposition.md` |
+| I2PControl Proposal 170 | M039 — Operational final-head reclosure | closed | `plans/closure/i2pcontrol-proposal-170/039-closure.md` | — |
 
 ## Current corrective findings
 
@@ -77,7 +78,7 @@ Canonical direction:
 | Proposal 170 AddressBook/SAM policy remains broader than desired outside i2pcontrol | medium containment gap | M037 | closed; residual adapters are narrow and documented |
 | No bounded live production-composition interoperability run | medium evidence gap | M038 | closed; qualified local data-plane blockers recorded |
 | M037 feature-enabled test imports/static guards exposed by M038 verification | low test-harness gap | M038A/M038B | closed; corrective passes accepted |
-| Independent final-head operational review | high evidence gate | M039 | ready; M038 closure accepted |
+| Independent final-head operational review | high evidence gate | M039 | closed; partial-support disposition accepted |
 
 ## Runtime tunnel decision
 
@@ -166,8 +167,8 @@ requires a contract-rebase plan.
 
 ## Registry maintenance rules
 
-1. M039 is the only dependency-ready implementation handoff.
-2. Do not advance final subsystem status until M039 independently reviews the M038 closure.
+1. M039 is closed as the independent final-head review.
+2. Do not claim full Proposal 170 completion while unavailable sources and tunnel families remain.
 3. Preserve M020–M030 evidence unless a new direct defect is demonstrated.
 4. Keep startup and control-plane runtime ownership separate.
 5. Keep production changes outside `i2pcontrol/**` minimal and individually justified.
@@ -175,5 +176,5 @@ requires a contract-rebase plan.
 7. Unsupported tunnel families and unavailable RouterInfo sources remain explicit.
 8. Verification remains local and package-scoped; no CI/release expansion.
 9. M038 requires real production-composition evidence, not fake-only substitution.
-10. M039 is the distinct final-head review.
+10. M039 is the accepted distinct final-head review.
 11. No upstream interaction is authorized.

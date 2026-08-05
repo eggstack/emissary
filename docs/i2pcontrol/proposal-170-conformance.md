@@ -1,6 +1,6 @@
 # Proposal 170 Conformance Matrix
 
-Status: partial Proposal 170 support; M031 generic client runtime closure accepted
+Status: partial Proposal 170 support; M039 final-head closure accepted
 
 Proposal 170 remains Open. This workstream is pinned to the revision created
 and last updated on `2026-05-20`.
@@ -16,18 +16,21 @@ Completed implementation correction:
 - M031, `plans/implementation/i2pcontrol-proposal-170/031-client-tunnel-runtime-backend.md`
 - M034, `plans/implementation/i2pcontrol-proposal-170/034-addressbook-setter-truthfulness.md`
 - M035, `plans/implementation/i2pcontrol-proposal-170/035-base-compatibility-and-selector-overlap.md`
+- M038, `plans/implementation/i2pcontrol-proposal-170/038-live-runtime-interoperability.md`
 
 Controlling final closure:
 
-- M029, `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
+- M039, `plans/implementation/i2pcontrol-proposal-170/039-operational-reclosure.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/039-closure.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained evidence, and
 M027's final subsystem disposition remains historical invalidated evidence.
 M028 is implemented and closed with the required boundary evidence. M030
 reviewed the actual AddressBook final head and accepted partial Proposal 170
-support. M031 subsequently made only the generic control-plane `client`
-backend operational; the generic `server` and ten other tunnel families remain
-explicitly unsupported.
+support. M031 and M032 made only the generic control-plane `client` and `server`
+backends operational; the ten other tunnel families remain explicitly
+unsupported. M039 independently revalidated the final source/runtime/evidence
+boundary and accepted the partial-support disposition.
 
 ## Retained machine-readable matrix
 
@@ -57,10 +60,10 @@ Retained counts:
 The separate existing-I2PControl and Emissary compatibility inventories are not
 counted in the 43 additions.
 
-## Why current closure is invalidated
+## Historical invalidation context
 
-The retained method-level conformance work is not the current defect. The
-post-M027 review found:
+The retained method-level conformance work is not a current defect. The
+post-M027 review historically found:
 
 1. a later merge revived superseded M019 closure language over M027;
 2. top-level documentation overstates the final support disposition; and

@@ -1,7 +1,7 @@
 # I2PControl Security
 
-Status: M036 authentication and publication hardening implemented; M021/M030/M032
-requirements retained
+Status: M039 final-head review accepted; M036 authentication/publication
+hardening and M021/M030/M032 requirements retained
 
 This document describes the security properties and considerations for the I2PControl administrative state in Emissary.
 

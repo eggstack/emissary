@@ -1,6 +1,7 @@
 # I2PControl TunnelManager
 
-Status: M033 lifecycle reconciliation closed against the pinned Proposal 170 revision
+Status: M039 final-head review accepted; lifecycle reconciliation remains closed
+against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
 Wire/CRUD/persistence evidence is distinct from runtime data-plane support.

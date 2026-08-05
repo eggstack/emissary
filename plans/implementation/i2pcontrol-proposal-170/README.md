@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; M038 closed; M039 ready
+Status: partial Proposal 170 support; M039 closed
 
 This directory contains bounded internal implementation and closure handoffs for
 the I2PControl Proposal 170 subsystem.
@@ -42,9 +42,7 @@ Violation is a stop condition and invalidates affected evidence.
 
 ## Current handoff
 
-| Handoff | Status | Plan | Dependency |
-|---|---|---|---|
-| M038 — Live-runtime interoperability | closed | `038-live-runtime-interoperability.md` | M031–M037 closed |
+No active handoff remains. M039 is formally closed against M038.
 
 M031 established the control-plane runtime supervisor and replaced only the
 generic `client` unsupported backend. M032 added the generic `server` backend
@@ -66,7 +64,7 @@ startup-managed tasks, or implement another tunnel family.
 | M036 — Authentication and publication hardening | closed | `036-auth-and-publication-hardening.md` | M035 closed |
 | M037 — Containment boundary reduction | closed | `037-containment-boundary-reduction.md` | M036 closed |
 | M038 — Live-runtime interoperability | closed | `038-live-runtime-interoperability.md` | M031–M037 closed |
-| M039 — Operational final-head reclosure | ready | `039-operational-reclosure.md` | M038 closed |
+| M039 — Operational final-head reclosure | closed | `039-operational-reclosure.md` | M038 closed |
 
 Future plans are written for continuity but are not executable until their named
 hard dependencies close and the registry advances them.
@@ -155,7 +153,7 @@ Each implementation milestone must:
    `plans/closure/i2pcontrol-proposal-170/`;
 7. freeze the implementation/test head;
 8. report every unresolved finding with severity;
-9. leave final subsystem closure to M039;
+9. leave final subsystem closure to the independent M039 closure record;
 10. attest that no upstream interaction occurred.
 
 A successful commit, compilation result, or broad test count is not closure by
@@ -221,14 +219,14 @@ required.
 
 ## Final-status rule
 
-M039 may select:
+M039 selected:
 
-- `partial Proposal 170 support` when every claimed wire/source/runtime/
-  persistence/security/containment dimension is exact and evidenced but one or
-  more RouterInfo sources or tunnel families remain unavailable;
-- `corrective pass required` for any unresolved high/medium defect;
-- `blocked` when the pinned external revision changed or required live evidence
-  cannot be obtained.
+- `partial Proposal 170 support`: every implemented/claimed wire, source,
+  runtime, persistence, security, and containment dimension is exact and
+  evidenced, while RouterInfo sources and tunnel families remain unavailable.
+
+The accepted closure record is
+`plans/closure/i2pcontrol-proposal-170/039-closure.md`.
 
 `closed internally against pinned revision` is not expected under this roadmap
 because 26 RouterInfo sources and ten tunnel families remain unavailable or

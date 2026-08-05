@@ -1,7 +1,7 @@
 # I2PControl Tunnel Backends
 
-Status: M033 client/server lifecycle reconciliation implemented; other families
-remain unsupported
+Status: M039 final-head review accepted; client/server lifecycle implemented;
+other families remain unsupported
 
 This document describes the tunnel backend interface and registry in Emissary.
 

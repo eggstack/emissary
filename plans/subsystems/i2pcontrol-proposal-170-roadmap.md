@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Operational Corrective Roadmap
 
-Status: partial Proposal 170 support; M038 closed; M039 ready
+Status: partial Proposal 170 support; M039 closed
 
 Planning baseline:
 
@@ -245,9 +245,11 @@ M038 live-runtime interoperability validation
 M039 independent final-head operational reclosure
 ```
 
-M038 is closed with qualified local data-plane blockers recorded. M039 is now
-the only dependency-ready implementation handoff. This prevents parallel edits to the same lifecycle
-and composition seams.
+M038 is closed with qualified local data-plane blockers recorded. M039
+independently reviewed the final head and formally closed the workstream as
+`partial Proposal 170 support`. No successor implementation handoff is
+currently registered; deferred RouterInfo sources and tunnel families remain
+explicit roadmap work.
 
 ## 6. Milestones
 
@@ -403,7 +405,7 @@ Objective:
 
 ### M039 — Independent operational reclosure
 
-Status: ready
+Status: closed
 
 Plan:
 
@@ -527,8 +529,8 @@ Each implementation milestone must create an implementation disposition under
 - unresolved findings with severity;
 - no-upstream attestation.
 
-A coding commit or test count is not closure. M039 remains the distinct final
-review.
+A coding commit or test count is not closure. M039 is the distinct accepted
+final review.
 
 ## 12. Milestone status
 
@@ -544,7 +546,7 @@ review.
 | 036 | closed | authentication/publication hardening and closure accepted |
 | 037 | closed | containment reduction and static boundary accepted |
 | 038 | closed | live production-composition evidence and closure accepted |
-| 039 | ready | hard dependency M038 closed |
+| 039 | closed | `plans/closure/i2pcontrol-proposal-170/039-closure.md` |
 
 ## 13. Completion definition
 
@@ -560,7 +562,7 @@ This roadmap is complete only when:
 - Proposal 170-specific coupling outside the I2PControl boundary is minimized
   without broad refactoring;
 - one live-runtime interoperability run passes or records a precise blocker;
-- M039 independently reviews the final head;
+- M039 independently reviewed the final head and accepted the partial-support disposition;
 - no unresolved high/medium correctness, security, compatibility, ownership, or
   scope defect remains in the implemented dimensions;
 - unavailable RouterInfo sources and unsupported tunnel families remain

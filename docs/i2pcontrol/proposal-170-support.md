@@ -38,6 +38,8 @@ Closed handoffs:
 - M038 closed: `plans/implementation/i2pcontrol-proposal-170/038-live-runtime-interoperability.md`; closure:
   `plans/closure/i2pcontrol-proposal-170/038-closure.md`; disposition:
   `plans/closure/i2pcontrol-proposal-170/038-implementation-disposition.md`
+- M039 closed: `plans/implementation/i2pcontrol-proposal-170/039-operational-reclosure.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/039-closure.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained corrective
 evidence, while M027's final disposition is historical invalidated evidence.
@@ -64,17 +66,17 @@ implementation.
 
 ## Current overall disposition
 
-The repository is closed for the authorized in-scope dimensions. M030 reviewed
-the corrected AddressBook head and accepted the final disposition as partial
-Proposal 170 support.
+The repository is closed for the authorized in-scope dimensions. M039 reviewed
+the complete final head and accepted the final disposition as partial Proposal
+170 support.
 
 M028 owns the status/feature-boundary correction. M030 owns the destination
 authority, lookup precedence, bounded import/repair, and independent final-head
 review. M034 owns live subscription replacement, bounded refresh control, and
 truthful configuration rejection. M035 owns the base method inventory and the
 mode-specific RouterInfo compatibility boundary. M038 owns production-composition
-and live child-process interoperability evidence; M039 remains the independent
-final-head review.
+and live child-process interoperability evidence. M039 owns the accepted
+independent final-head review.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because 26 of the 43 RouterInfo additions lack

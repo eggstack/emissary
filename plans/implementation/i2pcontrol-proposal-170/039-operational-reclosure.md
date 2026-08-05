@@ -1,6 +1,6 @@
 # M039 — Proposal 170 Operational Final-Head Reclosure
 
-Status: ready
+Status: closed
 
 Source roadmap:
 
@@ -19,6 +19,10 @@ Repository baseline:
 Hard dependency:
 
 - M038 closed; implementation disposition and closure accepted
+
+Closure record:
+
+- `plans/closure/i2pcontrol-proposal-170/039-closure.md`
 
 ## 1. Bounded objective
 
@@ -234,7 +238,7 @@ The closure must include an internal-only attestation:
 
 ## 10. Acceptance criteria
 
-M039 may select `partial Proposal 170 support` only when:
+M039 selected `partial Proposal 170 support` because:
 
 - every implemented/claimed dimension passes independent review;
 - generic client/server are operational and isolated;

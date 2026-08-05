@@ -1444,7 +1444,7 @@ fn is_canonical_option_key(key: &str) -> bool {
 }
 
 fn is_sensitive_key(key: &str) -> bool {
-    SENSITIVE_OPTION_KEYS.contains(&key)
+    SENSITIVE_OPTION_KEYS.contains(&key) || key.starts_with("__emissary_")
 }
 
 fn is_typed_secret_key(key: &str) -> bool {

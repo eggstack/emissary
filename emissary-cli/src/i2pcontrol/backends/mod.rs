@@ -19,6 +19,7 @@
 pub mod client;
 pub mod fake;
 pub mod registry;
+pub mod server;
 pub mod unsupported;
 
 use std::fmt;
@@ -84,6 +85,10 @@ pub struct BackendStatus {
 
     /// Human-readable status message.
     pub message: String,
+
+    /// Actual public destination, when the backend has established one.
+    /// Private destination material is never represented here.
+    pub destination: Option<String>,
 }
 
 /// Trait defining the interface for tunnel runtime backends.
@@ -165,6 +170,7 @@ mod tests {
             tunnel_type: TunnelType::Server,
             runtime_state: TunnelRuntimeState::Stopped,
             message: "not running".to_string(),
+            destination: None,
         };
         assert_eq!(status.tunnel_type, TunnelType::Server);
         assert_eq!(status.runtime_state, TunnelRuntimeState::Stopped);

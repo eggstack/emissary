@@ -56,6 +56,8 @@ mod proxy;
 mod tools;
 mod tunnel;
 #[cfg(feature = "i2pcontrol")]
+use crate::tunnel::server as tunnel_server;
+#[cfg(feature = "i2pcontrol")]
 use crate::tunnel::client as tunnel_client;
 mod ui;
 

@@ -55,6 +55,7 @@ use crate::{
             PeerLimits, RecentTransitTraffic, RouterInfoControl, TransitBytes, TransportBytes,
             TunnelBuildStats, TunnelSummary,
         },
+        server_secret_store::{ServerDestinationStore, StoredDestination},
         stores::{address_book_store::AddressBookStore, tunnel_store::TunnelStore},
     },
 };
@@ -526,6 +527,8 @@ pub struct ProductionTunnelManagerControl {
     inner: Arc<tokio::sync::Mutex<TunnelStore>>,
     registry: TunnelBackendRegistry,
     startup: StartupTunnelInventory,
+    server_destinations: ServerDestinationStore,
+    sam_tcp_port: Option<u16>,
 }
 
 impl ProductionTunnelManagerControl {
@@ -550,8 +553,15 @@ impl ProductionTunnelManagerControl {
         startup: StartupTunnelInventory,
         sam_tcp_port: Option<u16>,
     ) -> Result<Self, String> {
+        let state_root = dir.parent().unwrap_or(dir.as_path()).to_path_buf();
+        let server_destinations = ServerDestinationStore::new(state_root);
         let registry = match sam_tcp_port {
-            Some(port) => crate::i2pcontrol::backends::registry::create_production_registry(port),
+            Some(port) => {
+                crate::i2pcontrol::backends::registry::create_production_registry_with_server_store(
+                    port,
+                    server_destinations.clone(),
+                )
+            }
             None => crate::i2pcontrol::backends::registry::create_default_registry(),
         }
         .map_err(|e| format!("failed to create registry: {e}"))?;
@@ -559,13 +569,28 @@ impl ProductionTunnelManagerControl {
             inner: Arc::new(tokio::sync::Mutex::new(TunnelStore::new(dir, 1024 * 1024))),
             registry,
             startup,
+            server_destinations,
+            sam_tcp_port,
         })
     }
 
     /// Load existing state from disk.
     pub async fn load(&self) -> Result<(), String> {
+        self.server_destinations.load().await?;
         let mut store = self.inner.lock().await;
         store.load().await.map_err(|e| format!("store load: {e}"))?;
+        let referenced_server_identities = store
+            .list()
+            .iter()
+            .filter(|definition| definition.tunnel_type == TunnelType::Server)
+            .filter_map(|definition| {
+                definition
+                    .raw_config
+                    .get(crate::i2pcontrol::backends::server::SERVER_IDENTITY_KEY)
+                    .and_then(|value| value.as_str())
+                    .map(str::to_string)
+            })
+            .collect::<std::collections::BTreeSet<_>>();
         let startup_names = self
             .startup
             .list()?
@@ -586,16 +611,114 @@ impl ProductionTunnelManagerControl {
                 "combined tunnel inventory exceeds maximum of {MAX_TUNNEL_INVENTORY} entries"
             ));
         }
+        drop(store);
+        self.server_destinations
+            .prune_unreferenced(&referenced_server_identities)
+            .await?;
         Ok(())
     }
 
-    fn with_runtime_state(&self, mut definition: TunnelDefinition) -> TunnelDefinition {
+    async fn with_runtime_state(&self, mut definition: TunnelDefinition) -> TunnelDefinition {
         if definition.ownership == crate::i2pcontrol::domain::tunnel::TunnelOwnership::ControlPlane
         {
-            definition.runtime_state =
-                self.registry.get(definition.tunnel_type).inspect(&definition).runtime_state;
+            let status = self.registry.get(definition.tunnel_type).inspect(&definition);
+            definition.runtime_state = status.runtime_state;
+            if definition.tunnel_type == TunnelType::Server {
+                let public_destination = if status.destination.is_some() {
+                    status.destination
+                } else {
+                    let identity = definition
+                        .raw_config
+                        .get(crate::i2pcontrol::backends::server::SERVER_IDENTITY_KEY)
+                        .and_then(|value| value.as_str());
+                    let public = definition
+                        .raw_config
+                        .get(crate::i2pcontrol::backends::server::SERVER_PUBLIC_DESTINATION_KEY)
+                        .and_then(|value| value.as_str());
+                    match (identity, public) {
+                        (Some(identity), Some(public))
+                            if self
+                                .server_destinations
+                                .get(identity)
+                                .await
+                                .ok()
+                                .flatten()
+                                .is_some() =>
+                        {
+                            Some(public.to_string())
+                        }
+                        _ => None,
+                    }
+                };
+                definition.options.hosting_destination = public_destination;
+            }
         }
         definition
+    }
+
+    async fn prepare_server_definition(
+        &self,
+        mut definition: TunnelDefinition,
+    ) -> Result<TunnelDefinition, String> {
+        if definition.tunnel_type != TunnelType::Server {
+            return Ok(definition);
+        }
+        let identity = definition
+            .raw_config
+            .get(crate::i2pcontrol::backends::server::SERVER_IDENTITY_KEY)
+            .and_then(|value| value.as_str())
+            .map(str::to_string);
+        if let Some(identity) = identity {
+            if self.server_destinations.get(&identity).await?.is_none() {
+                return Err("server destination identity is unavailable".to_string());
+            }
+            return Ok(definition);
+        }
+
+        let sam_tcp_port = self
+            .sam_tcp_port
+            .ok_or_else(|| "server backend requires the router SAM listener".to_string())?;
+        let private = crate::tunnel_server::generate_persistent_destination(sam_tcp_port)
+            .await
+            .map_err(|_| "server destination generation failed".to_string())?;
+        let identity = ServerDestinationStore::new_identity();
+        self.server_destinations
+            .put(&identity, StoredDestination::from_private(private))
+            .await?;
+        definition.raw_config.insert(
+            crate::i2pcontrol::backends::server::SERVER_IDENTITY_KEY.to_string(),
+            serde_json::json!(identity),
+        );
+        let result = {
+            let mut store = self.inner.lock().await;
+            store
+                .upsert(definition.clone())
+                .await
+                .map_err(|error| format!("store upsert: {error}"))
+        };
+        if let Err(error) = result {
+            let _ = self.server_destinations.remove(&identity).await;
+            return Err(error);
+        }
+        Ok(definition)
+    }
+
+    async fn persist_server_public_destination(
+        &self,
+        mut definition: TunnelDefinition,
+        destination: String,
+    ) -> Result<(), String> {
+        definition.options.hosting_destination = Some(destination.clone());
+        definition.raw_config.insert(
+            crate::i2pcontrol::backends::server::SERVER_PUBLIC_DESTINATION_KEY.to_string(),
+            serde_json::json!(destination),
+        );
+        let mut store = self.inner.lock().await;
+        store
+            .upsert(definition)
+            .await
+            .map_err(|error| format!("store upsert: {error}"))?;
+        Ok(())
     }
 }
 
@@ -605,6 +728,8 @@ impl Clone for ProductionTunnelManagerControl {
             inner: Arc::clone(&self.inner),
             registry: self.registry.clone(),
             startup: self.startup.clone(),
+            server_destinations: self.server_destinations.clone(),
+            sam_tcp_port: self.sam_tcp_port,
         }
     }
 }
@@ -612,14 +737,17 @@ impl Clone for ProductionTunnelManagerControl {
 #[async_trait]
 impl TunnelManagerControl for ProductionTunnelManagerControl {
     async fn list(&self) -> Result<Vec<TunnelDefinition>, String> {
-        let store = self.inner.lock().await;
+        let persisted = {
+            let store = self.inner.lock().await;
+            store.list().into_iter().cloned().collect::<Vec<_>>()
+        };
         let startup = self.startup.list()?;
         let mut definitions = BTreeMap::new();
         for definition in startup {
             definitions.insert(definition.name.as_str().to_string(), definition);
         }
-        for definition in store.list() {
-            let definition = self.with_runtime_state(definition.clone());
+        for definition in persisted {
+            let definition = self.with_runtime_state(definition).await;
             if definitions.insert(definition.name.as_str().to_string(), definition).is_some() {
                 return Err(
                     "startup and persisted tunnel definitions contain a colliding name".into(),
@@ -638,8 +766,14 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         if let Some(definition) = self.startup.get(name)? {
             return Ok(Some(definition));
         }
-        let store = self.inner.lock().await;
-        Ok(store.get(name).cloned().map(|definition| self.with_runtime_state(definition)))
+        let definition = {
+            let store = self.inner.lock().await;
+            store.get(name).cloned()
+        };
+        Ok(match definition {
+            Some(definition) => Some(self.with_runtime_state(definition).await),
+            None => None,
+        })
     }
 
     async fn create(&self, definition: TunnelDefinition) -> Result<(), String> {
@@ -676,6 +810,19 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
                 return Err("error - tunnel name is owned by startup configuration".into());
             }
         }
+        if definition.tunnel_type == TunnelType::Server
+            && new_name.as_ref().is_some_and(|candidate| candidate.as_str() != name)
+        {
+            let status = self.registry.get(TunnelType::Server).inspect(&definition);
+            if matches!(
+                status.runtime_state,
+                crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Starting
+                    | crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Running
+                    | crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopping
+            ) {
+                return Err("running server tunnel rename is not supported".to_string());
+            }
+        }
         let mut store = self.inner.lock().await;
         if store.get(name).is_none() {
             return Ok(false);
@@ -698,9 +845,48 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         if self.startup.get(name)?.is_some() {
             return Err("error - tunnel is managed by startup configuration".into());
         }
-        let mut store = self.inner.lock().await;
-        let rev = store.remove(name).await.map_err(|e| format!("store remove: {e}"))?;
-        Ok(rev.is_some())
+        let definition = {
+            let store = self.inner.lock().await;
+            store.get(name).cloned()
+        };
+        let Some(definition) = definition else {
+            return Ok(false);
+        };
+        if definition.tunnel_type == TunnelType::Server {
+            let status = self.registry.get(TunnelType::Server).inspect(&definition);
+            if matches!(
+                status.runtime_state,
+                crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Starting
+                    | crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Running
+                    | crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopping
+            ) {
+                self.registry
+                    .get(TunnelType::Server)
+                    .stop(&definition)
+                    .await
+                    .map_err(|error| error.to_string())?;
+            }
+        }
+        let identity = definition
+            .raw_config
+            .get(crate::i2pcontrol::backends::server::SERVER_IDENTITY_KEY)
+            .and_then(|value| value.as_str())
+            .map(str::to_string);
+        let removed = {
+            let mut store = self.inner.lock().await;
+            store.remove(name).await.map_err(|e| format!("store remove: {e}"))?
+        };
+        if removed.is_none() {
+            return Ok(false);
+        }
+        if let Some(identity) = identity {
+            if let Err(error) = self.server_destinations.remove(&identity).await {
+                let mut store = self.inner.lock().await;
+                let _ = store.upsert(definition).await;
+                return Err(error);
+            }
+        }
+        Ok(true)
     }
 
     async fn start(&self, name: &str) -> Result<String, String> {
@@ -714,9 +900,28 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
                 .ok_or_else(|| format!("error - tunnel '{}' not found", name))?
                 .clone()
         };
+        let def = self.prepare_server_definition(def).await?;
         let backend = self.registry.get(def.tunnel_type);
         match backend.start(&def).await {
-            Ok(()) => Ok("ok".to_string()),
+            Ok(()) => {
+                if def.tunnel_type == TunnelType::Server {
+                    let status = backend.inspect(&def);
+                    let Some(destination) = status.destination else {
+                        let _ = backend.stop(&def).await;
+                        return Ok(
+                            "error - server runtime did not publish a destination".to_string()
+                        );
+                    };
+                    let runtime_definition = def.clone();
+                    if let Err(error) =
+                        self.persist_server_public_destination(def, destination).await
+                    {
+                        let _ = backend.stop(&runtime_definition).await;
+                        return Ok(format!("error - {error}"));
+                    }
+                }
+                Ok("ok".to_string())
+            }
             Err(BackendError::NotImplemented { tunnel_type }) => {
                 Ok(format!("error - {} not implemented", tunnel_type.as_str()))
             }
@@ -756,6 +961,9 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         let backend = self.registry.get(def.tunnel_type);
         if let Err(error) = backend.stop(&def).await {
             return Ok(format!("error - {error}"));
+        }
+        if def.tunnel_type == TunnelType::Server {
+            return self.start(name).await;
         }
         match backend.start(&def).await {
             Ok(()) => Ok("ok".to_string()),

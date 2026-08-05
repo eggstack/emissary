@@ -19,7 +19,10 @@
 use std::{collections::HashMap, sync::Arc};
 
 use super::TunnelBackend;
-use crate::i2pcontrol::domain::tunnel::{TunnelType, ALL_TUNNEL_ACTIONS, ALL_TUNNEL_TYPES};
+use crate::i2pcontrol::{
+    domain::tunnel::{TunnelType, ALL_TUNNEL_ACTIONS, ALL_TUNNEL_TYPES},
+    server_secret_store::ServerDestinationStore,
+};
 
 /// An exhaustive tunnel backend registry.
 ///
@@ -136,17 +139,50 @@ pub fn create_default_registry() -> Result<TunnelBackendRegistry, RegistryError>
     TunnelBackendRegistry::new(backends)
 }
 
-/// Create the production registry with a real generic client backend.
+/// Create the production registry with real generic client and server backends.
+#[allow(dead_code)]
 pub fn create_production_registry(
     sam_tcp_port: u16,
 ) -> Result<TunnelBackendRegistry, RegistryError> {
     let client =
         Arc::new(super::client::ClientTunnelBackend::new(sam_tcp_port)) as Arc<dyn TunnelBackend>;
+    let server = Arc::new(super::server::ServerTunnelBackend::without_store(
+        sam_tcp_port,
+    )) as Arc<dyn TunnelBackend>;
     let backends: Vec<Arc<dyn TunnelBackend>> = ALL_TUNNEL_TYPES
         .iter()
         .map(|&tt| {
             if tt == TunnelType::Client {
                 client.clone()
+            } else if tt == TunnelType::Server {
+                server.clone()
+            } else {
+                Arc::new(super::unsupported::UnsupportedTunnelBackend::new(tt))
+                    as Arc<dyn TunnelBackend>
+            }
+        })
+        .collect();
+    TunnelBackendRegistry::new(backends)
+}
+
+/// Create the production registry with a composed backend-owned server store.
+pub fn create_production_registry_with_server_store(
+    sam_tcp_port: u16,
+    server_store: ServerDestinationStore,
+) -> Result<TunnelBackendRegistry, RegistryError> {
+    let client =
+        Arc::new(super::client::ClientTunnelBackend::new(sam_tcp_port)) as Arc<dyn TunnelBackend>;
+    let server = Arc::new(super::server::ServerTunnelBackend::new(
+        sam_tcp_port,
+        server_store,
+    )) as Arc<dyn TunnelBackend>;
+    let backends: Vec<Arc<dyn TunnelBackend>> = ALL_TUNNEL_TYPES
+        .iter()
+        .map(|&tt| {
+            if tt == TunnelType::Client {
+                client.clone()
+            } else if tt == TunnelType::Server {
+                server.clone()
             } else {
                 Arc::new(super::unsupported::UnsupportedTunnelBackend::new(tt))
                     as Arc<dyn TunnelBackend>
@@ -262,14 +298,18 @@ mod tests {
     }
 
     #[test]
-    fn production_registry_has_only_client_as_real_backend() {
+    fn production_registry_has_only_client_and_server_as_real_backends() {
         let registry = create_production_registry(7656).unwrap();
         assert_eq!(registry.len(), ALL_TUNNEL_TYPES.len());
         assert_eq!(
             registry.get(TunnelType::Client).tunnel_type(),
             TunnelType::Client
         );
-        for &tunnel_type in &ALL_TUNNEL_TYPES[1..] {
+        assert_eq!(registry.get(TunnelType::Server).tunnel_type(), TunnelType::Server);
+        for &tunnel_type in ALL_TUNNEL_TYPES
+            .iter()
+            .filter(|&&tunnel_type| tunnel_type != TunnelType::Client && tunnel_type != TunnelType::Server)
+        {
             assert!(matches!(
                 registry.get(tunnel_type).inspect(&test_definition(tunnel_type)).runtime_state,
                 TunnelRuntimeState::Unsupported

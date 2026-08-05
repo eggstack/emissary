@@ -1,6 +1,7 @@
 # I2PControl Security
 
-Status: M030 security recheck passed; M021 secret-boundary and atomic-publication requirements closed
+Status: M032 server identity and secret-boundary review passed; M021/M030
+requirements retained
 
 This document describes the security properties and considerations for the I2PControl administrative state in Emissary.
 
@@ -50,6 +51,13 @@ ingress. Errors contain field names at most, never secret values.
 - Individual option values are logged only at debug level with redaction
 - Error messages from backends contain tunnel type but not secrets
 
+Generic server destination private material is held only by the backend-owned
+`ServerDestinationStore`. Its `StoredDestination` wrapper redacts Debug and
+Display output, the server runtime configuration is intentionally not
+Debuggable, and setup/forward errors are sanitized. Public destinations are
+distinct from private session material and are published only after a real
+Yosemite session exists.
+
 ## File system security
 
 ### Path confinement
@@ -60,6 +68,8 @@ The generation store enforces path confinement:
 - All resolved paths must remain within the configured base path
 - Symlinks in the generation directory are rejected during load
 - User-provided identifiers (tunnel names) are used as BTreeMap keys, never as filesystem paths
+- Server destination state uses the fixed `server-destinations/` directory;
+  request values never select a path or filename
 
 ### File permissions
 
@@ -85,6 +95,12 @@ If the process crashes during publication:
 Permission-setting failure is fatal on Unix rather than best effort. Failed
 publication removes its temporary file where possible and does not update the
 in-memory snapshot.
+
+The server destination store publishes bounded `current.json` and
+`backup.json` files. It writes and syncs a temporary file, applies owner-only
+permissions where supported, and atomically rotates current to backup before
+publishing the new current state. Corrupt current state falls back to a valid
+backup; corrupt state files and irregular/symlink files fail closed.
 
 ### Symlink rejection
 

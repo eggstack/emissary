@@ -30,6 +30,7 @@ pub mod router_info;
 pub mod router_info_handler;
 pub mod rpc;
 pub mod server;
+pub mod server_secret_store;
 pub mod service_registry;
 pub mod stores;
 pub mod tls;

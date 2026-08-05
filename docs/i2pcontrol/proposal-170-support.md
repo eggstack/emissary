@@ -73,6 +73,9 @@ Retained candidate evidence includes:
   backend registry;
 - exact TunnelManager result shapes, validation, atomic persistence, and secret
   handling;
+- operational control-plane-owned generic `client` and `server` runtime
+  backends with startup ownership isolation; server identities are persistent,
+  fixed-path, and redacted;
 - startup-managed tunnel inventory and proxy lifecycle observation;
 - bounded recoverable SAM observation;
 - exact 43-key RouterInfo matrix and explicit unavailable behavior;
@@ -101,8 +104,8 @@ recorded in `plans/closure/i2pcontrol-proposal-170/029-closure.md`.
 ## TunnelManager
 
 Retained status: wire/persistence correction complete in M021, startup/source
-correction retained from M023, and the generic control-plane `client` runtime
-backend is operational from M031.
+correction retained from M023, and the generic control-plane `client` and
+`server` runtime backends are operational from M031/M032.
 
 Retained behavior:
 
@@ -119,13 +122,13 @@ Retained behavior:
 
 ### Missing tunnel data planes
 
-The generic `client` type is the one real control-plane lifecycle backend at
-this stage. It reuses the existing Yosemite streaming client data plane behind
-an I2PControl-owned, per-name supervisor. Startup-managed client definitions
-remain externally managed and reject administrative lifecycle operations.
+The generic `client` and `server` types are the real control-plane lifecycle
+backends at this stage. They reuse the existing Yosemite streaming data planes
+behind I2PControl-owned, per-name supervisors. Startup-managed client and
+server definitions remain externally managed and reject administrative
+lifecycle operations.
 
-The generic `server` type remains unsupported until M032. The following other
-tunnel families remain intentionally out of scope:
+The following other tunnel families remain intentionally out of scope:
 
 - HTTP client/server and bidirectional server;
 - IRC client/server;

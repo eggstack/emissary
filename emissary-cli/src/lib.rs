@@ -34,6 +34,19 @@ pub mod config {
         pub i2cp: Option<I2cpOptions>,
     }
 
+    /// Startup generic server tunnel configuration.
+    #[derive(Debug, Clone)]
+    pub struct ServerTunnelConfig {
+        /// Tunnel name.
+        pub name: String,
+        /// Local forwarded port.
+        pub port: u16,
+        /// Startup destination file path.
+        pub destination_path: String,
+        /// Optional I2CP settings.
+        pub i2cp: Option<I2cpOptions>,
+    }
+
     /// Address-book configuration shared with the runtime owner in library
     /// builds used by I2PControl tests.
     #[derive(Debug, Clone, Default)]
@@ -55,3 +68,7 @@ pub mod i2pcontrol;
 #[cfg(feature = "i2pcontrol")]
 #[path = "tunnel/client.rs"]
 pub mod tunnel_client;
+
+#[cfg(feature = "i2pcontrol")]
+#[path = "tunnel/server.rs"]
+pub mod tunnel_server;

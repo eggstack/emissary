@@ -1,7 +1,7 @@
 # I2PControl Tunnel Backends
 
-Status: M031 client runtime implemented; server and other families remain
-unsupported
+Status: M032 client and generic server runtimes implemented; other families
+remain unsupported
 
 This document describes the tunnel backend interface and registry in Emissary.
 
@@ -71,8 +71,9 @@ Lookup is total for valid tunnel types. The registry is constructed once at star
 `create_default_registry()` maps all 12 tunnel types to
 `UnsupportedTunnelBackend` for tests and dependency-light compositions. The
 production constructor uses `create_production_registry(sam_tcp_port)`, which
-registers exactly one real backend for `client` and retains unsupported
-backends for the other eleven types.
+registers real backends for `client` and `server` and retains unsupported
+backends for the other ten types. The composed server backend uses a fixed
+`server-destinations/` store below the I2PControl state root.
 
 ```rust
 pub fn create_default_registry() -> Result<TunnelBackendRegistry, RegistryError> {
@@ -146,13 +147,22 @@ All 12 tunnel types are mapped to backends:
 | `socksirc` | Client | Unsupported |
 | `connectclient` | Client | Unsupported |
 | `streamrclient` | Client | Unsupported |
-| `server` | Server | Unsupported (M032) |
+| `server` | Server | Yosemite streaming server with per-name supervisor and persistent destination identity |
 | `httpserver` | Server | Unsupported |
 | `httpbidirserver` | Server | Unsupported |
 | `ircserver` | Server | Unsupported |
 | `streamrserver` | Server | Unsupported |
 
-Real tunnel data-plane implementations are deferred outside the I2PControl scope. The Proposal 170 contract is satisfied by explicit unsupported stubs.
+HTTP, IRC, SOCKS-IRC, CONNECT, Streamr, and bidirectional HTTP data planes are
+deferred outside the I2PControl scope and remain explicit unsupported stubs.
+
+The generic server maps `Port`/`TargetPort` to the existing Yosemite
+`STREAM FORWARD` local port and accepts only loopback target-host semantics.
+It publishes the actual public destination after session setup; private
+destination material is stored only in the backend-owned secret store. Stopped
+control-plane servers retain identity across restart and rename. Running
+server rename is rejected, and delete awaits the exact runtime task before
+removing durable definition and identity state.
 
 ## Design rationale
 

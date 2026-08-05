@@ -13,8 +13,8 @@ The TunnelManager handler implements the `TunnelManager` JSON-RPC method for all
 - Compatibility `List` and capitalized action values
 - Lifecycle dispatch (start, stop, restart) through the backend registry
 - Ownership enforcement for startup-managed tunnels
-- Real control-plane lifecycle for generic `client` and explicit unsupported
-  behavior for the remaining eleven types
+- Real control-plane lifecycle for generic `client` and `server`, with
+  explicit unsupported behavior for the remaining ten types
 
 Production inventory is the deterministic union of startup-configured generic
 client/server definitions and persisted control-plane definitions. Startup
@@ -26,6 +26,15 @@ Startup-managed generic client/server managers remain externally owned and are
 never adopted by I2PControl. Control-plane-created generic `client` definitions
 use an independent Yosemite streaming session and an I2PControl-owned,
 per-name supervisor with readiness, cancellation, restart, and failure cleanup.
+
+Control-plane-created generic `server` definitions use the existing Yosemite
+streaming server data plane through the same bounded per-name ownership model.
+The first successful start allocates a stable internal identity and stores its
+persistent destination below `server-destinations/` in the I2PControl state
+root. The key is never accepted as `PrivKeyFile`, copied into `rawConfig`, or
+returned by `get`. The actual public destination is available to
+`ClientServicesInfo` only after the backend has established the session.
+Startup-managed server definitions remain externally owned.
 
 ## Actions
 
@@ -115,7 +124,8 @@ Creates a new tunnel definition with the specified type and name.
 - `Type` and `Name` are required
 - Duplicate names return a Proposal 170 status error
 - Control-plane ownership is assigned automatically
-- `StartOnLoad` is stored but does not start the tunnel
+- `StartOnLoad` is stored but does not start the tunnel until M033 lifecycle
+  reconciliation
 
 ### Edit
 
@@ -132,6 +142,8 @@ Updates an existing tunnel definition. Preserves omitted fields.
 
 - `Name` is required
 - `NewName` performs an atomic rename with collision detection
+- Stopped control-plane server renames preserve destination identity; running
+  server renames are rejected
 - Startup-managed definitions are rejected
 
 ### Get

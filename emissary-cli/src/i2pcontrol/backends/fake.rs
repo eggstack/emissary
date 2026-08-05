@@ -121,6 +121,7 @@ impl TunnelBackend for FakeTunnelBackend {
             tunnel_type: self.tunnel_type,
             runtime_state: script.inspect_state,
             message: script.inspect_message,
+            destination: None,
         }
     }
 }

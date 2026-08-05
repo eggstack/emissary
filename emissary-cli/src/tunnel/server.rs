@@ -16,15 +16,132 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
+#![allow(dead_code)]
+
 use crate::config::{I2cpOptions, ServerTunnelConfig};
 
 use yosemite::{style, DestinationKind, RouterApi, Session, SessionOptions};
 
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
+/// Errors returned by the reusable single-server runtime primitive.
+///
+/// The error intentionally contains no SAM/Yosemite detail. A persistent
+/// destination is part of the session setup input and must never be copied
+/// into an error or diagnostic value.
+#[derive(Debug, thiserror::Error)]
+pub enum ServerRuntimeError {
+    /// The SAM session could not be created.
+    #[error("server tunnel session setup failed")]
+    SessionSetup,
+    /// The runtime task panicked.
+    #[error("server tunnel runtime task panicked")]
+    Panicked,
+}
+
 /// Passive callback used only to publish the actual destination returned by
 /// an existing server session into the composed startup inventory.
 pub type DestinationObserver = Arc<dyn Fn(&str, &str) + Send + Sync>;
+
+/// Plain runtime configuration for one server tunnel.
+///
+/// The destination is private session material. This type deliberately has no
+/// `Debug` implementation so accidental diagnostics cannot print it.
+pub struct ServerTunnelRuntimeConfig {
+    /// Diagnostic session nickname.
+    pub name: String,
+    /// Local TCP port receiving forwarded I2P streams.
+    pub port: u16,
+    /// Persistent destination private key material.
+    pub destination: String,
+    /// SAMv3 TCP port.
+    pub sam_tcp_port: u16,
+    /// Optional I2CP lease-set encryption type.
+    pub lease_set_enc_type: Option<String>,
+}
+
+/// Generate one persistent destination through the existing router SAM API.
+///
+/// This is a purpose-specific data-plane helper. It does not know about
+/// I2PControl, tunnel definitions, or filesystem paths.
+pub async fn generate_persistent_destination(
+    sam_tcp_port: u16,
+) -> Result<String, ServerRuntimeError> {
+    let router_api = RouterApi::new(sam_tcp_port);
+    for attempt in 0..DESTINATION_CREATION_RETRY_COUNT {
+        match router_api.generate_destination().await {
+            Ok((_, private_key)) => return Ok(private_key),
+            Err(_) if attempt + 1 < DESTINATION_CREATION_RETRY_COUNT => {
+                tokio::time::sleep(DESTINATION_CREATION_BACKOFF).await;
+            }
+            Err(_) => break,
+        }
+    }
+    Err(ServerRuntimeError::SessionSetup)
+}
+
+/// Run one cancellable generic server tunnel.
+///
+/// Readiness is reported only after the persistent session has published its
+/// actual public destination and `STREAM FORWARD` has succeeded. Forward
+/// failures retain the startup manager's bounded retry behavior. Cancellation
+/// is observed during session setup, forward retry, and the idle lifetime.
+pub async fn run_single_server(
+    config: ServerTunnelRuntimeConfig,
+    mut cancellation: tokio::sync::watch::Receiver<bool>,
+    ready: tokio::sync::oneshot::Sender<Result<(), String>>,
+    destination_observer: Option<DestinationObserver>,
+) -> Result<(), ServerRuntimeError> {
+    let mut session = tokio::select! {
+        _ = cancellation.changed() => {
+            let _ = ready.send(Err("server tunnel start cancelled".to_string()));
+            return Ok(());
+        }
+        result = Session::<style::Stream>::new(SessionOptions {
+            samv3_tcp_port: config.sam_tcp_port,
+            nickname: config.name.clone(),
+            silent_forward: true,
+            destination: DestinationKind::Persistent {
+                private_key: config.destination.clone(),
+            },
+            lease_set_enc_type: config.lease_set_enc_type,
+            ..Default::default()
+        }) => match result {
+            Ok(session) => session,
+            Err(_) => {
+                let _ = ready.send(Err("server tunnel session setup failed".to_string()));
+                return Err(ServerRuntimeError::SessionSetup);
+            }
+        },
+    };
+
+    if let Some(observer) = destination_observer.as_ref() {
+        observer(&config.name, session.destination());
+    }
+
+    loop {
+        let forward = tokio::select! {
+            _ = cancellation.changed() => return Ok(()),
+            result = session.forward(config.port) => result,
+        };
+        if forward.is_ok() {
+            break;
+        }
+
+        tokio::select! {
+            _ = cancellation.changed() => return Ok(()),
+            _ = tokio::time::sleep(STREAM_FORWARD_BACKOFF) => {},
+        }
+    }
+
+    let _ = ready.send(Ok(()));
+    loop {
+        tokio::select! {
+            _ = cancellation.changed() => return Ok(()),
+            _ = tokio::time::sleep(Duration::from_secs(10)) => {},
+        }
+    }
+}
 
 /// Logging target for the file.
 const LOG_TARGET: &str = "emissary::server-tunnel";
@@ -185,55 +302,30 @@ impl ServerTunnelManager {
             "starting server tunnel",
         );
 
-        let mut session = match Session::<style::Stream>::new(SessionOptions {
-            samv3_tcp_port: config.sam_tcp_port,
-            nickname: config.name.clone(),
-            silent_forward: true,
-            destination: DestinationKind::Persistent {
-                private_key: config.destination.clone(),
+        let (_, cancellation) = tokio::sync::watch::channel(false);
+        let (ready, _ready_result) = tokio::sync::oneshot::channel();
+        let result = run_single_server(
+            ServerTunnelRuntimeConfig {
+                name: config.name.clone(),
+                port: config.port,
+                destination: config.destination.clone(),
+                sam_tcp_port: config.sam_tcp_port,
+                lease_set_enc_type: config
+                    .i2cp
+                    .as_ref()
+                    .and_then(|i2cp| i2cp.lease_set_enc_type.clone()),
             },
-            lease_set_enc_type: config
-                .i2cp
-                .as_ref()
-                .and_then(|i2cp| i2cp.lease_set_enc_type.clone()),
-            ..Default::default()
-        })
-        .await
-        {
-            Ok(session) => session,
-            Err(error) => {
-                tracing::error!(
-                    target: LOG_TARGET,
-                    name = %config.name,
-                    ?error,
-                    "failed to start client samv3 session for server tunnel",
-                );
-                return;
-            }
-        };
-
-        if let Some(observer) = destination_observer.as_ref() {
-            observer(&config.name, session.destination());
-        }
-
-        // send `STREAM FORWARD` command to session and if it fails, sleep and try again later
-        loop {
-            let Err(error) = session.forward(config.port).await else {
-                break;
-            };
-
-            tracing::warn!(
+            cancellation,
+            ready,
+            destination_observer,
+        )
+        .await;
+        if result.is_err() {
+            tracing::error!(
                 target: LOG_TARGET,
                 name = %config.name,
-                ?error,
-                "failed to forward stream",
+                "failed to start server tunnel runtime",
             );
-
-            tokio::time::sleep(STREAM_FORWARD_BACKOFF).await;
-        }
-
-        loop {
-            tokio::time::sleep(Duration::from_secs(10)).await;
         }
     }
 

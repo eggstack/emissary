@@ -60,6 +60,7 @@ impl TunnelBackend for UnsupportedTunnelBackend {
             tunnel_type: self.tunnel_type,
             runtime_state: TunnelRuntimeState::Unsupported,
             message: format!("{} backend is not implemented", self.tunnel_type.as_str()),
+            destination: None,
         }
     }
 }

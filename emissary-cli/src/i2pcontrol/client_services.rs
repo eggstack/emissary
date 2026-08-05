@@ -536,6 +536,7 @@ mod tests {
     use super::*;
     use crate::i2pcontrol::{
         rpc::JsonRpcRequest,
+        sam_observer::{SamObservedSession, SamObservedSocket},
         service_registry::{ServiceCategory, ServiceMetadata, ServiceRegistry},
     };
 
@@ -959,10 +960,10 @@ mod tests {
         let snapshot = SamSessionObservationSnapshot {
             sessions: BTreeMap::from([(
                 Arc::from("chat"),
-                emissary_core::SamObservedSession {
+                SamObservedSession {
                     name: Arc::from("chat"),
                     address: Arc::from("chat.b32.i2p"),
-                    sockets: vec![emissary_core::SamObservedSocket {
+                    sockets: vec![SamObservedSocket {
                         socket_type: 2,
                         peer: Arc::from("127.0.0.1:7656"),
                     }],

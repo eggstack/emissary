@@ -59,11 +59,14 @@ pub use crate::i2pcontrol::address_book_runtime::{
 
 #[cfg(feature = "i2pcontrol")]
 use crate::i2pcontrol::address_book_runtime::{
-    base32_for_destination, is_valid_full_destination, validate_runtime_entry,
+    is_valid_full_destination, validate_runtime_entry,
     RuntimeAddressBookOwner, RuntimeSubscriptionCommand, RuntimeSubscriptionControl,
     MAX_LEGACY_DESTINATION_BYTES, MAX_LEGACY_DESTINATION_ENTRIES,
     MAX_LEGACY_DESTINATION_FILE_BYTES,
 };
+
+#[cfg(all(feature = "i2pcontrol", test))]
+use crate::i2pcontrol::address_book_runtime::base32_for_destination;
 
 /// Logging target for the file
 const LOG_TARGET: &str = "emissary::address-book";

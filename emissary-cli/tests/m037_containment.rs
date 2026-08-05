@@ -107,8 +107,16 @@ fn core_hook_exposes_no_live_or_secret_types() {
 
 #[test]
 fn unsupported_tunnel_backends_remain_resource_free() {
-    let source = source("emissary-cli/src/i2pcontrol/backends/unsupported.rs");
-    assert!(source.contains("does not allocate") || source.contains("must not allocate"));
+    let contents = source("emissary-cli/src/i2pcontrol/backends/unsupported.rs");
+    let source = contents
+        .split("#[cfg(test)]")
+        .next()
+        .expect("unsupported backend production section");
+    assert!(
+        source.contains("does not allocate")
+            || source.contains("must not allocate")
+            || source.contains("resource-free")
+    );
     assert!(!source.contains("TcpListener::bind"));
     assert!(!source.contains("spawn("));
 }

@@ -330,7 +330,7 @@ impl<R: Runtime> SamSession<R> {
             session_id: super::sanitized_text(&self.session_id, 256),
             socket_id: socket.observation_id(),
             socket_type,
-            peer: socket.peer_addr().map(super::sanitized_peer),
+            peer: super::sanitized_peer(socket.peer_addr()),
         };
         match hook.publish(event) {
             Ok(()) => true,

@@ -41,11 +41,12 @@ use emissary_cli::i2pcontrol::{
         ProductionTunnelManagerControl,
     },
     router_info::{RouterInfoControl, TunnelSummary},
+    sam_observer::SamSessionObservationHandle,
     server::{I2pControlState, ProductionControls},
     service_registry::{ObservedServiceState, ServiceCategory, ServiceMetadata, ServiceRegistry},
 };
 
-use emissary_core::{FirewallStatus, SamSessionObservationHandle};
+use emissary_core::FirewallStatus;
 
 // --- In-memory EventMetrics for tests ---
 

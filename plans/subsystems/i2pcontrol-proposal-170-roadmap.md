@@ -78,10 +78,13 @@ Do not reimplement these without a new direct defect:
 
 ### 2.2 Remaining material findings
 
-1. The production backend registry maps all twelve tunnel types to unsupported
-   backends. Definition CRUD is real; lifecycle is not operational.
-2. Existing generic client/server managers are startup-oriented and do not
-   expose safe named cancellation, inspection, or adoption.
+1. M031's production backend registry maps generic `client` to a real backend
+   and the other eleven tunnel types to unsupported backends. Definition CRUD
+   and generic client lifecycle are real; generic server lifecycle is not yet
+   operational.
+2. The startup generic client/server managers remain startup-oriented and do
+   not expose safe administrative adoption; M031 adds named cancellation only
+   for independently owned control-plane clients.
 3. AddressBook subscription/config setters persist metadata but do not control
    the active downloader/configuration, while returning success.
 4. The protected dispatcher is a Proposal-170-focused subset of the base
@@ -242,7 +245,7 @@ M038 live-runtime interoperability validation
 M039 independent final-head operational reclosure
 ```
 
-M031 is the only dependency-ready implementation handoff. Later plans are
+M032 is the only dependency-ready implementation handoff. Later plans are
 written for handoff continuity but remain blocked until their named hard
 dependencies close. This prevents parallel edits to the same lifecycle and
 composition seams.

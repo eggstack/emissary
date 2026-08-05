@@ -1,6 +1,7 @@
 # I2PControl Tunnel Backends
 
-Status: M002 infrastructure implemented
+Status: M031 client runtime implemented; server and other families remain
+unsupported
 
 This document describes the tunnel backend interface and registry in Emissary.
 
@@ -65,9 +66,13 @@ let backend = registry.get(tunnel_type);
 
 Lookup is total for valid tunnel types. The registry is constructed once at startup and not modified thereafter.
 
-### Default registry
+### Default and production registries
 
-`create_default_registry()` maps all 12 tunnel types to `UnsupportedTunnelBackend`:
+`create_default_registry()` maps all 12 tunnel types to
+`UnsupportedTunnelBackend` for tests and dependency-light compositions. The
+production constructor uses `create_production_registry(sam_tcp_port)`, which
+registers exactly one real backend for `client` and retains unsupported
+backends for the other eleven types.
 
 ```rust
 pub fn create_default_registry() -> Result<TunnelBackendRegistry, RegistryError> {
@@ -134,14 +139,14 @@ All 12 tunnel types are mapped to backends:
 
 | Type | Category | Backend |
 |---|---|---|
-| `client` | Client | Unsupported |
+| `client` | Client | Yosemite streaming client with per-name supervisor |
 | `httpclient` | Client | Unsupported |
 | `ircclient` | Client | Unsupported |
 | `socks` | Client | Unsupported |
 | `socksirc` | Client | Unsupported |
 | `connectclient` | Client | Unsupported |
 | `streamrclient` | Client | Unsupported |
-| `server` | Server | Unsupported |
+| `server` | Server | Unsupported (M032) |
 | `httpserver` | Server | Unsupported |
 | `httpbidirserver` | Server | Unsupported |
 | `ircserver` | Server | Unsupported |

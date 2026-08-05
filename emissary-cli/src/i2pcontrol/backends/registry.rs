@@ -119,14 +119,38 @@ impl std::fmt::Display for RegistryError {
 
 impl std::error::Error for RegistryError {}
 
-/// Create a default registry with all tunnel types mapped to unsupported
+/// Create a test/default registry with all tunnel types mapped to unsupported
 /// backends.
+///
+/// Production composition uses [`create_production_registry`] so the client
+/// backend receives the already-bound SAM endpoint without making this
+/// dependency part of the test/fake registry contract.
 pub fn create_default_registry() -> Result<TunnelBackendRegistry, RegistryError> {
     let backends: Vec<Arc<dyn TunnelBackend>> = ALL_TUNNEL_TYPES
         .iter()
         .map(|&tt| {
             Arc::new(super::unsupported::UnsupportedTunnelBackend::new(tt))
                 as Arc<dyn TunnelBackend>
+        })
+        .collect();
+    TunnelBackendRegistry::new(backends)
+}
+
+/// Create the production registry with a real generic client backend.
+pub fn create_production_registry(
+    sam_tcp_port: u16,
+) -> Result<TunnelBackendRegistry, RegistryError> {
+    let client =
+        Arc::new(super::client::ClientTunnelBackend::new(sam_tcp_port)) as Arc<dyn TunnelBackend>;
+    let backends: Vec<Arc<dyn TunnelBackend>> = ALL_TUNNEL_TYPES
+        .iter()
+        .map(|&tt| {
+            if tt == TunnelType::Client {
+                client.clone()
+            } else {
+                Arc::new(super::unsupported::UnsupportedTunnelBackend::new(tt))
+                    as Arc<dyn TunnelBackend>
+            }
         })
         .collect();
     TunnelBackendRegistry::new(backends)
@@ -234,6 +258,22 @@ mod tests {
         let registry = create_default_registry().unwrap();
         for &tt in ALL_TUNNEL_TYPES {
             assert!(registry.contains(tt));
+        }
+    }
+
+    #[test]
+    fn production_registry_has_only_client_as_real_backend() {
+        let registry = create_production_registry(7656).unwrap();
+        assert_eq!(registry.len(), ALL_TUNNEL_TYPES.len());
+        assert_eq!(
+            registry.get(TunnelType::Client).tunnel_type(),
+            TunnelType::Client
+        );
+        for &tunnel_type in &ALL_TUNNEL_TYPES[1..] {
+            assert!(matches!(
+                registry.get(tunnel_type).inspect(&test_definition(tunnel_type)).runtime_state,
+                TunnelRuntimeState::Unsupported
+            ));
         }
     }
 }

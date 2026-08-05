@@ -629,6 +629,8 @@ pub struct ServerInitContext {
     /// Startup-configured generic tunnel definitions shared with production
     /// TunnelManager and the existing tunnel managers.
     pub startup_tunnel_inventory: Option<StartupTunnelInventory>,
+    /// Existing router SAM TCP port used by the control-plane client backend.
+    pub sam_tcp_port: Option<u16>,
 }
 
 impl ServerInitContext {
@@ -648,6 +650,7 @@ impl ServerInitContext {
             sam_listener_enabled: false,
             address_book_handle: None,
             startup_tunnel_inventory: None,
+            sam_tcp_port: None,
         }
     }
 
@@ -712,6 +715,13 @@ impl ServerInitContext {
         self.startup_tunnel_inventory = Some(inventory);
         self
     }
+
+    /// Inject the already-bound router SAM TCP port for generic client
+    /// tunnel composition.
+    pub fn with_sam_tcp_port(mut self, port: u16) -> Self {
+        self.sam_tcp_port = Some(port);
+        self
+    }
 }
 
 /// Initialize the I2PControl server: validate config, set up TLS, bind the port.
@@ -774,9 +784,10 @@ pub async fn init_server(
     })?;
     let startup_tunnel_inventory = ctx.startup_tunnel_inventory.unwrap_or_default();
     let tunnels: Arc<ProductionTunnelManagerControl> = Arc::new(
-        ProductionTunnelManagerControl::new_with_startup_inventory(
+        ProductionTunnelManagerControl::new_with_startup_inventory_and_sam_port(
             tm_dir.clone(),
             startup_tunnel_inventory,
+            ctx.sam_tcp_port,
         )
         .map_err(|e| {
             I2pControlError::Persistence(format!("failed to create tunnel manager: {e}"))
@@ -1126,17 +1137,22 @@ async fn dispatch_protected(
     request: &JsonRpcRequest,
 ) -> serde_json::Value {
     match request.method.as_str() {
-        rpc::methods::ADDRESS_BOOK =>
-            super::address_book::handle_address_book(state, request).await,
-        rpc::methods::SET_SUBSCRIPTIONS =>
-            super::address_book::handle_set_subscriptions(state, request).await,
+        rpc::methods::ADDRESS_BOOK => {
+            super::address_book::handle_address_book(state, request).await
+        }
+        rpc::methods::SET_SUBSCRIPTIONS => {
+            super::address_book::handle_set_subscriptions(state, request).await
+        }
         rpc::methods::SET_CONFIG => super::address_book::handle_set_config(state, request).await,
-        rpc::methods::TUNNEL_MANAGER =>
-            super::tunnel_manager::handle_tunnel_manager(state, request).await,
-        rpc::methods::ROUTER_INFO =>
-            super::router_info_handler::handle_router_info(state, request).await,
-        rpc::methods::CLIENT_SERVICES_INFO =>
-            super::client_services::handle_client_services_info(state, request).await,
+        rpc::methods::TUNNEL_MANAGER => {
+            super::tunnel_manager::handle_tunnel_manager(state, request).await
+        }
+        rpc::methods::ROUTER_INFO => {
+            super::router_info_handler::handle_router_info(state, request).await
+        }
+        rpc::methods::CLIENT_SERVICES_INFO => {
+            super::client_services::handle_client_services_info(state, request).await
+        }
         _ => serde_json::to_value(JsonRpcErrorResponse::new(
             resolve_id(&request.id),
             rpc::error_codes::METHOD_NOT_FOUND,

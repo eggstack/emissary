@@ -13,7 +13,8 @@ The TunnelManager handler implements the `TunnelManager` JSON-RPC method for all
 - Compatibility `List` and capitalized action values
 - Lifecycle dispatch (start, stop, restart) through the backend registry
 - Ownership enforcement for startup-managed tunnels
-- Deterministic unsupported backend behavior for all 12 tunnel types
+- Real control-plane lifecycle for generic `client` and explicit unsupported
+  behavior for the remaining eleven types
 
 Production inventory is the deterministic union of startup-configured generic
 client/server definitions and persisted control-plane definitions. Startup
@@ -21,12 +22,10 @@ definitions are read-only observations and are not copied into the persistent
 generation store. A duplicate name across the two sources fails closed during
 I2PControl initialization; create and rename reject startup-owned names.
 
-The existing generic client/server managers do not expose independently
-cancellable named tasks: they own retrying task sets and their lifecycle
-authority is not safely targetable per name. M023 therefore deliberately keeps
-startup lifecycle operations externally managed rather than adding a supervisor
-or task registry. Proposal 170 lifecycle operations fail before touching those
-manager-owned tasks.
+Startup-managed generic client/server managers remain externally owned and are
+never adopted by I2PControl. Control-plane-created generic `client` definitions
+use an independent Yosemite streaming session and an I2PControl-owned,
+per-name supervisor with readiness, cancellation, restart, and failure cleanup.
 
 ## Actions
 
@@ -215,7 +214,9 @@ Returns all tunnel definitions as an array.
 }
 ```
 
-Dispatches through the backend registry. Canonical statuses are translated at
+Dispatches through the backend registry. Generic control-plane `client`
+definitions bind and establish their independent session before successful
+start returns. Canonical statuses are translated at
 the handler boundary and are tied to the requested action/name:
 - `success - starting tunnel <name>` for supported backends
 - `error - start tunnel <name> not implemented` for unsupported backends

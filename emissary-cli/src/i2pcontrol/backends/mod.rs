@@ -16,6 +16,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
+pub mod client;
 pub mod fake;
 pub mod registry;
 pub mod unsupported;

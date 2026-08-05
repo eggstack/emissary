@@ -55,6 +55,8 @@ mod logger;
 mod proxy;
 mod tools;
 mod tunnel;
+#[cfg(feature = "i2pcontrol")]
+use crate::tunnel::client as tunnel_client;
 mod ui;
 
 /// Logging target for the file.
@@ -591,6 +593,11 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                 }
 
                 ctx = ctx.with_startup_tunnel_inventory(startup_tunnel_inventory.clone());
+
+                if let Some(sam_tcp_port) = router.protocol_address_info().sam_tcp.map(|a| a.port())
+                {
+                    ctx = ctx.with_sam_tcp_port(sam_tcp_port);
+                }
 
                 let instance =
                     i2pcontrol::server::init_server(&server_config, &base_path, ctx).await?;

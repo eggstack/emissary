@@ -23,6 +23,135 @@ use yosemite::{style, Session, SessionOptions, StreamOptions};
 
 use std::{future::Future, sync::Arc, time::Duration};
 
+/// Errors returned by the reusable client runtime primitive.
+#[derive(Debug, thiserror::Error)]
+#[allow(dead_code)]
+pub enum ClientRuntimeError {
+    /// Local listener or stream I/O failed.
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+    /// Yosemite SAM operation failed.
+    #[error("Yosemite error")]
+    Yosemite(#[from] yosemite::Error),
+    /// The runtime task panicked.
+    #[error("client runtime task panicked")]
+    Panicked,
+}
+
+/// Plain runtime configuration for one generic client tunnel.
+///
+/// This type deliberately contains no I2PControl or persistence concepts so
+/// the startup manager and the administrative runtime adapter can share the
+/// same data-plane primitive.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct ClientTunnelRuntimeConfig {
+    /// Diagnostic nickname only; it is not used as a protocol identity.
+    pub name: String,
+    /// Local listener interface. `None` uses loopback.
+    pub address: Option<String>,
+    /// Local listener port.
+    pub port: u16,
+    /// Remote I2P destination.
+    pub destination: String,
+    /// Remote destination port. Zero preserves Yosemite's existing default.
+    pub destination_port: Option<u16>,
+    /// SAMv3 TCP endpoint port.
+    pub sam_tcp_port: u16,
+}
+
+/// Run one cancellable generic client tunnel.
+///
+/// Readiness is reported only after the local listener and independent
+/// Yosemite streaming session have both been established. Traffic failures
+/// retain the startup manager's bounded retry behavior. Bind and session
+/// setup failures are terminal for this instance so a caller can release its
+/// named runtime reservation and report a truthful failure.
+#[allow(dead_code)]
+pub async fn run_single_client(
+    config: ClientTunnelRuntimeConfig,
+    mut cancellation: tokio::sync::watch::Receiver<bool>,
+    ready: tokio::sync::oneshot::Sender<Result<(), String>>,
+) -> std::result::Result<(), ClientRuntimeError> {
+    let address = config.address.clone().unwrap_or_else(|| "127.0.0.1".to_string());
+    let listener = match TcpListener::bind(format!("{address}:{}", config.port)).await {
+        Ok(listener) => listener,
+        Err(error) => {
+            let _ = ready.send(Err("client tunnel listener bind failed".to_string()));
+            return Err(error.into());
+        }
+    };
+
+    let session = tokio::select! {
+        _ = cancellation.changed() => {
+            let _ = ready.send(Err("client tunnel start cancelled".to_string()));
+            return Ok(());
+        }
+        result = Session::<style::Stream>::new(SessionOptions {
+            publish: false,
+            samv3_tcp_port: config.sam_tcp_port,
+            nickname: format!("i2p-tunnel-{}", config.name),
+            inbound_quantity: 4,
+            outbound_quantity: 4,
+            ..Default::default()
+        }) => result,
+    }?;
+
+    let _ = ready.send(Ok(()));
+    let mut session = session;
+
+    loop {
+        let (mut tcp_stream, _) = tokio::select! {
+            _ = cancellation.changed() => return Ok(()),
+            result = listener.accept() => result?,
+        };
+
+        let mut i2p_stream = tokio::select! {
+            _ = cancellation.changed() => return Ok(()),
+            result = session.connect_detached_with_options(
+                &config.destination,
+                StreamOptions {
+                    dst_port: config.destination_port.unwrap_or(0),
+                    ..Default::default()
+                },
+            ) => match result {
+                Ok(stream) => stream,
+                Err(error) => {
+                    tracing::debug!(
+                        target: LOG_TARGET,
+                        name = %config.name,
+                        ?error,
+                        "client tunnel connection failed",
+                    );
+                    tokio::select! {
+                        _ = cancellation.changed() => return Ok(()),
+                        _ = tokio::time::sleep(RETRY_TIMEOUT) => continue,
+                    }
+                }
+            },
+        };
+
+        let copy_result = tokio::select! {
+            _ = cancellation.changed() => return Ok(()),
+            result = tokio::io::copy_bidirectional(&mut i2p_stream, &mut tcp_stream) => result,
+        };
+
+        if let Err(error) = copy_result {
+            tracing::debug!(
+                target: LOG_TARGET,
+                name = %config.name,
+                ?error,
+                "client tunnel traffic path failed",
+            );
+        }
+
+        tokio::select! {
+            _ = cancellation.changed() => return Ok(()),
+            _ = tokio::time::sleep(RETRY_TIMEOUT) => {},
+        }
+    }
+}
+
 /// Logging target for the file.
 const LOG_TARGET: &str = "emissary::client-tunnel";
 
@@ -63,7 +192,7 @@ impl ClientTunnelManager {
     async fn tunnel_event_loop(
         future: impl Future<Output = yosemite::Result<yosemite::Stream>>,
         tunnel: &Arc<ClientTunnelConfig>,
-    ) -> crate::Result<()> {
+    ) -> std::result::Result<(), ClientRuntimeError> {
         let listener = TcpListener::bind(format!(
             "{}:{}",
             tunnel.address.clone().unwrap_or(String::from("127.0.0.1")),

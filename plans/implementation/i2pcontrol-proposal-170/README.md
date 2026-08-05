@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; M031 ready
+Status: partial Proposal 170 support; M032 ready
 
 This directory contains bounded internal implementation and closure handoffs for
 the I2PControl Proposal 170 subsystem.
@@ -44,18 +44,18 @@ Violation is a stop condition and invalidates affected evidence.
 
 | Handoff | Status | Plan | Dependency |
 |---|---|---|---|
-| M031 — Runtime supervisor and generic client backend | ready | `031-client-tunnel-runtime-backend.md` | M030 closed |
+| M031 — Runtime supervisor and generic client backend | closed | `031-client-tunnel-runtime-backend.md` | M030 closed |
 
-M031 is the only dependency-ready implementation plan. It establishes the
-control-plane runtime supervisor and replaces only the generic `client`
-unsupported backend. It must not modify `emissary-core`, adopt startup-managed
+M031 established the control-plane runtime supervisor and replaced only the
+generic `client` unsupported backend. M032 is now the only dependency-ready
+implementation plan. Neither may modify `emissary-core`, adopt startup-managed
 tasks, or implement another tunnel family.
 
 ## Registered successor sequence
 
 | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|
-| M032 — Generic server backend and destination identity | blocked | `032-server-tunnel-runtime-backend.md` | M031 closed |
+| M032 — Generic server backend and destination identity | ready | `032-server-tunnel-runtime-backend.md` | M031 closed |
 | M033 — Lifecycle reconciliation and StartOnLoad | blocked | `033-tunnel-lifecycle-reconciliation.md` | M031 and M032 closed |
 | M034 — AddressBook setter truthfulness | blocked | `034-addressbook-setter-truthfulness.md` | M033 closed |
 | M035 — Base compatibility and selector overlap | blocked | `035-base-compatibility-and-selector-overlap.md` | M034 closed |

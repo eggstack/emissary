@@ -19,6 +19,8 @@ Closed handoffs:
   `plans/closure/i2pcontrol-proposal-170/029-closure.md`
 - M030 closed: `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md`; closure:
   `plans/closure/i2pcontrol-proposal-170/030-closure.md`
+- M031 closed: `plans/implementation/i2pcontrol-proposal-170/031-client-tunnel-runtime-backend.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/031-closure.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained corrective
 evidence, while M027's final disposition is historical invalidated evidence.
@@ -99,7 +101,8 @@ recorded in `plans/closure/i2pcontrol-proposal-170/029-closure.md`.
 ## TunnelManager
 
 Retained status: wire/persistence correction complete in M021, startup/source
-correction retained from M023.
+correction retained from M023, and the generic control-plane `client` runtime
+backend is operational from M031.
 
 Retained behavior:
 
@@ -116,7 +119,13 @@ Retained behavior:
 
 ### Missing tunnel data planes
 
-The following remain intentionally out of scope:
+The generic `client` type is the one real control-plane lifecycle backend at
+this stage. It reuses the existing Yosemite streaming client data plane behind
+an I2PControl-owned, per-name supervisor. Startup-managed client definitions
+remain externally managed and reject administrative lifecycle operations.
+
+The generic `server` type remains unsupported until M032. The following other
+tunnel families remain intentionally out of scope:
 
 - HTTP client/server and bidirectional server;
 - IRC client/server;

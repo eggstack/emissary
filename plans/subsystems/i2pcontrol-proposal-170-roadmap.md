@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Operational Corrective Roadmap
 
-Status: partial Proposal 170 support; M031 ready
+Status: partial Proposal 170 support; M032 ready
 
 Planning baseline:
 
@@ -251,7 +251,7 @@ composition seams.
 
 ### M031 — Runtime supervisor and generic client backend
 
-Status: ready
+Status: closed
 
 Plan:
 
@@ -275,7 +275,7 @@ Exit conditions:
 
 ### M032 — Generic server backend and destination identity
 
-Status: blocked on M031
+Status: ready
 
 Plan:
 
@@ -519,8 +519,8 @@ review.
 |---|---|---|
 | 001–019A | historical/superseded/invalidated as recorded | retained history |
 | 020–030 | retained closed evidence | current partial-support baseline |
-| 031 | ready | runtime supervisor and generic client backend |
-| 032 | blocked | hard dependency M031 |
+| 031 | closed | runtime supervisor and generic client backend |
+| 032 | ready | hard dependency M031 closed |
 | 033 | blocked | hard dependencies M031–M032 |
 | 034 | blocked | hard dependency M033 |
 | 035 | blocked | hard dependency M034 |

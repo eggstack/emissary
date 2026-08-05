@@ -1,6 +1,6 @@
 # M031 — Control-Plane Runtime Supervisor and Generic Client Backend
 
-Status: ready
+Status: implemented
 
 Source roadmap:
 

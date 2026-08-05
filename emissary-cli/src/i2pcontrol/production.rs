@@ -540,8 +540,21 @@ impl ProductionTunnelManagerControl {
         dir: PathBuf,
         startup: StartupTunnelInventory,
     ) -> Result<Self, String> {
-        let registry = crate::i2pcontrol::backends::registry::create_default_registry()
-            .map_err(|e| format!("failed to create registry: {e}"))?;
+        Self::new_with_startup_inventory_and_sam_port(dir, startup, None)
+    }
+
+    /// Create a production tunnel manager with the existing router SAM
+    /// endpoint. `None` retains the dependency-light test construction path.
+    pub fn new_with_startup_inventory_and_sam_port(
+        dir: PathBuf,
+        startup: StartupTunnelInventory,
+        sam_tcp_port: Option<u16>,
+    ) -> Result<Self, String> {
+        let registry = match sam_tcp_port {
+            Some(port) => crate::i2pcontrol::backends::registry::create_production_registry(port),
+            None => crate::i2pcontrol::backends::registry::create_default_registry(),
+        }
+        .map_err(|e| format!("failed to create registry: {e}"))?;
         Ok(Self {
             inner: Arc::new(tokio::sync::Mutex::new(TunnelStore::new(dir, 1024 * 1024))),
             registry,
@@ -575,6 +588,15 @@ impl ProductionTunnelManagerControl {
         }
         Ok(())
     }
+
+    fn with_runtime_state(&self, mut definition: TunnelDefinition) -> TunnelDefinition {
+        if definition.ownership == crate::i2pcontrol::domain::tunnel::TunnelOwnership::ControlPlane
+        {
+            definition.runtime_state =
+                self.registry.get(definition.tunnel_type).inspect(&definition).runtime_state;
+        }
+        definition
+    }
 }
 
 impl Clone for ProductionTunnelManagerControl {
@@ -597,10 +619,8 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
             definitions.insert(definition.name.as_str().to_string(), definition);
         }
         for definition in store.list() {
-            if definitions
-                .insert(definition.name.as_str().to_string(), definition.clone())
-                .is_some()
-            {
+            let definition = self.with_runtime_state(definition.clone());
+            if definitions.insert(definition.name.as_str().to_string(), definition).is_some() {
                 return Err(
                     "startup and persisted tunnel definitions contain a colliding name".into(),
                 );
@@ -619,7 +639,7 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
             return Ok(Some(definition));
         }
         let store = self.inner.lock().await;
-        Ok(store.get(name).cloned())
+        Ok(store.get(name).cloned().map(|definition| self.with_runtime_state(definition)))
     }
 
     async fn create(&self, definition: TunnelDefinition) -> Result<(), String> {
@@ -734,7 +754,9 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
                 .clone()
         };
         let backend = self.registry.get(def.tunnel_type);
-        let _ = backend.stop(&def).await;
+        if let Err(error) = backend.stop(&def).await {
+            return Ok(format!("error - {error}"));
+        }
         match backend.start(&def).await {
             Ok(()) => Ok("ok".to_string()),
             Err(BackendError::NotImplemented { tunnel_type }) => {

@@ -1,6 +1,6 @@
 # Proposal 170 Conformance Matrix
 
-Status: partial Proposal 170 support; M030 AddressBook closure accepted
+Status: partial Proposal 170 support; M031 generic client runtime closure accepted
 
 Proposal 170 remains Open. This workstream is pinned to the revision created
 and last updated on `2026-05-20`.
@@ -13,6 +13,7 @@ Completed implementation correction:
 
 - M028, `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 - M030, `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md`
+- M031, `plans/implementation/i2pcontrol-proposal-170/031-client-tunnel-runtime-backend.md`
 
 Controlling final closure:
 
@@ -22,7 +23,9 @@ M019 is superseded and non-controlling. M020–M027 remain retained evidence, an
 M027's final subsystem disposition remains historical invalidated evidence.
 M028 is implemented and closed with the required boundary evidence. M030
 reviewed the actual AddressBook final head and accepted partial Proposal 170
-support.
+support. M031 subsequently made only the generic control-plane `client`
+backend operational; the generic `server` and ten other tunnel families remain
+explicitly unsupported.
 
 ## Retained machine-readable matrix
 

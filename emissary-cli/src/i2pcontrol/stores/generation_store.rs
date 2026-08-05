@@ -40,6 +40,15 @@
 
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+
+#[cfg(test)]
+use tokio::sync::Notify;
+
 use serde::{Deserialize, Serialize};
 
 use crate::i2pcontrol::domain::revision::StateRevision;
@@ -232,6 +241,12 @@ pub struct GenerationStore<T> {
 
     #[cfg(test)]
     fail_next_directory_sync: bool,
+
+    #[cfg(test)]
+    pause_before_rename: Option<(Arc<AtomicBool>, Arc<Notify>)>,
+
+    #[cfg(test)]
+    pause_after_directory_sync: Option<(Arc<AtomicBool>, Arc<Notify>)>,
 }
 
 #[allow(dead_code)]
@@ -255,6 +270,10 @@ where
             fail_next_permission_change: false,
             #[cfg(test)]
             fail_next_directory_sync: false,
+            #[cfg(test)]
+            pause_before_rename: None,
+            #[cfg(test)]
+            pause_after_directory_sync: None,
         }
     }
 
@@ -274,6 +293,20 @@ where
     #[cfg(test)]
     pub fn fail_next_directory_sync(&mut self) {
         self.fail_next_directory_sync = true;
+    }
+
+    #[cfg(test)]
+    fn pause_before_rename(&mut self) -> (Arc<AtomicBool>, Arc<Notify>) {
+        let hook = (Arc::new(AtomicBool::new(false)), Arc::new(Notify::new()));
+        self.pause_before_rename = Some(hook.clone());
+        hook
+    }
+
+    #[cfg(test)]
+    fn pause_after_directory_sync(&mut self) -> (Arc<AtomicBool>, Arc<Notify>) {
+        let hook = (Arc::new(AtomicBool::new(false)), Arc::new(Notify::new()));
+        self.pause_after_directory_sync = Some(hook.clone());
+        hook
     }
 
     /// Validate that the store directory is safe (not a symlink, not escaping base).
@@ -374,6 +407,12 @@ where
         }
 
         #[cfg(test)]
+        if let Some((entered, release)) = &self.pause_before_rename {
+            entered.store(true, Ordering::Release);
+            release.notified().await;
+        }
+
+        #[cfg(test)]
         if self.fail_next_publication {
             self.fail_next_publication = false;
             let _ = tokio::fs::remove_file(&temp_path).await;
@@ -395,6 +434,12 @@ where
             ));
         }
         sync_directory(&self.dir).await.map_err(StoreError::Io)?;
+
+        #[cfg(test)]
+        if let Some((entered, release)) = &self.pause_after_directory_sync {
+            entered.store(true, Ordering::Release);
+            release.notified().await;
+        }
 
         // Update in-memory state
         self.current = Some(state);
@@ -1021,6 +1066,78 @@ mod tests {
         let mut restarted = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
         restarted.load().await.unwrap();
         assert_eq!(restarted.current().unwrap().value, "prior");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn cancellation_before_rename_preserves_prior_generation() {
+        let dir = test_store_dir();
+        let mut store = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        store
+            .publish(
+                TestPayload {
+                    value: "prior".to_string(),
+                },
+                |_| Ok(()),
+            )
+            .await
+            .unwrap();
+        let (entered, release) = store.pause_before_rename();
+        let task = tokio::spawn(async move {
+            store
+                .publish(
+                    TestPayload {
+                        value: "cancelled".to_string(),
+                    },
+                    |_| Ok(()),
+                )
+                .await
+        });
+        while !entered.load(Ordering::Acquire) {
+            tokio::task::yield_now().await;
+        }
+        task.abort();
+        release.notify_one();
+
+        let mut restarted = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        restarted.load().await.unwrap();
+        assert_eq!(restarted.current().unwrap().value, "prior");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn cancellation_after_directory_sync_leaves_committed_generation() {
+        let dir = test_store_dir();
+        let mut store = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        store
+            .publish(
+                TestPayload {
+                    value: "prior".to_string(),
+                },
+                |_| Ok(()),
+            )
+            .await
+            .unwrap();
+        let (entered, release) = store.pause_after_directory_sync();
+        let task = tokio::spawn(async move {
+            store
+                .publish(
+                    TestPayload {
+                        value: "committed".to_string(),
+                    },
+                    |_| Ok(()),
+                )
+                .await
+        });
+        while !entered.load(Ordering::Acquire) {
+            tokio::task::yield_now().await;
+        }
+        task.abort();
+        release.notify_one();
+
+        let mut restarted = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        restarted.load().await.unwrap();
+        assert_eq!(restarted.current().unwrap().value, "committed");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

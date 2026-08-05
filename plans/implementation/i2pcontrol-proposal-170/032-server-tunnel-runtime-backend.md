@@ -1,6 +1,6 @@
 # M032 — Generic Server Backend and Persistent Destination Identity
 
-Status: ready
+Status: implemented
 
 Source roadmap:
 

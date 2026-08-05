@@ -27,20 +27,20 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | partial Proposal 170 support; operational corrective work active | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M032 ready | M030 and M031 closed; M032 is the only dependency-ready plan |
+| I2PControl Proposal 170 | partial Proposal 170 support; operational corrective work active | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M033 ready | M030–M032 closed; M033 is the only dependency-ready plan |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M032 — Generic server backend and destination identity | ready | `plans/implementation/i2pcontrol-proposal-170/032-server-tunnel-runtime-backend.md` | M031 closed; ADR-0002 accepted |
+| I2PControl Proposal 170 | M033 — Lifecycle reconciliation and StartOnLoad | ready | `plans/implementation/i2pcontrol-proposal-170/033-tunnel-lifecycle-reconciliation.md` | M031 and M032 closed; ADR-0002 accepted |
 
 ## Registered successor handoffs
 
 | Subsystem | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M032 — Generic server backend and destination identity | ready | `plans/implementation/i2pcontrol-proposal-170/032-server-tunnel-runtime-backend.md` | M031 closed |
-| I2PControl Proposal 170 | M033 — Lifecycle reconciliation and StartOnLoad | blocked | `plans/implementation/i2pcontrol-proposal-170/033-tunnel-lifecycle-reconciliation.md` | M031 and M032 closed |
+| I2PControl Proposal 170 | M032 — Generic server backend and destination identity | closed | `plans/implementation/i2pcontrol-proposal-170/032-server-tunnel-runtime-backend.md` | M031 closed |
+| I2PControl Proposal 170 | M033 — Lifecycle reconciliation and StartOnLoad | ready | `plans/implementation/i2pcontrol-proposal-170/033-tunnel-lifecycle-reconciliation.md` | M031 and M032 closed |
 | I2PControl Proposal 170 | M034 — AddressBook setter truthfulness | blocked | `plans/implementation/i2pcontrol-proposal-170/034-addressbook-setter-truthfulness.md` | M033 closed |
 | I2PControl Proposal 170 | M035 — Base compatibility and selector overlap | blocked | `plans/implementation/i2pcontrol-proposal-170/035-base-compatibility-and-selector-overlap.md` | M034 closed |
 | I2PControl Proposal 170 | M036 — Authentication and publication hardening | blocked | `plans/implementation/i2pcontrol-proposal-170/036-auth-and-publication-hardening.md` | M035 closed |
@@ -52,20 +52,21 @@ Canonical direction:
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| — | None | — | M032 implementation is ready for handoff | — |
+| — | None | — | M032 closure accepted; M033 is ready for handoff | — |
 
 ## Recently closed milestones
 
 | Subsystem | Handoff | Status | Closure | Implementation disposition |
 |---|---|---|---|---|
 | I2PControl Proposal 170 | M031 — Runtime supervisor and generic client backend | closed | `plans/closure/i2pcontrol-proposal-170/031-closure.md` | `plans/closure/i2pcontrol-proposal-170/031-implementation-disposition.md` |
+| I2PControl Proposal 170 | M032 — Generic server backend and destination identity | closed | `plans/closure/i2pcontrol-proposal-170/032-closure.md` | `plans/closure/i2pcontrol-proposal-170/032-implementation-disposition.md` |
 
 ## Current corrective findings
 
 | Finding | Severity | Owner | State |
 |---|---|---|---|
-| Generic server and ten other tunnel families remain unsupported | high runtime capability gap | M032–M033 | M032 ready |
-| Existing startup generic client/server managers remain externally owned; server named cancellation is not yet available | high ownership/lifecycle gap | ADR-0002, M032–M033 | planned |
+| Ten non-client/server tunnel families remain unsupported | high runtime capability gap | roadmap future work | retained explicit disposition |
+| Existing startup generic client/server managers remain externally owned; StartOnLoad and full lifecycle reconciliation are not yet implemented | high ownership/lifecycle gap | M033 | ready |
 | AddressBook SetSubscriptions/SetConfig can report success for inert metadata | high API truthfulness gap | M034 | blocked on M033 |
 | Base I2PControl dispatcher/overlapping RouterInfo names require explicit compatibility boundary | medium compatibility gap | M035 | blocked on M034 |
 | Hand-written password comparison and no failed-auth throttle | medium security gap | M036 | blocked on M035 |
@@ -161,8 +162,8 @@ requires a contract-rebase plan.
 
 ## Registry maintenance rules
 
-1. M032 is the only dependency-ready implementation handoff.
-2. Do not advance M033 until M032 implementation disposition and closure are accepted.
+1. M033 is the only dependency-ready implementation handoff.
+2. Do not advance M034 until M033 implementation disposition and closure are accepted.
 3. Preserve M020–M030 evidence unless a new direct defect is demonstrated.
 4. Keep startup and control-plane runtime ownership separate.
 5. Keep production changes outside `i2pcontrol/**` minimal and individually justified.

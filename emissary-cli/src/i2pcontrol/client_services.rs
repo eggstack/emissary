@@ -24,7 +24,7 @@
 
 use std::collections::HashSet;
 
-use emissary_core::{
+use super::sam_observer::{
     SamSessionObservationHandle, SamSessionObservationSnapshot, SAM_SESSION_OBSERVATION_LIMIT,
     SAM_SOCKET_OBSERVATION_LIMIT,
 };

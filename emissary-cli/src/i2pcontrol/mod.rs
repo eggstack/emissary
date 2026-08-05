@@ -17,6 +17,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 pub mod address_book;
+pub mod address_book_runtime;
 pub mod auth;
 pub mod backends;
 pub mod client_services;
@@ -29,6 +30,7 @@ pub mod production;
 pub mod router_info;
 pub mod router_info_handler;
 pub mod rpc;
+pub mod sam_observer;
 pub mod server;
 pub mod server_secret_store;
 pub mod service_registry;

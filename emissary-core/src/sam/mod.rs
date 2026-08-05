@@ -47,7 +47,6 @@ use thingbuf::mpsc::{channel, with_recycle, Receiver, Sender};
 
 use alloc::{
     boxed::Box,
-    collections::BTreeMap,
     format,
     string::{String, ToString},
     sync::Arc,
@@ -60,11 +59,6 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-
-#[cfg(feature = "std")]
-use parking_lot::RwLock;
-#[cfg(not(feature = "std"))]
-use spin::rwlock::RwLock;
 
 mod parser;
 mod pending;
@@ -87,388 +81,82 @@ const LOG_TARGET: &str = "emissary::sam";
 /// SAMv3 command channel size.
 const COMMAND_CHANNEL_SIZE: usize = 256;
 
-/// Maximum number of active SAM sessions exposed to I2PControl.
-pub const SAM_SESSION_OBSERVATION_LIMIT: usize = 1000;
-
-/// Maximum number of sockets retained for one observed SAM session.
-pub const SAM_SOCKET_OBSERVATION_LIMIT: usize = 8;
-
-/// Temporary recovery capacity for observations that are active but not currently publishable.
+/// A sanitized lifecycle fact emitted by the authoritative SAM owner.
 ///
-/// This is deliberately finite. It lets a session or socket which briefly crosses the public
-/// response bound remain known until its authoritative close event arrives, without introducing
-/// an unbounded event history or a second SAM lifecycle registry.
-const SAM_SESSION_RECOVERY_LIMIT: usize = SAM_SESSION_OBSERVATION_LIMIT * 2;
-
-/// Temporary recovery capacity for sockets in one observed SAM session.
-const SAM_SOCKET_RECOVERY_LIMIT: usize = SAM_SOCKET_OBSERVATION_LIMIT * 2;
-
-/// Error returned when the bounded SAM observation state can no longer represent reality.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SamSessionObservationError {
-    /// The source is incomplete and refuses to expose a partial snapshot.
-    Incomplete,
-}
-
-/// A socket in a SAM session observation snapshot.
+/// The event contains no socket, session, destination, key, or command-channel handle. The
+/// receiver owns all aggregation, bounds, recovery, and serialization policy.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SamObservedSocket {
-    /// i2pd-compatible SAM socket type: session, stream, or acceptor.
-    pub socket_type: u8,
-
-    /// Remote TCP peer address.
-    pub peer: Arc<str>,
-}
-
-/// A SAM session in an observation snapshot.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SamObservedSession {
-    /// i2pd-compatible destination nickname.
-    pub name: Arc<str>,
-
-    /// i2pd-compatible `.b32.i2p` destination address.
-    pub address: Arc<str>,
-
-    /// Active SAM sockets belonging to this session.
-    pub sockets: Vec<SamObservedSocket>,
-}
-
-/// Bounded, read-only SAM observation snapshot.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SamSessionObservationSnapshot {
-    /// Active sessions keyed by their SAM session identifier.
-    pub sessions: BTreeMap<Arc<str>, SamObservedSession>,
-
-    /// Monotonic publication generation.
-    pub generation: u64,
-}
-
-#[derive(Clone)]
-pub struct SamSessionObservationHandle {
-    state: Arc<RwLock<SamSessionObservationState>>,
-}
-
-#[derive(Clone)]
-pub(crate) struct SamSessionObservationPublisher {
-    state: Arc<RwLock<SamSessionObservationState>>,
-}
-
-struct SamSessionObservationState {
-    sessions: BTreeMap<Arc<str>, SamObservedSessionState>,
-    /// Socket updates received before their session activation. These are retained only until the
-    /// matching activation or close event arrives.
-    unknown_sockets: BTreeMap<(Arc<str>, u64), SamObservedSocketState>,
-    generation: u64,
-    phase: SamSessionObservationPhase,
-    recovery_lost: bool,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SamSessionObservationPhase {
-    Complete,
-    Incomplete { reason: SamSessionObservationReason },
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SamSessionObservationReason {
-    SessionBound,
-    SocketBound,
-    MissingPeer,
-    DuplicateOrOutOfOrder,
-}
-
-struct SamObservedSessionState {
-    name: Arc<str>,
-    address: Arc<str>,
-    sockets: BTreeMap<u64, SamObservedSocketState>,
-}
-
-struct SamObservedSocketState {
-    socket_type: u8,
-    peer: Option<Arc<str>>,
-}
-
-impl SamSessionObservationHandle {
-    /// Read a bounded snapshot without holding the lock across any await point.
-    pub fn snapshot(&self) -> Result<SamSessionObservationSnapshot, SamSessionObservationError> {
-        let state = self.state.read();
-        if state.phase != SamSessionObservationPhase::Complete {
-            return Err(SamSessionObservationError::Incomplete);
-        }
-
-        let sessions = state
-            .sessions
-            .iter()
-            .map(|(session_id, session)| {
-                // A complete phase proves this invariant. Keep the fallible conversion here so a
-                // poisoned or otherwise corrupted lock state still fails closed.
-                let sockets = session
-                    .sockets
-                    .values()
-                    .map(|socket| {
-                        Some(SamObservedSocket {
-                            socket_type: socket.socket_type,
-                            peer: Arc::clone(socket.peer.as_ref()?),
-                        })
-                    })
-                    .collect::<Option<Vec<_>>>()?;
-                Some((
-                    Arc::clone(session_id),
-                    SamObservedSession {
-                        name: Arc::clone(&session.name),
-                        address: Arc::clone(&session.address),
-                        sockets,
-                    },
-                ))
-            })
-            .collect::<Option<BTreeMap<_, _>>>()
-            .ok_or(SamSessionObservationError::Incomplete)?;
-
-        Ok(SamSessionObservationSnapshot {
-            sessions,
-            generation: state.generation,
-        })
-    }
-
-    /// Construct an empty bounded source for test-only I2PControl state.
-    #[doc(hidden)]
-    pub fn empty_for_test() -> Self {
-        let (_, handle) = SamSessionObservationPublisher::new();
-        handle
-    }
-}
-
-impl SamSessionObservationPublisher {
-    fn new() -> (Self, SamSessionObservationHandle) {
-        let state = Arc::new(RwLock::new(SamSessionObservationState {
-            sessions: BTreeMap::new(),
-            unknown_sockets: BTreeMap::new(),
-            generation: 0,
-            phase: SamSessionObservationPhase::Complete,
-            recovery_lost: false,
-        }));
-
-        (
-            Self {
-                state: Arc::clone(&state),
-            },
-            SamSessionObservationHandle { state },
-        )
-    }
-
-    fn activate_session(
-        &self,
-        session_id: &Arc<str>,
-        destination_id: &DestinationId,
-        options: &HashMap<String, String>,
+pub enum SamObservationEvent {
+    /// A primary SAM session became active.
+    SessionActivated {
+        /// Stable SAM session identifier.
+        session_id: Arc<str>,
+        /// Sanitized configured nickname or derived short name.
+        name: Arc<str>,
+        /// Sanitized `.b32.i2p` destination address.
+        address: Arc<str>,
+        /// Stable identifier of the session socket.
         socket_id: u64,
-        peer: Option<SocketAddr>,
-    ) -> Result<(), SamSessionObservationError> {
-        let mut state = self.state.write();
-        if state.sessions.contains_key(session_id) {
-            state.enter_incomplete(SamSessionObservationReason::DuplicateOrOutOfOrder);
-            state.try_rebuild();
-            return Err(SamSessionObservationError::Incomplete);
-        }
-        if state.sessions.len() >= SAM_SESSION_RECOVERY_LIMIT {
-            state.recovery_lost = true;
-            state.enter_incomplete(SamSessionObservationReason::SessionBound);
-            return Err(SamSessionObservationError::Incomplete);
-        }
-
-        let mut sockets = BTreeMap::new();
-        sockets.insert(
-            socket_id,
-            SamObservedSocketState {
-                socket_type: 1,
-                peer: peer.map(|peer| Arc::from(peer.to_string())),
-            },
-        );
-        state.sessions.insert(
-            Arc::clone(session_id),
-            SamObservedSessionState {
-                name: Arc::from(
-                    options
-                        .get("inbound.nickname")
-                        .or_else(|| options.get("outbound.nickname"))
-                        .cloned()
-                        .unwrap_or_else(|| {
-                            base64_encode(destination_id.to_vec()).chars().take(4).collect()
-                        }),
-                ),
-                address: Arc::from(format!(
-                    "{}.b32.i2p",
-                    base32_encode(destination_id.to_vec())
-                )),
-                sockets,
-            },
-        );
-
-        // A socket update racing ahead of activation is folded into the authoritative session
-        // record. This is bounded and preserves the exact close key needed for recovery.
-        let unknown = state
-            .unknown_sockets
-            .keys()
-            .filter(|(unknown_session_id, _)| unknown_session_id.as_ref() == session_id.as_ref())
-            .cloned()
-            .collect::<Vec<_>>();
-        for key @ (_, unknown_socket_id) in unknown {
-            let Some(socket) = state.unknown_sockets.remove(&key) else {
-                continue;
-            };
-            let Some(session) = state.sessions.get_mut(session_id) else {
-                state.recovery_lost = true;
-                break;
-            };
-            if session.sockets.len() >= SAM_SOCKET_RECOVERY_LIMIT
-                || session.sockets.contains_key(&unknown_socket_id)
-            {
-                state.recovery_lost = true;
-                break;
-            }
-            session.sockets.insert(unknown_socket_id, socket);
-        }
-
-        state.generation = state.generation.wrapping_add(1);
-        if peer.is_none() || state.sessions.len() > SAM_SESSION_OBSERVATION_LIMIT {
-            state.enter_incomplete(if peer.is_none() {
-                SamSessionObservationReason::MissingPeer
-            } else {
-                SamSessionObservationReason::SessionBound
-            });
-        }
-        state.try_rebuild();
-        if state.phase == SamSessionObservationPhase::Complete {
-            Ok(())
-        } else {
-            Err(SamSessionObservationError::Incomplete)
-        }
-    }
-
-    fn add_socket(
-        &self,
-        session_id: &Arc<str>,
-        socket_id: u64,
+        /// SAM socket type for the session socket.
         socket_type: u8,
-        peer: Option<SocketAddr>,
-    ) -> Result<(), SamSessionObservationError> {
-        let mut state = self.state.write();
-        let socket = SamObservedSocketState {
-            socket_type,
-            peer: peer.map(|peer| Arc::from(peer.to_string())),
-        };
-        let socket_count = {
-            let Some(session) = state.sessions.get(session_id) else {
-                let key = (Arc::clone(session_id), socket_id);
-                if state.unknown_sockets.len() >= SAM_SESSION_RECOVERY_LIMIT {
-                    state.recovery_lost = true;
-                } else {
-                    match state.unknown_sockets.entry(key) {
-                        alloc::collections::btree_map::Entry::Occupied(_) => {
-                            state.enter_incomplete(
-                                SamSessionObservationReason::DuplicateOrOutOfOrder,
-                            );
-                            state.try_rebuild();
-                            return Err(SamSessionObservationError::Incomplete);
-                        }
-                        alloc::collections::btree_map::Entry::Vacant(entry) => {
-                            entry.insert(socket);
-                        }
-                    }
-                }
-                state.enter_incomplete(SamSessionObservationReason::DuplicateOrOutOfOrder);
-                return Err(SamSessionObservationError::Incomplete);
-            };
-            if session.sockets.contains_key(&socket_id) {
-                state.enter_incomplete(SamSessionObservationReason::DuplicateOrOutOfOrder);
-                state.try_rebuild();
-                return Err(SamSessionObservationError::Incomplete);
-            }
-            if session.sockets.len() >= SAM_SOCKET_RECOVERY_LIMIT {
-                state.recovery_lost = true;
-                state.enter_incomplete(SamSessionObservationReason::SocketBound);
-                return Err(SamSessionObservationError::Incomplete);
-            }
-            let session = state.sessions.get_mut(session_id).expect("session checked above");
-            session.sockets.insert(socket_id, socket);
-            session.sockets.len()
-        };
-        state.generation = state.generation.wrapping_add(1);
-        if peer.is_none() || socket_count > SAM_SOCKET_OBSERVATION_LIMIT {
-            state.enter_incomplete(if peer.is_none() {
-                SamSessionObservationReason::MissingPeer
-            } else {
-                SamSessionObservationReason::SocketBound
-            });
-        }
-        state.try_rebuild();
-        if state.phase == SamSessionObservationPhase::Complete {
-            Ok(())
-        } else {
-            Err(SamSessionObservationError::Incomplete)
-        }
-    }
-
-    fn remove_socket(&self, session_id: &Arc<str>, socket_id: u64) {
-        let mut state = self.state.write();
-        let mut removed =
-            state.unknown_sockets.remove(&(Arc::clone(session_id), socket_id)).is_some();
-        if let Some(session) = state.sessions.get_mut(session_id) {
-            if session.sockets.remove(&socket_id).is_some() {
-                removed = true;
-            }
-        }
-        if removed {
-            state.generation = state.generation.wrapping_add(1);
-            state.try_rebuild();
-        }
-    }
-
-    fn remove_session(&self, session_id: &Arc<str>) {
-        let mut state = self.state.write();
-        let removed_session = state.sessions.remove(session_id).is_some();
-        let had_unknown = state
-            .unknown_sockets
-            .keys()
-            .any(|(unknown_session_id, _)| unknown_session_id.as_ref() == session_id.as_ref());
-        state.unknown_sockets.retain(|(unknown_session_id, _), _| {
-            unknown_session_id.as_ref() != session_id.as_ref()
-        });
-        if removed_session || had_unknown {
-            state.generation = state.generation.wrapping_add(1);
-            state.try_rebuild();
-        }
-    }
+        /// Sanitized TCP peer address, if available.
+        peer: Option<Arc<str>>,
+    },
+    /// A stream or listener socket became active.
+    SocketActivated {
+        /// Owning SAM session identifier.
+        session_id: Arc<str>,
+        /// Stable socket identifier.
+        socket_id: u64,
+        /// SAM socket type.
+        socket_type: u8,
+        /// Sanitized TCP peer address, if available.
+        peer: Option<Arc<str>>,
+    },
+    /// A socket was authoritatively removed.
+    SocketRemoved {
+        /// Owning SAM session identifier.
+        session_id: Arc<str>,
+        /// Stable socket identifier.
+        socket_id: u64,
+    },
+    /// A SAM session was authoritatively removed.
+    SessionRemoved {
+        /// SAM session identifier.
+        session_id: Arc<str>,
+    },
 }
 
-impl SamSessionObservationState {
-    fn enter_incomplete(&mut self, reason: SamSessionObservationReason) {
-        if matches!(self.phase, SamSessionObservationPhase::Complete) {
-            self.generation = self.generation.wrapping_add(1);
-        }
-        self.phase = SamSessionObservationPhase::Incomplete { reason };
-    }
+/// Failure returned by an optional passive SAM observer.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SamObservationHookError;
 
-    fn is_representable(&self) -> bool {
-        !self.recovery_lost
-            && self.unknown_sockets.is_empty()
-            && self.sessions.len() <= SAM_SESSION_OBSERVATION_LIMIT
-            && self.sessions.values().all(|session| {
-                session.sockets.len() <= SAM_SOCKET_OBSERVATION_LIMIT
-                    && session.sockets.values().all(|socket| socket.peer.is_some())
-            })
-    }
+/// Optional, synchronous, passive SAM lifecycle observer.
+///
+/// The hook is called from the SAM owner after authoritative transitions. It must not block or
+/// await. A failed publication is reported to the caller and never changes SAM lifecycle state.
+pub trait SamObservationHook: Send + Sync {
+    /// Publish one sanitized lifecycle event.
+    fn publish(&self, event: SamObservationEvent) -> Result<(), SamObservationHookError>;
+}
 
-    /// Rebuild the complete publication only after the tracked authoritative state is once again
-    /// representable. This is intentionally a reconstruction, not a sticky-flag clear: every
-    /// active session/socket and every peer field must be present and within the public bounds.
-    fn try_rebuild(&mut self) {
-        if matches!(self.phase, SamSessionObservationPhase::Incomplete { .. })
-            && self.is_representable()
-        {
-            self.phase = SamSessionObservationPhase::Complete;
-            self.generation = self.generation.wrapping_add(1);
-        }
+fn sanitized_text(value: &str, limit: usize) -> Arc<str> {
+    Arc::from(value.chars().take(limit).collect::<String>())
+}
+
+fn sanitized_peer(peer: Option<SocketAddr>) -> Option<Arc<str>> {
+    peer.map(|peer| sanitized_text(&peer.to_string(), 64))
+}
+
+fn publish_observation_event(
+    hook: Option<&Arc<dyn SamObservationHook>>,
+    event: SamObservationEvent,
+) {
+    if hook.is_some_and(|hook| hook.publish(event).is_err()) {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "SAM observation hook rejected a lifecycle event",
+        );
     }
 }
 
@@ -662,8 +350,8 @@ pub struct SamServer<R: Runtime> {
     /// Session ID to `DestinationId` mappings.
     session_id_destinations: HashMap<Arc<str>, DestinationId>,
 
-    /// Private publisher for the bounded I2PControl SAM observation handle.
-    observation_publisher: SamSessionObservationPublisher,
+    /// Optional passive observer supplied by the application composition root.
+    observation_hook: Option<Arc<dyn SamObservationHook>>,
 
     /// SAMv3 datagram socket handle.
     socket_handle: UdpSocketHandle,
@@ -680,6 +368,7 @@ pub struct SamServer<R: Runtime> {
 
 impl<R: Runtime> SamServer<R> {
     /// Create new [`SamServer`]
+    #[allow(dead_code)]
     pub async fn new(
         tcp_port: u16,
         udp_port: u16,
@@ -690,6 +379,34 @@ impl<R: Runtime> SamServer<R> {
         address_book: Option<Arc<dyn AddressBook>>,
         event_handle: EventHandle<R>,
         profile_storage: ProfileStorage<R>,
+    ) -> crate::Result<Self> {
+        Self::new_with_observation_hook(
+            tcp_port,
+            udp_port,
+            host,
+            netdb_handle,
+            tunnel_manager_handle,
+            metrics,
+            address_book,
+            event_handle,
+            profile_storage,
+            None,
+        )
+        .await
+    }
+
+    /// Create a SAM server with an optional passive lifecycle observer.
+    pub async fn new_with_observation_hook(
+        tcp_port: u16,
+        udp_port: u16,
+        host: String,
+        netdb_handle: NetDbHandle,
+        tunnel_manager_handle: TunnelManagerHandle,
+        metrics: R::MetricsHandle,
+        address_book: Option<Arc<dyn AddressBook>>,
+        event_handle: EventHandle<R>,
+        profile_storage: ProfileStorage<R>,
+        observation_hook: Option<Arc<dyn SamObservationHook>>,
     ) -> crate::Result<Self> {
         let listener = R::TcpListener::bind(SocketAddr::new(
             host.parse::<IpAddr>().expect("valid address"),
@@ -722,8 +439,6 @@ impl<R: Runtime> SamServer<R> {
 
         let (datagram_tx, datagram_rx) = channel(1024);
         let (sub_session_tx, sub_session_rx) = channel(64);
-        let (observation_publisher, _) = SamSessionObservationPublisher::new();
-
         Ok(Self {
             active_destinations: HashSet::new(),
             active_sessions: SessionContext::new(),
@@ -739,7 +454,7 @@ impl<R: Runtime> SamServer<R> {
             pending_sessions: SessionContext::new(),
             profile_storage,
             session_id_destinations: HashMap::new(),
-            observation_publisher,
+            observation_hook,
             socket_handle,
             sub_session_rx,
             sub_session_tx,
@@ -755,13 +470,6 @@ impl<R: Runtime> SamServer<R> {
     /// Get address of the SAMv3 UDP socket.
     pub fn udp_local_address(&self) -> Option<SocketAddr> {
         self.socket_handle.local_address()
-    }
-
-    /// Clone the read-only SAM observation handle before moving the server into its runtime.
-    pub fn observation_handle(&self) -> SamSessionObservationHandle {
-        SamSessionObservationHandle {
-            state: Arc::clone(&self.observation_publisher.state),
-        }
     }
 }
 
@@ -1174,19 +882,33 @@ impl<R: Runtime> Future for SamServer<R> {
                 Poll::Ready(None) => return Poll::Ready(()),
                 Poll::Ready(Some(Ok(context))) => {
                     let destination_id = context.destination.destination.id();
-                    if let Err(error) = this.observation_publisher.activate_session(
-                        &context.session_id,
-                        &destination_id,
-                        &context.options,
-                        context.socket.observation_id(),
-                        context.socket.peer_addr(),
-                    ) {
-                        tracing::warn!(
-                            target: LOG_TARGET,
-                            session_id = %context.session_id,
-                            ?error,
-                            "SAM observation source became incomplete while activating session",
-                        );
+                    if let Some(hook) = &this.observation_hook {
+                        let name = context
+                            .options
+                            .get("inbound.nickname")
+                            .or_else(|| context.options.get("outbound.nickname"))
+                            .map(|name| sanitized_text(name, 256))
+                            .unwrap_or_else(|| {
+                                sanitized_text(&base64_encode(destination_id.to_vec())[..4], 4)
+                            });
+                        let event = SamObservationEvent::SessionActivated {
+                            session_id: sanitized_text(&context.session_id, 256),
+                            name,
+                            address: sanitized_text(
+                                &format!("{}.b32.i2p", base32_encode(destination_id.to_vec())),
+                                256,
+                            ),
+                            socket_id: context.socket.observation_id(),
+                            socket_type: 1,
+                            peer: sanitized_peer(context.socket.peer_addr()),
+                        };
+                        if hook.publish(event).is_err() {
+                            tracing::warn!(
+                                target: LOG_TARGET,
+                                session_id = %context.session_id,
+                                "SAM observation hook rejected session activation",
+                            );
+                        }
                     }
 
                     match this.pending_sessions.remove(&context.session_id) {
@@ -1194,9 +916,9 @@ impl<R: Runtime> Future for SamServer<R> {
                             this.active_sessions.insert(
                                 Arc::clone(&context.session_id),
                                 tx,
-                                SamSession::new_with_observation(
+                                SamSession::new_with_observation_hook(
                                     context,
-                                    this.observation_publisher.clone(),
+                                    this.observation_hook.clone(),
                                 ),
                             );
                         }
@@ -1208,7 +930,12 @@ impl<R: Runtime> Future for SamServer<R> {
                             );
                             debug_assert!(false);
 
-                            this.observation_publisher.remove_session(&context.session_id);
+                            publish_observation_event(
+                                this.observation_hook.as_ref(),
+                                SamObservationEvent::SessionRemoved {
+                                    session_id: sanitized_text(&context.session_id, 256),
+                                },
+                            );
 
                             if let Some(destination_id) =
                                 this.session_id_destinations.remove(&context.session_id)
@@ -1237,7 +964,12 @@ impl<R: Runtime> Future for SamServer<R> {
                         "session terminated",
                     );
                     this.active_sessions.remove(&session_id);
-                    this.observation_publisher.remove_session(&session_id);
+                    publish_observation_event(
+                        this.observation_hook.as_ref(),
+                        SamObservationEvent::SessionRemoved {
+                            session_id: sanitized_text(&session_id, 256),
+                        },
+                    );
 
                     if let Some(destination_id) = this.session_id_destinations.remove(&session_id) {
                         this.active_destinations.remove(&destination_id);
@@ -1275,236 +1007,5 @@ impl<R: Runtime> Future for SamServer<R> {
         }
 
         Poll::Pending
-    }
-}
-
-#[cfg(test)]
-mod observation_tests {
-    use super::*;
-
-    fn session_id(value: &str) -> Arc<str> {
-        Arc::from(value)
-    }
-
-    fn destination_id(byte: u8) -> DestinationId {
-        DestinationId::from([byte; 32])
-    }
-
-    fn options() -> HashMap<String, String> {
-        HashMap::new()
-    }
-
-    fn peer() -> SocketAddr {
-        "127.0.0.1:7656".parse().unwrap()
-    }
-
-    #[test]
-    fn observation_starts_empty() {
-        let (_, handle) = SamSessionObservationPublisher::new();
-        let snapshot = handle.snapshot().unwrap();
-        assert!(snapshot.sessions.is_empty());
-        assert_eq!(snapshot.generation, 0);
-    }
-
-    #[test]
-    fn cloned_handles_read_the_same_state() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        let clone = handle.clone();
-        let id = session_id("session");
-        publisher
-            .activate_session(&id, &destination_id(1), &options(), 1, Some(peer()))
-            .unwrap();
-        assert_eq!(handle.snapshot().unwrap(), clone.snapshot().unwrap());
-    }
-
-    #[test]
-    fn activation_publishes_exact_session_fields() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        let id = session_id("session");
-        publisher
-            .activate_session(&id, &destination_id(2), &options(), 1, Some(peer()))
-            .unwrap();
-        let mut snapshot = handle.snapshot().unwrap();
-        let session = snapshot.sessions.remove(&id).unwrap();
-        assert_eq!(session.name.as_ref(), &base64_encode([2u8; 32])[..4]);
-        assert_eq!(
-            session.address,
-            format!("{}.b32.i2p", base32_encode([2u8; 32])).into()
-        );
-        assert_eq!(session.sockets.len(), 1);
-        assert_eq!(session.sockets[0].socket_type, 1);
-        assert_eq!(session.sockets[0].peer.as_ref(), "127.0.0.1:7656");
-    }
-
-    #[test]
-    fn inbound_nickname_has_priority() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        let id = session_id("session");
-        let mut options = options();
-        options.insert("inbound.nickname".into(), "inbound".into());
-        options.insert("outbound.nickname".into(), "outbound".into());
-        publisher
-            .activate_session(&id, &destination_id(3), &options, 1, Some(peer()))
-            .unwrap();
-        assert_eq!(
-            handle.snapshot().unwrap().sessions[&id].name.as_ref(),
-            "inbound"
-        );
-    }
-
-    #[test]
-    fn outbound_nickname_is_used_when_inbound_is_absent() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        let id = session_id("session");
-        let mut options = options();
-        options.insert("outbound.nickname".into(), "outbound".into());
-        publisher
-            .activate_session(&id, &destination_id(4), &options, 1, Some(peer()))
-            .unwrap();
-        assert_eq!(
-            handle.snapshot().unwrap().sessions[&id].name.as_ref(),
-            "outbound"
-        );
-    }
-
-    #[test]
-    fn missing_peer_fails_closed() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        let id = session_id("session");
-        let result = publisher.activate_session(&id, &destination_id(5), &options(), 1, None);
-        assert_eq!(result, Err(SamSessionObservationError::Incomplete));
-        assert_eq!(
-            handle.snapshot(),
-            Err(SamSessionObservationError::Incomplete)
-        );
-        publisher.remove_session(&id);
-        assert!(handle.snapshot().unwrap().sessions.is_empty());
-    }
-
-    #[test]
-    fn socket_add_and_remove_are_visible() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        let id = session_id("session");
-        publisher
-            .activate_session(&id, &destination_id(6), &options(), 1, Some(peer()))
-            .unwrap();
-        publisher.add_socket(&id, 2, 2, Some(peer())).unwrap();
-        assert_eq!(handle.snapshot().unwrap().sessions[&id].sockets.len(), 2);
-        publisher.remove_socket(&id, 2);
-        assert_eq!(handle.snapshot().unwrap().sessions[&id].sockets.len(), 1);
-    }
-
-    #[test]
-    fn session_removal_is_visible() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        let id = session_id("session");
-        publisher
-            .activate_session(&id, &destination_id(7), &options(), 1, Some(peer()))
-            .unwrap();
-        publisher.remove_session(&id);
-        assert!(handle.snapshot().unwrap().sessions.is_empty());
-    }
-
-    #[test]
-    fn per_session_socket_bound_is_explicit() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        let id = session_id("session");
-        publisher
-            .activate_session(&id, &destination_id(8), &options(), 1, Some(peer()))
-            .unwrap();
-        for socket_id in 2..=SAM_SOCKET_OBSERVATION_LIMIT as u64 {
-            publisher.add_socket(&id, socket_id, 2, Some(peer())).unwrap();
-        }
-        assert_eq!(
-            publisher.add_socket(&id, 99, 2, Some(peer())),
-            Err(SamSessionObservationError::Incomplete)
-        );
-        assert_eq!(
-            handle.snapshot(),
-            Err(SamSessionObservationError::Incomplete)
-        );
-        publisher.remove_socket(&id, 1);
-        let snapshot = handle.snapshot().unwrap();
-        assert_eq!(
-            snapshot.sessions[&id].sockets.len(),
-            SAM_SOCKET_OBSERVATION_LIMIT
-        );
-    }
-
-    #[test]
-    fn session_bound_is_explicit() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        for session_number in 0..SAM_SESSION_OBSERVATION_LIMIT {
-            publisher
-                .activate_session(
-                    &session_id(&format!("session-{session_number}")),
-                    &destination_id(9),
-                    &options(),
-                    session_number as u64,
-                    Some(peer()),
-                )
-                .unwrap();
-        }
-        assert_eq!(
-            publisher.activate_session(
-                &session_id("overflow"),
-                &destination_id(9),
-                &options(),
-                2000,
-                Some(peer())
-            ),
-            Err(SamSessionObservationError::Incomplete)
-        );
-        assert_eq!(
-            handle.snapshot(),
-            Err(SamSessionObservationError::Incomplete)
-        );
-        publisher.remove_session(&session_id("session-0"));
-        let snapshot = handle.snapshot().unwrap();
-        assert_eq!(snapshot.sessions.len(), SAM_SESSION_OBSERVATION_LIMIT);
-        assert!(snapshot.sessions.contains_key(&session_id("overflow")));
-    }
-
-    #[test]
-    fn unknown_socket_update_recovers_after_matching_close() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        let id = session_id("session");
-        assert_eq!(
-            publisher.add_socket(&id, 42, 2, Some(peer())),
-            Err(SamSessionObservationError::Incomplete)
-        );
-        assert_eq!(
-            handle.snapshot(),
-            Err(SamSessionObservationError::Incomplete)
-        );
-        publisher.remove_socket(&id, 42);
-        assert!(handle.snapshot().unwrap().sessions.is_empty());
-    }
-
-    #[test]
-    fn duplicate_activation_fails_closed_without_fabricating_state() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        let id = session_id("session");
-        publisher
-            .activate_session(&id, &destination_id(11), &options(), 1, Some(peer()))
-            .unwrap();
-        let before = handle.snapshot().unwrap();
-        assert_eq!(
-            publisher.activate_session(&id, &destination_id(12), &options(), 2, Some(peer())),
-            Err(SamSessionObservationError::Incomplete)
-        );
-        assert_eq!(handle.snapshot().unwrap().sessions, before.sessions);
-    }
-
-    #[test]
-    fn generation_changes_only_on_successful_publications() {
-        let (publisher, handle) = SamSessionObservationPublisher::new();
-        let id = session_id("session");
-        publisher
-            .activate_session(&id, &destination_id(10), &options(), 1, Some(peer()))
-            .unwrap();
-        let generation = handle.snapshot().unwrap().generation;
-        publisher.add_socket(&id, 2, 2, Some(peer())).unwrap();
-        assert!(handle.snapshot().unwrap().generation > generation);
     }
 }

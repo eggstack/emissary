@@ -27,7 +27,7 @@ use crate::{
     profile::ProfileStorage,
     router::context::RouterContext,
     runtime::{AddressBook, Runtime, Storage},
-    sam::SamServer,
+    sam::{SamObservationHook, SamServer},
     shutdown::ShutdownContext,
     subsystem::{Source, SubsystemManager, SubsystemManagerContext},
     transport::{Ntcp2Transport, Ssu2Transport, TransportManager, TransportManagerBuilder},
@@ -156,18 +156,25 @@ pub struct Router<R: Runtime> {
 
     /// Handle to [`TunnelManager`].
     _tunnel_manager_handle: TunnelManagerHandle,
-
-    /// Read-only SAM session observation handle for administrative consumers.
-    sam_session_observation: Option<crate::SamSessionObservationHandle>,
 }
 
 impl<R: Runtime> Router<R> {
     /// Create new [`Router`] from `config` and pass `address_book` to [`SamServer`] and
     /// [`I2cpServer`] if address book support was enabled.
     pub async fn new(
+        config: Config,
+        address_book: Option<Arc<dyn AddressBook>>,
+        storage: Option<Arc<dyn Storage>>,
+    ) -> crate::Result<(Self, EventSubscriber, Vec<u8>)> {
+        Self::new_with_sam_observation(config, address_book, storage, None).await
+    }
+
+    /// Create a router with an optional passive SAM lifecycle observer.
+    pub async fn new_with_sam_observation(
         mut config: Config,
         address_book: Option<Arc<dyn AddressBook>>,
         storage: Option<Arc<dyn Storage>>,
+        observation_hook: Option<Arc<dyn SamObservationHook>>,
     ) -> crate::Result<(Self, EventSubscriber, Vec<u8>)> {
         // attempt to initialize the ntcp2 transport from provided config
         //
@@ -398,14 +405,13 @@ impl<R: Runtime> Router<R> {
             R::spawn(i2cp_server);
         }
 
-        let mut sam_session_observation = None;
         if let Some(SamConfig {
             tcp_port,
             udp_port,
             host,
         }) = samv3_config
         {
-            let sam_server = SamServer::<R>::new(
+            let sam_server = SamServer::<R>::new_with_observation_hook(
                 tcp_port,
                 udp_port,
                 host,
@@ -415,12 +421,12 @@ impl<R: Runtime> Router<R> {
                 address_book,
                 sam_event_handle,
                 profile_storage.clone(),
+                observation_hook,
             )
             .await?;
 
             address_info.sam_tcp = sam_server.tcp_local_address();
             address_info.sam_udp = sam_server.udp_local_address();
-            sam_session_observation = Some(sam_server.observation_handle());
 
             R::spawn(sam_server)
         }
@@ -445,7 +451,6 @@ impl<R: Runtime> Router<R> {
                 shutdown_count: 0usize,
                 transport_manager: transport_manager_builder.build(),
                 _tunnel_manager_handle: tunnel_manager_handle,
-                sam_session_observation,
             },
             event_subscriber,
             serialized_router_info,
@@ -477,11 +482,6 @@ impl<R: Runtime> Router<R> {
     /// Get reference to [`ProtocolAddressInfo`].
     pub fn protocol_address_info(&self) -> &ProtocolAddressInfo {
         &self.address_info
-    }
-
-    /// Clone the read-only bounded SAM session observation handle, if SAM is enabled.
-    pub fn sam_session_observation_handle(&self) -> Option<crate::SamSessionObservationHandle> {
-        self.sam_session_observation.clone()
     }
 
     /// Get local router ID.

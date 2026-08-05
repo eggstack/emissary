@@ -56,9 +56,9 @@ mod proxy;
 mod tools;
 mod tunnel;
 #[cfg(feature = "i2pcontrol")]
-use crate::tunnel::server as tunnel_server;
-#[cfg(feature = "i2pcontrol")]
 use crate::tunnel::client as tunnel_client;
+#[cfg(feature = "i2pcontrol")]
+use crate::tunnel::server as tunnel_server;
 mod ui;
 
 /// Logging target for the file.
@@ -254,6 +254,14 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
     #[cfg(feature = "i2pcontrol")]
     let i2pcontrol_enabled = router_config.i2pcontrol.as_ref().is_some_and(|config| config.enabled);
 
+    #[cfg(feature = "i2pcontrol")]
+    let sam_observation = if i2pcontrol_enabled {
+        let (source, handle) = i2pcontrol::sam_observer::SamObservationSource::new();
+        Some((source as Arc<dyn emissary_core::SamObservationHook>, handle))
+    } else {
+        None
+    };
+
     let default_address_book_config = {
         #[cfg(feature = "i2pcontrol")]
         {
@@ -270,9 +278,17 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
     let address_book_config = config.address_book.take().or(default_address_book_config);
 
     let (router, events, local_router_info, address_book_manager) = match address_book_config {
-        None => Router::<TokioRuntime>::new(config.into(), None, Some(Arc::new(storage)))
-            .await
-            .map(|(router, event_subscriber, info)| (router, event_subscriber, info, None)),
+        None => Router::<TokioRuntime>::new_with_sam_observation(
+            config.into(),
+            None,
+            Some(Arc::new(storage)),
+            #[cfg(feature = "i2pcontrol")]
+            sam_observation.as_ref().map(|(source, _)| Arc::clone(source)),
+            #[cfg(not(feature = "i2pcontrol"))]
+            None,
+        )
+        .await
+        .map(|(router, event_subscriber, info)| (router, event_subscriber, info, None)),
 
         Some(address_book_config) => {
             // create address book, allocate address book handle and pass it to `Router`
@@ -291,10 +307,14 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                 AddressBookManager::new(config.base_path.clone(), address_book_config).await;
             let address_book_handle = address_book_manager.handle();
 
-            Router::<TokioRuntime>::new(
+            Router::<TokioRuntime>::new_with_sam_observation(
                 config.into(),
                 Some(address_book_handle),
                 Some(Arc::new(storage)),
+                #[cfg(feature = "i2pcontrol")]
+                sam_observation.as_ref().map(|(source, _)| Arc::clone(source)),
+                #[cfg(not(feature = "i2pcontrol"))]
+                None,
             )
             .await
             .map(|(router, event_subscriber, info)| {
@@ -590,8 +610,8 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                     ctx = ctx.with_address_book_handle(Arc::clone(handle));
                 }
 
-                if let Some(handle) = router.sam_session_observation_handle() {
-                    ctx = ctx.with_sam_session_observation(handle);
+                if let Some((_, handle)) = &sam_observation {
+                    ctx = ctx.with_sam_session_observation(handle.clone());
                 }
 
                 ctx = ctx.with_startup_tunnel_inventory(startup_tunnel_inventory.clone());

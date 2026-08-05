@@ -55,7 +55,9 @@ use super::{
 
 use crate::address_book::RuntimeAddressBookHandle;
 
-use emissary_core::{crypto::base64_encode, SamSessionObservationHandle};
+use emissary_core::crypto::base64_encode;
+
+use super::sam_observer::SamSessionObservationHandle;
 
 const LOG_TARGET: &str = "emissary::i2pcontrol::server";
 

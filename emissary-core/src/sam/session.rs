@@ -37,7 +37,7 @@ use crate::{
             PendingSession, PendingSessionState, PublicKeyContext, SamSessionCommand,
             SamSessionCommandRecycle, SamSessionKind,
         },
-        SamSessionObservationPublisher, SubSessionCommand,
+        SamObservationEvent, SamObservationHook, SubSessionCommand,
     },
 };
 
@@ -146,8 +146,8 @@ pub struct SamSession<R: Runtime> {
     /// Waker.
     waker: Option<Waker>,
 
-    /// Publisher for the bounded SAM observation source.
-    observation_publisher: Option<SamSessionObservationPublisher>,
+    /// Optional passive lifecycle observer.
+    observation_hook: Option<Arc<dyn SamObservationHook>>,
 }
 
 impl<R: Runtime> SamSession<R> {
@@ -157,17 +157,17 @@ impl<R: Runtime> SamSession<R> {
         Self::new_inner(context, None)
     }
 
-    /// Create new [`SamSession`] with the server-owned observation publisher.
-    pub(crate) fn new_with_observation(
+    /// Create new [`SamSession`] with an optional passive observation hook.
+    pub(crate) fn new_with_observation_hook(
         context: SamSessionContext<R>,
-        observation_publisher: SamSessionObservationPublisher,
+        observation_hook: Option<Arc<dyn SamObservationHook>>,
     ) -> Self {
-        Self::new_inner(context, Some(observation_publisher))
+        Self::new_inner(context, observation_hook)
     }
 
     fn new_inner(
         context: SamSessionContext<R>,
-        observation_publisher: Option<SamSessionObservationPublisher>,
+        observation_hook: Option<Arc<dyn SamObservationHook>>,
     ) -> Self {
         let SamSessionContext {
             address_book,
@@ -318,27 +318,27 @@ impl<R: Runtime> SamSession<R> {
             stream_manager: StreamManager::new(dest, *signing_key),
             sub_session_tx,
             waker: None,
-            observation_publisher,
+            observation_hook,
         }
     }
 
     fn observe_socket(&mut self, socket: &SamSocket<R>, socket_type: u8) -> bool {
-        let Some(publisher) = &self.observation_publisher else {
+        let Some(hook) = &self.observation_hook else {
             return true;
         };
-        match publisher.add_socket(
-            &self.session_id,
-            socket.observation_id(),
+        let event = SamObservationEvent::SocketActivated {
+            session_id: super::sanitized_text(&self.session_id, 256),
+            socket_id: socket.observation_id(),
             socket_type,
-            socket.peer_addr(),
-        ) {
+            peer: socket.peer_addr().map(super::sanitized_peer),
+        };
+        match hook.publish(event) {
             Ok(()) => true,
-            Err(error) => {
+            Err(_) => {
                 tracing::warn!(
                     target: LOG_TARGET,
                     session_id = %self.session_id,
-                    ?error,
-                    "SAM observation source became incomplete while adding socket",
+                    "SAM observation hook rejected socket activation",
                 );
                 false
             }
@@ -346,8 +346,21 @@ impl<R: Runtime> SamSession<R> {
     }
 
     fn remove_observed_socket(&mut self, socket_id: u64) {
-        if let Some(publisher) = &self.observation_publisher {
-            publisher.remove_socket(&self.session_id, socket_id);
+        if let Some(hook) = &self.observation_hook {
+            if hook
+                .publish(SamObservationEvent::SocketRemoved {
+                    session_id: super::sanitized_text(&self.session_id, 256),
+                    socket_id,
+                })
+                .is_err()
+            {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    session_id = %self.session_id,
+                    socket_id,
+                    "SAM observation hook rejected socket removal",
+                );
+            }
         }
     }
 
@@ -456,7 +469,7 @@ impl<R: Runtime> SamSession<R> {
 
         let socket_id = socket.observation_id();
         let observed = self.observe_socket(&socket, 2);
-        if self.observation_publisher.is_some() {
+        if self.observation_hook.is_some() {
             self.observed_stream_sockets
                 .entry(destination_id.clone())
                 .or_default()
@@ -951,7 +964,7 @@ impl<R: Runtime> SamSession<R> {
                                 );
                             }
                         }
-                        protocol =>
+                        protocol => {
                             if let Err(error) = self.datagram_manager.on_datagram(payload) {
                                 tracing::warn!(
                                     target: LOG_TARGET,
@@ -960,7 +973,8 @@ impl<R: Runtime> SamSession<R> {
                                     ?error,
                                     "failed to handle datagram",
                                 );
-                            },
+                            }
+                        }
                     }
                 }
                 None => tracing::warn!(
@@ -1403,10 +1417,12 @@ impl<R: Runtime> Future for SamSession<R> {
             match self.destination.poll_next_unpin(cx) {
                 Poll::Pending => break,
                 Poll::Ready(None) => return Poll::Ready(Arc::clone(&self.session_id)),
-                Poll::Ready(Some(DestinationEvent::Messages { messages })) =>
-                    self.on_inbound_message(messages),
-                Poll::Ready(Some(DestinationEvent::LeaseSetFound { destination_id })) =>
-                    self.on_lease_set_found(destination_id),
+                Poll::Ready(Some(DestinationEvent::Messages { messages })) => {
+                    self.on_inbound_message(messages)
+                }
+                Poll::Ready(Some(DestinationEvent::LeaseSetFound { destination_id })) => {
+                    self.on_lease_set_found(destination_id)
+                }
                 Poll::Ready(Some(DestinationEvent::LeaseSetNotFound {
                     destination_id,
                     error,

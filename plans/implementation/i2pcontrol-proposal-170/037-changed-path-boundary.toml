@@ -1,0 +1,37 @@
+version = 1
+objective = "M037 containment boundary reduction"
+
+[ownership]
+i2pcontrol = [
+  "emissary-cli/src/i2pcontrol/address_book_runtime.rs",
+  "emissary-cli/src/i2pcontrol/sam_observer.rs",
+  "emissary-cli/src/i2pcontrol/client_services.rs",
+]
+adapter = [
+  "emissary-cli/src/address_book.rs",
+  "emissary-cli/src/i2pcontrol/server.rs",
+  "emissary-cli/src/i2pcontrol/mod.rs",
+  "emissary-cli/src/main.rs",
+]
+approved_core_passive_hook = [
+  "emissary-core/src/lib.rs",
+  "emissary-core/src/router/mod.rs",
+  "emissary-core/src/sam/mod.rs",
+  "emissary-core/src/sam/session.rs",
+]
+tests_and_docs = [
+  "emissary-cli/tests/m037_containment.rs",
+  "plans/implementation/i2pcontrol-proposal-170/037-changed-path-boundary.toml",
+]
+
+prohibited_production_prefixes = [
+  "emissary-core/src/crypto/",
+  "emissary-core/src/destination/",
+  "emissary-core/src/i2cp/",
+  "emissary-core/src/i2np/",
+  "emissary-core/src/netdb/",
+  "emissary-core/src/transport/",
+  "emissary-core/src/tunnel/",
+  "emissary-cli/src/ui/",
+  "emissary-cli/src/proxy/",
+]

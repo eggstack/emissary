@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Operational Corrective Roadmap
 
-Status: partial Proposal 170 support; M036 ready
+Status: partial Proposal 170 support; M036 closed; M037 ready
 
 Planning baseline:
 
@@ -233,10 +233,10 @@ M034 AddressBook setter truthfulness
 M035 base compatibility and selector overlap
                 |
                 v
-M036 auth and persistence durability hardening
+                M036 auth and persistence durability hardening
                 |
                 v
-M037 I2PControl containment reduction
+                M037 I2PControl containment reduction
                 |
                 v
 M038 live-runtime interoperability validation
@@ -245,7 +245,7 @@ M038 live-runtime interoperability validation
 M039 independent final-head operational reclosure
 ```
 
-M036 is the only dependency-ready implementation handoff. Later plans are
+M037 is now the only dependency-ready implementation handoff. Later plans are
 written for handoff continuity but remain blocked until their named hard
 dependencies close. This prevents parallel edits to the same lifecycle and
 composition seams.
@@ -345,7 +345,7 @@ Closure:
 
 ### M036 — Authentication and publication durability hardening
 
-Status: ready
+Status: closed
 
 Plan:
 
@@ -359,9 +359,14 @@ Objective:
   affected I2PControl stores;
 - preserve local-only defaults and existing wire errors.
 
+Closure:
+
+- `plans/closure/i2pcontrol-proposal-170/036-closure.md`
+- `plans/closure/i2pcontrol-proposal-170/036-implementation-disposition.md`
+
 ### M037 — Containment reduction and static boundary
 
-Status: blocked on M036
+Status: ready
 
 Plan:
 
@@ -532,8 +537,8 @@ review.
 | 033 | closed | lifecycle reconciliation and StartOnLoad |
 | 034 | closed | AddressBook setter truthfulness |
 | 035 | closed | base compatibility and selector overlap |
-| 036 | ready | hard dependency M035 closed |
-| 037 | blocked | hard dependency M036 |
+| 036 | closed | authentication/publication hardening and closure accepted |
+| 037 | ready | hard dependency M036 closed |
 | 038 | blocked | hard dependencies M031–M037 |
 | 039 | blocked | hard dependency M038 |
 

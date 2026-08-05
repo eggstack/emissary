@@ -27,13 +27,13 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | partial Proposal 170 support; operational corrective work active | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M036 ready | M030–M035 closed; M036 is the only dependency-ready plan |
+| I2PControl Proposal 170 | partial Proposal 170 support; operational corrective work active | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M037 ready | M030–M036 closed; M037 is the only dependency-ready plan |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M036 — Authentication and publication hardening | ready | `plans/implementation/i2pcontrol-proposal-170/036-auth-and-publication-hardening.md` | M035 closed; ADR-0002 accepted |
+| I2PControl Proposal 170 | M037 — Containment boundary reduction | ready | `plans/implementation/i2pcontrol-proposal-170/037-containment-boundary-reduction.md` | M036 closed; ADR-0002 accepted |
 
 ## Registered successor handoffs
 
@@ -43,8 +43,8 @@ Canonical direction:
 | I2PControl Proposal 170 | M033 — Lifecycle reconciliation and StartOnLoad | closed | `plans/implementation/i2pcontrol-proposal-170/033-tunnel-lifecycle-reconciliation.md` | M031 and M032 closed |
 | I2PControl Proposal 170 | M034 — AddressBook setter truthfulness | closed | `plans/implementation/i2pcontrol-proposal-170/034-addressbook-setter-truthfulness.md` | M033 closed |
 | I2PControl Proposal 170 | M035 — Base compatibility and selector overlap | closed | `plans/implementation/i2pcontrol-proposal-170/035-base-compatibility-and-selector-overlap.md` | M034 closed |
-| I2PControl Proposal 170 | M036 — Authentication and publication hardening | ready | `plans/implementation/i2pcontrol-proposal-170/036-auth-and-publication-hardening.md` | M035 closed |
-| I2PControl Proposal 170 | M037 — Containment boundary reduction | blocked | `plans/implementation/i2pcontrol-proposal-170/037-containment-boundary-reduction.md` | M036 closed |
+| I2PControl Proposal 170 | M036 — Authentication and publication hardening | closed | `plans/implementation/i2pcontrol-proposal-170/036-auth-and-publication-hardening.md` | M035 closed |
+| I2PControl Proposal 170 | M037 — Containment boundary reduction | ready | `plans/implementation/i2pcontrol-proposal-170/037-containment-boundary-reduction.md` | M036 closed |
 | I2PControl Proposal 170 | M038 — Live-runtime interoperability | blocked | `plans/implementation/i2pcontrol-proposal-170/038-live-runtime-interoperability.md` | M031–M037 closed |
 | I2PControl Proposal 170 | M039 — Operational final-head reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/039-operational-reclosure.md` | M038 closed |
 
@@ -52,7 +52,7 @@ Canonical direction:
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| — | None | — | M035 closure accepted; M036 is ready for handoff | — |
+| — | None | — | M036 closure accepted; M037 is ready for handoff | — |
 
 ## Recently closed milestones
 
@@ -63,6 +63,7 @@ Canonical direction:
 | I2PControl Proposal 170 | M033 — Lifecycle reconciliation and StartOnLoad | closed | `plans/closure/i2pcontrol-proposal-170/033-closure.md` | `plans/closure/i2pcontrol-proposal-170/033-implementation-disposition.md` |
 | I2PControl Proposal 170 | M034 — AddressBook setter truthfulness | closed | `plans/closure/i2pcontrol-proposal-170/034-closure.md` | `plans/closure/i2pcontrol-proposal-170/034-implementation-disposition.md` |
 | I2PControl Proposal 170 | M035 — Base compatibility and selector overlap | closed | `plans/closure/i2pcontrol-proposal-170/035-closure.md` | `plans/closure/i2pcontrol-proposal-170/035-implementation-disposition.md` |
+| I2PControl Proposal 170 | M036 — Authentication and publication hardening | closed | `plans/closure/i2pcontrol-proposal-170/036-closure.md` | `plans/closure/i2pcontrol-proposal-170/036-implementation-disposition.md` |
 
 ## Current corrective findings
 
@@ -70,9 +71,9 @@ Canonical direction:
 |---|---|---|---|
 | Ten non-client/server tunnel families remain unsupported | high runtime capability gap | roadmap future work | retained explicit disposition |
 | Base I2PControl dispatcher/overlapping RouterInfo names require explicit compatibility boundary | medium compatibility gap | M035 | closed; mode-specific inventory and tests added |
-| Hand-written password comparison and no failed-auth throttle | medium security gap | M036 | ready |
-| Publication documentation may overstate power-loss durability | medium persistence-claim gap | M036 | ready |
-| Proposal 170 AddressBook/SAM policy remains broader than desired outside i2pcontrol | medium containment gap | M037 | blocked on M036 |
+| Hand-written password comparison and no failed-auth throttle | medium security gap | M036 | closed; reviewed primitive and bounded peer throttle |
+| Publication documentation may overstate power-loss durability | medium persistence-claim gap | M036 | closed; claims qualified and directory sync added |
+| Proposal 170 AddressBook/SAM policy remains broader than desired outside i2pcontrol | medium containment gap | M037 | ready on M036 closure |
 | No bounded live production-composition interoperability run | medium evidence gap | M038 | blocked on M031–M037 |
 | Independent final-head operational review | high evidence gate | M039 | blocked on M038 |
 
@@ -163,8 +164,8 @@ requires a contract-rebase plan.
 
 ## Registry maintenance rules
 
-1. M036 is the only dependency-ready implementation handoff.
-2. Do not advance M037 until M036 implementation disposition and closure are accepted.
+1. M037 is the only dependency-ready implementation handoff.
+2. Do not advance M038 until M037 implementation disposition and closure are accepted.
 3. Preserve M020–M030 evidence unless a new direct defect is demonstrated.
 4. Keep startup and control-plane runtime ownership separate.
 5. Keep production changes outside `i2pcontrol/**` minimal and individually justified.

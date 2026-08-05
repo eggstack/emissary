@@ -1,6 +1,6 @@
 # M036 — Authentication and Persistent Publication Hardening
 
-Status: ready
+Status: closed
 
 Source roadmap:
 

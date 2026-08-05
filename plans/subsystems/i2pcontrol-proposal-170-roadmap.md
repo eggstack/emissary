@@ -1,10 +1,10 @@
 # I2PControl Proposal 170 Operational Corrective Roadmap
 
-Status: partial Proposal 170 support; M039 closed
+Status: corrective pass required; M040 ready
 
 Planning baseline:
 
-- `5a2e216` — M033 implementation/test head
+- `563e093ba1e65b4edc31104e3045c8b5a665e8ed` — invalidated M039 final head
 
 Pinned external authority:
 
@@ -19,555 +19,392 @@ Canonical internal references:
 - `plans/adrs/ADR-0001-proposal-170-contract-and-stub-boundary.md`
 - `plans/adrs/ADR-0002-control-plane-tunnel-runtime-ownership.md`
 - `plans/closure/i2pcontrol-proposal-170/030-closure.md`
+- `plans/closure/i2pcontrol-proposal-170/039-closure-invalidation.md`
 - `plans/implementation/i2pcontrol-proposal-170/README.md`
 
 ## 1. Purpose
 
-M030 closed the demonstrated AddressBook destination-owner defect and retained an
-honest `partial Proposal 170 support` disposition. The next workstream converts
-that partial implementation into a more operational administrative API without
-expanding into missing tunnel families, broad router-core telemetry, frontend
-work, or upstream contribution activity.
+M031–M039 made the Proposal 170 service materially operational while retaining
+an honest partial-support boundary. Generic control-plane `client` and `server`
+tunnels gained real backends, lifecycle reconciliation, fixed server identity,
+truthful AddressBook behavior, compatibility inventories, authentication and
+publication hardening, containment reduction, and bounded live validation.
 
-The primary capability goal is real TunnelManager lifecycle support for generic
-`client` and `server` tunnels, the two Proposal 170 types whose data planes
-already exist in Emissary. The work must preserve the security-audited router
-core and keep Proposal 170 policy, persistence, supervision, and wire behavior
-inside `emissary-cli/src/i2pcontrol/**` wherever possible.
+A final-head review after M039 demonstrated three defects that the accepted
+evidence did not cover:
 
-The secondary goals correct remaining truthful-operation, compatibility,
-security, persistence, and containment findings:
+1. the startup-managed generic server manager drops its watch sender before
+   entering the reusable server runtime, allowing immediate self-cancellation;
+2. failed-authentication throttling is keyed by full source socket address and
+   can be bypassed by reconnecting with a new ephemeral port; its split
+   read/sleep/write accounting also undercounts concurrent bursts;
+3. `SetSubscriptions` can durably commit a replacement and then return failure
+   if refresh scheduling becomes unavailable.
 
-- AddressBook `SetSubscriptions` and `SetConfig` must not report operational
-  success for inert metadata;
-- base I2PControl compatibility and overlapping RouterInfo names require an
-  explicit tested boundary;
-- authentication comparison/throttling and publication durability require
-  focused hardening;
-- existing Proposal 170-specific SAM and AddressBook policy outside the
-  I2PControl boundary should be reduced only where that can be done without a
-  broad refactor;
-- one bounded live-runtime interoperability exercise must verify the composed
-  service rather than relying only on handler/fake-adapter tests.
+The M039 final disposition is therefore invalidated. M040–M044 correct only
+these demonstrated defects, add the missing exact-path evidence, and perform a
+new independent final-head review.
 
-The expected end state remains partial support unless every unavailable
-RouterInfo source and unsupported tunnel family is separately implemented and
-evidenced. This roadmap does not authorize that expansion.
+The expected end state remains `partial Proposal 170 support`. This roadmap does
+not authorize the ten missing tunnel data planes or 26 unavailable RouterInfo
+sources.
 
-## 2. Current state
+## 2. Retained implementation state
 
-### 2.1 Retained closed dimensions
+Unless a corrective milestone demonstrates a direct additional defect, retain:
 
-Do not reimplement these without a new direct defect:
-
-- standard authentication/token/error and JSON-RPC request-ID/notification
-  behavior from M020;
-- exact Proposal 170 wire names, casing, direct-presence semantics, action and
-  type inventory;
-- atomic tunnel-definition persistence, secret response filtering, and
-  exhaustive backend registration from M021;
-- startup tunnel inventory and ClientServicesInfo listener/source behavior from
-  M023;
-- bounded SAM observation behavior from M024;
-- exact 43-selector RouterInfo contract and 16 available / 1 neutral / 26
-  unavailable source classification from M025/M026;
-- literal wire fixtures from M027;
-- AddressBook compile-time/runtime isolation from M028;
-- enabled AddressBook destination and lookup owner coherence from M030;
+- standard I2PControl authentication/token/error and JSON-RPC ID/notification
+  behavior;
+- exact Proposal 170 names, casing, types, selector presence semantics, tunnel
+  inventory, and action inventory;
+- real control-plane generic client and server backends;
+- per-name lifecycle supervision, generation fencing, stop-before-restart,
+  delete/edit/rename coordination, and eligible `StartOnLoad`;
+- backend-owned fixed-path server destination identity and secret redaction;
+- startup/control-plane ownership separation and administrative rejection of
+  startup-managed mutation;
+- resource-free explicit unsupported status for ten tunnel families;
+- AddressBook entry ownership, full-destination coherence, feature isolation,
+  live subscription control, and explicit non-empty `SetConfig` rejection;
+- direct/base compatibility inventories and overlap handling;
+- reviewed constant-time password comparison;
+- bounded TLS/request/connection/concurrency limits;
+- atomic publication, backup recovery, restrictive permissions, path
+  confinement, and directory-sync qualification;
+- bounded passive SAM observation with Proposal 170 aggregation in
+  `emissary-cli/src/i2pcontrol/**`;
+- RouterInfo classification of 16 available, 1 neutral, and 26 unavailable
+  additions;
 - internal-only/no-upstream governance.
 
-### 2.2 Remaining material findings
+The corrective sequence must not reimplement these dimensions.
 
-1. M031's production backend registry maps generic `client` to a real backend
-   and the other eleven tunnel types to unsupported backends. Definition CRUD
-   and generic client lifecycle are real; generic server lifecycle is not yet
-   operational.
-2. The startup generic client/server managers remain startup-oriented and do
-   not expose safe administrative adoption; M031 adds named cancellation only
-   for independently owned control-plane clients.
-3. AddressBook subscription/config setters persist metadata but do not control
-   the active downloader/configuration, while returning success.
-4. The protected dispatcher is a Proposal-170-focused subset of the base
-   I2PControl API; overlapping selector names may not preserve historical
-   behavior.
-5. Authentication uses a hand-written comparison and has no bounded failed-login
-   throttling.
-6. Persistent publication syncs files but not all containing directories, so
-   strict power-loss durability is stronger in documentation than in evidence.
-7. Proposal 170-specific AddressBook policy remains substantial in the original
-   CLI AddressBook module, and SAM observation aggregation materially changes
-   core SAM files.
-8. GitHub has no attached CI status for the current head; retained local test
-   evidence is extensive but not a live composed-router interoperability run.
+## 3. Current corrective findings
 
-## 3. Scope boundary
+### 3.1 Startup server cancellation ownership
 
-### 3.1 In scope
+The original startup `ServerTunnelManager` creates a watch channel while
+discarding its sender. The reusable runtime treats sender loss as cancellation.
+This is a high-severity regression in existing startup server functionality and
+contradicts the M032/M039 behavior-preservation claim.
 
-- real `client` and `server` TunnelManager backends using existing Emissary data
-  planes;
-- an I2PControl-owned per-name runtime supervisor for control-plane definitions;
-- safe start, stop, restart, inspect, failure recovery, delete, rename, and
-  `StartOnLoad` behavior for eligible types;
-- a backend-owned, path-confined server destination identity store;
-- truthful AddressBook subscription/config operation results;
-- base compatibility and overlapping-selector reconciliation;
-- bounded authentication and publication durability hardening;
-- reduction of Proposal 170 policy outside the I2PControl boundary where
-  behavior-preserving and reviewable;
-- focused local and one bounded live-runtime interoperability test;
-- directly affected documentation, static guards, implementation dispositions,
-  and independent closure.
+### 3.2 Authentication source identity and atomic accounting
 
-### 3.2 Explicitly out of scope
+The throttle map uses `SocketAddr`, so source-port churn resets accumulated
+state. Delay is computed before failure count is recorded, so concurrent invalid
+attempts can reserve the same stale count. This is a medium security defect in
+the M036/M039 throttle claim.
 
-- new HTTP client/server, bidirectional HTTP server, IRC client/server,
-  SOCKS-IRC, CONNECT, Streamr client/server, or other tunnel data planes;
-- treating the existing HTTP/SOCKS startup proxies as Proposal 170 I2PTunnel
-  backends without a separate ownership and contract plan;
-- adoption, mutation, stop, restart, or deletion of startup-managed tunnel tasks;
-- new RouterInfo sources, rolling samplers, polling loops, NetDB inspection,
-  peer classification, queue instrumentation, or fabricated values;
+### 3.3 AddressBook mutation linearization
+
+The live manager commits subscriptions before refresh scheduling. A failed
+post-commit enqueue can produce an error response for an already-applied
+mutation. This is a medium operation-truthfulness defect in the M034/M039 claim.
+
+### 3.4 Evidence gap
+
+M038 exercises a startup client but not the original startup server manager.
+Authentication tests omit same-IP/different-port and concurrent reservation.
+AddressBook tests omit refresh-worker failure after durable commit.
+
+## 4. Scope boundary
+
+### 4.1 In scope
+
+- retaining the startup server runtime's cancellation sender for its lifetime;
+- direct startup-manager regression against a bounded fake SAM endpoint;
+- normalizing authentication throttle identity to source IP;
+- atomically reserving failed-auth counts before sleeping;
+- defining one durable `SetSubscriptions` linearization point;
+- making refresh scheduling bounded follow-up work that cannot reverse a
+  completed mutation result;
+- focused regressions for the exact missed paths;
+- the existing package-scoped verification matrix;
+- closure invalidation, dispositions, documentation, and independent reclosure.
+
+### 4.2 Explicitly out of scope
+
+- HTTP client/server, bidirectional HTTP server, IRC client/server, SOCKS-IRC,
+  CONNECT, Streamr, or any other missing tunnel data plane;
+- control, adoption, restart, stop, or deletion of startup-managed tasks;
+- new RouterInfo sources, polling, rolling samplers, NetDB inspection, or
+  fabricated values;
 - router, transport, streaming protocol, LeaseSet, cryptographic, routing, or
-  tunnel-building algorithm changes;
-- frontend/UI controls;
-- a repository-wide crate extraction or general service framework;
-- schema redesign unrelated to the exact backend or durability requirement;
-- remote CI matrices, release/publishing automation, coverage gates, fuzz
-  campaigns, soak farms, generated evidence bundles, or unrelated test debt;
+  tunnel-building changes;
+- frontend/UI work;
+- a repository-wide crate extraction or service framework;
+- persistent accounts, distributed bans, proxy-header trust, or firewall
+  integration;
+- a new AddressBook scheduler, event bus, second authority, arbitrary paths, or
+  synchronous download transaction;
+- remote CI matrices, release automation, coverage gates, fuzz campaigns, soak
+  farms, generated evidence bundles, or unrelated test cleanup;
 - upstream issues, pull requests, reviews, discussions, submissions, adoption,
   merge solicitation, maintainer outreach, or contribution preparation.
 
-## 4. Target architecture
+## 5. Ownership and target architecture
 
-### 4.1 Administrative layer
+### 5.1 Startup server runtime
 
-JSON-RPC handlers, canonical/compatibility parsing, domain definitions,
-persistence, operation-status translation, and validation remain inside
-`emissary-cli/src/i2pcontrol/**`.
+The original CLI server manager remains the owner of startup-configured server
+tasks. It retains a local watch sender solely to keep the reusable runtime's
+cancellation channel open. The sender is not exposed through I2PControl and does
+not become an administrative stop handle.
 
-Handlers continue to depend only on `TunnelManagerControl`; they do not bind
-listeners, spawn data-plane tasks, manipulate key files, or know backend-specific
-configuration.
+Production work is limited to `emissary-cli/src/tunnel/server.rs`.
 
-### 4.2 Runtime supervisor
+### 5.2 Authentication throttle
 
-Add an I2PControl-owned control-plane runtime supervisor:
+The I2PControl server obtains a peer `SocketAddr` at the TLS/HTTP boundary and
+normalizes it to `IpAddr` for throttle state. One short locked operation expires
+old state, reserves the next count, enforces capacity, and returns a bounded
+delay. The lock is released before sleep.
 
-- keyed by canonical tunnel name;
-- bounded by the existing tunnel inventory limit;
-- stores only task/cancellation/state metadata required for control-plane-owned
-  instances;
-- serializes transitions per name without globally serializing unrelated
-  tunnels;
-- removes completed tasks and permits corrected definitions to restart;
-- never owns startup-managed tasks;
-- does not hold the TunnelStore lock across runtime operations.
+No forwarded header is trusted. State remains in-memory and process-local.
 
-### 4.3 Existing data-plane adapters
+### 5.3 AddressBook subscription mutation
 
-The original CLI tunnel modules remain the canonical data-plane code. Narrow
-single-instance runners may be extracted:
+The live AddressBook manager remains the sole runtime owner. `SetSubscriptions`
+success means validation, durable owner publication, and active-set replacement.
+Remote download completion is not part of the mutation transaction.
 
-- client: bind one configured listener, create/connect the existing Yosemite
-  stream session, copy bidirectionally, retry according to bounded policy, and
-  terminate on cancellation;
-- server: create/load a backend-owned destination, create the existing Yosemite
-  persistent session, publish destination metadata, issue forwarding, and
-  terminate on cancellation.
+Refresh scheduling remains bounded follow-up work. A post-commit scheduling
+failure may produce a sanitized internal diagnostic but must not turn the
+completed mutation into an error response.
 
-Those adapters must not import I2PControl domain, store, handler, or JSON-RPC
-types. Translation remains in I2PControl.
+### 5.4 Validation and closure
 
-### 4.4 Server secret identity
+M043 validates exact corrected paths and the retained matrix without production
+patches. M044 independently reviews the final head and selects the truthful
+status.
 
-Control-plane server destinations live under a fixed I2PControl-owned state
-directory. The backend accepts no arbitrary key path. Identity is durable across
-stop/restart and rename, permissions are restrictive where supported, and key
-material is omitted from logs and responses.
-
-### 4.5 Startup ownership
-
-Startup configuration remains authoritative for existing startup tasks.
-I2PControl may observe their definitions and actual destination metadata but
-must reject lifecycle and mutation. There is no adoption or dual authority.
-
-### 4.6 AddressBook operation truthfulness
-
-`SetSubscriptions` and `SetConfig` must have one of two outcomes:
-
-- a supported field is applied to the actual runtime owner and the response
-  reports success only after the operational state accepts it; or
-- the request receives a deterministic unsupported/error result before inert
-  metadata is published.
-
-The implementation must not add arbitrary path control merely because Proposal
-170 lists Java address-book file paths. Existing path ownership remains fixed by
-Emissary configuration.
-
-### 4.7 Compatibility boundary
-
-Direct Proposal 170 selectors and historical nested/base requests remain
-separate request modes. Exact-name overlaps receive mode-specific behavior and
-fixtures. Unsupported base methods are documented and must not be silently
-represented as implemented.
-
-## 5. Dependency graph
+## 6. Dependency graph
 
 ```text
-M030 retained partial-support closure
-                |
-                v
-M031 runtime supervisor + generic client backend
-                |
-                v
-M032 generic server backend + secret identity
-                |
-                v
-M033 lifecycle recovery, StartOnLoad, and TunnelManager closure
-                |
-                v
-M034 AddressBook setter truthfulness
-                |
-                v
-M035 base compatibility and selector overlap
-                |
-                v
-                M036 auth and persistence durability hardening
-                |
-                v
-                M037 I2PControl containment reduction
-                |
-                v
-M038 live-runtime interoperability validation
-                |
-                v
-M039 independent final-head operational reclosure
+M039 closure invalidated
+          |
+          v
+M040 startup server cancellation-owner correction
+          |
+          v
+M041 auth throttle IP identity + atomic reservation
+          |
+          v
+M042 AddressBook subscription commit boundary
+          |
+          v
+M043 corrective runtime regression validation
+          |
+          v
+M044 independent corrective final-head reclosure
 ```
 
-M038 is closed with qualified local data-plane blockers recorded. M039
-independently reviewed the final head and formally closed the workstream as
-`partial Proposal 170 support`. No successor implementation handoff is
-currently registered; deferred RouterInfo sources and tunnel families remain
-explicit roadmap work.
+Only M040 is dependency-ready. The sequence is deliberately serialized so each
+implementation and closure head is frozen before the next handoff.
 
-## 6. Milestones
+## 7. Corrective milestones
 
-### M031 — Runtime supervisor and generic client backend
+### M040 — Startup server cancellation-owner correction
 
-Status: closed
+Status: ready
 
 Plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/031-client-tunnel-runtime-backend.md`
+- `plans/implementation/i2pcontrol-proposal-170/040-startup-server-cancellation-correction.md`
 
 Objective:
 
-- establish the control-plane runtime supervisor;
-- extract the smallest reusable single-client runtime primitive;
-- replace only the `client` unsupported backend with a real backend;
-- prove isolated start/stop/restart/failure behavior without touching core.
+- retain the startup server watch sender for the runtime lifetime;
+- prove the original manager reaches HELLO, SESSION CREATE, destination
+  observation, and STREAM FORWARD;
+- preserve startup ownership and control-plane behavior;
+- change no core or protocol code.
 
 Exit conditions:
 
-- control-plane `client` definitions can start and stop truthfully;
-- startup-managed clients remain external;
-- unrelated unsupported types remain resource-free;
-- no `emissary-core/**` production change;
-- every external CLI file change is justified;
-- implementation disposition freezes the head.
+- the regression fails on `563e093` and passes after correction;
+- the startup runtime remains alive after readiness;
+- no administrative startup-task handle is added;
+- only the authorized server tunnel module and focused tests change;
+- M040 closure is accepted.
 
-### M032 — Generic server backend and destination identity
+### M041 — Authentication throttle source/accounting correction
 
-Status: closed
-
-Plan:
-
-- `plans/implementation/i2pcontrol-proposal-170/032-server-tunnel-runtime-backend.md`
-
-Objective:
-
-- reuse the existing generic server runtime through a narrow adapter;
-- replace only the `server` unsupported backend;
-- implement backend-owned persistent destination identity and rename/delete
-  semantics;
-- prove no arbitrary key path or secret disclosure.
-
-### M033 — Lifecycle reconciliation and StartOnLoad
-
-Status: closed
+Status: blocked on M040
 
 Plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/033-tunnel-lifecycle-reconciliation.md`
+- `plans/implementation/i2pcontrol-proposal-170/041-auth-throttle-source-accounting.md`
 
 Objective:
 
-- reconcile runtime and durable definition state;
-- implement deterministic `StartOnLoad` for eligible control-plane definitions;
-- close concurrent lifecycle, restart, delete, rename, and failure-recovery
-  semantics;
-- revalidate all twelve backend registrations and public status shapes.
+- key failure state by normalized source IP;
+- reserve/increment failure count atomically before delay;
+- preserve bounded capacity, monotonic capped delays, exact errors, tokens, and
+  constant-time comparison.
 
-### M034 — AddressBook setter truthfulness
+### M042 — AddressBook subscription commit-boundary correction
 
-Status: closed
+Status: blocked on M041
 
 Plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/034-addressbook-setter-truthfulness.md`
+- `plans/implementation/i2pcontrol-proposal-170/042-addressbook-subscription-commit-boundary.md`
 
 Objective:
 
-- stop successful responses for inert subscription/config metadata;
-- implement only safely enforceable runtime fields;
-- reject path-based or unsupported settings before persistence;
-- keep M028/M030 owner and disabled-mode invariants.
+- define one durable linearization point;
+- prohibit failure responses after commit;
+- preserve pre-commit failure rollback and bounded refresh coalescing;
+- retain explicit unsupported `SetConfig` and owner/feature isolation.
 
-### M035 — Base compatibility and selector overlap
+### M043 — Corrective runtime regression validation
 
-Status: closed
+Status: blocked on M040–M042
 
 Plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/035-base-compatibility-and-selector-overlap.md`
+- `plans/implementation/i2pcontrol-proposal-170/043-corrective-runtime-regression-validation.md`
 
 Objective:
 
-- freeze the exact supported base API inventory;
-- correct mode-specific behavior for overlapping RouterInfo keys;
-- preserve historical nested requests where implemented;
-- document unsupported base methods without inventing capability claims.
+- exercise the original startup server path;
+- exercise ephemeral-port and concurrent auth cases;
+- exercise post-commit refresh-worker failure;
+- run the retained bounded verification matrix;
+- make no production changes.
 
-Closure:
+### M044 — Corrective final-head reclosure
 
-- `plans/closure/i2pcontrol-proposal-170/035-closure.md`
-- `plans/closure/i2pcontrol-proposal-170/035-implementation-disposition.md`
-
-### M036 — Authentication and publication durability hardening
-
-Status: closed
+Status: blocked on M043
 
 Plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/036-auth-and-publication-hardening.md`
+- `plans/implementation/i2pcontrol-proposal-170/044-corrective-final-head-reclosure.md`
 
 Objective:
 
-- replace the hand-written password comparator with a reviewed primitive;
-- add bounded failed-authentication throttling without global denial of service;
-- qualify or strengthen file/directory synchronization and recovery semantics for
-  affected I2PControl stores;
-- preserve local-only defaults and existing wire errors.
+- independently review the exact final head;
+- verify the corrected and retained dimensions;
+- select `partial Proposal 170 support`, `corrective pass required`, or
+  `blocked` without production changes.
 
-Closure:
+## 8. Historical milestones and evidence
 
-- `plans/closure/i2pcontrol-proposal-170/036-closure.md`
-- `plans/closure/i2pcontrol-proposal-170/036-implementation-disposition.md`
+| Milestone | Current disposition |
+|---|---|
+| M020–M030 | retained component evidence; M030 is the controlling pre-runtime baseline |
+| M031 | retained generic client backend/supervisor evidence |
+| M032 | retained server backend/identity evidence; startup behavior-preservation claim invalidated |
+| M033 | retained lifecycle/StartOnLoad evidence |
+| M034 | retained live setter/config evidence; post-commit result claim invalidated |
+| M035 | retained compatibility evidence |
+| M036 | retained password/publication evidence; throttle effectiveness claim invalidated |
+| M037 | retained containment evidence subject to startup adapter correction |
+| M038 | retained live evidence; exact-path coverage gap recorded |
+| M039 | final disposition invalidated by `039-closure-invalidation.md` |
 
-### M037 — Containment reduction and static boundary
+Historical records remain in place and are not rewritten or deleted.
 
-Status: closed
-
-Plan:
-
-- `plans/implementation/i2pcontrol-proposal-170/037-containment-boundary-reduction.md`
-
-Objective:
-
-- reduce Proposal 170 policy outside `i2pcontrol/**`;
-- leave only narrow runtime hooks in the original CLI modules;
-- reduce SAM core changes toward an optional passive observer seam where
-  behavior-preserving;
-- add static changed-path and dependency guards;
-- stop rather than perform a broad crate/core refactor.
-
-Closure:
-
-- `plans/closure/i2pcontrol-proposal-170/037-closure.md`
-- `plans/closure/i2pcontrol-proposal-170/037-implementation-disposition.md`
-
-### M038 — Live-runtime interoperability validation
-
-Status: closed
-
-Plan:
-
-- `plans/implementation/i2pcontrol-proposal-170/038-live-runtime-interoperability.md`
-
-Objective:
-
-- run one bounded local Emissary instance with I2PControl enabled;
-- exercise TLS authentication, AddressBook entry behavior, available RouterInfo,
-  ClientServicesInfo, TunnelManager CRUD, real client/server lifecycle, and
-  explicit unsupported paths;
-- capture reproducible local evidence without new CI infrastructure.
-
-### M039 — Independent operational reclosure
-
-Status: closed
-
-Plan:
-
-- `plans/implementation/i2pcontrol-proposal-170/039-operational-reclosure.md`
-
-Objective:
-
-- independently review the actual final head;
-- classify wire, source, runtime, persistence, feature isolation, containment,
-  security, and evidence dimensions;
-- select `partial Proposal 170 support`, `corrective pass required`, or `blocked`
-  without overstating unsupported selectors or tunnel families.
-
-## 7. Cross-cutting invariants
+## 9. Cross-cutting invariants
 
 1. Proposal 170 names, casing, JSON types, presence semantics, and status channels
    remain exact.
 2. Existing compatibility aliases are not expanded.
 3. Startup-managed tunnels remain externally owned and read-only.
-4. Only `client` and `server` receive real backends under this roadmap.
-5. Unsupported tunnel types open no listener/session/task and never report
+4. Only generic `client` and `server` have real backends under this roadmap.
+5. Unsupported tunnel types allocate no listener/session/task and never report
    running.
-6. Runtime failure is isolated to one control-plane tunnel and does not require
-   router restart or store deletion to recover.
-7. No persistence lock is held across network I/O, bind, cancellation, sleep, or
-   join.
-8. Stop targets one exact named runtime; restart completes stop before start.
-9. Server private destination material remains internal and path-confined.
-10. Disabled/default I2PControl behavior remains unaffected.
-11. AddressBook owner coherence from M030 remains intact.
-12. Unavailable RouterInfo values remain explicit and unfabricated.
-13. No `emissary-core/**` change is authorized by M031–M036.
-14. M037 may only reduce existing core coupling through a narrow passive seam;
-    it may not add router behavior.
-15. Every production file outside `i2pcontrol/**` requires an explicit
-    requirement and changed-path justification.
-16. No frontend, CI/release expansion, unrelated refactor, or upstream activity
-    is authorized.
+6. No persistence lock is held across network I/O, sleep, cancellation, or join.
+7. Server private destination material remains fixed-path, internal, and
+   redacted.
+8. Disabled/default I2PControl behavior remains unaffected.
+9. AddressBook owner coherence and full-destination precedence remain intact.
+10. Unavailable RouterInfo values remain explicit and unfabricated.
+11. The auth throttle remains bounded, local, and non-persistent.
+12. No post-commit AddressBook mutation failure is reported.
+13. No new `emissary-core/**` behavior is authorized.
+14. Every production file outside `i2pcontrol/**` requires an explicit defect
+    and changed-path justification.
+15. No frontend, CI/release expansion, broad refactor, or upstream activity is
+    authorized.
 
-## 8. Failure, cancellation, restart, and contention policy
+## 10. Failure, cancellation, restart, and contention policy
 
-### Lifecycle
+### Startup server
 
-- Start validates and reserves the name before task allocation.
-- Bind/SAM/startup failure publishes failed/stopped state and releases the name.
-- Stop is idempotent for absent/stopped tasks and awaits bounded cancellation.
-- Restart is stop-then-start; it never permits old and new tasks to overlap.
-- Panic/completion removes the task handle and records sanitized failure.
-- Delete of a running eligible tunnel must stop it first or fail without deleting
-  durable state.
-- Rename of a running tunnel is rejected unless the milestone proves a fully
-  atomic stop/rename/start sequence; silent split identity is prohibited.
+- The local sender keeps the cancellation channel open.
+- Startup task termination remains process/task-owner controlled.
+- No new administrative cancellation is introduced.
+- SAM/session/forward failures retain existing bounded handling.
 
-### Persistence
+### Authentication
 
-- Definition and secret mutations validate before publication.
-- Failure leaves the previous generation and runtime task coherent.
-- `StartOnLoad` failure does not block unrelated tunnels or falsely report
-  running.
-- Server secret rename/delete is coordinated with definition mutation.
-- Directory durability is either implemented and tested or documentation is
-  narrowed to the actual guarantee.
+- Invalid-password failure is reserved under the short throttle lock.
+- Cancellation during delay leaves the failure recorded.
+- Success clears the normalized source IP.
+- Capacity and delay remain bounded.
 
-### Contention
+### AddressBook
 
-- Per-name lifecycle transitions are serialized.
-- Unrelated tunnel names may progress concurrently within global bounds.
-- `All` operations remain bounded and deterministic.
-- Authentication throttling is bounded per source/context and cannot consume
-  unbounded memory.
+- Validation and publication failure occur before commit and preserve prior
+  state.
+- After durable commit, refresh failure cannot reverse or relabel the mutation.
+- Refresh work remains bounded and coalesced.
+- Network failure never rolls back the active subscription set.
 
-## 9. Compatibility and migration
+### Validation
 
-- Existing startup configurations remain valid and unchanged.
-- Existing control-plane definition generations remain readable.
-- Existing `client` and `server` definitions become operational without public
-  schema migration.
-- Unsupported definitions remain stored and inactive.
-- Server runtime identity receives an internal migration only when needed; no
-  arbitrary user path is introduced.
-- AddressBook state from M030 remains readable without a new authority.
-- Existing direct Proposal 170 requests retain their current exact wire.
-- Compatibility behavior is corrected through request-mode distinction rather
-  than new aliases.
+- Tests use loopback, ephemeral ports, bounded timeouts, and temporary state.
+- A material production defect discovered in M043/M044 requires a new plan.
 
-## 10. Verification policy
+## 11. Verification policy
 
-Use local, package-scoped verification. Each milestone runs focused tests first,
-then the smallest broad matrix that covers changed paths. The normal upper bound
-is:
+Use focused tests first, then the existing bounded matrix:
 
 ```bash
 cargo check -p emissary-cli --no-default-features
+cargo test -p emissary-cli --no-default-features
+cargo clippy -p emissary-cli --no-default-features --all-targets -- -D warnings
+
 cargo check -p emissary-cli --no-default-features --features i2pcontrol
 cargo test -p emissary-cli --no-default-features --features i2pcontrol
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
+
+cargo check -p emissary-core
+cargo test -p emissary-core sam
+cargo clippy -p emissary-core --all-targets -- -D warnings
+
+git diff --check
 ```
 
-When a milestone changes an original non-I2PControl CLI module, also run its
-focused no-feature tests to prove default behavior remains unchanged. M037 may
-run focused core SAM tests only because it is explicitly a coupling-reduction
-milestone.
+Each milestone adds exact focused commands. Use targeted formatting because the
+repository's stable/nightly rustfmt mismatch is known. Do not add remote CI,
+release, coverage, fuzz, soak, or network-farm infrastructure.
 
-Use targeted formatting and `git diff --check`. Do not add remote CI, platform
-matrices, coverage gates, fuzz/soak farms, release checks, or generated evidence
-bundles.
+## 12. Risks and mitigations
 
-## 11. Documentation and closure discipline
+| Risk | Mitigation |
+|---|---|
+| A minimal sender fix grows into startup task control | Keep sender local and unexposed; changed-path review |
+| IP throttling creates global lock contention | Short in-memory reservation only; no lock across sleep |
+| Concurrent failures are undercounted | Reserve count atomically before delay |
+| AddressBook response remains ambiguous | Test worker failure after durable commit and pre-commit failure separately |
+| Corrective tests use the wrong backend | Require the original `ServerTunnelManager` path |
+| Scope expands into missing capability work | Static plan guards and M044 changed-path classification |
+| Closure repeats M039 overclaim | Independent M044 matrix and explicit unavailable capability status |
 
-Each implementation milestone must create an implementation disposition under
-`plans/closure/i2pcontrol-proposal-170/` containing:
+## 13. Final status rule
 
-- implementation commits and frozen head;
-- exact changed production/test/documentation files;
-- justification for every file outside `i2pcontrol/**`;
-- requirement-to-evidence matrix;
-- exact command outcomes;
-- failure/cancellation/restart/contention review;
-- compatibility and migration review;
-- security and secret-handling review;
-- unresolved findings with severity;
-- no-upstream attestation.
+M044 may select `partial Proposal 170 support` only when every implemented and
+claimed dimension is exact, operational, bounded, and evidenced.
 
-A coding commit or test count is not closure. M039 is the distinct accepted
-final review.
+Ten tunnel families remain unsupported and 26 RouterInfo additions remain
+unavailable. Full Proposal 170 completion and `closed internally against pinned
+revision` are not available under this roadmap.
 
-## 12. Milestone status
+Any unresolved high/medium defect requires `corrective pass required`. Missing
+or unreviewable evidence requires `blocked`.
 
-| Milestone | Status | Disposition |
-|---|---|---|
-| 001–019A | historical/superseded/invalidated as recorded | retained history |
-| 020–030 | retained closed evidence | current partial-support baseline |
-| 031 | closed | runtime supervisor and generic client backend |
-| 032 | closed | generic server backend and persistent destination identity |
-| 033 | closed | lifecycle reconciliation and StartOnLoad |
-| 034 | closed | AddressBook setter truthfulness |
-| 035 | closed | base compatibility and selector overlap |
-| 036 | closed | authentication/publication hardening and closure accepted |
-| 037 | closed | containment reduction and static boundary accepted |
-| 038 | closed | live production-composition evidence and closure accepted |
-| 039 | closed | `plans/closure/i2pcontrol-proposal-170/039-closure.md` |
-
-## 13. Completion definition
-
-This roadmap is complete only when:
-
-- real generic client and server backends are operational and isolated;
-- startup-managed ownership remains unchanged;
-- `StartOnLoad`, stop/restart/delete/rename, failure, and recovery semantics are
-  coherent;
-- inert AddressBook setter success is eliminated;
-- base compatibility overlap is tested and documented;
-- authentication and persistence claims match implemented guarantees;
-- Proposal 170-specific coupling outside the I2PControl boundary is minimized
-  without broad refactoring;
-- one live-runtime interoperability run passes or records a precise blocker;
-- M039 independently reviewed the final head and accepted the partial-support disposition;
-- no unresolved high/medium correctness, security, compatibility, ownership, or
-  scope defect remains in the implemented dimensions;
-- unavailable RouterInfo sources and unsupported tunnel families remain
-  explicit rather than fabricated;
-- no upstream interaction occurred.
-
-The expected honest final label is still `partial Proposal 170 support` unless
-separately authorized future work closes every unavailable source/runtime.
+No status implies upstream review, acceptance, certification, adoption, or
+merge.

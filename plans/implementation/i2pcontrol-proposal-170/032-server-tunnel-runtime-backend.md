@@ -1,6 +1,6 @@
 # M032 — Generic Server Backend and Persistent Destination Identity
 
-Status: blocked on M031
+Status: ready
 
 Source roadmap:
 
@@ -14,7 +14,7 @@ Applicable governance and decisions:
 
 Repository baseline:
 
-- M031 accepted implementation/closure head, to be recorded before execution
+- `8f635616c174e8681ba86de79f80ca3fff2cccee` — M031 implementation head
 
 Hard dependency:
 
@@ -36,8 +36,8 @@ tasks; and it does not modify `emissary-core`.
 
 ## 2. Readiness and current evidence
 
-M032 becomes dependency-ready only after M031 closes the supervisor and client
-backend boundary.
+M032 is dependency-ready now that M031 has closed the supervisor and client
+backend boundary at the recorded implementation head.
 
 Current server runtime:
 

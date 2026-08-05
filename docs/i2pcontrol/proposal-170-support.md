@@ -25,7 +25,8 @@ Closed handoffs:
   `plans/closure/i2pcontrol-proposal-170/032-closure.md`
 - M033 closed: `plans/implementation/i2pcontrol-proposal-170/033-tunnel-lifecycle-reconciliation.md`; closure:
   `plans/closure/i2pcontrol-proposal-170/033-closure.md`
-- M034 implemented: `plans/implementation/i2pcontrol-proposal-170/034-addressbook-setter-truthfulness.md`; disposition:
+- M034 closed: `plans/implementation/i2pcontrol-proposal-170/034-addressbook-setter-truthfulness.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/034-closure.md`; disposition:
   `plans/closure/i2pcontrol-proposal-170/034-implementation-disposition.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained corrective
@@ -247,7 +248,7 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M028 | closed for implementation | post-M027 status repair and AddressBook compile/runtime feature isolation |
 | M029 | historical invalidated closure | retained non-AddressBook evidence |
 | M030 | closed; partial Proposal 170 support | AddressBook destination/lookup coherence and final-head review |
-| M034 | implemented; closure pending | AddressBook setter truthfulness and runtime subscription control |
+| M034 | closed | AddressBook setter truthfulness and runtime subscription control |
 
 ## Final-status rule
 

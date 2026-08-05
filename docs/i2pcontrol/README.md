@@ -11,6 +11,7 @@ Historical invalidation and completed corrective sequence:
 - `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 - `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
 - `plans/closure/i2pcontrol-proposal-170/030-closure.md`
+- `plans/closure/i2pcontrol-proposal-170/034-closure.md`
 
 M020–M027 implementation/evidence remains retained, but M027's final disposition
 is historical invalidated evidence. The post-M027 merge that revived M019 is

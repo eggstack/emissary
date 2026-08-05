@@ -1,6 +1,6 @@
 # M034 — AddressBook Setter Truthfulness and Runtime Subscription Control
 
-Status: ready
+Status: closed
 
 Source roadmap:
 

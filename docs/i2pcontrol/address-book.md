@@ -1,6 +1,6 @@
 # Proposal 170 AddressBook Administrative API
 
-Status: partial Proposal 170 support; M034 implementation accepted
+Status: partial Proposal 170 support; M034 closed
 
 Historical corrective implementation:
 

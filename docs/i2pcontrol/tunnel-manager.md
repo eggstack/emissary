@@ -1,6 +1,6 @@
 # I2PControl TunnelManager
 
-Status: closed against the pinned Proposal 170 revision
+Status: M033 lifecycle reconciliation closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
 Wire/CRUD/persistence evidence is distinct from runtime data-plane support.
@@ -35,6 +35,12 @@ root. The key is never accepted as `PrivKeyFile`, copied into `rawConfig`, or
 returned by `get`. The actual public destination is available to
 `ClientServicesInfo` only after the backend has established the session.
 Startup-managed server definitions remain externally owned.
+
+After the durable definition and server-identity stores load, `StartOnLoad` is
+reconciled only for control-plane-owned generic `client` and `server`
+definitions. Each start is isolated; a failed definition remains stopped and
+does not prevent the service or other eligible definitions from starting.
+Unsupported and startup-managed definitions are never auto-started.
 
 ## Actions
 
@@ -124,8 +130,8 @@ Creates a new tunnel definition with the specified type and name.
 - `Type` and `Name` are required
 - Duplicate names return a Proposal 170 status error
 - Control-plane ownership is assigned automatically
-- `StartOnLoad` is stored but does not start the tunnel until M033 lifecycle
-  reconciliation
+- `StartOnLoad` is stored durably and is applied during post-load reconciliation
+  for eligible control-plane `client` and `server` definitions
 
 ### Edit
 
@@ -142,8 +148,9 @@ Updates an existing tunnel definition. Preserves omitted fields.
 
 - `Name` is required
 - `NewName` performs an atomic rename with collision detection
-- Stopped control-plane server renames preserve destination identity; running
-  server renames are rejected
+- Stopped control-plane renames preserve backend state (including server
+  destination identity); edits and renames while a tunnel is starting, running,
+  or stopping are rejected
 - Startup-managed definitions are rejected
 
 ### Get
@@ -203,6 +210,8 @@ Removes a tunnel definition.
 ```
 
 - Startup-managed definitions are rejected
+- A running eligible tunnel is stopped and awaited before its definition is
+  removed; failed stop preserves durable state
 - Delete of absent name is a successful no-op
 
 ### Compatibility List
@@ -254,9 +263,16 @@ For unsupported backends, stop is safe and idempotent.
 }
 ```
 
-Composed as stop then start through the backend registry.
+Composed as exact stop completion followed by a reload of the latest durable
+definition and start through the backend registry. Per-name lifecycle locks
+prevent overlapping generations; unrelated names remain independently usable.
 
 ### All behavior
+
+`All` snapshots the bounded deterministic inventory, skips startup-managed
+definitions, and dispatches each remaining name in sorted order. Unsupported
+types produce their explicit per-item not-implemented result without resource
+allocation. One item failing does not prevent later items from being attempted.
 
 ```json
 {

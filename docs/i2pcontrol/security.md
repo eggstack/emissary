@@ -136,12 +136,16 @@ Each store has a configurable maximum size limit. State that exceeds this limit 
 
 ## Startup safety
 
-### No automatic task launch
+### Bounded automatic task launch
 
-- `StartOnLoad` is stored in tunnel definitions
-- The persistence layer does not execute StartOnLoad
-- No tasks are launched from persisted state
-- Runtime adoption happens only through explicit handler calls
+- `StartOnLoad` is stored as durable intent in tunnel definitions
+- Post-load reconciliation launches tasks only for control-plane-owned generic
+  `client` and `server` definitions
+- Unsupported and startup-managed definitions are never launched or adopted
+- Each eligible definition is started independently, with bounded inventory and
+  sanitized failure handling
+- Runtime inspection comes from the supervisor/backend, never from persisted
+  intent alone
 
 ### Runtime resolver owner coherence
 

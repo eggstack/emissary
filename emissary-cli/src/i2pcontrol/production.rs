@@ -529,6 +529,7 @@ pub struct ProductionTunnelManagerControl {
     startup: StartupTunnelInventory,
     server_destinations: ServerDestinationStore,
     sam_tcp_port: Option<u16>,
+    lifecycle: Arc<tokio::sync::Mutex<BTreeMap<String, Arc<tokio::sync::Mutex<()>>>>>,
 }
 
 impl ProductionTunnelManagerControl {
@@ -571,6 +572,7 @@ impl ProductionTunnelManagerControl {
             startup,
             server_destinations,
             sam_tcp_port,
+            lifecycle: Arc::new(tokio::sync::Mutex::new(BTreeMap::new())),
         })
     }
 
@@ -615,7 +617,132 @@ impl ProductionTunnelManagerControl {
         self.server_destinations
             .prune_unreferenced(&referenced_server_identities)
             .await?;
+        self.reconcile_start_on_load().await;
         Ok(())
+    }
+
+    /// Start eligible persisted definitions after durable state and secrets
+    /// have loaded. Each definition is isolated so one invalid runtime or
+    /// unavailable SAM endpoint cannot prevent the administrative service from
+    /// coming up for the remaining definitions.
+    async fn reconcile_start_on_load(&self) {
+        let definitions = {
+            let store = self.inner.lock().await;
+            store.list().into_iter().cloned().collect::<Vec<_>>()
+        };
+
+        for definition in definitions {
+            if definition.ownership
+                != crate::i2pcontrol::domain::tunnel::TunnelOwnership::ControlPlane
+                || definition.start_intent
+                    != crate::i2pcontrol::domain::tunnel::StartIntent::StartOnLoad
+                || !matches!(
+                    definition.tunnel_type,
+                    TunnelType::Client | TunnelType::Server
+                )
+            {
+                continue;
+            }
+
+            let name = definition.name.as_str().to_string();
+            match self.start(&name).await {
+                Ok(result) if result.starts_with("error") => tracing::warn!(
+                    target: "emissary::i2pcontrol::tunnel_manager",
+                    tunnel = %name,
+                    "StartOnLoad tunnel did not start",
+                ),
+                Err(_) => tracing::warn!(
+                    target: "emissary::i2pcontrol::tunnel_manager",
+                    tunnel = %name,
+                    "StartOnLoad tunnel could not be reconciled",
+                ),
+                _ => {}
+            }
+        }
+    }
+
+    /// Acquire all per-name lifecycle locks in deterministic order.
+    ///
+    /// The lock entries are deliberately retained for the bounded lifetime of
+    /// this manager. This keeps rename and delete races serializable without
+    /// holding the store lock across runtime awaits or introducing a lock
+    /// reclamation race.
+    async fn lifecycle_locks(&self, names: &[&str]) -> Vec<tokio::sync::OwnedMutexGuard<()>> {
+        let mut names = names.iter().map(|name| (*name).to_string()).collect::<Vec<_>>();
+        names.sort();
+        names.dedup();
+        let locks = {
+            let mut lifecycle = self.lifecycle.lock().await;
+            names
+                .iter()
+                .map(|name| {
+                    lifecycle
+                        .entry(name.clone())
+                        .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+                        .clone()
+                })
+                .collect::<Vec<_>>()
+        };
+        let mut guards = Vec::with_capacity(locks.len());
+        for lock in locks {
+            guards.push(lock.lock_owned().await);
+        }
+        guards
+    }
+
+    async fn lifecycle_lock(&self, name: &str) -> tokio::sync::OwnedMutexGuard<()> {
+        self.lifecycle_locks(&[name]).await.remove(0)
+    }
+
+    fn runtime_is_active(&self, definition: &TunnelDefinition) -> bool {
+        if definition.ownership != crate::i2pcontrol::domain::tunnel::TunnelOwnership::ControlPlane
+        {
+            return false;
+        }
+        matches!(
+            self.registry.get(definition.tunnel_type).inspect(definition).runtime_state,
+            crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Starting
+                | crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Running
+                | crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopping
+        )
+    }
+
+    async fn start_locked(&self, name: &str) -> Result<String, String> {
+        if self.startup.get(name)?.is_some() {
+            return Err("startup-managed tunnel lifecycle is externally managed".into());
+        }
+        let definition = {
+            let store = self.inner.lock().await;
+            store
+                .get(name)
+                .ok_or_else(|| format!("error - tunnel '{}' not found", name))?
+                .clone()
+        };
+        let definition = self.prepare_server_definition(definition).await?;
+        let backend = self.registry.get(definition.tunnel_type);
+        match backend.start(&definition).await {
+            Ok(()) => {
+                if definition.tunnel_type == TunnelType::Server {
+                    let status = backend.inspect(&definition);
+                    let Some(destination) = status.destination else {
+                        let _ = backend.stop(&definition).await;
+                        return Ok("error - server runtime did not publish a destination".into());
+                    };
+                    if let Err(error) = self
+                        .persist_server_public_destination(definition.clone(), destination)
+                        .await
+                    {
+                        let _ = backend.stop(&definition).await;
+                        return Ok(format!("error - {error}"));
+                    }
+                }
+                Ok("ok".to_string())
+            }
+            Err(BackendError::NotImplemented { tunnel_type }) => {
+                Ok(format!("error - {} not implemented", tunnel_type.as_str()))
+            }
+            Err(error) => Ok(format!("error - {error}")),
+        }
     }
 
     async fn with_runtime_state(&self, mut definition: TunnelDefinition) -> TunnelDefinition {
@@ -730,6 +857,7 @@ impl Clone for ProductionTunnelManagerControl {
             startup: self.startup.clone(),
             server_destinations: self.server_destinations.clone(),
             sam_tcp_port: self.sam_tcp_port,
+            lifecycle: Arc::clone(&self.lifecycle),
         }
     }
 }
@@ -802,6 +930,9 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         definition: TunnelDefinition,
         new_name: Option<TunnelName>,
     ) -> Result<bool, String> {
+        let new_name_str = new_name.as_ref().map(TunnelName::as_str);
+        let names = new_name_str.map_or_else(|| vec![name], |new_name| vec![name, new_name]);
+        let _lifecycle = self.lifecycle_locks(&names).await;
         if self.startup.get(name)?.is_some() {
             return Err("error - tunnel name is owned by startup configuration".into());
         }
@@ -810,24 +941,18 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
                 return Err("error - tunnel name is owned by startup configuration".into());
             }
         }
-        if definition.tunnel_type == TunnelType::Server
-            && new_name.as_ref().is_some_and(|candidate| candidate.as_str() != name)
-        {
-            let status = self.registry.get(TunnelType::Server).inspect(&definition);
-            if matches!(
-                status.runtime_state,
-                crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Starting
-                    | crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Running
-                    | crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopping
-            ) {
-                return Err("running server tunnel rename is not supported".to_string());
-            }
-        }
-        let mut store = self.inner.lock().await;
-        if store.get(name).is_none() {
+        let current = {
+            let store = self.inner.lock().await;
+            store.get(name).cloned()
+        };
+        let Some(current) = current else {
             return Ok(false);
+        };
+        if self.runtime_is_active(&current) {
+            return Err("running tunnel edit is not supported; stop the tunnel first".into());
         }
         if let Some(ref nn) = new_name {
+            let store = self.inner.lock().await;
             if nn.as_str() != name && store.contains(nn.as_str()) {
                 return Err(format!(
                     "error - tunnel name '{}' already exists",
@@ -835,6 +960,10 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
                 ));
             }
         }
+        let mut definition = definition;
+        definition.runtime_state =
+            self.registry.get(current.tunnel_type).inspect(&current).runtime_state;
+        let mut store = self.inner.lock().await;
         store
             .update(name, definition, new_name.as_ref().map(TunnelName::as_str))
             .await
@@ -842,6 +971,7 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn delete(&self, name: &str) -> Result<bool, String> {
+        let _lifecycle = self.lifecycle_lock(name).await;
         if self.startup.get(name)?.is_some() {
             return Err("error - tunnel is managed by startup configuration".into());
         }
@@ -852,20 +982,12 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         let Some(definition) = definition else {
             return Ok(false);
         };
-        if definition.tunnel_type == TunnelType::Server {
-            let status = self.registry.get(TunnelType::Server).inspect(&definition);
-            if matches!(
-                status.runtime_state,
-                crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Starting
-                    | crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Running
-                    | crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopping
-            ) {
-                self.registry
-                    .get(TunnelType::Server)
-                    .stop(&definition)
-                    .await
-                    .map_err(|error| error.to_string())?;
-            }
+        if self.runtime_is_active(&definition) {
+            self.registry
+                .get(definition.tunnel_type)
+                .stop(&definition)
+                .await
+                .map_err(|error| error.to_string())?;
         }
         let identity = definition
             .raw_config
@@ -890,46 +1012,12 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn start(&self, name: &str) -> Result<String, String> {
-        if self.startup.get(name)?.is_some() {
-            return Err("startup-managed tunnel lifecycle is externally managed".into());
-        }
-        let def = {
-            let store = self.inner.lock().await;
-            store
-                .get(name)
-                .ok_or_else(|| format!("error - tunnel '{}' not found", name))?
-                .clone()
-        };
-        let def = self.prepare_server_definition(def).await?;
-        let backend = self.registry.get(def.tunnel_type);
-        match backend.start(&def).await {
-            Ok(()) => {
-                if def.tunnel_type == TunnelType::Server {
-                    let status = backend.inspect(&def);
-                    let Some(destination) = status.destination else {
-                        let _ = backend.stop(&def).await;
-                        return Ok(
-                            "error - server runtime did not publish a destination".to_string()
-                        );
-                    };
-                    let runtime_definition = def.clone();
-                    if let Err(error) =
-                        self.persist_server_public_destination(def, destination).await
-                    {
-                        let _ = backend.stop(&runtime_definition).await;
-                        return Ok(format!("error - {error}"));
-                    }
-                }
-                Ok("ok".to_string())
-            }
-            Err(BackendError::NotImplemented { tunnel_type }) => {
-                Ok(format!("error - {} not implemented", tunnel_type.as_str()))
-            }
-            Err(e) => Ok(format!("error - {e}")),
-        }
+        let _lifecycle = self.lifecycle_lock(name).await;
+        self.start_locked(name).await
     }
 
     async fn stop(&self, name: &str) -> Result<String, String> {
+        let _lifecycle = self.lifecycle_lock(name).await;
         if self.startup.get(name)?.is_some() {
             return Err("startup-managed tunnel lifecycle is externally managed".into());
         }
@@ -948,30 +1036,25 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn restart(&self, name: &str) -> Result<String, String> {
+        let _lifecycle = self.lifecycle_lock(name).await;
         if self.startup.get(name)?.is_some() {
             return Err("startup-managed tunnel lifecycle is externally managed".into());
         }
-        let def = {
+        let definition = {
             let store = self.inner.lock().await;
             store
                 .get(name)
                 .ok_or_else(|| format!("error - tunnel '{}' not found", name))?
                 .clone()
         };
-        let backend = self.registry.get(def.tunnel_type);
-        if let Err(error) = backend.stop(&def).await {
+        let backend = self.registry.get(definition.tunnel_type);
+        if let Err(error) = backend.stop(&definition).await {
             return Ok(format!("error - {error}"));
         }
-        if def.tunnel_type == TunnelType::Server {
-            return self.start(name).await;
-        }
-        match backend.start(&def).await {
-            Ok(()) => Ok("ok".to_string()),
-            Err(BackendError::NotImplemented { tunnel_type }) => {
-                Ok(format!("error - {} not implemented", tunnel_type.as_str()))
-            }
-            Err(e) => Ok(format!("error - {e}")),
-        }
+        // Reload after the exact stop. This prevents a restart from using a
+        // stale pre-edit definition and keeps the old and new generations
+        // strictly non-overlapping.
+        self.start_locked(name).await
     }
 
     fn get_backend(&self, tunnel_type: TunnelType) -> Option<Arc<dyn TunnelBackend>> {

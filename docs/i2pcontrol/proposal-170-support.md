@@ -21,6 +21,10 @@ Closed handoffs:
   `plans/closure/i2pcontrol-proposal-170/030-closure.md`
 - M031 closed: `plans/implementation/i2pcontrol-proposal-170/031-client-tunnel-runtime-backend.md`; closure:
   `plans/closure/i2pcontrol-proposal-170/031-closure.md`
+- M032 closed: `plans/implementation/i2pcontrol-proposal-170/032-server-tunnel-runtime-backend.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/032-closure.md`
+- M033 closed: `plans/implementation/i2pcontrol-proposal-170/033-tunnel-lifecycle-reconciliation.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/033-closure.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained corrective
 evidence, while M027's final disposition is historical invalidated evidence.
@@ -145,6 +149,11 @@ report running or open resources.
 Retained enabled-mode status: M022 established one runtime/durable authority for
 private, local, router, and published books, subscription/config metadata, and
 normal lookup publication.
+
+TunnelManager lifecycle reconciliation is now operational for control-plane
+generic `client` and `server` definitions. `StartOnLoad` is honored only for
+those definitions after durable state loads; startup-managed and unsupported
+definitions remain explicit non-auto-start boundaries.
 
 M028-corrected defect:
 

@@ -1,6 +1,6 @@
 # I2PControl Tunnel Backends
 
-Status: M032 client and generic server runtimes implemented; other families
+Status: M033 client/server lifecycle reconciliation implemented; other families
 remain unsupported
 
 This document describes the tunnel backend interface and registry in Emissary.
@@ -29,6 +29,8 @@ pub trait TunnelBackend: Send + Sync {
 - `stop` of an inactive definition must be safe and resource-free
 - `inspect` must return the current state without side effects
 - All methods must honor caller deadlines without blocking
+- Runtime inspection is authoritative for control-plane state; persisted
+  `StartOnLoad` is intent, not proof that a runtime is active
 
 ### Error types
 
@@ -163,6 +165,12 @@ destination material is stored only in the backend-owned secret store. Stopped
 control-plane servers retain identity across restart and rename. Running
 server rename is rejected, and delete awaits the exact runtime task before
 removing durable definition and identity state.
+
+The production manager serializes start, stop, restart, edit, rename, and
+delete per exact tunnel name. Post-load reconciliation starts only eligible
+control-plane client/server definitions with `StartOnLoad`; failures are
+isolated and leave the definition stopped. Restart stops the prior generation
+before reloading and starting the latest durable definition.
 
 ## Design rationale
 

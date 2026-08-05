@@ -1,11 +1,12 @@
 # Proposal 170 AddressBook Administrative API
 
-Status: partial Proposal 170 support; M030 closure accepted
+Status: partial Proposal 170 support; M034 implementation accepted
 
 Historical corrective implementation:
 
 - M028, `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 - M030, `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md`
+- M034, `plans/implementation/i2pcontrol-proposal-170/034-addressbook-setter-truthfulness.md`
 
 The enabled-mode Proposal 170 wire, mutation, source, and persistence behavior
 implemented by M022 remains retained evidence. M028 corrected the narrower
@@ -20,7 +21,9 @@ and lookup coherence and independently closed this AddressBook dimension.
 ## Overview
 
 The AddressBook API provides administrative management of four independent
-address books, a subscription set, and a configuration map.
+address books, a live subscription source set, and a read-only configuration
+view. Configuration mutation is intentionally empty-set-only until Emissary
+has a safe live owner for another field.
 
 When I2PControl is enabled, successful entry mutations must be committed by one
 runtime control owner and immediately visible to normal destination lookup.
@@ -58,7 +61,7 @@ added or replaced.
 
 ```json
 {"SetSubscriptions": ["https://example.i2p/hosts.txt"]}
-{"SetConfig": {"updateInterval": "3600"}}
+{"SetConfig": {}}
 ```
 
 These modes are handled inside `AddressBook`; they are not separate canonical
@@ -89,20 +92,39 @@ Operations:
 
 Compatibility forms do not count as canonical Proposal 170 coverage.
 
-### Compatibility SetSubscriptions
+### SetSubscriptions
 
-The compatibility method atomically replaces the stored subscription set.
-Subscriptions are not fetched synchronously by this API.
+`SetSubscriptions` replaces the complete bounded source set used by the active
+AddressBook downloader. The manager accepts one bounded command at a time and
+coalesces refresh work to the newest complete generation. A successful result
+means the active source set and durable control state were both updated and one
+refresh was accepted; remote download success is not part of the setter's
+success condition. If the downloader is unavailable, the request fails and the
+previous set remains active and durable.
 
 Bounds:
 
 - maximum 1000 subscriptions;
 - maximum 2048 bytes per URL.
+- URLs must be HTTP or HTTPS URLs with a host;
+- aggregate subscription text is bounded to 4 MiB.
 
-### Compatibility SetConfig
+### SetConfig
 
-The compatibility method atomically replaces the configuration metadata.
-Values are inert strings and never choose files.
+The production supported configuration-key set is empty. An empty object is a
+successful no-op. Every non-empty key is rejected before persistence:
+
+| Proposal 170 key class | Keys | Result |
+|---|---|---|
+| Request-selected path | `subscriptions`, `published_addressbook`, `router_addressbook`, `local_addressbook`, `private_addressbook`, `etags`, `last_modified`, `log` | Invalid parameters |
+| No live Emissary owner | `update_delay`, `proxy_port`, `proxy_host`, `should_publish`, `theme` | Unsupported operation |
+| Unknown/future key | any other key | Unsupported operation |
+
+The table is exhaustive against the pinned Proposal 170 key inventory. Emissary
+does not accept arbitrary filesystem paths, proxy changes, scheduler changes,
+publication toggles, or UI settings through this API. Legacy inert configuration
+metadata is discarded during enabled-mode migration rather than treated as
+operational.
 
 Bounds:
 
@@ -180,7 +202,9 @@ M030 revalidated it against the frozen final repository head.
 - Full destinations, subscriptions, configuration values, and raw state are not
   logged.
 - Input cannot select arbitrary filesystem paths.
-- Path-like configuration values are inert.
+- Request-selected configuration paths are rejected before persistence.
+- Subscription commands are capacity-bounded; no request creates a detached
+  refresh task or an unbounded queue.
 - State and response sizes are bounded.
 - Failed publication leaves the prior state.
 - Disabled/default execution must not be influenced by stale, corrupt, or
@@ -198,8 +222,9 @@ M030 revalidated it against the frozen final repository head.
 | I2PControl re-enabled | retained current/backup control state | control owner | restore enabled-mode authority |
 
 I2PControl must receive only the dedicated bounded control handle. It must not
-replace the resolver, control downloader task lifecycles, or write arbitrary
-paths.
+replace the resolver, create a second downloader authority, or write arbitrary
+paths. The original AddressBook module contains no JSON-RPC policy or request
+DTOs.
 
 ## Closure rule
 

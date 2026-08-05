@@ -25,6 +25,8 @@ Closed handoffs:
   `plans/closure/i2pcontrol-proposal-170/032-closure.md`
 - M033 closed: `plans/implementation/i2pcontrol-proposal-170/033-tunnel-lifecycle-reconciliation.md`; closure:
   `plans/closure/i2pcontrol-proposal-170/033-closure.md`
+- M034 implemented: `plans/implementation/i2pcontrol-proposal-170/034-addressbook-setter-truthfulness.md`; disposition:
+  `plans/closure/i2pcontrol-proposal-170/034-implementation-disposition.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained corrective
 evidence, while M027's final disposition is historical invalidated evidence.
@@ -57,7 +59,8 @@ Proposal 170 support.
 
 M028 owns the status/feature-boundary correction. M030 owns the destination
 authority, lookup precedence, bounded import/repair, and independent final-head
-review.
+review. M034 owns live subscription replacement, bounded refresh control, and
+truthful configuration rejection.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because 26 of the 43 RouterInfo additions lack
@@ -147,8 +150,21 @@ report running or open resources.
 ## AddressBook
 
 Retained enabled-mode status: M022 established one runtime/durable authority for
-private, local, router, and published books, subscription/config metadata, and
-normal lookup publication.
+private, local, router, and published books and normal lookup publication. M034
+replaces the former inert subscription/configuration setter behavior.
+
+M034 additionally proves:
+
+- `SetSubscriptions` reaches the active downloader through one bounded typed
+  command seam and publishes complete generations durably;
+- restart restores the last accepted source set;
+- queue/unavailable and concurrent replacement behavior preserves complete
+  prior-or-new generations;
+- URL/count/aggregate bounds are enforced before mutation;
+- every pinned `SetConfig` key has an explicit path/unsupported disposition;
+- non-empty configuration requests never persist or report success;
+- disabled/default execution still does not construct or consult the control
+  command seam.
 
 TunnelManager lifecycle reconciliation is now operational for control-plane
 generic `client` and `server` definitions. `StartOnLoad` is honored only for
@@ -231,6 +247,7 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M028 | closed for implementation | post-M027 status repair and AddressBook compile/runtime feature isolation |
 | M029 | historical invalidated closure | retained non-AddressBook evidence |
 | M030 | closed; partial Proposal 170 support | AddressBook destination/lookup coherence and final-head review |
+| M034 | implemented; closure pending | AddressBook setter truthfulness and runtime subscription control |
 
 ## Final-status rule
 

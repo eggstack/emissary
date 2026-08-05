@@ -372,6 +372,7 @@ impl ProductionAddressBookControl {
 
         let destinations = self.runtime.legacy_destinations().await?;
         if self.runtime.runtime_authority_present() {
+            self.runtime.runtime_clear_unsupported_configuration().await?;
             return self.runtime.repair_published_runtime_state(destinations).await;
         }
 
@@ -402,7 +403,6 @@ impl ProductionAddressBookControl {
             }
         }
         snapshot.subscriptions = store.subscriptions().as_slice().to_vec();
-        snapshot.configuration = store.configuration().as_map().clone();
         self.runtime.import_legacy_runtime_state(snapshot, destinations).await
     }
 }
@@ -1405,6 +1405,60 @@ mod tests {
             control.runtime_list(RuntimeAddressBookType::Private).await.unwrap().len(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn production_setters_do_not_report_inert_success() {
+        use crate::i2pcontrol::control_plane::AddressBookControl;
+
+        let base = tempfile::tempdir().unwrap().keep();
+        let manager = AddressBookManager::new_with_control_owner(
+            base.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+        let adapter = ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"));
+
+        let mut config = AddressBookConfiguration::new();
+        config.insert("private_addressbook".to_string(), "chosen-by-request".to_string());
+        assert!(adapter.set_configuration(config).await.is_err());
+        assert!(control.runtime_configuration().await.unwrap().is_empty());
+
+        let subscriptions = SubscriptionSet::from_vec(vec![
+            "https://example.i2p/hosts.txt".to_string(),
+        ]);
+        assert!(adapter.set_subscriptions(subscriptions).await.is_err());
+        assert!(control.runtime_subscriptions().await.unwrap().is_empty());
+        assert!(!control.runtime_authority_present());
+    }
+
+    #[tokio::test]
+    async fn legacy_configuration_is_not_promoted_into_runtime_owner() {
+        let base = tempfile::tempdir().unwrap().keep();
+        let legacy_dir = base.join("addressbooks");
+        let mut legacy = AddressBookStore::new(legacy_dir.clone(), 1024 * 1024);
+        let mut configuration = AddressBookConfiguration::new();
+        configuration.insert("theme".to_string(), "light".to_string());
+        legacy.set_configuration(configuration).await.unwrap();
+
+        let manager = AddressBookManager::new_with_control_owner(
+            base,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+        ProductionAddressBookControl::new(control.clone(), legacy_dir)
+            .load()
+            .await
+            .unwrap();
+        assert!(control.runtime_configuration().await.unwrap().is_empty());
     }
 
     #[tokio::test]

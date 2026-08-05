@@ -83,6 +83,27 @@ const MAX_CONFIG_VALUE_LENGTH: usize = 4096;
 /// Maximum length of a hostname.
 const MAX_HOSTNAME_LENGTH: usize = 254;
 
+/// Proposal 170's complete AddressBook configuration-key inventory. Every key
+/// is classified explicitly so unknown or future keys cannot be retained as
+/// inert metadata.
+const CONFIG_PATH_KEYS: &[&str] = &[
+    "subscriptions",
+    "published_addressbook",
+    "router_addressbook",
+    "local_addressbook",
+    "private_addressbook",
+    "etags",
+    "last_modified",
+    "log",
+];
+const CONFIG_UNSUPPORTED_KEYS: &[&str] = &[
+    "update_delay",
+    "proxy_port",
+    "proxy_host",
+    "should_publish",
+    "theme",
+];
+
 /// AddressBook handler.
 pub(crate) async fn handle_address_book(
     state: &I2pControlState,
@@ -226,6 +247,9 @@ async fn handle_canonical_address_book(
             Ok(value) => value,
             Err(message) => return error_response(id, rpc::error_codes::INVALID_PARAMS, message),
         };
+        if let Err(error) = validate_configuration_disposition(&configuration) {
+            return configuration_error_response(id, error);
+        }
         return match state.address_book_set_configuration(configuration).await {
             Ok(()) => success_response(
                 id,
@@ -605,6 +629,7 @@ fn parse_subscriptions(value: &serde_json::Value) -> Result<SubscriptionSet, Str
         ));
     }
 
+    let mut total_bytes = 0usize;
     let mut subscriptions = SubscriptionSet::new();
     for (i, item) in subs_array.iter().enumerate() {
         let url = item.as_str().ok_or_else(|| format!("Subscription {} is not a string", i))?;
@@ -617,7 +642,21 @@ fn parse_subscriptions(value: &serde_json::Value) -> Result<SubscriptionSet, Str
         if url.chars().any(|c| c.is_control()) {
             return Err(format!("Subscription {} contains control characters", i));
         }
+        let parsed =
+            url::Url::parse(url).map_err(|_| format!("Subscription {} is not a valid URL", i))?;
+        if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+            return Err(format!(
+                "Subscription {} must be an HTTP or HTTPS URL with a host",
+                i
+            ));
+        }
+        total_bytes = total_bytes
+            .checked_add(url.len())
+            .ok_or_else(|| "Subscription set exceeds its size limit".to_string())?;
         subscriptions.push(url.to_string());
+    }
+    if total_bytes > 4 * 1024 * 1024 {
+        return Err("Subscription set exceeds its size limit".to_string());
     }
     Ok(subscriptions)
 }
@@ -661,6 +700,45 @@ fn parse_configuration(value: &serde_json::Value) -> Result<AddressBookConfigura
     Ok(configuration)
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ConfigurationDispositionError {
+    RequestPath(String),
+    Unsupported(String),
+}
+
+fn validate_configuration_disposition(
+    configuration: &AddressBookConfiguration,
+) -> Result<(), ConfigurationDispositionError> {
+    for key in configuration.as_map().keys() {
+        if CONFIG_PATH_KEYS.contains(&key.as_str()) {
+            return Err(ConfigurationDispositionError::RequestPath(key.clone()));
+        }
+        if CONFIG_UNSUPPORTED_KEYS.contains(&key.as_str()) {
+            return Err(ConfigurationDispositionError::Unsupported(key.clone()));
+        }
+        return Err(ConfigurationDispositionError::Unsupported(key.clone()));
+    }
+    Ok(())
+}
+
+fn configuration_error_response(
+    id: RequestId,
+    error: ConfigurationDispositionError,
+) -> serde_json::Value {
+    match error {
+        ConfigurationDispositionError::RequestPath(key) => error_response(
+            id,
+            rpc::error_codes::INVALID_PARAMS,
+            format!("Configuration key '{key}' is a request-selected path and is not accepted"),
+        ),
+        ConfigurationDispositionError::Unsupported(key) => error_response(
+            id,
+            rpc::error_codes::APP_ERROR,
+            format!("AddressBook configuration key '{key}' is unsupported"),
+        ),
+    }
+}
+
 /// Handle SetSubscriptions method: replace the subscription set.
 pub(crate) async fn handle_set_subscriptions(
     state: &I2pControlState,
@@ -675,10 +753,12 @@ pub(crate) async fn handle_set_subscriptions(
         }
     };
 
-    // Extract subscriptions array
-    let subs_array = match params.get("subscriptions") {
-        Some(serde_json::Value::Array(arr)) => arr,
-        _ => {
+    let subscriptions = match params.get("subscriptions") {
+        Some(value) => match parse_subscriptions(value) {
+            Ok(subscriptions) => subscriptions,
+            Err(message) => return error_response(id, rpc::error_codes::INVALID_PARAMS, message),
+        },
+        None => {
             return error_response(
                 id,
                 rpc::error_codes::INVALID_PARAMS,
@@ -686,51 +766,6 @@ pub(crate) async fn handle_set_subscriptions(
             );
         }
     };
-
-    // Validate bounds
-    if subs_array.len() > MAX_SUBSCRIPTIONS {
-        return error_response(
-            id,
-            rpc::error_codes::INVALID_PARAMS,
-            format!("Too many subscriptions; maximum is {}", MAX_SUBSCRIPTIONS),
-        );
-    }
-
-    let mut subscriptions = SubscriptionSet::new();
-    for (i, item) in subs_array.iter().enumerate() {
-        let url = match item.as_str() {
-            Some(s) => s,
-            None => {
-                return error_response(
-                    id,
-                    rpc::error_codes::INVALID_PARAMS,
-                    format!("Subscription {} is not a string", i),
-                );
-            }
-        };
-
-        if url.len() > MAX_SUBSCRIPTION_LENGTH {
-            return error_response(
-                id,
-                rpc::error_codes::INVALID_PARAMS,
-                format!(
-                    "Subscription {} exceeds maximum length of {}",
-                    i, MAX_SUBSCRIPTION_LENGTH
-                ),
-            );
-        }
-
-        // Reject control characters
-        if url.chars().any(|c| c.is_control()) {
-            return error_response(
-                id,
-                rpc::error_codes::INVALID_PARAMS,
-                format!("Subscription {} contains control characters", i),
-            );
-        }
-
-        subscriptions.push(url.to_string());
-    }
 
     match state.address_book_set_subscriptions(subscriptions).await {
         Ok(()) => success_response(id, serde_json::json!("ok")),
@@ -828,6 +863,10 @@ pub(crate) async fn handle_set_config(
         }
 
         configuration.insert(key.clone(), val_str.to_string());
+    }
+
+    if let Err(error) = validate_configuration_disposition(&configuration) {
+        return configuration_error_response(id, error);
     }
 
     match state.address_book_set_configuration(configuration).await {
@@ -1224,7 +1263,7 @@ mod tests {
             }),
         );
         let resp = handle_address_book(&state, &config).await;
-        assert_eq!(resp["result"]["success"], true);
+        assert_eq!(resp["error"]["code"], -1);
     }
 
     #[tokio::test]
@@ -1543,17 +1582,28 @@ mod tests {
         assert_eq!(resp["error"]["code"], -32602);
     }
 
+    #[tokio::test]
+    async fn handler_set_subscriptions_invalid_url() {
+        let state = test_state();
+        let req = ab_request(
+            "SetSubscriptions",
+            serde_json::json!({"subscriptions": ["not-a-url"]}),
+        );
+        let resp = handle_set_subscriptions(&state, &req).await;
+        assert_eq!(resp["error"]["code"], -32602);
+    }
+
     // --- SetConfig handler tests ---
 
     #[tokio::test]
-    async fn handler_set_config_success() {
+    async fn handler_set_config_unsupported_key() {
         let state = test_state();
         let req = ab_request(
             "SetConfig",
             serde_json::json!({"config": {"mode": "aggressive", "level": "3"}}),
         );
         let resp = handle_set_config(&state, &req).await;
-        assert_eq!(resp["result"], "ok");
+        assert_eq!(resp["error"]["code"], -1);
     }
 
     #[tokio::test]
@@ -1562,6 +1612,52 @@ mod tests {
         let req = ab_request("SetConfig", serde_json::json!({"config": {}}));
         let resp = handle_set_config(&state, &req).await;
         assert_eq!(resp["result"], "ok");
+    }
+
+    #[tokio::test]
+    async fn set_config_path_keys_are_rejected() {
+        for key in CONFIG_PATH_KEYS {
+            let state = test_state();
+            let req = ab_request(
+                "SetConfig",
+                serde_json::json!({"config": {*key: "chosen-by-request"}}),
+            );
+            let resp = handle_set_config(&state, &req).await;
+            assert_eq!(resp["error"]["code"], -32602, "key: {key}");
+            assert!(state.address_book_configuration().await.unwrap().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn set_config_unsupported_keys_do_not_persist() {
+        for key in CONFIG_UNSUPPORTED_KEYS.iter().chain(["future_key"].iter()) {
+            let state = test_state();
+            let req = ab_request("SetConfig", serde_json::json!({"config": {*key: "value"}}));
+            let resp = handle_set_config(&state, &req).await;
+            assert_eq!(resp["error"]["code"], -1, "key: {key}");
+            assert!(state.address_book_configuration().await.unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn proposal_config_key_disposition_is_exhaustive() {
+        assert_eq!(CONFIG_PATH_KEYS.len() + CONFIG_UNSUPPORTED_KEYS.len(), 13);
+        for key in CONFIG_PATH_KEYS {
+            assert!(matches!(
+                validate_configuration_disposition(&AddressBookConfiguration::from_map(
+                    std::collections::BTreeMap::from([(key.to_string(), "value".to_string())])
+                )),
+                Err(ConfigurationDispositionError::RequestPath(_))
+            ));
+        }
+        for key in CONFIG_UNSUPPORTED_KEYS {
+            assert!(matches!(
+                validate_configuration_disposition(&AddressBookConfiguration::from_map(
+                    std::collections::BTreeMap::from([(key.to_string(), "value".to_string())])
+                )),
+                Err(ConfigurationDispositionError::Unsupported(_))
+            ));
+        }
     }
 
     #[tokio::test]

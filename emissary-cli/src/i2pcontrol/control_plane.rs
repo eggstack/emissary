@@ -61,7 +61,8 @@ pub trait ControlPlane: Send + Sync {
 ///
 /// - Only one administrative book is mutated per operation.
 /// - All four books remain independent across operations.
-/// - Success means durable commit; failure leaves prior state active.
+/// - Address-book entry success means durable commit; subscription success means the composed
+///   downloader accepted a complete replacement and durable publication.
 /// - Production mutations use the composed runtime address-book owner rather than a disconnected
 ///   administrative shadow.
 /// - No implementation writes to `router.toml`, fetches subscriptions, or accepts request-selected
@@ -117,13 +118,16 @@ pub trait AddressBookControl: Send + Sync {
     /// Get the current subscription set.
     async fn subscriptions(&self) -> Result<SubscriptionSet, String>;
 
-    /// Replace the subscription set atomically.
+    /// Replace the active downloader subscription set and publish it durably.
     async fn set_subscriptions(&self, subscriptions: SubscriptionSet) -> Result<(), String>;
 
     /// Get the current address book configuration.
     async fn configuration(&self) -> Result<AddressBookConfiguration, String>;
 
     /// Set the address book configuration atomically.
+    ///
+    /// Production currently supports the empty set only. Non-empty Proposal 170 configuration
+    /// keys must be rejected before persistence unless a live Emissary owner is added.
     async fn set_configuration(
         &self,
         configuration: AddressBookConfiguration,

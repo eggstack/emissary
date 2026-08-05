@@ -49,6 +49,9 @@ use std::collections::BTreeMap;
 #[cfg(feature = "i2pcontrol")]
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(feature = "i2pcontrol")]
+use tokio::sync::mpsc;
+
 /// Logging target for the file
 const LOG_TARGET: &str = "emissary::address-book";
 
@@ -57,6 +60,13 @@ const RETRY_BACKOFF: Duration = Duration::from_secs(30);
 
 /// How many times each subscription is tried before giving up.
 const SUBSCRIPTION_NUM_RETRIES: usize = 5usize;
+
+#[cfg(feature = "i2pcontrol")]
+const MAX_RUNTIME_SUBSCRIPTIONS: usize = 1000;
+#[cfg(feature = "i2pcontrol")]
+const MAX_RUNTIME_SUBSCRIPTION_LENGTH: usize = 2048;
+#[cfg(feature = "i2pcontrol")]
+const MAX_RUNTIME_SUBSCRIPTION_BYTES: usize = 4 * 1024 * 1024;
 
 #[cfg(feature = "i2pcontrol")]
 const MAX_LEGACY_DESTINATION_ENTRIES: usize = 10_000;
@@ -383,14 +393,11 @@ impl RuntimeAddressBookOwner {
         if !legacy.subscriptions.is_empty() {
             merged.subscriptions = legacy.subscriptions;
         }
-        if !legacy.configuration.is_empty() {
-            merged.configuration = legacy.configuration;
-        }
+        // Proposal 170 configuration has no live Emissary owner. Do not
+        // promote historical inert metadata into the runtime authority.
+        merged.configuration.clear();
         for (hostname, entry) in &destinations {
-            merged
-                .published
-                .entry(hostname.clone())
-                .or_insert_with(|| entry.clone());
+            merged.published.entry(hostname.clone()).or_insert_with(|| entry.clone());
         }
         repair_published_entries(&mut merged, &destinations)?;
         validate_runtime_snapshot(&merged)?;
@@ -438,6 +445,154 @@ impl RuntimeAddressBookOwner {
             *self.state.write() = state;
             self.authority_present.store(true, Ordering::Release);
             self.rebuild_runtime_indexes();
+        }
+    }
+}
+
+#[cfg(feature = "i2pcontrol")]
+/// One bounded command sent to the live address-book manager.
+struct RuntimeSubscriptionCommand {
+    subscriptions: Vec<String>,
+    response: oneshot::Sender<Result<(), String>>,
+}
+
+#[cfg(feature = "i2pcontrol")]
+/// The only live control seam for changing the downloader's subscription set.
+///
+/// The channel is deliberately bounded to one command. The manager coalesces
+/// refresh work to the newest complete generation while each caller receives
+/// the result of its own durable/active generation change.
+struct RuntimeSubscriptionControl {
+    sender: mpsc::Sender<RuntimeSubscriptionCommand>,
+    active: RwLock<Vec<String>>,
+    started: AtomicBool,
+}
+
+#[cfg(feature = "i2pcontrol")]
+#[derive(Clone)]
+struct RuntimeRefreshContext {
+    address_book_path: PathBuf,
+    addresses: Arc<RwLock<HashMap<String, String>>>,
+    owner: Arc<RuntimeAddressBookOwner>,
+}
+
+#[cfg(feature = "i2pcontrol")]
+fn validate_runtime_subscriptions(subscriptions: &[String]) -> Result<(), String> {
+    if subscriptions.len() > MAX_RUNTIME_SUBSCRIPTIONS {
+        return Err(format!(
+            "too many subscriptions; maximum is {MAX_RUNTIME_SUBSCRIPTIONS}"
+        ));
+    }
+
+    let mut total_bytes = 0usize;
+    for subscription in subscriptions {
+        if subscription.len() > MAX_RUNTIME_SUBSCRIPTION_LENGTH {
+            return Err("subscription exceeds its length limit".to_string());
+        }
+        if subscription.chars().any(|character| character.is_control()) {
+            return Err("subscription contains control characters".to_string());
+        }
+        let parsed = url::Url::parse(subscription)
+            .map_err(|_| "subscription is not a valid URL".to_string())?;
+        if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+            return Err("subscription must be an HTTP or HTTPS URL with a host".to_string());
+        }
+        total_bytes = total_bytes
+            .checked_add(subscription.len())
+            .ok_or_else(|| "subscription set exceeds its size limit".to_string())?;
+    }
+    if total_bytes > MAX_RUNTIME_SUBSCRIPTION_BYTES {
+        return Err("subscription set exceeds its size limit".to_string());
+    }
+    Ok(())
+}
+
+#[cfg(feature = "i2pcontrol")]
+impl RuntimeRefreshContext {
+    async fn save_to_disk(&self, addresses: HashMap<String, (String, String)>) {
+        let persisted_addresses = addresses.clone();
+        let (addresses, destinations): (HashMap<_, _>, HashMap<_, _>) = addresses
+            .into_iter()
+            .map(|(hostname, (base32, base64))| ((hostname.clone(), base32), (hostname, base64)))
+            .unzip();
+
+        {
+            let base32_addresses = {
+                let mut inner = self.addresses.write();
+                inner.extend(addresses);
+                inner
+                    .iter()
+                    .map(|(hostname, address)| format!("{hostname}={address}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            if let Err(error) =
+                tokio::fs::write(self.address_book_path.join("addresses"), base32_addresses).await
+            {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    ?error,
+                    "failed to write base32 addresses to disk",
+                );
+            }
+        }
+
+        match tokio::fs::create_dir_all(self.address_book_path.join("destinations")).await {
+            Err(error) => tracing::warn!(
+                target: LOG_TARGET,
+                ?error,
+                "failed to create directory for destinations",
+            ),
+            Ok(_) => {
+                for (hostname, destination) in destinations {
+                    if let Err(error) = tokio::fs::write(
+                        self.address_book_path.join("destinations").join(format!("{hostname}.txt")),
+                        destination,
+                    )
+                    .await
+                    {
+                        tracing::warn!(
+                            target: LOG_TARGET,
+                            %hostname,
+                            ?error,
+                            "failed to store destination to disk",
+                        );
+                    }
+                }
+            }
+        }
+
+        self.owner.merge_downloaded(persisted_addresses).await;
+    }
+
+    async fn refresh(
+        &self,
+        client: &Client,
+        addresses: &mut HashMap<String, (String, String)>,
+        host_modified_times: &mut HashMap<String, Modified>,
+        subscriptions: &[String],
+    ) {
+        for subscription in subscriptions {
+            AddressBookManager::download_with_retries(
+                subscription,
+                client,
+                addresses,
+                host_modified_times,
+            )
+            .await;
+        }
+        self.save_to_disk(std::mem::take(addresses)).await;
+        let path = self.address_book_path.join("host_modified_times");
+        let modified = HostModified::from(host_modified_times.clone());
+        match toml::to_string(&modified) {
+            Ok(raw) => {
+                if let Err(error) = tokio::fs::write(path, raw).await {
+                    tracing::warn!(target: LOG_TARGET, ?error, "could not write host_modified_times");
+                }
+            }
+            Err(error) => {
+                tracing::warn!(target: LOG_TARGET, ?error, "could not serialize host_modified_times");
+            }
         }
     }
 }
@@ -688,6 +843,14 @@ pub struct AddressBookManager {
     /// runtime-enabled I2PControl composition path.
     #[cfg(feature = "i2pcontrol")]
     owner: Option<Arc<RuntimeAddressBookOwner>>,
+
+    /// Receiver for the one bounded live subscription command seam.
+    #[cfg(feature = "i2pcontrol")]
+    subscription_receiver: Option<mpsc::Receiver<RuntimeSubscriptionCommand>>,
+
+    /// Shared state exposed to the administrative adapter.
+    #[cfg(feature = "i2pcontrol")]
+    subscription_control: Option<Arc<RuntimeSubscriptionControl>>,
 }
 
 impl AddressBookManager {
@@ -715,6 +878,12 @@ impl AddressBookManager {
             subscriptions.clone(),
         )
         .await;
+        let (sender, receiver) = mpsc::channel(1);
+        let subscription_control = Arc::new(RuntimeSubscriptionControl {
+            sender,
+            active: RwLock::new(owner.snapshot().subscriptions.clone()),
+            started: AtomicBool::new(false),
+        });
 
         Self {
             address_book_path: path,
@@ -723,6 +892,8 @@ impl AddressBookManager {
             serialized,
             subscriptions,
             owner: Some(owner),
+            subscription_receiver: Some(receiver),
+            subscription_control: Some(subscription_control),
         }
     }
 
@@ -748,6 +919,8 @@ impl AddressBookManager {
             serialized,
             subscriptions,
             owner,
+            subscription_receiver: None,
+            subscription_control: None,
         }
     }
 
@@ -804,11 +977,15 @@ impl AddressBookManager {
     /// Get the dedicated Proposal 170 control handle, if runtime control is active.
     #[cfg(feature = "i2pcontrol")]
     pub fn control_handle(&self) -> Option<Arc<RuntimeAddressBookHandle>> {
-        self.owner.as_ref().map(|owner| {
-            Arc::new(RuntimeAddressBookHandle {
-                owner: Arc::clone(owner),
+        self.owner
+            .as_ref()
+            .zip(self.subscription_control.as_ref())
+            .map(|(owner, control)| {
+                Arc::new(RuntimeAddressBookHandle {
+                    owner: Arc::clone(owner),
+                    subscription_control: Arc::clone(control),
+                })
             })
-        })
     }
 
     /// Attempt to download `hosts.txt` from `url`.
@@ -902,8 +1079,16 @@ impl AddressBookManager {
     /// `addresses`.
     ///
     /// Addresses already present in `addresses` will be ignored.
+    #[allow(dead_code)]
     async fn parse_and_merge(
         &self,
+        addresses: &mut HashMap<String, (String, String)>,
+        hosts: String,
+    ) {
+        Self::parse_and_merge_impl(addresses, hosts).await;
+    }
+
+    async fn parse_and_merge_impl(
         addresses: &mut HashMap<String, (String, String)>,
         hosts: String,
     ) {
@@ -1021,8 +1206,9 @@ impl AddressBookManager {
     ///
     /// Before the address book subscription download starts, [`AddressBook`] waits on
     /// `http_proxy_ready_rx` which the HTTP proxy sends a signal to once it's ready.
+    #[allow(unused_mut)]
     pub async fn run(
-        self,
+        mut self,
         http_port: u16,
         http_host: String,
         http_proxy_ready_rx: oneshot::Receiver<()>,
@@ -1036,11 +1222,24 @@ impl AddressBookManager {
             return;
         }
 
+        #[cfg(feature = "i2pcontrol")]
+        let subscriptions = self.owner.as_ref().map_or_else(
+            || self.subscriptions.clone(),
+            |owner| owner.snapshot().subscriptions,
+        );
+        #[cfg(not(feature = "i2pcontrol"))]
+        let subscriptions = self.subscriptions.clone();
+
+        #[cfg(feature = "i2pcontrol")]
+        if let Some(control) = &self.subscription_control {
+            *control.active.write() = subscriptions.clone();
+        }
+
         tracing::info!(
             target: LOG_TARGET,
             ?http_port,
             ?http_host,
-            subscriptions = ?self.subscriptions,
+            subscriptions = ?subscriptions,
             "create address book",
         );
 
@@ -1054,7 +1253,7 @@ impl AddressBookManager {
         let mut host_modified_times = self.load_host_modified_times().await;
 
         if let Some(url) = &self.hosts_url {
-            self.download_with_retries(url, &client, &mut addresses, &mut host_modified_times)
+            Self::download_with_retries(url, &client, &mut addresses, &mut host_modified_times)
                 .await;
 
             // save hosts to disk at this point as subscriptions might contain .i2p addresses
@@ -1067,8 +1266,8 @@ impl AddressBookManager {
             );
         };
 
-        for subscription in &self.subscriptions {
-            self.download_with_retries(
+        for subscription in &subscriptions {
+            Self::download_with_retries(
                 subscription,
                 &client,
                 &mut addresses,
@@ -1079,11 +1278,126 @@ impl AddressBookManager {
 
         self.save_to_disk(addresses).await;
         self.save_host_modified_times(host_modified_times).await;
+
+        #[cfg(feature = "i2pcontrol")]
+        if let (Some(control), Some(receiver)) = (
+            self.subscription_control.as_ref(),
+            self.subscription_receiver.take(),
+        ) {
+            control.started.store(true, Ordering::Release);
+            self.run_subscription_control(client, receiver).await;
+            control.started.store(false, Ordering::Release);
+        }
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    async fn run_subscription_control(
+        &self,
+        client: Client,
+        mut receiver: mpsc::Receiver<RuntimeSubscriptionCommand>,
+    ) {
+        let context = RuntimeRefreshContext {
+            address_book_path: self.address_book_path.clone(),
+            addresses: Arc::clone(&self.addresses),
+            owner: Arc::clone(self.owner.as_ref().expect("control owner is present")),
+        };
+        let (refresh_sender, mut refresh_receiver) = mpsc::channel::<Vec<String>>(1);
+        let (done_sender, mut done_receiver) = mpsc::channel(1);
+        let worker_context = context.clone();
+        let worker = tokio::spawn(async move {
+            let mut addresses = HashMap::new();
+            let mut host_modified_times = {
+                let path = worker_context.address_book_path.join("host_modified_times");
+                match tokio::fs::read_to_string(path).await {
+                    Ok(raw) => {
+                        toml::from_str::<HostModified>(&raw).map(Into::into).unwrap_or_default()
+                    }
+                    Err(_) => HashMap::new(),
+                }
+            };
+            while let Some(subscriptions) = refresh_receiver.recv().await {
+                worker_context
+                    .refresh(
+                        &client,
+                        &mut addresses,
+                        &mut host_modified_times,
+                        &subscriptions,
+                    )
+                    .await;
+                if done_sender.send(()).await.is_err() {
+                    break;
+                }
+            }
+        });
+
+        let mut refresh_busy = false;
+        let mut pending_refresh = None;
+
+        loop {
+            tokio::select! {
+                command = receiver.recv() => {
+                    let Some(command) = command else { break };
+                    let subscriptions = command.subscriptions;
+                    let result = self.commit_subscription_command(&subscriptions).await;
+                    if result.is_ok() {
+                        if refresh_busy {
+                            pending_refresh = Some(subscriptions);
+                        } else {
+                            match refresh_sender.try_send(subscriptions) {
+                                Ok(()) => refresh_busy = true,
+                                Err(mpsc::error::TrySendError::Full(subscriptions)) => {
+                                    pending_refresh = Some(subscriptions);
+                                    refresh_busy = true;
+                                }
+                                Err(mpsc::error::TrySendError::Closed(_)) => {
+                                    let _ = command.response.send(Err(
+                                        "address book refresh worker was unavailable".to_string(),
+                                    ));
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    let _ = command.response.send(result);
+                }
+                done = done_receiver.recv(), if refresh_busy => {
+                    if done.is_none() {
+                        break;
+                    }
+                    refresh_busy = false;
+                    if let Some(subscriptions) = pending_refresh.take() {
+                        if refresh_sender.send(subscriptions).await.is_err() {
+                            break;
+                        }
+                        refresh_busy = true;
+                    }
+                }
+            }
+        }
+
+        worker.abort();
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    async fn commit_subscription_command(&self, subscriptions: &[String]) -> Result<(), String> {
+        validate_runtime_subscriptions(subscriptions)?;
+        let Some(owner) = self.owner.as_ref() else {
+            return Err("address book downloader is unavailable".to_string());
+        };
+        owner
+            .mutate(|state| {
+                state.subscriptions = subscriptions.to_vec();
+                Ok(())
+            })
+            .await?;
+        if let Some(control) = &self.subscription_control {
+            *control.active.write() = subscriptions.to_vec();
+        }
+        Ok(())
     }
 
     /// A wrapper around `Self::download` which deals with retries, logging, etc.
     async fn download_with_retries(
-        &self,
         url: &String,
         client: &Client,
         addresses: &mut HashMap<String, (String, String)>,
@@ -1105,7 +1419,7 @@ impl AddressBookManager {
                         %url,
                         "hosts.txt downloaded",
                     );
-                    self.parse_and_merge(addresses, body).await;
+                    Self::parse_and_merge_impl(addresses, body).await;
                     host_modified_times.insert(url.to_string(), modified);
                     break;
                 }
@@ -1217,6 +1531,7 @@ pub struct AddressBookHandle {
 #[derive(Clone)]
 pub struct RuntimeAddressBookHandle {
     owner: Arc<RuntimeAddressBookOwner>,
+    subscription_control: Arc<RuntimeSubscriptionControl>,
 }
 
 #[cfg(feature = "i2pcontrol")]
@@ -1328,17 +1643,34 @@ impl RuntimeAddressBookHandle {
         Ok(self.owner.state.read().subscriptions.clone())
     }
 
-    /// Replace stored subscription metadata without fetching anything.
+    /// Return the source set currently held by the live downloader.
+    #[allow(dead_code)]
+    pub fn runtime_active_subscriptions(&self) -> Vec<String> {
+        self.subscription_control.active.read().clone()
+    }
+
+    /// Replace the active downloader source set and publish it durably through
+    /// the manager's bounded command seam.
     pub async fn runtime_set_subscriptions(
         &self,
         subscriptions: Vec<String>,
     ) -> Result<(), String> {
-        self.owner
-            .mutate(|state| {
-                state.subscriptions = subscriptions;
-                Ok(())
+        validate_runtime_subscriptions(&subscriptions)?;
+        if !self.subscription_control.started.load(Ordering::Acquire) {
+            return Err("address book downloader is unavailable".to_string());
+        }
+        let (response, result) = oneshot::channel();
+        self.subscription_control
+            .sender
+            .send(RuntimeSubscriptionCommand {
+                subscriptions,
+                response,
             })
             .await
+            .map_err(|_| "address book subscription command was unavailable".to_string())?;
+        result
+            .await
+            .map_err(|_| "address book subscription command was cancelled".to_string())?
     }
 
     /// Read stored non-operative address-book configuration metadata.
@@ -1351,9 +1683,20 @@ impl RuntimeAddressBookHandle {
         &self,
         configuration: BTreeMap<String, String>,
     ) -> Result<(), String> {
+        if configuration.is_empty() {
+            return Ok(());
+        }
+        Err("address book configuration is unsupported".to_string())
+    }
+
+    /// Remove legacy non-operative configuration metadata during migration.
+    pub async fn runtime_clear_unsupported_configuration(&self) -> Result<(), String> {
+        if self.owner.state.read().configuration.is_empty() {
+            return Ok(());
+        }
         self.owner
             .mutate(|state| {
-                state.configuration = configuration;
+                state.configuration.clear();
                 Ok(())
             })
             .await
@@ -2435,6 +2778,160 @@ mod tests {
             .await
             .unwrap();
         assert!(handle.resolve_base32("runtime.i2p").is_none());
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    #[tokio::test]
+    async fn set_subscriptions_queue_failure_preserves_prior_state() {
+        let dir = tempdir().unwrap().keep();
+        let manager = AddressBookManager::new_with_control_owner(
+            dir,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+
+        let result = control
+            .runtime_set_subscriptions(vec!["https://example.i2p/hosts.txt".to_string()])
+            .await;
+        assert!(result.is_err());
+        assert!(control.runtime_subscriptions().await.unwrap().is_empty());
+        assert!(control.runtime_active_subscriptions().is_empty());
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    async fn running_address_book_manager() -> (
+        Arc<RuntimeAddressBookHandle>,
+        tokio::task::JoinHandle<()>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let dir = tempdir().unwrap().keep();
+        let manager = AddressBookManager::new_with_control_owner(
+            dir,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let proxy = tokio::spawn(async move {
+            loop {
+                let Ok((mut stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let mut request = [0u8; 4096];
+                let _ = stream.read(&mut request).await;
+                let _ = stream
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                    .await;
+            }
+        });
+        let (ready_sender, ready_receiver) = oneshot::channel();
+        let task = tokio::spawn(manager.run(port, "127.0.0.1".to_string(), ready_receiver));
+        ready_sender.send(()).unwrap();
+        for _ in 0..100 {
+            if control.subscription_control.started.load(Ordering::Acquire) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        (control, task, proxy)
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    #[tokio::test]
+    async fn set_subscriptions_updates_active_runtime_sources() {
+        let (control, manager_task, proxy_task) = running_address_book_manager().await;
+        let subscriptions = vec!["http://sub.example/hosts.txt".to_string()];
+        let mut result = Err(String::new());
+        for _ in 0..100 {
+            result = control.runtime_set_subscriptions(subscriptions.clone()).await;
+            if result.is_ok() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        result.unwrap();
+        assert_eq!(control.runtime_active_subscriptions(), subscriptions);
+        assert_eq!(
+            control.runtime_subscriptions().await.unwrap(),
+            subscriptions
+        );
+        manager_task.abort();
+        proxy_task.abort();
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    #[tokio::test]
+    async fn concurrent_subscription_replacements_publish_complete_generation() {
+        let (control, manager_task, proxy_task) = running_address_book_manager().await;
+        let first = vec!["http://first.example/hosts.txt".to_string()];
+        let second = vec![
+            "http://second.example/hosts.txt".to_string(),
+            "https://third.example/hosts.txt".to_string(),
+        ];
+        let (first_result, second_result) = tokio::join!(
+            control.runtime_set_subscriptions(first.clone()),
+            control.runtime_set_subscriptions(second.clone()),
+        );
+        first_result.unwrap();
+        second_result.unwrap();
+        let active = control.runtime_active_subscriptions();
+        assert!(active == first || active == second);
+        assert_eq!(control.runtime_subscriptions().await.unwrap(), active);
+        manager_task.abort();
+        proxy_task.abort();
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    #[tokio::test]
+    async fn set_subscriptions_restart_restores_accepted_sources() {
+        let dir = tempdir().unwrap().keep();
+        let manager = AddressBookManager::new_with_control_owner(
+            dir.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+        control
+            .owner
+            .mutate(|state| {
+                state.subscriptions = vec!["https://restored.i2p/hosts.txt".to_string()];
+                Ok(())
+            })
+            .await
+            .unwrap();
+        drop(manager);
+
+        let restarted = AddressBookManager::new_with_control_owner(
+            dir,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = restarted.control_handle().unwrap();
+        assert_eq!(
+            control.runtime_active_subscriptions(),
+            vec!["https://restored.i2p/hosts.txt"]
+        );
+        assert_eq!(
+            control.runtime_subscriptions().await.unwrap(),
+            vec!["https://restored.i2p/hosts.txt"]
+        );
     }
 
     #[cfg(feature = "i2pcontrol")]

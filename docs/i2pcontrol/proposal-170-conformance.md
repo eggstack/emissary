@@ -14,6 +14,7 @@ Completed implementation correction:
 - M028, `plans/implementation/i2pcontrol-proposal-170/028-post-m027-status-and-addressbook-feature-isolation.md`
 - M030, `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md`
 - M031, `plans/implementation/i2pcontrol-proposal-170/031-client-tunnel-runtime-backend.md`
+- M034, `plans/implementation/i2pcontrol-proposal-170/034-addressbook-setter-truthfulness.md`
 
 Controlling final closure:
 
@@ -124,6 +125,13 @@ M030 additionally proves that enabled administrative, RouterInfo, Base32, and
 Base64 views share one full-destination owner, including first activation,
 historical seed repair, stale-file update/delete, download merge, and
 re-enable deletion semantics.
+
+M034 closes the setter-truthfulness gap: subscription replacement is applied by
+the live downloader through a bounded command seam and durably published, while
+all non-empty configuration mutations are rejected before persistence. The
+Proposal 170 configuration inventory is explicitly classified into
+request-selected paths and unsupported runtime fields; no inert metadata is
+reported as a successful mutation.
 
 ### ClientServicesInfo
 

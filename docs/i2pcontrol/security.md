@@ -1,7 +1,7 @@
 # I2PControl Security
 
-Status: M032 server identity and secret-boundary review passed; M021/M030
-requirements retained
+Status: M034 setter-truthfulness review passed; M021/M030/M032 requirements
+retained
 
 This document describes the security properties and considerations for the I2PControl administrative state in Emissary.
 
@@ -165,6 +165,21 @@ Proposal 170 state is stored separately from:
 - Server private key paths
 - Frontend configuration files
 
+AddressBook setter isolation is stricter:
+
+- `SetSubscriptions` accepts only bounded HTTP/HTTPS URLs and sends one typed
+  replacement command to the active downloader;
+- the command channel has capacity one, with at most one in-flight refresh and
+  one newest pending generation;
+- durable state is committed by the runtime manager before success is returned;
+- unavailable manager/channel state fails explicitly and cannot claim deferred
+  success;
+- all Proposal 170 `SetConfig` keys are classified, with arbitrary path keys
+  rejected as invalid parameters and every other non-empty key rejected as
+  unsupported;
+- legacy configuration metadata is cleared during enabled migration and never
+  controls filesystem, proxy, scheduler, publication, or logging behavior.
+
 ## Compilation features
 
 ### Feature gating
@@ -224,6 +239,8 @@ Compile-time guards ensure:
 - All 12 tunnel types are registered in `ALL_TUNNEL_TYPES`
 - All 8 tunnel actions are registered in `ALL_TUNNEL_ACTIONS`
 - No tunnel type is accidentally omitted
+- The complete Proposal 170 AddressBook configuration-key inventory has one
+  explicit disposition.
 
 ### No-side-effect tests
 

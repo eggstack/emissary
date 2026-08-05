@@ -1,6 +1,6 @@
 # M034 — AddressBook Setter Truthfulness and Runtime Subscription Control
 
-Status: blocked on M033
+Status: ready
 
 Source roadmap:
 
@@ -14,7 +14,7 @@ Applicable governance and decisions:
 
 Repository baseline:
 
-- accepted M033 implementation/closure head, to be recorded before execution
+- `5a2e216` — accepted M033 implementation/test and closure head
 
 Hard dependency:
 

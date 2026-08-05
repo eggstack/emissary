@@ -111,7 +111,9 @@ The store retains at most 5 prior good generations plus the current one (6 total
 - **Runtime address book** (`<base>/addressbook/`) is not touched. Administrative books are separate.
 - **Startup-managed tunnels** are not migrated. Existing client/server/proxy startup definitions continue to work through their existing paths.
 - **Frontend state** is not stored. I2PControl runs independently of the UI.
-- **No task state** is persisted. StartOnLoad is stored but not executed by the persistence layer.
+- **No task state** is persisted. StartOnLoad is stored as intent and is
+  reconciled after load only for eligible control-plane client/server
+  definitions; runtime state remains owned by the backend supervisor.
 
 ## Schema versioning
 

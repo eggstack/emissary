@@ -1,10 +1,10 @@
 # I2PControl Proposal 170 Operational Corrective Roadmap
 
-Status: partial Proposal 170 support; M033 ready
+Status: partial Proposal 170 support; M034 ready
 
 Planning baseline:
 
-- `415213a72be1afecb4925a25112d0f6fabcd1638` — M030 closure head
+- `5a2e216` — M033 implementation/test head
 
 Pinned external authority:
 
@@ -245,7 +245,7 @@ M038 live-runtime interoperability validation
 M039 independent final-head operational reclosure
 ```
 
-M032 is the only dependency-ready implementation handoff. Later plans are
+M034 is the only dependency-ready implementation handoff. Later plans are
 written for handoff continuity but remain blocked until their named hard
 dependencies close. This prevents parallel edits to the same lifecycle and
 composition seams.
@@ -310,7 +310,7 @@ Objective:
 
 ### M034 — AddressBook setter truthfulness
 
-Status: blocked on M033 to avoid concurrent composition changes
+Status: ready
 
 Plan:
 
@@ -524,8 +524,8 @@ review.
 | 020–030 | retained closed evidence | current partial-support baseline |
 | 031 | closed | runtime supervisor and generic client backend |
 | 032 | closed | generic server backend and persistent destination identity |
-| 033 | ready | hard dependencies M031–M032 closed |
-| 034 | blocked | hard dependency M033 |
+| 033 | closed | lifecycle reconciliation and StartOnLoad |
+| 034 | ready | hard dependency M033 closed |
 | 035 | blocked | hard dependency M034 |
 | 036 | blocked | hard dependency M035 |
 | 037 | blocked | hard dependency M036 |

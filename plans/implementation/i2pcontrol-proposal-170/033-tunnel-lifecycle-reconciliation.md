@@ -1,6 +1,6 @@
 # M033 — TunnelManager Lifecycle Reconciliation and StartOnLoad
 
-Status: blocked on M031 and M032
+Status: implemented
 
 Source roadmap:
 
@@ -14,7 +14,8 @@ Applicable governance and decisions:
 
 Repository baseline:
 
-- accepted M032 implementation/closure head, to be recorded before execution
+- `3a03aea` — accepted M032 implementation/closure head
+- implementation/test head: `5a2e216`
 
 Hard dependencies:
 

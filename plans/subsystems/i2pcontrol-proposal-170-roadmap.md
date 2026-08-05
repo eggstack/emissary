@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Operational Corrective Roadmap
 
-Status: partial Proposal 170 support; M036 closed; M037 ready
+Status: partial Proposal 170 support; M037 closed; M038 ready
 
 Planning baseline:
 
@@ -245,10 +245,9 @@ M038 live-runtime interoperability validation
 M039 independent final-head operational reclosure
 ```
 
-M037 is now the only dependency-ready implementation handoff. Later plans are
-written for handoff continuity but remain blocked until their named hard
-dependencies close. This prevents parallel edits to the same lifecycle and
-composition seams.
+M038 is now the only dependency-ready implementation handoff. M039 remains
+blocked until M038 closes. This prevents parallel edits to the same lifecycle
+and composition seams.
 
 ## 6. Milestones
 
@@ -366,7 +365,7 @@ Closure:
 
 ### M037 — Containment reduction and static boundary
 
-Status: ready
+Status: closed
 
 Plan:
 
@@ -381,9 +380,14 @@ Objective:
 - add static changed-path and dependency guards;
 - stop rather than perform a broad crate/core refactor.
 
+Closure:
+
+- `plans/closure/i2pcontrol-proposal-170/037-closure.md`
+- `plans/closure/i2pcontrol-proposal-170/037-implementation-disposition.md`
+
 ### M038 — Live-runtime interoperability validation
 
-Status: blocked on M031–M037
+Status: ready
 
 Plan:
 
@@ -538,8 +542,8 @@ review.
 | 034 | closed | AddressBook setter truthfulness |
 | 035 | closed | base compatibility and selector overlap |
 | 036 | closed | authentication/publication hardening and closure accepted |
-| 037 | ready | hard dependency M036 closed |
-| 038 | blocked | hard dependencies M031–M037 |
+| 037 | closed | containment reduction and static boundary accepted |
+| 038 | ready | hard dependencies M031–M037 closed |
 | 039 | blocked | hard dependency M038 |
 
 ## 13. Completion definition

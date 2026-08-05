@@ -1,6 +1,6 @@
 # M037 — I2PControl Containment Boundary Reduction
 
-Status: blocked on M036
+Status: closed
 
 Source roadmap:
 
@@ -14,11 +14,16 @@ Applicable governance and decisions:
 
 Repository baseline:
 
-- accepted M036 implementation/closure head, to be recorded before execution
+- accepted M036 implementation/closure head: `5afe953`
 
 Hard dependency:
 
 - M036 closed
+
+Closure records:
+
+- `plans/closure/i2pcontrol-proposal-170/037-closure.md`
+- `plans/closure/i2pcontrol-proposal-170/037-implementation-disposition.md`
 
 ## 1. Bounded objective
 

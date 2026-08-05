@@ -1,6 +1,6 @@
 # M038 — Live-Runtime Proposal 170 Interoperability Validation
 
-Status: blocked on M031–M037
+Status: ready
 
 Source roadmap:
 
@@ -14,7 +14,7 @@ Applicable governance:
 
 Repository baseline:
 
-- accepted M037 implementation/closure head, to be recorded before execution
+- accepted M037 implementation head: `5e003fe`
 
 Hard dependencies:
 

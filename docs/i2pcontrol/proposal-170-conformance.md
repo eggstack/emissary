@@ -15,6 +15,7 @@ Completed implementation correction:
 - M030, `plans/implementation/i2pcontrol-proposal-170/030-addressbook-destination-owner-coherence.md`
 - M031, `plans/implementation/i2pcontrol-proposal-170/031-client-tunnel-runtime-backend.md`
 - M034, `plans/implementation/i2pcontrol-proposal-170/034-addressbook-setter-truthfulness.md`
+- M035, `plans/implementation/i2pcontrol-proposal-170/035-base-compatibility-and-selector-overlap.md`
 
 Controlling final closure:
 
@@ -84,6 +85,15 @@ Retained M020 evidence covers:
 - notification execution and response suppression;
 - explicit-null and strict request-ID behavior;
 - direct base RouterInfo compatibility.
+
+M035 freezes the currently claimed method surface in
+`rpc.rs::methods::SUPPORT_INVENTORY`: `Authenticate` and `RouterInfo` are the
+implemented base methods, `AddressBook`, `TunnelManager`, and
+`ClientServicesInfo` are Proposal 170 methods, and `SetSubscriptions`/
+`SetConfig` are already-shipped compatibility aliases. `GetKeys`, `GetRate`,
+`RouterManager`, `NetworkSetting`, and `AdvancedSettings` remain explicit
+standard `METHOD_NOT_FOUND` responses. No missing base method is represented
+as a partial implementation.
 
 ### TunnelManager
 
@@ -160,6 +170,12 @@ Retained M025/M026 evidence covers:
 
 M028 does not alter this matrix. M029 revalidated the counts and focused
 fixtures after the AddressBook feature-boundary correction.
+
+M035 additionally proves that direct and nested request modes are distinct:
+the nested base inventories use legacy serializers, while direct Proposal 170
+requests retain exact presence/source semantics. The three exact selector
+overlaps are maintained in an explicit mode-specific table and tested against
+the inventory intersection. Direct and nested parameters cannot be mixed.
 
 ## Support dimensions
 

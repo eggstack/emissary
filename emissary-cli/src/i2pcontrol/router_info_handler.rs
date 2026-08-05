@@ -24,7 +24,9 @@
 use std::collections::HashSet;
 
 use crate::i2pcontrol::{
-    address_book::resolve_address_book_selectors,
+    address_book::{
+        resolve_address_book_selectors_with_mode, RouterInfoAddressBookMode,
+    },
     router_info::{InspectionError, RouterInfoControl},
     rpc::{self, JsonRpcErrorResponse, JsonRpcRequest, JsonRpcSuccess, RequestId},
 };
@@ -52,6 +54,12 @@ const MAX_I2PTUNNEL_INFO_ENTRIES: usize = 1000;
 /// Maximum serialized RouterInfo response size, including the JSON-RPC
 /// envelope. The final response is checked after actual serialization.
 const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RouterInfoRequestMode {
+    CanonicalDirect,
+    CompatibilityNested,
+}
 
 /// Base UDP selectors that have no truthful source yet. Canonical additions
 /// are adjudicated by `PROPOSAL_170_CONTRACT`.
@@ -239,6 +247,12 @@ pub async fn handle_router_info(
         );
     }
 
+    let mode = if has_nested_selector {
+        RouterInfoRequestMode::CompatibilityNested
+    } else {
+        RouterInfoRequestMode::CanonicalDirect
+    };
+
     let mut requested_keys: Vec<&str> = Vec::new();
     let mut peer_ri_id: Option<&str> = None;
     if has_nested_selector {
@@ -260,7 +274,7 @@ pub async fn handle_router_info(
                 if let Some(id_str) = value.as_str() {
                     if !id_str.is_empty() {
                         peer_ri_id = Some(id_str);
-                        if !rpc::is_valid_router_info_selector(key) {
+                        if !rpc::router_info_keys::is_base_router_info_selector(key) {
                             return error_response(
                                 id,
                                 rpc::error_codes::INVALID_PARAMS,
@@ -271,7 +285,7 @@ pub async fn handle_router_info(
                     }
                 }
             } else if value.as_bool() == Some(true) {
-                if !rpc::is_valid_router_info_selector(key) {
+                if !rpc::router_info_keys::is_base_router_info_selector(key) {
                     return error_response(
                         id,
                         rpc::error_codes::INVALID_PARAMS,
@@ -286,7 +300,7 @@ pub async fn handle_router_info(
         // by presence, and its value is intentionally ignored. The standard
         // Token metadata has already been removed by the dispatcher.
         for key in params.keys() {
-            if !rpc::is_valid_router_info_selector(key) {
+            if !rpc::router_info_keys::is_direct_router_info_selector(key) {
                 return error_response(
                     id,
                     rpc::error_codes::INVALID_PARAMS,
@@ -305,7 +319,7 @@ pub async fn handle_router_info(
     }
 
     // Dispatch and assemble response
-    match assemble_response(state, &requested_keys, peer_ri_id).await {
+    match assemble_response(state, &requested_keys, peer_ri_id, mode).await {
         Ok(result) => {
             let response = JsonRpcSuccess::new(id.clone(), serde_json::Value::Object(result));
             let serialized = match serde_json::to_vec(&response) {
@@ -355,6 +369,7 @@ async fn assemble_response(
     state: &crate::i2pcontrol::server::I2pControlState,
     requested_keys: &[&str],
     peer_ri_id: Option<&str>,
+    mode: RouterInfoRequestMode,
 ) -> Result<serde_json::Map<String, serde_json::Value>, InspectionError> {
     let router_info = state.router_info();
     let address_book = state.address_book_control();
@@ -366,17 +381,21 @@ async fn assemble_response(
 
     let key_set: HashSet<&str> = requested_keys.iter().copied().collect();
 
-    // Validate canonical addition availability before querying any source.
-    for key in requested_keys {
-        if let Some(field) = rpc::router_info_keys::PROPOSAL_170_CONTRACT
-            .iter()
-            .find(|field| field.key == *key)
-        {
-            if !field.source.is_requestable() {
-                return Err(InspectionError::UnavailableReason {
-                    group: canonical_group_for_key(key),
-                    reason: field.source.reason().unwrap_or("source unavailable"),
-                });
+    // Only direct mode applies Proposal 170 availability/source rules. A
+    // nested request is historical base compatibility and must not inherit a
+    // direct addition's disposition merely because the spelling overlaps.
+    if mode == RouterInfoRequestMode::CanonicalDirect {
+        for key in requested_keys {
+            if let Some(field) = rpc::router_info_keys::PROPOSAL_170_CONTRACT
+                .iter()
+                .find(|field| field.key == *key)
+            {
+                if !field.source.is_requestable() {
+                    return Err(InspectionError::UnavailableReason {
+                        group: canonical_group_for_key(key),
+                        reason: field.source.reason().unwrap_or("source unavailable"),
+                    });
+                }
             }
         }
     }
@@ -771,7 +790,17 @@ async fn assemble_response(
         })
         .collect();
     if !address_book_keys.is_empty() {
-        let ab_result = resolve_address_book_selectors(address_book, &address_book_keys)
+        let address_book_mode = match mode {
+            RouterInfoRequestMode::CanonicalDirect => RouterInfoAddressBookMode::CanonicalDirect,
+            RouterInfoRequestMode::CompatibilityNested => {
+                RouterInfoAddressBookMode::CompatibilityNested
+            }
+        };
+        let ab_result = resolve_address_book_selectors_with_mode(
+            address_book,
+            &address_book_keys,
+            address_book_mode,
+        )
             .await
             .map_err(|_| InspectionError::QueryFailed {
                 group: crate::i2pcontrol::router_info::InspectionGroup::AddressBook,
@@ -1510,6 +1539,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn direct_and_nested_routerinfo_modes_are_distinct() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_router_news("legacy news".into());
+        let state = test_state(ri);
+
+        let nested = handle_router_info(
+            &state,
+            &test_request(serde_json::json!({rpc::router_info_keys::ROUTER_NEWS: true})),
+        )
+        .await;
+        assert_eq!(nested["result"][rpc::router_info_keys::ROUTER_NEWS], "legacy news");
+
+        let direct = handle_router_info(
+            &state,
+            &direct_request(serde_json::json!({rpc::router_info_keys::ROUTER_NEWS: false})),
+        )
+        .await;
+        assert_eq!(direct["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
+        assert!(direct["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("no router news owner"));
+    }
+
+    #[tokio::test]
+    async fn nested_news_uses_legacy_disposition() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_router_news("historical news".into());
+        let response = handle_router_info(
+            &test_state(ri),
+            &test_request(serde_json::json!({rpc::router_info_keys::ROUTER_NEWS: true})),
+        )
+        .await;
+
+        assert_eq!(response["result"][rpc::router_info_keys::ROUTER_NEWS], "historical news");
+    }
+
+    #[tokio::test]
+    async fn direct_news_uses_p170_disposition() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_router_news("must not bypass direct disposition".into());
+        let response = handle_router_info(
+            &test_state(ri),
+            &direct_request(serde_json::json!({rpc::router_info_keys::ROUTER_NEWS: true})),
+        )
+        .await;
+
+        assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
+        assert!(response["result"].is_null());
+    }
+
+    #[tokio::test]
     async fn canonical_unavailable_field_is_explicit_error() {
         let state = test_state(FakeRouterInfoControl::new());
         let req = direct_request(serde_json::json!({
@@ -1591,6 +1672,75 @@ mod tests {
             result["i2p.router.addressbook.config"],
             serde_json::json!({"path": null, "entries": {"updateInterval": "3600"}})
         );
+    }
+
+    #[tokio::test]
+    async fn nested_addressbook_metadata_uses_legacy_shape() {
+        let state = test_state(FakeRouterInfoControl::new());
+        let mut subscriptions = SubscriptionSet::new();
+        subscriptions.push("https://example.i2p/hosts.txt".to_string());
+        state.address_book_set_subscriptions(subscriptions).await.unwrap();
+        let mut config = AddressBookConfiguration::new();
+        config.insert("updateInterval".to_string(), "3600".to_string());
+        state.address_book_set_configuration(config).await.unwrap();
+
+        let response = handle_router_info(
+            &state,
+            &test_request(serde_json::json!({
+                rpc::router_info_keys::ADDRESS_BOOK_SUBSCRIPTIONS: true,
+                rpc::router_info_keys::ADDRESS_BOOK_CONFIG: true,
+            })),
+        )
+        .await;
+        let result = response["result"].as_object().unwrap();
+        assert_eq!(
+            result[rpc::router_info_keys::ADDRESS_BOOK_SUBSCRIPTIONS],
+            serde_json::json!(["https://example.i2p/hosts.txt"])
+        );
+        assert_eq!(
+            result[rpc::router_info_keys::ADDRESS_BOOK_CONFIG],
+            serde_json::json!({"updateInterval": "3600"})
+        );
+    }
+
+    #[tokio::test]
+    async fn mixed_modes_are_rejected_before_query() {
+        let response = handle_router_info(
+            &test_state(FakeRouterInfoControl::new()),
+            &JsonRpcRequest {
+                jsonrpc: "2.0".into(),
+                method: "RouterInfo".into(),
+                params: Some(
+                    serde_json::json!({
+                        "Selector": {rpc::router_info_keys::VERSION: true},
+                        rpc::router_info_keys::P170_ID: true,
+                    })
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+                ),
+                id: Some(rpc::RequestId::Number(1)),
+            },
+        )
+        .await;
+
+        assert_eq!(response["error"]["code"], rpc::error_codes::INVALID_PARAMS);
+        assert!(response["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("cannot be mixed"));
+    }
+
+    #[tokio::test]
+    async fn nested_proposal_only_selector_is_rejected() {
+        let response = handle_router_info(
+            &test_state(FakeRouterInfoControl::new()),
+            &test_request(serde_json::json!({rpc::router_info_keys::P170_ID: true})),
+        )
+        .await;
+
+        assert_eq!(response["error"]["code"], rpc::error_codes::INVALID_PARAMS);
+        assert!(response["result"].is_null());
     }
 
     #[tokio::test]

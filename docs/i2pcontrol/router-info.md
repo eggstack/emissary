@@ -22,6 +22,25 @@ are returned under the exact same key. Values are ignored. All four address-book
 list additions and the subscription/config objects consume the shared runtime
 address-book owner established by M022.
 
+### Base compatibility boundary
+
+The handler has two exclusive request modes:
+
+- Direct mode accepts the retained base inventory plus the 43 Proposal 170
+  additions, selects every key by presence, and applies the Proposal 170 source
+  and response contract.
+- Nested compatibility mode accepts only the historical base inventories and
+  selects truthy boolean values in `Selector` (with the retained peer lookup
+  string exception). It uses the historical base serializers.
+
+The exact overlaps are `i2p.router.news`,
+`i2p.router.addressbook.subscriptions`, and
+`i2p.router.addressbook.config`. Nested requests preserve the legacy news
+source and array/map metadata shapes; direct requests use the Proposal 170
+disposition and `{path, entries}` metadata shape. Mixing modes fails before
+any source query. The machine-readable inventories and overlap table are in
+`rpc.rs::router_info_keys`.
+
 ### Legacy/base selector groups
 
 | Group | Prefix | Count | Source |

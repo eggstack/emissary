@@ -12,12 +12,15 @@ Historical invalidation and completed corrective sequence:
 - `plans/implementation/i2pcontrol-proposal-170/029-in-scope-conformance-reclosure.md`
 - `plans/closure/i2pcontrol-proposal-170/030-closure.md`
 - `plans/closure/i2pcontrol-proposal-170/034-closure.md`
+- `plans/closure/i2pcontrol-proposal-170/035-closure.md`
 
 M020–M027 implementation/evidence remains retained, but M027's final disposition
 is historical invalidated evidence. The post-M027 merge that revived M019 is
 historical and superseded. M028 restored strict AddressBook feature/runtime
 isolation. M030 corrected destination/lookup owner coherence and independently
 closed the AddressBook dimension; the bounded result remains partial support.
+M035 corrected the base method inventory and separated direct Proposal 170
+RouterInfo requests from historical nested compatibility requests.
 
 The expected bounded final status remains `partial Proposal 170 support` while
 26 RouterInfo selectors lack bounded authoritative sources and missing tunnel

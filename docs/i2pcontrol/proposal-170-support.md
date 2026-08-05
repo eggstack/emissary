@@ -28,6 +28,9 @@ Closed handoffs:
 - M034 closed: `plans/implementation/i2pcontrol-proposal-170/034-addressbook-setter-truthfulness.md`; closure:
   `plans/closure/i2pcontrol-proposal-170/034-closure.md`; disposition:
   `plans/closure/i2pcontrol-proposal-170/034-implementation-disposition.md`
+- M035 closed: `plans/implementation/i2pcontrol-proposal-170/035-base-compatibility-and-selector-overlap.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/035-closure.md`; disposition:
+  `plans/closure/i2pcontrol-proposal-170/035-implementation-disposition.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained corrective
 evidence, while M027's final disposition is historical invalidated evidence.
@@ -61,12 +64,29 @@ Proposal 170 support.
 M028 owns the status/feature-boundary correction. M030 owns the destination
 authority, lookup precedence, bounded import/repair, and independent final-head
 review. M034 owns live subscription replacement, bounded refresh control, and
-truthful configuration rejection.
+truthful configuration rejection. M035 owns the base method inventory and the
+mode-specific RouterInfo compatibility boundary.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because 26 of the 43 RouterInfo additions lack
 bounded authoritative sources and missing tunnel data planes remain explicit
 unsupported runtimes.
+
+## Base method and RouterInfo compatibility
+
+The exact method support inventory is maintained in
+`rpc.rs::methods::SUPPORT_INVENTORY`. Implemented base methods are
+`Authenticate` and `RouterInfo`; `AddressBook`, `TunnelManager`, and
+`ClientServicesInfo` are Proposal 170 methods; and `SetSubscriptions` and
+`SetConfig` remain shipped compatibility aliases. `GetKeys`, `GetRate`,
+`RouterManager`, `NetworkSetting`, and `AdvancedSettings` return standard
+`METHOD_NOT_FOUND` errors and are not claimed as implemented.
+
+RouterInfo direct requests use Proposal 170 presence/source semantics. The
+historical nested `Selector` form accepts only base selectors, uses truthy
+boolean selection, and retains legacy serializers. The three exact overlaps
+(`i2p.router.news`, `i2p.router.addressbook.subscriptions`, and
+`i2p.router.addressbook.config`) are explicitly table-driven and tested.
 
 ## Retained implementation
 

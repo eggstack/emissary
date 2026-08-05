@@ -1477,6 +1477,17 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn unsupported_base_methods_return_method_not_found() {
+        let state = I2pControlState::new_test("testpass".to_string());
+        for method in rpc::methods::UNSUPPORTED_BASE {
+            let response = dispatch_protected(&state, &request(method, serde_json::json!({}), Some(RequestId::Number(1))))
+                .await;
+            assert_eq!(response["error"]["code"], rpc::error_codes::METHOD_NOT_FOUND);
+            assert!(response["result"].is_null(), "method: {method}");
+        }
+    }
+
+    #[tokio::test]
     async fn protected_authentication_distinguishes_missing_unknown_and_conflicting_tokens() {
         let state = I2pControlState::new_test("testpass".to_string());
         let base_request = request(

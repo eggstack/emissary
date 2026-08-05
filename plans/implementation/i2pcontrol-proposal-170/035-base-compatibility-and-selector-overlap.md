@@ -1,6 +1,6 @@
 # M035 — Base I2PControl Compatibility and RouterInfo Selector Overlap
 
-Status: blocked on M034
+Status: closed
 
 Source roadmap:
 
@@ -13,7 +13,7 @@ Applicable governance:
 
 Repository baseline:
 
-- accepted M034 implementation/closure head, to be recorded before execution
+- `555d02b` — accepted M034 implementation/closure head
 
 Hard dependency:
 

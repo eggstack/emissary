@@ -301,14 +301,111 @@ pub mod methods {
     /// ClientServicesInfo method.
     pub const CLIENT_SERVICES_INFO: &str = "ClientServicesInfo";
 
-    /// GetKeys method.
+    /// Existing base I2PControl methods retained as explicit unsupported
+    /// entries in the dispatcher inventory.
     pub const GET_KEYS: &str = "GetKeys";
+    pub const GET_RATE: &str = "GetRate";
+    pub const ROUTER_MANAGER: &str = "RouterManager";
+    pub const NETWORK_SETTING: &str = "NetworkSetting";
+    pub const ADVANCED_SETTINGS: &str = "AdvancedSettings";
 
     /// SetConfig method.
     pub const SET_CONFIG: &str = "SetConfig";
 
     /// SetSubscriptions method.
     pub const SET_SUBSCRIPTIONS: &str = "SetSubscriptions";
+
+    /// Methods that the protected dispatcher actually routes to a handler.
+    pub const PROTECTED_DISPATCH: &[&str] = &[
+        ADDRESS_BOOK,
+        SET_SUBSCRIPTIONS,
+        SET_CONFIG,
+        TUNNEL_MANAGER,
+        ROUTER_INFO,
+        CLIENT_SERVICES_INFO,
+    ];
+
+    /// Existing base methods that remain standard `METHOD_NOT_FOUND`
+    /// responses. Keeping these names explicit prevents the support claim
+    /// from growing merely because a client happens to request them.
+    pub const UNSUPPORTED_BASE: &[&str] = &[
+        GET_KEYS,
+        GET_RATE,
+        ROUTER_MANAGER,
+        NETWORK_SETTING,
+        ADVANCED_SETTINGS,
+    ];
+
+    /// Proposal 170 methods routed by the protected dispatcher.
+    pub const PROPOSAL_170: &[&str] = &[ADDRESS_BOOK, TUNNEL_MANAGER, CLIENT_SERVICES_INFO];
+
+    /// Machine-readable method support disposition.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum SupportDisposition {
+        Authenticate,
+        ImplementedBase,
+        CompatibilityAlias,
+        Proposal170,
+        UnsupportedBase,
+    }
+
+    /// Exact method support inventory used by documentation and tests.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct MethodSupport {
+        pub method: &'static str,
+        pub disposition: SupportDisposition,
+    }
+
+    pub const SUPPORT_INVENTORY: &[MethodSupport] = &[
+        MethodSupport {
+            method: AUTHENTICATE,
+            disposition: SupportDisposition::Authenticate,
+        },
+        MethodSupport {
+            method: ROUTER_INFO,
+            disposition: SupportDisposition::ImplementedBase,
+        },
+        MethodSupport {
+            method: GET_KEYS,
+            disposition: SupportDisposition::UnsupportedBase,
+        },
+        MethodSupport {
+            method: GET_RATE,
+            disposition: SupportDisposition::UnsupportedBase,
+        },
+        MethodSupport {
+            method: ROUTER_MANAGER,
+            disposition: SupportDisposition::UnsupportedBase,
+        },
+        MethodSupport {
+            method: NETWORK_SETTING,
+            disposition: SupportDisposition::UnsupportedBase,
+        },
+        MethodSupport {
+            method: ADVANCED_SETTINGS,
+            disposition: SupportDisposition::UnsupportedBase,
+        },
+        MethodSupport {
+            method: ADDRESS_BOOK,
+            disposition: SupportDisposition::Proposal170,
+        },
+        MethodSupport {
+            method: TUNNEL_MANAGER,
+            disposition: SupportDisposition::Proposal170,
+        },
+        MethodSupport {
+            method: CLIENT_SERVICES_INFO,
+            disposition: SupportDisposition::Proposal170,
+        },
+        MethodSupport {
+            method: SET_SUBSCRIPTIONS,
+            disposition: SupportDisposition::CompatibilityAlias,
+        },
+        MethodSupport {
+            method: SET_CONFIG,
+            disposition: SupportDisposition::CompatibilityAlias,
+        },
+    ];
 }
 
 /// Proposal 170 tunnel types.
@@ -1411,11 +1508,63 @@ pub mod router_info_keys {
         ADDRESS_BOOK_CONFIG,
     ];
 
+    /// The historical base selector inventories remain separate so a nested
+    /// compatibility request cannot accidentally select a Proposal 170-only
+    /// key. `CORE_KEYS` and `ADDRESS_BOOK_KEYS` are the literal legacy
+    /// inventories; their serializers are recorded below for the exact names
+    /// that overlap the Proposal 170 additions.
+    pub const BASE_ROUTER_INFO_SERIALIZERS: &[(&str, &str)] = &[
+        (ROUTER_NEWS, "serialize_legacy_router_news"),
+        (
+            ADDRESS_BOOK_SUBSCRIPTIONS,
+            "serialize_legacy_address_book_subscriptions",
+        ),
+        (ADDRESS_BOOK_CONFIG, "serialize_legacy_address_book_config"),
+    ];
+
+    /// Exact-name overlap between the retained base inventory and Proposal
+    /// 170. Every row has a mode-specific serializer disposition.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct SelectorOverlap {
+        pub key: &'static str,
+        pub base_serializer: &'static str,
+        pub proposal_170_serializer: &'static str,
+    }
+
+    pub const ROUTER_INFO_SELECTOR_OVERLAPS: &[SelectorOverlap; 3] = &[
+        SelectorOverlap {
+            key: ROUTER_NEWS,
+            base_serializer: "serialize_legacy_router_news",
+            proposal_170_serializer: "serialize_router_news",
+        },
+        SelectorOverlap {
+            key: ADDRESS_BOOK_SUBSCRIPTIONS,
+            base_serializer: "serialize_legacy_address_book_subscriptions",
+            proposal_170_serializer: "serialize_address_book_subscriptions",
+        },
+        SelectorOverlap {
+            key: ADDRESS_BOOK_CONFIG,
+            base_serializer: "serialize_legacy_address_book_config",
+            proposal_170_serializer: "serialize_address_book_config",
+        },
+    ];
+
     /// Existing I2PControl RouterInfo inventories, kept separate from the
     /// Proposal 170 additions. These aliases make the partition explicit to
     /// callers and static guards without changing the established key sets.
     pub const BASE_ROUTER_INFO_CORE_KEYS: &[&str] = CORE_KEYS;
     pub const BASE_ROUTER_INFO_ADDRESS_BOOK_KEYS: &[&str] = ADDRESS_BOOK_KEYS;
+
+    /// Test whether a selector belongs to the retained/base RouterInfo
+    /// inventory, independent of the Proposal 170 additions.
+    pub fn is_base_router_info_selector(key: &str) -> bool {
+        BASE_ROUTER_INFO_CORE_KEYS.contains(&key) || BASE_ROUTER_INFO_ADDRESS_BOOK_KEYS.contains(&key)
+    }
+
+    /// Test whether a selector is accepted by direct Proposal 170 mode.
+    pub fn is_direct_router_info_selector(key: &str) -> bool {
+        is_base_router_info_selector(key) || PROPOSAL_170_ADDITIONS.contains(&key)
+    }
 
     /// Emissary compatibility form; it is a request envelope, not a canonical
     /// selector and must never be counted as one of the 43 additions.
@@ -2013,10 +2162,73 @@ mod tests {
             ])
         );
         assert_eq!(
+            router_info_keys::ROUTER_INFO_SELECTOR_OVERLAPS
+                .iter()
+                .map(|row| row.key)
+                .collect::<HashSet<_>>(),
+            overlap
+        );
+        for row in router_info_keys::ROUTER_INFO_SELECTOR_OVERLAPS {
+            assert!(router_info_keys::is_base_router_info_selector(row.key));
+            assert!(router_info_keys::is_proposal_170_addition(row.key));
+            assert!(router_info_keys::BASE_ROUTER_INFO_SERIALIZERS
+                .iter()
+                .any(|(key, serializer)| *key == row.key && *serializer == row.base_serializer));
+        }
+        assert_eq!(
             router_info_keys::COMPATIBILITY_ROUTER_INFO_FORMS,
             &["Selector"]
         );
         assert_eq!(canonical.len(), 43);
+    }
+
+    #[test]
+    fn overlap_table_contains_every_exact_name_intersection() {
+        use std::collections::HashSet;
+
+        let base: HashSet<&str> = router_info_keys::BASE_ROUTER_INFO_CORE_KEYS
+            .iter()
+            .chain(router_info_keys::BASE_ROUTER_INFO_ADDRESS_BOOK_KEYS.iter())
+            .copied()
+            .collect();
+        let additions: HashSet<&str> = router_info_keys::PROPOSAL_170_ADDITIONS.iter().copied().collect();
+        let table: HashSet<&str> = router_info_keys::ROUTER_INFO_SELECTOR_OVERLAPS
+            .iter()
+            .map(|row| row.key)
+            .collect();
+
+        assert_eq!(base.intersection(&additions).copied().collect::<HashSet<_>>(), table);
+        assert_eq!(table.len(), 3);
+        for row in router_info_keys::ROUTER_INFO_SELECTOR_OVERLAPS {
+            assert_ne!(row.base_serializer, row.proposal_170_serializer);
+        }
+    }
+
+    #[test]
+    fn method_support_inventory_matches_dispatcher_surface() {
+        use std::collections::HashSet;
+
+        let inventory: HashSet<&str> = methods::SUPPORT_INVENTORY
+            .iter()
+            .map(|entry| entry.method)
+            .collect();
+        let protected: HashSet<&str> = methods::PROTECTED_DISPATCH.iter().copied().collect();
+        let proposal: HashSet<&str> = methods::PROPOSAL_170.iter().copied().collect();
+        let unsupported: HashSet<&str> = methods::UNSUPPORTED_BASE.iter().copied().collect();
+
+        assert_eq!(inventory.len(), methods::SUPPORT_INVENTORY.len());
+        assert!(protected.is_subset(&inventory));
+        assert!(proposal.is_subset(&protected));
+        assert!(unsupported.is_subset(&inventory));
+        assert!(protected.is_disjoint(&unsupported));
+        assert_eq!(
+            methods::SUPPORT_INVENTORY
+                .iter()
+                .filter(|entry| entry.disposition == methods::SupportDisposition::UnsupportedBase)
+                .map(|entry| entry.method)
+                .collect::<HashSet<_>>(),
+            unsupported
+        );
     }
 
     #[test]

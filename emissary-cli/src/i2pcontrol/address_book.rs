@@ -709,7 +709,7 @@ enum ConfigurationDispositionError {
 fn validate_configuration_disposition(
     configuration: &AddressBookConfiguration,
 ) -> Result<(), ConfigurationDispositionError> {
-    for key in configuration.as_map().keys() {
+    if let Some(key) = configuration.as_map().keys().next() {
         if CONFIG_PATH_KEYS.contains(&key.as_str()) {
             return Err(ConfigurationDispositionError::RequestPath(key.clone()));
         }
@@ -967,9 +967,34 @@ fn error_response(id: RequestId, code: i32, message: impl Into<String>) -> serde
 ///
 /// Each selector returns a JSON array or object. Only requested selectors
 /// appear in the result. Entries are ordered deterministically by hostname.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RouterInfoAddressBookMode {
+    /// Historical nested `Selector` response shape.
+    CompatibilityNested,
+    /// Direct Proposal 170 response shape.
+    CanonicalDirect,
+}
+
+#[allow(dead_code)]
 pub async fn resolve_address_book_selectors(
     control: &dyn crate::i2pcontrol::control_plane::AddressBookControl,
     requested_keys: &[&str],
+) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    resolve_address_book_selectors_with_mode(
+        control,
+        requested_keys,
+        RouterInfoAddressBookMode::CanonicalDirect,
+    )
+    .await
+}
+
+/// Resolve address-book selectors using the response shape belonging to the
+/// request mode. The source is queried through the same control plane in both
+/// modes; only the historical serializer differs.
+pub(crate) async fn resolve_address_book_selectors_with_mode(
+    control: &dyn crate::i2pcontrol::control_plane::AddressBookControl,
+    requested_keys: &[&str],
+    mode: RouterInfoAddressBookMode,
 ) -> Result<serde_json::Map<String, serde_json::Value>, String> {
     let mut result = serde_json::Map::new();
 
@@ -1021,7 +1046,14 @@ pub async fn resolve_address_book_selectors(
     if requested_keys.contains(&rpc::router_info_keys::ADDRESS_BOOK_SUBSCRIPTIONS) {
         let subs = control.subscriptions().await?;
         let urls: Vec<&str> = subs.as_slice().iter().map(|s| s.as_str()).collect();
-        let value = bounded_selector_value(serde_json::json!({"path": null, "entries": urls}))?;
+        let value = match mode {
+            RouterInfoAddressBookMode::CompatibilityNested => {
+                bounded_selector_value(serde_json::json!(urls))?
+            }
+            RouterInfoAddressBookMode::CanonicalDirect => {
+                bounded_selector_value(serde_json::json!({"path": null, "entries": urls}))?
+            }
+        };
         result.insert(
             rpc::router_info_keys::ADDRESS_BOOK_SUBSCRIPTIONS.to_string(),
             value,
@@ -1031,7 +1063,14 @@ pub async fn resolve_address_book_selectors(
         let config = control.configuration().await?;
         let map: serde_json::Map<String, serde_json::Value> =
             config.as_map().iter().map(|(k, v)| (k.clone(), serde_json::json!(v))).collect();
-        let value = bounded_selector_value(serde_json::json!({"path": null, "entries": map}))?;
+        let value = match mode {
+            RouterInfoAddressBookMode::CompatibilityNested => {
+                bounded_selector_value(serde_json::Value::Object(map))?
+            }
+            RouterInfoAddressBookMode::CanonicalDirect => {
+                bounded_selector_value(serde_json::json!({"path": null, "entries": map}))?
+            }
+        };
         result.insert(
             rpc::router_info_keys::ADDRESS_BOOK_CONFIG.to_string(),
             value,

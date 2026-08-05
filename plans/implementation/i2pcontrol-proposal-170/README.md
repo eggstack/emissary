@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; M037 closed; M038 ready
+Status: partial Proposal 170 support; M038 closed; M039 ready
 
 This directory contains bounded internal implementation and closure handoffs for
 the I2PControl Proposal 170 subsystem.
@@ -44,14 +44,14 @@ Violation is a stop condition and invalidates affected evidence.
 
 | Handoff | Status | Plan | Dependency |
 |---|---|---|---|
-| M038 — Live-runtime interoperability | ready | `038-live-runtime-interoperability.md` | M031–M037 closed |
+| M038 — Live-runtime interoperability | closed | `038-live-runtime-interoperability.md` | M031–M037 closed |
 
 M031 established the control-plane runtime supervisor and replaced only the
 generic `client` unsupported backend. M032 added the generic `server` backend
 and persistent destination identity. M033 closed lifecycle reconciliation and
 StartOnLoad. M035 closed the base compatibility boundary, M036 hardened
-authentication/publication, and M037 reduced containment coupling. M038 is now
-the only dependency-ready implementation plan. These
+authentication/publication, and M037 reduced containment coupling. M038 closed
+the live-runtime validation gate. These
 milestones may not modify `emissary-core`, adopt
 startup-managed tasks, or implement another tunnel family.
 
@@ -65,8 +65,8 @@ startup-managed tasks, or implement another tunnel family.
 | M035 — Base compatibility and selector overlap | closed | `035-base-compatibility-and-selector-overlap.md` | M034 closed |
 | M036 — Authentication and publication hardening | closed | `036-auth-and-publication-hardening.md` | M035 closed |
 | M037 — Containment boundary reduction | closed | `037-containment-boundary-reduction.md` | M036 closed |
-| M038 — Live-runtime interoperability | ready | `038-live-runtime-interoperability.md` | M031–M037 closed |
-| M039 — Operational final-head reclosure | blocked | `039-operational-reclosure.md` | M038 closed |
+| M038 — Live-runtime interoperability | closed | `038-live-runtime-interoperability.md` | M031–M037 closed |
+| M039 — Operational final-head reclosure | ready | `039-operational-reclosure.md` | M038 closed |
 
 Future plans are written for continuity but are not executable until their named
 hard dependencies close and the registry advances them.

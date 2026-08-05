@@ -1,6 +1,6 @@
 # M038 — Live-Runtime Proposal 170 Interoperability Validation
 
-Status: ready
+Status: closed
 
 Source roadmap:
 
@@ -15,10 +15,16 @@ Applicable governance:
 Repository baseline:
 
 - accepted M037 implementation head: `5e003fe`
+- accepted M038 implementation/evidence head: `a5864d2`
 
 Hard dependencies:
 
 - M031 through M037 closed
+
+Corrective passes completed during validation:
+
+- `038a-sam-observation-hook-call-shape.md`
+- `038b-feature-test-import-repair.md`
 
 ## 1. Bounded objective
 

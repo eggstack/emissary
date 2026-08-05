@@ -1,6 +1,6 @@
 # M038A — SAM Observation Hook Call-Shape Corrective Pass
 
-Status: ready
+Status: closed
 
 Source milestones:
 

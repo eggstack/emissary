@@ -31,6 +31,13 @@ Closed handoffs:
 - M035 closed: `plans/implementation/i2pcontrol-proposal-170/035-base-compatibility-and-selector-overlap.md`; closure:
   `plans/closure/i2pcontrol-proposal-170/035-closure.md`; disposition:
   `plans/closure/i2pcontrol-proposal-170/035-implementation-disposition.md`
+- M036 closed: `plans/implementation/i2pcontrol-proposal-170/036-auth-and-publication-hardening.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/036-closure.md`
+- M037 closed: `plans/implementation/i2pcontrol-proposal-170/037-containment-boundary-reduction.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/037-closure.md`
+- M038 closed: `plans/implementation/i2pcontrol-proposal-170/038-live-runtime-interoperability.md`; closure:
+  `plans/closure/i2pcontrol-proposal-170/038-closure.md`; disposition:
+  `plans/closure/i2pcontrol-proposal-170/038-implementation-disposition.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained corrective
 evidence, while M027's final disposition is historical invalidated evidence.
@@ -65,12 +72,38 @@ M028 owns the status/feature-boundary correction. M030 owns the destination
 authority, lookup precedence, bounded import/repair, and independent final-head
 review. M034 owns live subscription replacement, bounded refresh control, and
 truthful configuration rejection. M035 owns the base method inventory and the
-mode-specific RouterInfo compatibility boundary.
+mode-specific RouterInfo compatibility boundary. M038 owns production-composition
+and live child-process interoperability evidence; M039 remains the independent
+final-head review.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because 26 of the 43 RouterInfo additions lack
 bounded authoritative sources and missing tunnel data planes remain explicit
 unsupported runtimes.
+
+## M038 live-runtime evidence
+
+The live evidence is layered rather than presented as a universal network
+certification:
+
+- unit and fixture evidence remains in the retained M020–M037 suites;
+- production-composition evidence launches the feature-enabled `emissary-cli`
+  binary with its real TLS/authentication, AddressBook, RouterInfo,
+  ClientServicesInfo, and TunnelManager owners;
+- the child-process scenario is
+  `emissary-cli/tests/i2pcontrol_live_runtime.rs` and exercises restart,
+  persistence, bind failure/recovery, unsupported types, startup ownership,
+  malformed requests, and bounded cleanup;
+- local I2P data-plane formation is not claimed: this loopback run has no
+  reseeded peer set, so client/server traffic and public server destination
+  identity stability remain explicitly blocked at the formation boundary;
+- subscription replacement is reported as unavailable when no HTTP downloader
+  is composed, matching the existing documented `-32603` failure rather than
+  claiming a successful refresh.
+
+The run uses temporary loopback state, process-local credentials, generated
+runtime-only destination material, and temporary service TLS material. No
+secrets or generated state are committed.
 
 ## Base method and RouterInfo compatibility
 

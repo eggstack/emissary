@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Operational Corrective Roadmap
 
-Status: partial Proposal 170 support; M037 closed; M038 ready
+Status: partial Proposal 170 support; M038 closed; M039 ready
 
 Planning baseline:
 
@@ -245,8 +245,8 @@ M038 live-runtime interoperability validation
 M039 independent final-head operational reclosure
 ```
 
-M038 is now the only dependency-ready implementation handoff. M039 remains
-blocked until M038 closes. This prevents parallel edits to the same lifecycle
+M038 is closed with qualified local data-plane blockers recorded. M039 is now
+the only dependency-ready implementation handoff. This prevents parallel edits to the same lifecycle
 and composition seams.
 
 ## 6. Milestones
@@ -387,7 +387,7 @@ Closure:
 
 ### M038 — Live-runtime interoperability validation
 
-Status: ready
+Status: closed
 
 Plan:
 
@@ -403,7 +403,7 @@ Objective:
 
 ### M039 — Independent operational reclosure
 
-Status: blocked on M038
+Status: ready
 
 Plan:
 
@@ -543,8 +543,8 @@ review.
 | 035 | closed | base compatibility and selector overlap |
 | 036 | closed | authentication/publication hardening and closure accepted |
 | 037 | closed | containment reduction and static boundary accepted |
-| 038 | ready | hard dependencies M031–M037 closed |
-| 039 | blocked | hard dependency M038 |
+| 038 | closed | live production-composition evidence and closure accepted |
+| 039 | ready | hard dependency M038 closed |
 
 ## 13. Completion definition
 

@@ -1,6 +1,6 @@
 # M039 — Proposal 170 Operational Final-Head Reclosure
 
-Status: blocked on M038
+Status: ready
 
 Source roadmap:
 
@@ -14,11 +14,11 @@ Applicable governance and decisions:
 
 Repository baseline:
 
-- accepted M038 implementation/evidence head, to be recorded before execution
+- accepted M038 implementation/evidence head: `a5864d2`
 
 Hard dependency:
 
-- M038 closed
+- M038 closed; implementation disposition and closure accepted
 
 ## 1. Bounded objective
 

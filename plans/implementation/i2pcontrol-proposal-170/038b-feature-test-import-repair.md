@@ -1,6 +1,6 @@
 # M038B — Feature-Test Import Repair Corrective Pass
 
-Status: ready
+Status: closed
 
 Source milestones:
 

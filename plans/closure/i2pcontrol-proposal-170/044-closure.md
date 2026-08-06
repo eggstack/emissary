@@ -10,7 +10,7 @@ Corrective authority:
 
 - `plans/closure/i2pcontrol-proposal-170/039-closure-invalidation.md`
 
-Reviewed final implementation/evidence head: `342420e`
+Reviewed final implementation/evidence head: `75514ce`
 
 Dependency closure heads:
 

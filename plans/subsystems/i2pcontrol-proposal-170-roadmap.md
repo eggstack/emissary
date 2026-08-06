@@ -4,7 +4,7 @@ Status: partial Proposal 170 support; corrective sequence closed
 
 Planning baseline:
 
-- `342420e` — corrected final evidence head reviewed by M044
+- `75514ce` — corrected final evidence head reviewed by M044
 
 Pinned external authority:
 

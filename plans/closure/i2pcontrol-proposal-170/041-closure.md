@@ -12,6 +12,8 @@ Implementation disposition:
 
 Implementation/test head: `f7a9b37`
 
+Disposition tightening head: see git history (`041-closure.md` tightened after M043/M044 acceptance)
+
 ## 1. Finding
 
 M041 closes both authentication accounting defects. Source ports no longer
@@ -22,14 +24,21 @@ successive counts before any delay is awaited.
 
 | Requirement | Evidence | Result |
 |---|---|---|
-| IP identity | `AuthThrottle` map keyed by `IpAddr`; IPv4/IPv6 normalization tests | pass |
-| Port churn | pure reservation and handler-level reconnect tests | pass |
-| Atomic reservation | barrier-based concurrent reservation test | pass: counts/delays are unique and ordered as a multiset |
-| Delay bounds | capacity and bounded-delay tests; existing constants | pass |
-| Success reset | new-port handler success and existing reset test | pass |
-| Lock/cancellation semantics | reservation returns before handler sleep | pass |
-| Wire compatibility | authentication error, API, token, and fixture suites | pass |
-| Security boundary | security documentation and no forwarded-header logic | pass |
+| IP identity (IPv4) | `throttle_normalizes_source_ports_to_one_ip_identity` | pass |
+| IP identity (IPv6) | `throttle_normalizes_ipv6_source_ports_to_one_ip_identity` | pass |
+| Independent addresses | `throttle_keeps_distinct_ips_independent` | pass |
+| Port churn (handler) | `authentication_throttle_is_shared_across_reconnect_ports` | pass |
+| Atomic reservation | `throttle_reserves_concurrent_failures_atomically` (8-way barrier) | pass: counts/delays are unique and ordered as a multiset |
+| Documented delay schedule | `throttle_matches_documented_delay_schedule` (ZERO, BASE, 2×, 4×, 8×, 16×, 32×, capped) | pass |
+| Cancellation-safe reservation | `throttle_reservation_preserved_through_dropped_sleep` | pass: third reservation continues from incremented count |
+| Delay bounds | `throttle_delay_is_bounded`; existing constants | pass |
+| Capacity bounds | `throttle_capacity_is_bounded_under_source_churn` | pass |
+| Success reset | `successful_authentication_resets_failure_state`; new-port clear in reconnect test | pass |
+| Handler-level compatibility | `failed_authentication_is_bounded_and_throttled`, `authentication_throttle_is_shared_across_reconnect_ports`, full authentication suite | pass |
+| Lock/sleep semantics | `reserve_failure` returns before handler `tokio::time::sleep`; no mutex across await | pass |
+| Wire compatibility | authentication error, API, token, golden/adversarial fixtures | pass |
+| Security boundary | `docs/i2pcontrol/security.md` documents per-IP, in-memory only; no forwarded-header logic | pass |
+| Ephemeral-port regression on baseline | `m041_ephemeral_port_regression_baseline_check` against `563e093` (manual reproduction, not retained in tree) | fails on baseline (left=2, right=1) |
 
 ## 3. Residual findings
 
@@ -39,10 +48,17 @@ and not proxy-aware or distributed.
 
 ## 4. Future-plan disposition
 
-M042 is dependency-ready and was completed at `ef30155`. M043 remains the
-combined validation gate for M040–M042.
+M042 is dependency-ready and was completed at `ef30155`. M043 is the combined
+validation gate for M040–M042 and was completed at `342420e`. M044 is the
+corrective final-head reclosure and was completed at `342420e`. The full
+corrective sequence (M040–M044) is closed; no successor implementation plan
+is dependency-ready, deferred RouterInfo sources and the ten unsupported
+tunnel families remain outside this roadmap with no accepted owner.
 
 ## 5. Internal-only attestation
 
 All work and evidence are internal-only. No upstream channel was mutated or
-contacted.
+contacted. No upstream issue, pull request, review, submission, adoption,
+merge, or contribution artifact was created or prepared under this plan.
+
+**Disposition: closed.**

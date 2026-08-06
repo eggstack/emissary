@@ -413,4 +413,68 @@ mod tests {
         actual.sort();
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn throttle_normalizes_ipv6_source_ports_to_one_ip_identity() {
+        let throttle = AuthThrottle::new();
+        let first = Some("[::1]:10001".parse().unwrap());
+        let second = Some("[::1]:50000".parse().unwrap());
+
+        assert_eq!(throttle.reserve_failure(first), Duration::ZERO);
+        assert_eq!(throttle.reserve_failure(second), THROTTLE_BASE_DELAY);
+        assert_eq!(throttle.count(), 1);
+    }
+
+    #[test]
+    fn throttle_keeps_distinct_ips_independent() {
+        let throttle = AuthThrottle::new();
+        let first = Some(([127, 0, 0, 1], 7650).into());
+        let second = Some(([10, 0, 0, 1], 7650).into());
+
+        assert_eq!(throttle.reserve_failure(first), Duration::ZERO);
+        assert_eq!(throttle.reserve_failure(second), Duration::ZERO);
+        assert_eq!(throttle.count(), 2);
+
+        assert_eq!(throttle.reserve_failure(first), THROTTLE_BASE_DELAY);
+        assert_eq!(throttle.reserve_failure(second), THROTTLE_BASE_DELAY);
+
+        throttle.clear(first);
+        assert_eq!(throttle.count(), 1);
+    }
+
+    #[test]
+    fn throttle_matches_documented_delay_schedule() {
+        let throttle = AuthThrottle::new();
+        let source = Some(([127, 0, 0, 1], 7650).into());
+
+        assert_eq!(throttle.reserve_failure(source), Duration::ZERO);
+        assert_eq!(throttle.reserve_failure(source), THROTTLE_BASE_DELAY);
+        assert_eq!(throttle.reserve_failure(source), 2 * THROTTLE_BASE_DELAY);
+        assert_eq!(throttle.reserve_failure(source), 4 * THROTTLE_BASE_DELAY);
+        assert_eq!(throttle.reserve_failure(source), 8 * THROTTLE_BASE_DELAY);
+        assert_eq!(throttle.reserve_failure(source), 16 * THROTTLE_BASE_DELAY);
+        assert_eq!(throttle.reserve_failure(source), 32 * THROTTLE_BASE_DELAY);
+        for _ in 0..100 {
+            let delay = throttle.reserve_failure(source);
+            assert!(delay <= THROTTLE_MAX_DELAY);
+        }
+    }
+
+    #[tokio::test]
+    async fn throttle_reservation_preserved_through_dropped_sleep() {
+        let throttle = AuthThrottle::new();
+        let source = Some(([127, 0, 0, 1], 7650).into());
+
+        let first = throttle.reserve_failure(source);
+        assert_eq!(first, Duration::ZERO);
+        let second = throttle.reserve_failure(source);
+        assert_eq!(second, THROTTLE_BASE_DELAY);
+
+        // The reservation is recorded synchronously inside reserve_failure; a
+        // cancelled sleep future (handler drop) cannot erase it.
+        drop(tokio::time::sleep(second));
+
+        let third = throttle.reserve_failure(source);
+        assert_eq!(third, 2 * THROTTLE_BASE_DELAY);
+    }
 }

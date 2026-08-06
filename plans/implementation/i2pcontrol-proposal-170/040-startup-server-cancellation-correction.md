@@ -1,6 +1,6 @@
 # M040 — Startup Server Cancellation-Owner Correction
 
-Status: ready
+Status: closed
 
 Source roadmap:
 

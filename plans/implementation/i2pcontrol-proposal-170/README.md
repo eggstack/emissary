@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: corrective pass required; M040 ready
+Status: partial Proposal 170 support; corrective sequence closed
 
 This directory contains bounded internal implementation and closure handoffs for
 the I2PControl Proposal 170 subsystem.
@@ -36,23 +36,23 @@ read-only. Violation is a stop condition and invalidates affected evidence.
 
 ## Current handoff
 
-M040 is the only dependency-ready implementation plan:
+The corrective sequence is closed through M044. No implementation plan is
+currently dependency-ready; deferred RouterInfo sources and unsupported tunnel
+families remain outside this roadmap.
 
-- `040-startup-server-cancellation-correction.md`
-
-It corrects the startup-managed generic server cancellation-owner regression
-without changing control-plane ownership, core behavior, protocol, or tunnel
-families.
+The sequence corrected the startup-managed generic server cancellation-owner
+regression without changing control-plane ownership, core behavior, protocol,
+or tunnel families.
 
 ## Corrective sequence
 
 | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|
-| M040 — Startup server cancellation-owner correction | ready | `040-startup-server-cancellation-correction.md` | M039 invalidation recorded |
-| M041 — Authentication throttle source/accounting correction | blocked | `041-auth-throttle-source-accounting.md` | M040 closed |
-| M042 — AddressBook subscription commit boundary | blocked | `042-addressbook-subscription-commit-boundary.md` | M041 closed |
-| M043 — Corrective runtime regression validation | blocked | `043-corrective-runtime-regression-validation.md` | M040–M042 closed |
-| M044 — Corrective final-head reclosure | blocked | `044-corrective-final-head-reclosure.md` | M043 closed |
+| M040 — Startup server cancellation-owner correction | closed | `040-startup-server-cancellation-correction.md` | M039 invalidation recorded |
+| M041 — Authentication throttle source/accounting correction | closed | `041-auth-throttle-source-accounting.md` | M040 closed |
+| M042 — AddressBook subscription commit boundary | closed | `042-addressbook-subscription-commit-boundary.md` | M041 closed |
+| M043 — Corrective runtime regression validation | closed | `043-corrective-runtime-regression-validation.md` | M040–M042 closed |
+| M044 — Corrective final-head reclosure | closed | `044-corrective-final-head-reclosure.md` | M043 closed |
 
 Only the registry may advance a successor to `ready` after its hard dependency
 and closure evidence are accepted.
@@ -210,6 +210,13 @@ git diff --check
 Each plan adds focused commands. Use targeted formatting. Remote CI, release,
 coverage, fuzz, soak, network farms, and generated evidence bundles are not
 required.
+
+## Corrective sequence disposition
+
+The M039 invalidation was resolved by the serialized M040–M044 corrective
+sequence. M040–M043 are closed with accepted evidence records; M044 is the
+final independent reclosure. No deferred RouterInfo source or unsupported
+tunnel-family plan became dependency-ready.
 
 ## Final-status rule
 

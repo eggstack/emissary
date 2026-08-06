@@ -1,6 +1,6 @@
 # M044 — Corrective Final-Head Reclosure
 
-Status: blocked
+Status: closed; partial Proposal 170 support
 
 Hard dependency:
 

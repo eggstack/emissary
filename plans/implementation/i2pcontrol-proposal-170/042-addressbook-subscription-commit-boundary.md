@@ -1,6 +1,6 @@
 # M042 — AddressBook Subscription Commit-Boundary Correction
 
-Status: blocked
+Status: closed
 
 Hard dependency:
 

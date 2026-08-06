@@ -1,10 +1,10 @@
 # I2PControl Proposal 170 Operational Corrective Roadmap
 
-Status: corrective pass required; M040 ready
+Status: partial Proposal 170 support; corrective sequence closed
 
 Planning baseline:
 
-- `563e093ba1e65b4edc31104e3045c8b5a665e8ed` — invalidated M039 final head
+- `342420e` — corrected final evidence head reviewed by M044
 
 Pinned external authority:
 
@@ -199,14 +199,14 @@ M043 corrective runtime regression validation
 M044 independent corrective final-head reclosure
 ```
 
-Only M040 is dependency-ready. The sequence is deliberately serialized so each
-implementation and closure head is frozen before the next handoff.
+M040–M044 are closed. No successor is registered or dependency-ready: deferred
+RouterInfo sources and unsupported tunnel families remain outside this roadmap.
 
 ## 7. Corrective milestones
 
 ### M040 — Startup server cancellation-owner correction
 
-Status: ready
+Status: closed
 
 Plan:
 
@@ -230,7 +230,7 @@ Exit conditions:
 
 ### M041 — Authentication throttle source/accounting correction
 
-Status: blocked on M040
+Status: closed
 
 Plan:
 
@@ -245,7 +245,7 @@ Objective:
 
 ### M042 — AddressBook subscription commit-boundary correction
 
-Status: blocked on M041
+Status: closed
 
 Plan:
 
@@ -260,7 +260,7 @@ Objective:
 
 ### M043 — Corrective runtime regression validation
 
-Status: blocked on M040–M042
+Status: closed
 
 Plan:
 
@@ -276,7 +276,7 @@ Objective:
 
 ### M044 — Corrective final-head reclosure
 
-Status: blocked on M043
+Status: closed; partial Proposal 170 support
 
 Plan:
 

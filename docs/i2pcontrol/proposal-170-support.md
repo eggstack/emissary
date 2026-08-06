@@ -7,6 +7,7 @@ Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 Historical invalidation:
 
 - `plans/closure/i2pcontrol-proposal-170/027-closure-invalidation.md`
+- `plans/closure/i2pcontrol-proposal-170/039-closure-invalidation.md` (resolved by M040–M044)
 
 Current roadmap:
 
@@ -40,6 +41,14 @@ Closed handoffs:
   `plans/closure/i2pcontrol-proposal-170/038-implementation-disposition.md`
 - M039 closed: `plans/implementation/i2pcontrol-proposal-170/039-operational-reclosure.md`; closure:
   `plans/closure/i2pcontrol-proposal-170/039-closure.md`
+- M039's final disposition was invalidated by
+  `plans/closure/i2pcontrol-proposal-170/039-closure-invalidation.md` and
+  corrected by M040–M044:
+  - M040: `plans/closure/i2pcontrol-proposal-170/040-closure.md`
+  - M041: `plans/closure/i2pcontrol-proposal-170/041-closure.md`
+  - M042: `plans/closure/i2pcontrol-proposal-170/042-closure.md`
+  - M043: `plans/closure/i2pcontrol-proposal-170/043-closure.md`
+  - M044: `plans/closure/i2pcontrol-proposal-170/044-closure.md`
 
 M019 is superseded and non-controlling. M020–M027 remain retained corrective
 evidence, while M027's final disposition is historical invalidated evidence.
@@ -66,17 +75,18 @@ implementation.
 
 ## Current overall disposition
 
-The repository is closed for the authorized in-scope dimensions. M039 reviewed
-the complete final head and accepted the final disposition as partial Proposal
-170 support.
+The repository is closed for the authorized in-scope dimensions. M044 reviewed
+the corrected final head and accepted the final disposition as partial Proposal
+170 support. M039 remains a historical invalidated closure.
 
 M028 owns the status/feature-boundary correction. M030 owns the destination
 authority, lookup precedence, bounded import/repair, and independent final-head
 review. M034 owns live subscription replacement, bounded refresh control, and
 truthful configuration rejection. M035 owns the base method inventory and the
 mode-specific RouterInfo compatibility boundary. M038 owns production-composition
-and live child-process interoperability evidence. M039 owns the accepted
-independent final-head review.
+and live child-process interoperability evidence. M040–M043 own the corrective
+implementation and regression evidence; M044 owns the accepted independent
+final-head review.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because 26 of the 43 RouterInfo additions lack
@@ -214,8 +224,9 @@ M034 additionally proves:
 - `SetSubscriptions` reaches the active downloader through one bounded typed
   command seam and publishes complete generations durably;
 - restart restores the last accepted source set;
-- queue/unavailable and concurrent replacement behavior preserves complete
-  prior-or-new generations;
+- pre-commit unavailability preserves the prior generation, while post-commit
+  refresh-worker unavailability cannot turn the completed mutation into an
+  error response;
 - URL/count/aggregate bounds are enforced before mutation;
 - every pinned `SetConfig` key has an explicit path/unsupported disposition;
 - non-empty configuration requests never persist or report success;
@@ -304,6 +315,11 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M029 | historical invalidated closure | retained non-AddressBook evidence |
 | M030 | closed; partial Proposal 170 support | AddressBook destination/lookup coherence and final-head review |
 | M034 | closed | AddressBook setter truthfulness and runtime subscription control |
+| M040 | closed | startup server cancellation-owner correction |
+| M041 | closed | source-IP throttle identity and atomic reservation |
+| M042 | closed | AddressBook post-commit refresh boundary |
+| M043 | closed | corrective runtime regression validation |
+| M044 | closed; partial Proposal 170 support | corrected final-head independent reclosure |
 
 ## Final-status rule
 

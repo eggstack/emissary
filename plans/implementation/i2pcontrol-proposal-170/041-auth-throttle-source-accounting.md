@@ -1,6 +1,6 @@
 # M041 — Authentication Throttle Source and Accounting Correction
 
-Status: blocked
+Status: closed
 
 Hard dependency:
 

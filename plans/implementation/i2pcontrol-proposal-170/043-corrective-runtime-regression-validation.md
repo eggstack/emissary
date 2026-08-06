@@ -1,6 +1,6 @@
 # M043 — Corrective Runtime Regression Validation
 
-Status: blocked
+Status: closed
 
 Hard dependencies:
 

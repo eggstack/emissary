@@ -14,9 +14,12 @@ I2PControl uses JSON-RPC authentication with opaque tokens:
 - Tokens are cryptographically random (32 bytes, hex-encoded)
 - Tokens are stored in-memory only; no persistence
 - Maximum concurrent tokens bounded at 1024
-- Failed authentication is throttled per accepted TCP peer with a fixed-capacity
-  monotonic-window table and bounded delay; successful authentication clears
-  that peer's failure state
+- Failed authentication is throttled per source IP with a fixed-capacity
+  monotonic-window table and bounded delay; source ports are not separate
+  identities, and successful authentication clears that IP's failure state
+- Failure counts are reserved before response delay, including for concurrent
+  reconnects; state is in-memory and process-local, with no forwarded-header,
+  persistent, or distributed rate limiting
 - Credentials are never logged or included in Debug output
 
 See [README.md](README.md) for authentication details.

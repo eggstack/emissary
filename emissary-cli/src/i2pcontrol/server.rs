@@ -1278,13 +1278,12 @@ async fn invalid_password_response(
     source: Option<SocketAddr>,
     id: RequestId,
 ) -> serde_json::Value {
-    let delay = state.auth_throttle().delay_for_failure(source);
-    // The throttle lock is released before this await. Cancellation here does
-    // not mutate throttle state; the failure is recorded only after the delay.
+    let delay = state.auth_throttle().reserve_failure(source);
+    // The throttle lock is released before this await. Reservation is deliberately conservative:
+    // cancellation during the delay does not erase the recorded failed attempt.
     if !delay.is_zero() {
         tokio::time::sleep(delay).await;
     }
-    state.auth_throttle().record_failure(source);
     serde_json::to_value(JsonRpcErrorResponse::new(
         id,
         rpc::error_codes::INVALID_PASSWORD,
@@ -1501,7 +1500,7 @@ mod tests {
         let first = handle_authenticate_with_source(&state, &wrong, source).await;
         assert_eq!(first["error"]["code"], rpc::error_codes::INVALID_PASSWORD);
         assert_eq!(state.auth_throttle().count(), 1);
-        let delay = state.auth_throttle().delay_for_failure(source);
+        let delay = state.auth_throttle().reserve_failure(source);
         assert!(delay <= auth::THROTTLE_MAX_DELAY);
 
         let second = handle_authenticate_with_source(&state, &wrong, source).await;
@@ -1525,6 +1524,33 @@ mod tests {
         );
         let _ = handle_authenticate_with_source(&state, &wrong, source).await;
         let response = handle_authenticate_with_source(&state, &correct, source).await;
+        assert!(response["result"]["Token"].is_string());
+        assert_eq!(state.auth_throttle().count(), 0);
+    }
+
+    #[tokio::test]
+    async fn authentication_throttle_is_shared_across_reconnect_ports() {
+        let state = I2pControlState::new_test("testpass".to_string());
+        let wrong = request(
+            rpc::methods::AUTHENTICATE,
+            serde_json::json!({"API": 2, "Password": "wrong"}),
+            Some(RequestId::Number(1)),
+        );
+        let correct = request(
+            rpc::methods::AUTHENTICATE,
+            serde_json::json!({"API": 2, "Password": "testpass"}),
+            Some(RequestId::Number(2)),
+        );
+        let first_port = Some("127.0.0.1:10001".parse().unwrap());
+        let second_port = Some("127.0.0.1:50000".parse().unwrap());
+
+        let first = handle_authenticate_with_source(&state, &wrong, first_port).await;
+        let second = handle_authenticate_with_source(&state, &wrong, second_port).await;
+        assert_eq!(first["error"]["code"], rpc::error_codes::INVALID_PASSWORD);
+        assert_eq!(second["error"]["code"], rpc::error_codes::INVALID_PASSWORD);
+        assert_eq!(state.auth_throttle().count(), 1);
+
+        let response = handle_authenticate_with_source(&state, &correct, second_port).await;
         assert!(response["result"]["Token"].is_string());
         assert_eq!(state.auth_throttle().count(), 0);
     }

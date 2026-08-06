@@ -20,7 +20,7 @@ use parking_lot::{Mutex, RwLock};
 use rand::RngExt;
 use std::{
     collections::{HashMap, VecDeque},
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -63,7 +63,7 @@ pub(crate) struct AuthThrottle {
 }
 
 struct ThrottleStore {
-    failures: HashMap<SocketAddr, FailureState>,
+    failures: HashMap<IpAddr, FailureState>,
 }
 
 #[derive(Clone, Copy)]
@@ -88,26 +88,13 @@ impl AuthThrottle {
         }
     }
 
-    /// Compute a delay without changing state. Callers sleep after the lock
-    /// is released and record the completed failure afterwards.
-    pub(crate) fn delay_for_failure(&self, source: Option<SocketAddr>) -> Duration {
-        let Some(source) = source else {
+    /// Reserve one failed-authentication attempt and return its bounded delay.
+    ///
+    /// The reservation is complete before the caller awaits, so concurrent attempts cannot
+    /// observe and reuse one stale failure count. The lock is released before this returns.
+    pub(crate) fn reserve_failure(&self, source: Option<SocketAddr>) -> Duration {
+        let Some(source) = source.map(|address| address.ip()) else {
             return Duration::ZERO;
-        };
-        let now = Instant::now();
-        let store = self.inner.lock();
-        let Some(failure) = store.failures.get(&source) else {
-            return Duration::ZERO;
-        };
-        if now.duration_since(failure.last_failure) >= THROTTLE_WINDOW {
-            return Duration::ZERO;
-        }
-        delay_for_count(failure.count)
-    }
-
-    pub(crate) fn record_failure(&self, source: Option<SocketAddr>) {
-        let Some(source) = source else {
-            return;
         };
         let now = Instant::now();
         let mut store = self.inner.lock();
@@ -118,11 +105,12 @@ impl AuthThrottle {
                     first_failure: now,
                     last_failure: now,
                 };
+                return Duration::ZERO;
             } else {
                 failure.count = failure.count.saturating_add(1);
                 failure.last_failure = now;
             }
-            return;
+            return delay_for_count(failure.count.saturating_sub(1));
         }
 
         if store.failures.len() >= MAX_THROTTLE_ENTRIES {
@@ -143,11 +131,12 @@ impl AuthThrottle {
                 last_failure: now,
             },
         );
+        Duration::ZERO
     }
 
     pub(crate) fn clear(&self, source: Option<SocketAddr>) {
         if let Some(source) = source {
-            self.inner.lock().failures.remove(&source);
+            self.inner.lock().failures.remove(&source.ip());
         }
     }
 
@@ -361,8 +350,9 @@ mod tests {
     #[test]
     fn throttle_capacity_is_bounded_under_source_churn() {
         let throttle = AuthThrottle::new();
-        for port in 0..(MAX_THROTTLE_ENTRIES as u16 + 32) {
-            throttle.record_failure(Some(([127, 0, 0, 1], port).into()));
+        for index in 0..(MAX_THROTTLE_ENTRIES + 32) {
+            let source = std::net::Ipv4Addr::new(10, 0, (index / 255) as u8, (index % 255) as u8);
+            throttle.reserve_failure(Some((source, 7650).into()));
         }
         assert_eq!(throttle.count(), MAX_THROTTLE_ENTRIES);
     }
@@ -372,8 +362,55 @@ mod tests {
         let throttle = AuthThrottle::new();
         let source = Some(([127, 0, 0, 1], 7650).into());
         for _ in 0..1000 {
-            throttle.record_failure(source);
+            throttle.reserve_failure(source);
         }
-        assert!(throttle.delay_for_failure(source) <= THROTTLE_MAX_DELAY);
+        assert!(throttle.reserve_failure(source) <= THROTTLE_MAX_DELAY);
+    }
+
+    #[test]
+    fn throttle_normalizes_source_ports_to_one_ip_identity() {
+        let throttle = AuthThrottle::new();
+        let first = Some(([127, 0, 0, 1], 10001).into());
+        let second = Some(([127, 0, 0, 1], 50000).into());
+
+        assert_eq!(throttle.reserve_failure(first), Duration::ZERO);
+        assert_eq!(throttle.reserve_failure(second), THROTTLE_BASE_DELAY);
+        assert_eq!(throttle.count(), 1);
+        throttle.clear(second);
+        assert_eq!(throttle.count(), 0);
+    }
+
+    #[test]
+    fn throttle_reserves_concurrent_failures_atomically() {
+        let throttle = AuthThrottle::new();
+        let source = Some(([127, 0, 0, 1], 7650).into());
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(8));
+
+        let delays = std::thread::scope(|scope| {
+            let mut handles = Vec::new();
+            for _ in 0..8 {
+                let throttle = throttle.clone();
+                let barrier = std::sync::Arc::clone(&barrier);
+                handles.push(scope.spawn(move || {
+                    barrier.wait();
+                    throttle.reserve_failure(source)
+                }));
+            }
+            handles.into_iter().map(|handle| handle.join().unwrap()).collect::<Vec<_>>()
+        });
+
+        let mut expected = (0..8)
+            .map(|count| {
+                if count == 0 {
+                    Duration::ZERO
+                } else {
+                    delay_for_count(count)
+                }
+            })
+            .collect::<Vec<_>>();
+        let mut actual = delays;
+        expected.sort();
+        actual.sort();
+        assert_eq!(actual, expected);
     }
 }

@@ -2419,12 +2419,13 @@ mod tests {
         let (ready_sender, ready_receiver) = oneshot::channel();
         let task = tokio::spawn(manager.run(port, "127.0.0.1".to_string(), ready_receiver));
         ready_sender.send(()).unwrap();
-        for _ in 0..100 {
-            if control.subscription_control.started.load(Ordering::Acquire) {
-                break;
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while !control.subscription_control.started.load(Ordering::Acquire) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
             }
-            tokio::time::sleep(Duration::from_millis(1)).await;
-        }
+        })
+        .await
+        .expect("address book subscription worker should start");
         (control, task, proxy)
     }
 

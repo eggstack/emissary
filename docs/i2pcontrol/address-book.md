@@ -97,10 +97,12 @@ Compatibility forms do not count as canonical Proposal 170 coverage.
 `SetSubscriptions` replaces the complete bounded source set used by the active
 AddressBook downloader. The manager accepts one bounded command at a time and
 coalesces refresh work to the newest complete generation. A successful result
-means the active source set and durable control state were both updated and one
-refresh was accepted; remote download success is not part of the setter's
-success condition. If the downloader is unavailable, the request fails and the
-previous set remains active and recoverable. On platforms with directory
+means the active source set and durable control state were both updated; remote
+download success is not part of the setter's success condition. Refresh is
+bounded follow-up work, so a worker that becomes unavailable after commit may
+emit a diagnostic but cannot turn the completed mutation into an error. If the
+downloader is unavailable before the manager accepts the command, the request
+fails and the previous set remains active and recoverable. On platforms with directory
 synchronization, the publication also reaches the documented power-loss
 durability point; other platforms retain process-crash atomicity only.
 

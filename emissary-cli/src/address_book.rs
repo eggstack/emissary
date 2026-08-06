@@ -59,10 +59,9 @@ pub use crate::i2pcontrol::address_book_runtime::{
 
 #[cfg(feature = "i2pcontrol")]
 use crate::i2pcontrol::address_book_runtime::{
-    is_valid_full_destination, validate_runtime_entry,
-    RuntimeAddressBookOwner, RuntimeSubscriptionCommand, RuntimeSubscriptionControl,
-    MAX_LEGACY_DESTINATION_BYTES, MAX_LEGACY_DESTINATION_ENTRIES,
-    MAX_LEGACY_DESTINATION_FILE_BYTES,
+    is_valid_full_destination, validate_runtime_entry, RuntimeAddressBookOwner,
+    RuntimeSubscriptionCommand, RuntimeSubscriptionControl, MAX_LEGACY_DESTINATION_BYTES,
+    MAX_LEGACY_DESTINATION_ENTRIES, MAX_LEGACY_DESTINATION_FILE_BYTES,
 };
 
 #[cfg(all(feature = "i2pcontrol", test))]
@@ -862,28 +861,13 @@ impl AddressBookManager {
             tokio::select! {
                 command = receiver.recv() => {
                     let Some(command) = command else { break };
-                    let subscriptions = command.subscriptions;
-                    let result = self.commit_subscription_command(&subscriptions).await;
-                    if result.is_ok() {
-                        if refresh_busy {
-                            pending_refresh = Some(subscriptions);
-                        } else {
-                            match refresh_sender.try_send(subscriptions) {
-                                Ok(()) => refresh_busy = true,
-                                Err(mpsc::error::TrySendError::Full(subscriptions)) => {
-                                    pending_refresh = Some(subscriptions);
-                                    refresh_busy = true;
-                                }
-                                Err(mpsc::error::TrySendError::Closed(_)) => {
-                                    let _ = command.response.send(Err(
-                                        "address book refresh worker was unavailable".to_string(),
-                                    ));
-                                    continue;
-                                }
-                            }
-                        }
-                    }
-                    let _ = command.response.send(result);
+                    self.handle_subscription_command(
+                        command,
+                        &mut refresh_busy,
+                        &mut pending_refresh,
+                        &refresh_sender,
+                    )
+                    .await;
                 }
                 done = done_receiver.recv(), if refresh_busy => {
                     if done.is_none() {
@@ -901,6 +885,41 @@ impl AddressBookManager {
         }
 
         worker.abort();
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    async fn handle_subscription_command(
+        &self,
+        command: RuntimeSubscriptionCommand,
+        refresh_busy: &mut bool,
+        pending_refresh: &mut Option<Vec<String>>,
+        refresh_sender: &mpsc::Sender<Vec<String>>,
+    ) {
+        let subscriptions = command.subscriptions;
+        let result = self.commit_subscription_command(&subscriptions).await;
+        if result.is_ok() {
+            if *refresh_busy {
+                *pending_refresh = Some(subscriptions);
+            } else {
+                match refresh_sender.try_send(subscriptions) {
+                    Ok(()) => *refresh_busy = true,
+                    Err(mpsc::error::TrySendError::Full(subscriptions)) => {
+                        *pending_refresh = Some(subscriptions);
+                        *refresh_busy = true;
+                    }
+                    Err(mpsc::error::TrySendError::Closed(_)) => {
+                        // The subscription owner has already committed and activated the
+                        // replacement. Refresh is bounded follow-up work, so a closed worker
+                        // cannot turn that completed mutation into an error response.
+                        tracing::warn!(
+                            target: LOG_TARGET,
+                            "address book refresh worker was unavailable after subscription commit",
+                        );
+                    }
+                }
+            }
+        }
+        let _ = command.response.send(result);
     }
 
     #[cfg(feature = "i2pcontrol")]
@@ -2325,6 +2344,43 @@ mod tests {
         assert!(result.is_err());
         assert!(control.runtime_subscriptions().await.unwrap().is_empty());
         assert!(control.runtime_active_subscriptions().is_empty());
+    }
+
+    #[cfg(feature = "i2pcontrol")]
+    #[tokio::test]
+    async fn set_subscriptions_worker_failure_after_commit_returns_success() {
+        let dir = tempdir().unwrap().keep();
+        let manager = AddressBookManager::new_with_control_owner(
+            dir,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let control = manager.control_handle().unwrap();
+        let replacement = vec!["https://committed.example/hosts.txt".to_string()];
+        let (response_sender, response_receiver) = oneshot::channel();
+        let (refresh_sender, refresh_receiver) = mpsc::channel(1);
+        drop(refresh_receiver);
+
+        let mut refresh_busy = false;
+        let mut pending_refresh = None;
+        manager
+            .handle_subscription_command(
+                RuntimeSubscriptionCommand {
+                    subscriptions: replacement.clone(),
+                    response: response_sender,
+                },
+                &mut refresh_busy,
+                &mut pending_refresh,
+                &refresh_sender,
+            )
+            .await;
+
+        assert!(response_receiver.await.unwrap().is_ok());
+        assert_eq!(control.runtime_active_subscriptions(), replacement);
+        assert_eq!(control.runtime_subscriptions().await.unwrap(), replacement);
     }
 
     #[cfg(feature = "i2pcontrol")]

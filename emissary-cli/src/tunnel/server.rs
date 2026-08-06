@@ -302,7 +302,9 @@ impl ServerTunnelManager {
             "starting server tunnel",
         );
 
-        let (_, cancellation) = tokio::sync::watch::channel(false);
+        // The startup manager has no administrative stop handle. Keep the sender alive for the
+        // whole runtime invocation so its receiver does not interpret sender drop as cancellation.
+        let (_cancellation_keepalive, cancellation) = tokio::sync::watch::channel(false);
         let (ready, _ready_result) = tokio::sync::oneshot::channel();
         let result = run_single_server(
             ServerTunnelRuntimeConfig {
@@ -341,5 +343,133 @@ impl ServerTunnelManager {
                 self.destination_observer.clone(),
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+    #[tokio::test]
+    async fn startup_manager_reaches_forward_and_keeps_runtime_alive() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let sam_port = listener.local_addr().unwrap().port();
+        let commands = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let command_notify = Arc::new(tokio::sync::Notify::new());
+        let sam_commands = Arc::clone(&commands);
+        let sam_notify = Arc::clone(&command_notify);
+        let sam_task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let sam_commands = Arc::clone(&sam_commands);
+                let sam_notify = Arc::clone(&sam_notify);
+                tokio::spawn(async move {
+                    let (read_half, mut write_half) = stream.into_split();
+                    let mut reader = BufReader::new(read_half);
+                    let mut line = String::new();
+                    loop {
+                        line.clear();
+                        if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                            break;
+                        }
+                        sam_commands.lock().unwrap().push(line.trim_end().to_string());
+                        sam_notify.notify_waiters();
+                        let response = if line.starts_with("HELLO") {
+                            "HELLO REPLY RESULT=OK VERSION=3.3\n"
+                        } else if line.starts_with("SESSION CREATE") {
+                            "SESSION STATUS DESTINATION=startup-destination\n"
+                        } else {
+                            "STREAM STATUS RESULT=OK\n"
+                        };
+                        if write_half.write_all(response.as_bytes()).await.is_err() {
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+
+        let (destination_sender, destination_receiver) = tokio::sync::oneshot::channel();
+        let destination_sender = Arc::new(std::sync::Mutex::new(Some(destination_sender)));
+        let observer: DestinationObserver = Arc::new(move |name, destination| {
+            if let Some(sender) = destination_sender.lock().unwrap().take() {
+                let _ = sender.send((name.to_string(), destination.to_string()));
+            }
+        });
+        let config = Arc::new(TunnelConfig {
+            destination: "startup-private-key".to_string(),
+            i2cp: None,
+            name: "startup-server".to_string(),
+            port: 0,
+            sam_tcp_port: sam_port,
+        });
+        let runtime = tokio::spawn(ServerTunnelManager::server_event_loop(
+            config,
+            Some(observer),
+        ));
+
+        let (name, destination) =
+            tokio::time::timeout(Duration::from_secs(1), destination_receiver)
+                .await
+                .expect("startup server should reach SAM session setup")
+                .expect("destination observer should be called");
+        assert_eq!(name, "startup-server");
+        assert_eq!(destination, "startup-destination");
+
+        let forward_result = tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if commands
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|command| command.starts_with("STREAM FORWARD"))
+                {
+                    break;
+                }
+                command_notify.notified().await;
+            }
+        })
+        .await;
+        assert!(
+            forward_result.is_ok(),
+            "startup server should reach STREAM FORWARD; commands: {:?}",
+            commands.lock().unwrap()
+        );
+
+        assert!(
+            !runtime.is_finished(),
+            "startup runtime must remain owned and alive"
+        );
+        runtime.abort();
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn closed_cancellation_sender_still_cancels_reusable_runtime() {
+        let (cancellation_sender, cancellation) = tokio::sync::watch::channel(false);
+        drop(cancellation_sender);
+        let (ready_sender, ready_receiver) = tokio::sync::oneshot::channel();
+        let result = run_single_server(
+            ServerTunnelRuntimeConfig {
+                name: "cancelled-server".to_string(),
+                port: 0,
+                destination: "unused-private-key".to_string(),
+                sam_tcp_port: 1,
+                lease_set_enc_type: None,
+            },
+            cancellation,
+            ready_sender,
+            None,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(
+            ready_receiver.await.unwrap().unwrap_err(),
+            "server tunnel start cancelled"
+        );
     }
 }

@@ -1,14 +1,16 @@
 # M045 — RouterInfo Known-Peer Directory Sources
 
-Status: blocked — corrective live ProfileStorage seam required
+Status: blocked — corrected only through M053
 
 Planning baseline: `b759038`
 
 Source roadmap: `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 
+Corrective authority: `plans/implementation/i2pcontrol-proposal-170/053-m045-live-profile-storage-corrective.md`
+
 Milestone class: capability + containment invariant
 
-Hard dependency: M044 closed
+Hard dependency: M044 closed; corrective dependency M053 must close before M045 can be accepted
 
 Pinned authority: I2P Proposal 170 `I2PControl Expansion`, Open, revision `2026-05-20`.
 
@@ -24,62 +26,66 @@ Use the existing `ProfileStorage` owned by `RouterContext` as the canonical know
 
 ## 2. Current evidence
 
-`Router::inspection_snapshot()` already demonstrates that `router_context().profile_storage()` can enumerate known router IDs and retrieve public serialized RouterInfo without mutable NetDB authority. The existing snapshot is not a live I2PControl source and must not become a second cache.
+`Router::inspection_snapshot()` demonstrates that core can enumerate known router IDs and retrieve public serialized RouterInfo without mutable NetDB authority, but M045 closure proved that retaining this one-shot snapshot at I2PControl startup is not a live source.
 
-`router_info.rs` already defines the peer-directory DTO/trait vocabulary and `router_info_handler.rs` already owns wire serialization. `rpc.rs::router_info_keys::PROPOSAL_170_CONTRACT` currently marks these three fields unavailable.
+The M045 implementation attempt at `5ae0477` passed shape/bounds/conformance tests but was rejected at closure because later peer-directory churn was invisible. The rollback/planning head `bf9c2eeb` restored all three fields to unavailable and recorded the exact missing primitive.
+
+`router_info_handler.rs` owns wire serialization and `rpc.rs::router_info_keys::PROPOSAL_170_CONTRACT` currently marks these three fields unavailable.
 
 ## 3. Invariants
 
-1. No `emissary-core/**` production change is expected or authorized for M045.
+1. M045 itself does not authorize core production changes; its disproven zero-core assumption is corrected only by M053's explicitly bounded exception.
 2. No new NetDB command, query, polling loop, cache, or mutable handle is introduced.
 3. The source is read-only and contains public RouterInfo only; no keys, LeaseSet private material, sockets, channels, or mutable subsystem objects cross the boundary.
-4. Results are bounded before allocation/serialization and deterministic after collection.
-5. A missing raw RouterInfo for a known ID is represented according to the exact field contract; it is not replaced by an empty string or adjacent data.
+4. Results are bounded before wire serialization and deterministic after collection.
+5. A missing raw RouterInfo for an enumerated ID fails closed according to the exact field contract; it is not replaced by an empty string or adjacent data.
 6. Direct Proposal 170 presence semantics and compatibility-mode behavior do not change.
-7. Default/no-I2PControl execution performs no new work.
+7. Default/no-I2PControl execution performs no new background work.
+8. A source retained across I2PControl startup must remain live: canonical peer-directory mutation after source construction must be visible to a later request.
 
 ## 4. Explicit non-goals
 
 - active-peer sources, connection limits, active-peer statistics, bans;
-- NetDB protocol or storage changes;
+- NetDB protocol or storage behavior changes;
 - peer discovery, scoring, routing, profiling, or eviction changes;
 - new background sampling;
+- public export of `ProfileStorage`/`Bucket` merely for I2PControl;
 - tunnel, transport, AddressBook, frontend, CI/release, or upstream work.
 
-## 5. Required production changes
+## 5. Original production budget and corrective disposition
 
-Preferred production budget:
+The original M045 preferred production budget was:
 
 - `emissary-cli/src/i2pcontrol/router_info.rs`;
 - `emissary-cli/src/i2pcontrol/router_info_handler.rs`;
 - `emissary-cli/src/i2pcontrol/production.rs`;
 - `emissary-cli/src/i2pcontrol/rpc.rs`;
 - `emissary-cli/src/i2pcontrol/server.rs` as composition/state plumbing only;
-- `emissary-cli/src/main.rs` only to provide the already-existing read-only router/profile source to I2PControl.
+- `emissary-cli/src/main.rs` as composition only.
 
-If implementation appears to require a change under `emissary-core/**`, stop M045 and record the exact missing public read-only primitive. Do not broaden the milestone silently.
+That zero-core budget reached its stop condition. M053 now separately authorizes exactly:
 
-## 6. Work packages
+- `emissary-core/src/inspection.rs`;
+- `emissary-core/src/router/mod.rs`.
 
-### WP1 — Source contract
+M053 does not authorize `profile.rs`, `router/context.rs`, NetDB, or `lib.rs` public re-export changes. M045 must not be implemented independently of M053 or by restoring the rejected startup `CoreSnapshot` approach.
 
-Define one I2PControl-owned read-only peer-directory abstraction that can return a bounded generation/snapshot of known router IDs and public RouterInfo bytes. The production adapter may retain a clone of the existing `ProfileStorage` or another existing read-only core object; it must not retain `Router` itself.
+## 6. Required corrective behavior
 
-### WP2 — Production adapter
+M053 owns the corrective implementation details. For M045 acceptance, the resulting production path must:
 
-Implement the source against current `ProfileStorage` APIs. Acquire/copy only the requested bounded data. Canonical ordering and duplicate handling belong to I2PControl.
-
-### WP3 — Wire integration
-
-Wire the source into `ProductionRouterInfoControl`. Reuse existing serializers. Change only these three `PROPOSAL_170_CONTRACT` rows from unavailable to available after focused source tests pass.
-
-### WP4 — Evidence and guards
-
-Add tests proving boundedness, deterministic ordering, public RouterInfo fidelity, unavailable/error behavior when the source cannot satisfy a request, and no core production diff.
+- retain a neutral cloneable live core inspection source rather than a one-shot startup snapshot;
+- observe current canonical `ProfileStorage` state at request time;
+- return only bounded owned public RouterIds and serialized public RouterInfo;
+- leave sorting/deduplication, Base64/wire conversion, bounds, Proposal 170 source disposition, and JSON-RPC behavior in I2PControl;
+- fail closed for incomplete churn joins;
+- promote only the three M045 rows after live-source regression evidence passes.
 
 ## 7. Failure, cancellation, restart, and contention
 
-The operation is request-scoped and read-only. No locks may be held across `.await`, network I/O, sleep, or JSON serialization. Source failure aborts the RouterInfo request through the existing sanitized inspection error path; no partial peer result is returned. Restart requires no migration or persisted state.
+The operation is request-scoped and read-only. No locks may be held across `.await`, network I/O, sleep, or JSON serialization. Source failure aborts the RouterInfo request through the existing sanitized inspection error path; no partial peer result is fabricated. Restart requires no migration or persisted state.
+
+Concurrent peer churn is normal. A request-time snapshot may reflect a bounded instant during collection, but if an enumerated peer's required public RouterInfo cannot be copied coherently, the request fails closed rather than returning a plausible partial directory.
 
 ## 8. Compatibility and migration
 
@@ -87,42 +93,38 @@ No storage/schema/configuration migration. Base nested `Selector` behavior remai
 
 ## 9. Tests and verification
 
-Focused tests must cover zero peers, one peer, deterministic many-peer ordering, bound rejection rather than truncation where required, known ID with public RI, and failure propagation.
+The original fixtures remain necessary but insufficient. M053 adds the missing regression:
 
-Run at minimum:
+1. construct the live source;
+2. observe initial state;
+3. mutate canonical `ProfileStorage` through its existing normal owner/test path;
+4. query the same source instance again;
+5. prove the new/current peer and RouterInfo are visible without source reconstruction.
 
-```bash
-cargo test -p emissary-cli --no-default-features --features i2pcontrol router_info --no-fail-fast
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --test production_composition --no-fail-fast
-cargo check -p emissary-cli --no-default-features
-cargo test -p emissary-cli --no-default-features
-cargo check -p emissary-cli --no-default-features --features i2pcontrol
-cargo test -p emissary-cli --no-default-features --features i2pcontrol
-git diff --check
-```
-
-Use targeted formatting only; do not add CI/fuzz/soak infrastructure.
+Also retain zero/one/many peer cases, deterministic ordering, bound rejection, known ID with public RI, failure propagation, conformance-manifest fixtures, production composition, no-feature checks, and the bounded package matrix defined by M053.
 
 ## 10. Acceptance criteria
 
-M045 may close only when all three fields are served from the live canonical known-peer directory, their exact JSON types/shapes match the pinned contract, bounds are explicit, no fabricated value path exists, no `emissary-core/**` production file changed, no-feature behavior remains unchanged, and an independent closure record records the exact implementation head and command results.
+M045 may close only through an accepted M053 closure showing that:
+
+- all three fields are served from the live canonical known-peer directory;
+- the same retained inspection source observes canonical mutation after construction;
+- exact JSON types/shapes match the pinned contract;
+- bounds and incomplete-join failure semantics are explicit;
+- no fabricated value path or stale `CoreSnapshot` source remains;
+- the only corrective core production changes are the two paths authorized by M053;
+- no-feature behavior remains unchanged;
+- source accounting is truthfully 19 available, 1 protocol-permitted neutral, and 23 unavailable;
+- the independent closure records exact implementation head, verification outcomes, changed-path audit, and security review.
+
+The original M045 requirement of zero `emissary-core/**` production diff is superseded only by M053's explicit two-file corrective authorization; it is not a general relaxation of the roadmap containment rule.
 
 ## 11. Stop conditions
 
-Stop and require a corrective/new plan if the only implementation path requires changing peer discovery/routing behavior, exporting mutable NetDB authority, retaining private material, or modifying core production code.
+Stop and require another corrective disposition if the only implementation path requires changing peer discovery/routing behavior, modifying `profile.rs` or NetDB semantics, broadly exporting `ProfileStorage`/`Bucket`, retaining private material, exposing mutable authority, adding a background cache/poller, or touching core production paths outside M053's explicit budget.
 
-M045 reached this stop condition during implementation review. `RouterContext::profile_storage()`
-exposes the canonical storage owner, but the public enumeration method requires the private
-`emissary_core::profile::Bucket` type. `emissary-cli` can therefore neither enumerate the live
-directory nor construct a bounded request-time adapter without a new core read-only primitive or
-public type export. M045 authorizes no `emissary-core/**` production change. The existing
-`Router::inspection_snapshot()` adapter is a startup snapshot and is not an acceptable substitute.
-
-The exact corrective requirement is a neutral, cloneable, bounded read-only ProfileStorage
-directory primitive that returns public RouterIds and raw public RouterInfo bytes, with no Proposal
-170 or mutable subsystem types. It must be separately planned and authorized before M045 can be
-reopened.
+M045 previously reached its stop condition because `RouterContext::profile_storage()` exposed the canonical owner but `emissary-cli` could not enumerate it without the private `Bucket` type. The rejected `Router::inspection_snapshot()` adapter was startup-stale. M053 is now the authorized correction for exactly this gap.
 
 ## 12. Closure evidence required
 
-Closure must include a requirement-to-evidence matrix, changed-path review, focused contract fixtures for all three keys, no-feature evidence, failure/bounds evidence, and an internal-only attestation. External specifications/reference implementations are read-only; no upstream issue, PR, review, submission, adoption, or merge activity is authorized.
+Closure must reference M053, the blocked M045 closure, and the stale-source implementation attempt; include a requirement-to-evidence matrix; show the failing-before/passing-after post-construction churn regression; record exact verification commands/results; audit the two-file core corrective budget; reconcile all three field dispositions; and attest that external specifications/reference implementations were read-only with no upstream issue, PR, review, submission, adoption, merge, maintainer contact, or contribution artifact.

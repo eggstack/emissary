@@ -300,8 +300,8 @@ fn selector_registry_address_book_partition() {
 
 #[test]
 fn production_adapter_returns_unavailable_for_unimplemented_selectors() {
-    // The production adapter does not yet wire known peers, active peers,
-    // banned peers, peer limits, or netdb summaries. The methods must
+    // The production adapter does not yet wire active peers, banned peers,
+    // peer limits, or netdb summaries. The methods must
     // return Err(Unavailable) rather than fabricated default values.
     let rt = tokio::runtime::Runtime::new().unwrap();
     let ri = make_production_router_info();
@@ -331,6 +331,14 @@ fn production_adapter_returns_unavailable_for_unimplemented_selectors() {
             Err(InspectionError::Unavailable { .. })
         ));
     });
+}
+
+#[test]
+fn m053_composes_live_peer_directory_without_startup_snapshot() {
+    let main = read_source("src/main.rs");
+    assert!(main.contains("LivePeerDirectorySource::new"));
+    assert!(!main.contains("inspection_snapshot"));
+    assert!(!main.contains("CoreSnapshot"));
 }
 
 #[test]

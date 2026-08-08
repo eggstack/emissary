@@ -14,11 +14,11 @@ The `RouterInfo` method allows authenticated callers to request specific router 
 Proposal 170 addition manifest. The 121-key catalog is not counted as Proposal
 170 coverage. The machine-readable manifest declares exact nested JSON types,
 direct-presence semantics, mutation, owner, serializer, fixture, bound, and
-source disposition for every addition: 16 available, 1 protocol-permitted
-neutral, and 26 unavailable. The known-peer directory fields remain unavailable
-because the current public core API has no live bounded ProfileStorage
-enumeration seam; active-peer, transport, tunnel, network-error, news, and ban
-fields remain unavailable until their canonical owners are independently wired.
+source disposition for every addition: 19 available, 1 protocol-permitted
+neutral, and 23 unavailable. The known-peer directory fields use the live,
+bounded ProfileStorage inspection seam; active-peer, transport, tunnel,
+network-error, news, and ban fields remain unavailable until their canonical
+owners are independently wired.
 
 Canonical Proposal 170 additions are selected by direct parameter presence and
 are returned under the exact same key. Values are ignored. All four address-book

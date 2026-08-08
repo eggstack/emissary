@@ -205,9 +205,9 @@ backend stubs are not operational coverage.
 
 The retained matrix contains:
 
-- 16 available selectors;
+- 19 available selectors;
 - 1 protocol-permitted neutral selector;
-- 26 unavailable selectors.
+- 23 unavailable selectors.
 
 Unavailable selectors fail explicitly and are never substituted with zero,
 false, empty, or semantically adjacent values.

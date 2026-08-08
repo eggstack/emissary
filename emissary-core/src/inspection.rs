@@ -29,7 +29,157 @@
 //! - All list fields are bounded at construction time.
 //! - Snapshots are immutable after construction.
 
+use crate::{
+    primitives::RouterId,
+    profile::{Bucket, ProfileStorage},
+    runtime::Runtime,
+};
+
 use alloc::{string::String, vec::Vec};
+use core::fmt;
+
+/// A public router identity and its serialized public RouterInfo.
+#[derive(Debug, Clone)]
+pub struct PeerDirectoryEntry {
+    /// Public router identity.
+    pub router_id: RouterId,
+    /// Serialized public RouterInfo bytes.
+    pub router_info: Vec<u8>,
+}
+
+/// Owned, bounded snapshot of the current public router directory.
+#[derive(Debug, Clone, Default)]
+pub struct PeerDirectorySnapshot {
+    /// Public router entries copied from canonical profile storage.
+    pub entries: Vec<PeerDirectoryEntry>,
+}
+
+/// Failure while collecting a public router-directory snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PeerDirectoryInspectionError {
+    /// The caller-supplied item bound would be exceeded.
+    ItemLimitExceeded { limit: usize },
+    /// A directory entry did not have a matching serialized RouterInfo.
+    IncompleteEntry,
+}
+
+impl fmt::Display for PeerDirectoryInspectionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ItemLimitExceeded { limit } => {
+                write!(f, "public router directory exceeds item bound of {limit}")
+            }
+            Self::IncompleteEntry => write!(f, "public router directory snapshot is incomplete"),
+        }
+    }
+}
+
+/// Cloneable, request-time, read-only access to the canonical public router directory.
+///
+/// The storage owner remains private to the core crate. This handle exposes only
+/// bounded owned public identities and serialized public RouterInfo bytes; it has
+/// no mutation or router-control operations.
+#[derive(Clone)]
+pub struct PeerDirectoryInspection<R: Runtime> {
+    profile_storage: ProfileStorage<R>,
+}
+
+impl<R: Runtime> PeerDirectoryInspection<R> {
+    pub(crate) fn new(profile_storage: ProfileStorage<R>) -> Self {
+        Self { profile_storage }
+    }
+
+    /// Copy the current public router directory, enforcing `max_items` before
+    /// returning the collection. All storage guards are released on return.
+    pub fn snapshot(
+        &self,
+        max_items: usize,
+    ) -> Result<PeerDirectorySnapshot, PeerDirectoryInspectionError> {
+        let router_ids = self.profile_storage.get_router_ids(Bucket::Any, |_, _, _| true);
+        if router_ids.len() > max_items {
+            return Err(PeerDirectoryInspectionError::ItemLimitExceeded { limit: max_items });
+        }
+
+        let reader = self.profile_storage.reader();
+        let entries = router_ids
+            .into_iter()
+            .map(|router_id| {
+                let router_info = reader
+                    .raw_router_info(&router_id)
+                    .ok_or(PeerDirectoryInspectionError::IncompleteEntry)?;
+                Ok(PeerDirectoryEntry {
+                    router_id,
+                    router_info,
+                })
+            })
+            .collect::<Result<Vec<_>, PeerDirectoryInspectionError>>()?;
+
+        Ok(PeerDirectorySnapshot { entries })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{primitives::RouterInfoBuilder, runtime::mock::MockRuntime};
+    use bytes::Bytes;
+
+    #[tokio::test]
+    async fn peer_directory_snapshot_is_live_after_construction() {
+        let (initial_info, _, initial_signing_key) = RouterInfoBuilder::default().build();
+        let initial_id = initial_info.identity.id();
+        let initial_bytes = initial_info.serialize(&initial_signing_key);
+        let storage = ProfileStorage::<MockRuntime>::new(&[initial_bytes.clone()], &[], None);
+        let inspection = PeerDirectoryInspection::new(storage.clone());
+
+        let first = inspection.snapshot(10).unwrap();
+        assert_eq!(first.entries.len(), 1);
+        assert_eq!(first.entries[0].router_id, initial_id);
+        assert_eq!(first.entries[0].router_info, initial_bytes);
+
+        let (discovered_info, _, _) = RouterInfoBuilder::default().build();
+        let discovered_id = discovered_info.identity.id();
+        let discovered_bytes = b"current-discovered-router-info".to_vec();
+        assert!(storage.discover_router(
+            discovered_info.clone(),
+            Bytes::from(discovered_bytes.clone()),
+        ));
+
+        let second = inspection.snapshot(10).unwrap();
+        assert_eq!(second.entries.len(), 2);
+        let discovered =
+            second.entries.iter().find(|entry| entry.router_id == discovered_id).unwrap();
+        assert_eq!(discovered.router_info, discovered_bytes);
+
+        let updated_bytes = b"current-updated-router-info".to_vec();
+        assert!(storage.discover_router(discovered_info, Bytes::from(updated_bytes.clone())));
+        let third = inspection.snapshot(10).unwrap();
+        let updated = third.entries.iter().find(|entry| entry.router_id == discovered_id).unwrap();
+        assert_eq!(updated.router_info, updated_bytes);
+    }
+
+    #[tokio::test]
+    async fn peer_directory_snapshot_rejects_oversize_and_incomplete_results() {
+        let (first_info, _, first_signing_key) = RouterInfoBuilder::default().build();
+        let storage = ProfileStorage::<MockRuntime>::new(
+            &[first_info.serialize(&first_signing_key)],
+            &[],
+            None,
+        );
+        let inspection = PeerDirectoryInspection::new(storage.clone());
+
+        let (second_info, _, _) = RouterInfoBuilder::default().build();
+        storage.add_router(second_info);
+        assert!(matches!(
+            inspection.snapshot(1),
+            Err(PeerDirectoryInspectionError::ItemLimitExceeded { limit: 1 })
+        ));
+        assert!(matches!(
+            inspection.snapshot(10),
+            Err(PeerDirectoryInspectionError::IncompleteEntry)
+        ));
+    }
+}
 
 /// Bounded transport connection snapshot.
 ///

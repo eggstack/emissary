@@ -562,6 +562,12 @@ async fn udp_group_queried_once_for_multiple_selectors() {
         async fn peer_router_info(&self, peer_id: &str) -> Result<Option<String>, InspectionError> {
             self.inner.peer_router_info(peer_id).await
         }
+        async fn peer_directory(
+            &self,
+        ) -> Result<emissary_cli::i2pcontrol::router_info::PeerDirectorySnapshot, InspectionError>
+        {
+            self.inner.peer_directory().await
+        }
         async fn banned_peers(&self) -> Result<Vec<BannedPeer>, InspectionError> {
             self.inner.banned_peers().await
         }

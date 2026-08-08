@@ -15,7 +15,7 @@ use std::{
 
 use emissary_core::{crypto::base64_encode, primitives::Destination};
 use emissary_util::runtime::tokio::Runtime as TokioRuntime;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tokio::{
     io::AsyncReadExt,
     process::{Child, Command},
@@ -451,7 +451,7 @@ async fn live_runtime_interoperability() {
     )
     .await;
     assert!(result(&available)["i2p.router.logs"].is_array());
-    let unavailable = protected(
+    let peers = protected(
         &client,
         &endpoint,
         13,
@@ -460,11 +460,7 @@ async fn live_runtime_interoperability() {
         serde_json::Map::from_iter([("i2p.router.netdb.peers".into(), json!(false))]),
     )
     .await;
-    assert!(
-        unavailable["error"]["message"]
-            .as_str()
-            .is_some_and(|message| message.contains("unavailable"))
-    );
+    assert!(peers["result"]["i2p.router.netdb.peers"].is_array());
     let services = protected(
         &client,
         &endpoint,

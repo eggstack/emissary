@@ -22,7 +22,10 @@
 //! produce exact Proposal 170 responses. All data is returned as bounded
 //! immutable snapshots. No mutation, no private keys, no EventSubscriber.
 
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+};
 
 use async_trait::async_trait;
 
@@ -309,6 +312,21 @@ pub struct PeerIdentity {
     pub is_active: bool,
 }
 
+/// A bounded, owned snapshot of the public peer directory.
+#[derive(Debug, Clone, Default)]
+pub struct PeerDirectorySnapshot {
+    /// Base64 router IDs in deterministic order.
+    pub peer_ids: Vec<String>,
+    /// Base64 router ID to serialized public RouterInfo bytes.
+    pub router_infos: BTreeMap<String, Vec<u8>>,
+}
+
+/// Read-only source for the canonical public peer directory.
+pub trait PeerDirectorySource: Send + Sync {
+    /// Return a bounded request-time snapshot of public peer state.
+    fn snapshot(&self) -> Result<PeerDirectorySnapshot, InspectionError>;
+}
+
 /// Peer connection limits.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default)]
@@ -501,6 +519,9 @@ pub trait RouterInfoControl: Send + Sync {
     /// is not present. It must not mean the source is not wired.
     async fn peer_router_info(&self, peer_id: &str) -> Result<Option<String>, InspectionError>;
 
+    /// Get the bounded public peer directory used by the canonical fields.
+    async fn peer_directory(&self) -> Result<PeerDirectorySnapshot, InspectionError>;
+
     /// Get banned peers.
     async fn banned_peers(&self) -> Result<Vec<BannedPeer>, InspectionError>;
 
@@ -559,6 +580,7 @@ struct FakeInner {
     known_peers: Result<Vec<PeerIdentity>, InspectionError>,
     active_peers: Result<Vec<PeerIdentity>, InspectionError>,
     peer_ris: HashMap<String, String>,
+    peer_directory: Result<PeerDirectorySnapshot, InspectionError>,
     banned_peers: Result<Vec<BannedPeer>, InspectionError>,
     peer_limits: Result<PeerLimits, InspectionError>,
     active_peer_stats: Result<Vec<ActivePeerStats>, InspectionError>,
@@ -596,6 +618,7 @@ impl FakeRouterInfoControl {
                 known_peers: Err(unavailable(InspectionGroup::PeerList)),
                 active_peers: Err(unavailable(InspectionGroup::PeerList)),
                 peer_ris: HashMap::new(),
+                peer_directory: Err(unavailable(InspectionGroup::PeerList)),
                 banned_peers: Err(unavailable(InspectionGroup::PeerStats)),
                 peer_limits: Err(unavailable(InspectionGroup::PeerStats)),
                 active_peer_stats: Err(unavailable(InspectionGroup::PeerStats)),
@@ -703,6 +726,12 @@ impl FakeRouterInfoControl {
     pub fn insert_peer_ri(&self, peer_id: String, ri: String) {
         let mut inner = self.inner.lock().unwrap();
         inner.peer_ris.insert(peer_id, ri);
+    }
+
+    /// Set the canonical public peer directory for tests.
+    pub fn set_peer_directory(&self, directory: PeerDirectorySnapshot) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.peer_directory = Ok(directory);
     }
 
     /// Set banned peers for tests.
@@ -834,6 +863,11 @@ impl RouterInfoControl for FakeRouterInfoControl {
     async fn peer_router_info(&self, peer_id: &str) -> Result<Option<String>, InspectionError> {
         let inner = self.inner.lock().unwrap();
         Ok(inner.peer_ris.get(peer_id).cloned())
+    }
+
+    async fn peer_directory(&self) -> Result<PeerDirectorySnapshot, InspectionError> {
+        let inner = self.inner.lock().unwrap();
+        inner.peer_directory.clone()
     }
 
     async fn banned_peers(&self) -> Result<Vec<BannedPeer>, InspectionError> {

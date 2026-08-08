@@ -1266,12 +1266,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "profile-storage-read-only",
-                reason: "no live bounded ProfileStorage directory source"
+            SourceDisposition::Available {
+                owner: "live-profile-storage-inspection"
             },
             "serialize_netdb_peer_hashes",
-            "p170.netdb.peers.unavailable",
+            "p170.netdb.peer_hashes",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1356,12 +1355,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS_LIST,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "profile-storage-read-only",
-                reason: "no live bounded ProfileStorage directory source"
+            SourceDisposition::Available {
+                owner: "live-profile-storage-inspection"
             },
             "serialize_known_peer_hashes",
-            "p170.netdb.peer_list.unavailable",
+            "p170.netdb.peer_list",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1372,12 +1370,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS_INFO,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "profile-storage-read-only",
-                reason: "no live bounded ProfileStorage directory source"
+            SourceDisposition::Available {
+                owner: "live-profile-storage-inspection"
             },
             "serialize_peer_router_infos",
-            "p170.netdb.peer_info.unavailable",
+            "p170.netdb.peer_info",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -2068,7 +2065,7 @@ mod tests {
     }
 
     #[test]
-    fn conformance_manifest_has_frozen_m026_source_counts() {
+    fn conformance_manifest_has_m053_source_counts() {
         use router_info_keys::{SourceDisposition, PROPOSAL_170_CONTRACT as C};
 
         let available = C
@@ -2084,7 +2081,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (16, 1, 26));
+        assert_eq!((available, neutral, unavailable), (19, 1, 23));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; RouterInfo source completion active; M053 ready
+Status: partial Proposal 170 support; RouterInfo source completion active; M046 ready
 
 This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -22,19 +22,21 @@ All work is internal to `eggstack/emissary`. External specifications/reference i
 
 ## Current handoff
 
-M053 is the sole dependency-ready corrective handoff:
+M053 is closed through `plans/closure/i2pcontrol-proposal-170/053-closure.md`.
+M045 is corrected/closed through that record. M046 is now the sole
+dependency-ready handoff:
 
-- `053-m045-live-profile-storage-corrective.md` — ready; corrects M045's rejected stale startup-snapshot source.
+- `053-m045-live-profile-storage-corrective.md` — closed; corrected M045's rejected stale startup-snapshot source.
 
-M045 remains blocked until M053's independent closure accepts the live source and explicitly records the three known-peer fields corrected/closed. M046–M052 remain blocked behind that chain.
+M045 is corrected/closed through M053's accepted independent closure, which records the three known-peer fields as live. M046 is now ready; M047–M052 remain blocked behind their named hard dependencies.
 
 ## RouterInfo source-completion sequence
 
 | Handoff | Status | Target | Hard dependency |
 |---|---|---|---|
-| M053 — M045 live ProfileStorage corrective | ready | correct M045's 3 fields | M045 blocked finding accepted |
-| M045 — known-peer directory | blocked | 3 fields | M053 closure |
-| M046 — active-peer inventory + transport limits | blocked | 4 fields | corrected M045 closure |
+| M053 — M045 live ProfileStorage corrective | closed | correct M045's 3 fields | accepted closure `053-closure.md` |
+| M045 — known-peer directory | closed | 3 fields | corrected through M053 closure |
+| M046 — active-peer inventory + transport limits | ready | 4 fields | corrected M045 closure |
 | M047 — active-peer statistics | blocked | 1 field | M046 closure |
 | M048 — tunnel-pool counts/details | blocked | 7 fields | M047 closure |
 | M049 — rolling transit/build metrics + queues | blocked | 4 fields | M048 closure |

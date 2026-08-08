@@ -1,6 +1,6 @@
 # M045 — RouterInfo Known-Peer Directory Sources
 
-Status: blocked — corrected only through M053
+Status: closed — corrected through accepted M053 closure
 
 Planning baseline: `b759038`
 

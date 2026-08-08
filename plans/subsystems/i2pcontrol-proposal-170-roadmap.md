@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 RouterInfo Source-Completion Roadmap
 
-Status: partial Proposal 170 support; RouterInfo source-completion sequence active; M053 ready
+Status: partial Proposal 170 support; RouterInfo source-completion sequence active; M046 ready
 
 Planning baseline: `b759038` — M044 finalized reviewed head
 
@@ -20,15 +20,16 @@ Canonical internal references:
 - `plans/adrs/ADR-0002-control-plane-tunnel-runtime-ownership.md`;
 - `plans/closure/i2pcontrol-proposal-170/044-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/045-closure.md`;
+- `plans/closure/i2pcontrol-proposal-170/053-closure.md`;
 - `plans/implementation/i2pcontrol-proposal-170/README.md`;
 - `plans/implementation/i2pcontrol-proposal-170/045-052-routerinfo-source-boundary.toml`;
 - `plans/implementation/i2pcontrol-proposal-170/053-m045-live-profile-storage-corrective.md`.
 
 ## 1. Purpose
 
-M044 truthfully closed the prior corrective sequence with 43 canonical Proposal 170 RouterInfo additions classified as 16 available, 1 protocol-permitted neutral, and 26 unavailable. M045 then attempted to implement three known-peer fields using a bounded `Router::inspection_snapshot()` captured at I2PControl startup. Closure rejected that source because it was safe but stale: peer churn after composition was not visible. The attempted promotion was rolled back, so the truthful matrix remains 16 available, 1 neutral, and 26 unavailable.
+M044 truthfully closed the prior corrective sequence with 43 canonical Proposal 170 RouterInfo additions classified as 16 available, 1 protocol-permitted neutral, and 26 unavailable. M045 then attempted to implement three known-peer fields using a bounded `Router::inspection_snapshot()` captured at I2PControl startup. Closure rejected that source because it was safe but stale: peer churn after composition was not visible.
 
-M053 is the corrective pass for that exact defect. It authorizes the smallest neutral live core inspection seam required to expose the canonical `ProfileStorage` directory without making `ProfileStorage`, `Bucket`, NetDB authority, or mutable router state public. After M053 closure corrects and closes M045, the original M046–M052 source-completion sequence resumes.
+M053 corrected that exact defect with the smallest neutral live core inspection seam required to expose the canonical `ProfileStorage` directory without making `ProfileStorage`, `Bucket`, NetDB authority, or mutable router state public. M045 is corrected/closed through the accepted M053 closure, the matrix is now 19 available, 1 protocol-permitted neutral, and 23 unavailable, and the original M046–M052 source-completion sequence resumes.
 
 The architecture remains asymmetric: core/runtime code may expose only the smallest neutral bounded read-only facts that only the canonical owner can know. I2PControl owns source composition, rolling windows, aggregation, deterministic ordering, response bounds, Proposal 170 source disposition, numeric/wire mapping, JSON serialization, and failure semantics.
 
@@ -36,7 +37,7 @@ This roadmap does not reopen the ten unsupported tunnel data planes, `SetConfig`
 
 ## 2. Target fields
 
-The 26 target rows remain exactly the current unavailable rows in `router_info_keys::PROPOSAL_170_CONTRACT` and `docs/i2pcontrol/router-info-source-map.md`:
+The 23 remaining target rows are exactly the current unavailable rows in `router_info_keys::PROPOSAL_170_CONTRACT` and `docs/i2pcontrol/router-info-source-map.md`:
 
 1. `i2p.router.news`;
 2. `i2p.router.net.bw.transit.15s`;
@@ -55,15 +56,12 @@ The 26 target rows remain exactly the current unavailable rows in `router_info_k
 15. `i2p.router.net.tunnels.successrate`;
 16. `i2p.router.net.tunnels.queue`;
 17. `i2p.router.net.tunnels.tbmqueue`;
-18. `i2p.router.netdb.peers`;
-19. `i2p.router.netdb.activepeers.info`;
-20. `i2p.router.netdb.ntcp.limit`;
-21. `i2p.router.netdb.ssu.limit`;
-22. `i2p.router.netdb.bannedpeers`;
-23. `i2p.router.netdb.activepeers.list`;
-24. `i2p.router.netdb.peers.list`;
-25. `i2p.router.netdb.peers.info`;
-26. `i2p.router.netdb.activepeers.stats`.
+18. `i2p.router.netdb.activepeers.info`;
+19. `i2p.router.netdb.ntcp.limit`;
+20. `i2p.router.netdb.ssu.limit`;
+21. `i2p.router.netdb.bannedpeers`;
+22. `i2p.router.netdb.activepeers.list`;
+23. `i2p.router.netdb.activepeers.stats`.
 
 No additional RouterInfo/base selector work is authorized unless a direct regression is discovered and separately planned.
 
@@ -134,7 +132,7 @@ The one-shot `CoreSnapshot` must not become a runtime authority or be retained b
 M044 closed
    |
    v
-M053 M045 live ProfileStorage corrective — ready
+M053 M045 live ProfileStorage corrective — closed
    |
    v
 M045 known peer directory (3) corrected/closed
@@ -161,11 +159,11 @@ M051 news + banned-peer semantics (2)
 M052 integration/containment reclosure
 ```
 
-The sequence remains serialized so every new audited-core observation seam receives independent closure before the next one is introduced. M053 is the only dependency-ready handoff. M046–M052 remain blocked until their named predecessors close.
+The sequence remains serialized so every new audited-core observation seam receives independent closure before the next one is introduced. M046 is now the only dependency-ready handoff. M047–M052 remain blocked until their named predecessors close.
 
 ## 7. Milestones
 
-### M053 — M045 live ProfileStorage corrective — ready
+### M053 — M045 live ProfileStorage corrective — closed
 
 Plan: `053-m045-live-profile-storage-corrective.md`.
 
@@ -175,15 +173,15 @@ Create a neutral cloneable request-time live inspection handle in `emissary-core
 
 Exit: M045's stale-source defect is corrected, the three selectors are live/bounded/exact, source accounting becomes 19 available + 1 neutral + 23 unavailable, and an independent closure accepts the core path audit and post-construction churn regression.
 
-### M045 — Known-peer directory sources — blocked on M053
+### M045 — Known-peer directory sources — corrected/closed through M053
 
 Plan: `045-routerinfo-known-peer-directory.md`.
 
 Fields: `netdb.peers`, `netdb.peers.list`, `netdb.peers.info`.
 
-The zero-core-change assumption was disproven by closure. M053 is the only authorized corrective expansion. M045 is not closed until M053's independent closure explicitly accepts the correction.
+The zero-core-change assumption was disproven by closure. M053 is the authorized corrective expansion, and its independent closure explicitly accepts the live source and closes M045.
 
-### M046 — Active-peer inventory and limits — blocked on corrected M045 closure
+### M046 — Active-peer inventory and limits — ready
 
 Plan: `046-routerinfo-active-peer-inventory-and-limits.md`.
 
@@ -278,7 +276,7 @@ Because upstream Emissary is treated as heavily security-reviewed, a small purpo
 
 ## 13. Final status rule
 
-If M053 corrects M045, M046–M051 make all remaining fields operational, and M052 accepts the final head, the RouterInfo dimension may be recorded as 42 available + 1 protocol-permitted neutral + 0 unavailable and `RouterInfo source completion closed internally against pinned revision`.
+If M046–M051 make all remaining fields operational and M052 accepts the final head, the RouterInfo dimension may be recorded as 42 available + 1 protocol-permitted neutral + 0 unavailable and `RouterInfo source completion closed internally against pinned revision`.
 
 That does not by itself make the entire Proposal 170 implementation complete. Unrelated accepted unsupported/runtime dimensions remain outside this roadmap.
 

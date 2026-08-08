@@ -1,6 +1,6 @@
 # M046 — RouterInfo Active-Peer Inventory and Transport Limits
 
-Status: blocked
+Status: ready
 
 Planning baseline: `b759038`
 

@@ -1,234 +1,120 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; corrective sequence closed
+Status: partial Proposal 170 support; RouterInfo source completion active; M045 ready
 
-This directory contains bounded internal implementation and closure handoffs for
-the I2PControl Proposal 170 subsystem.
+This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
 Authoritative direction:
 
-- `plans/003-planning-process.md`
-- `plans/adrs/ADR-0001-proposal-170-contract-and-stub-boundary.md`
-- `plans/adrs/ADR-0002-control-plane-tunnel-runtime-ownership.md`
-- `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
-- `plans/closure/i2pcontrol-proposal-170/039-closure-invalidation.md`
+- `plans/003-planning-process.md`;
+- `plans/adrs/ADR-0001-proposal-170-contract-and-stub-boundary.md`;
+- `plans/adrs/ADR-0002-control-plane-tunnel-runtime-ownership.md`;
+- `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`;
+- `plans/implementation/i2pcontrol-proposal-170/045-052-routerinfo-source-boundary.toml`;
+- retained M044 closure: `plans/closure/i2pcontrol-proposal-170/044-closure.md`.
 
-Pinned external authority:
-
-- Proposal 170 `I2PControl Expansion`, Open, created/updated `2026-05-20`
-- existing I2PControl authentication and JSON-RPC contract
+Pinned external authority: Proposal 170 `I2PControl Expansion`, Open, revision `2026-05-20`, plus existing I2PControl authentication/JSON-RPC contract.
 
 ## Internal-only rule
 
-All handoffs are internal to `eggstack/emissary`.
-
-No plan authorizes:
-
-- upstream issues, pull requests, reviews, discussions, submissions, adoption,
-  or merge requests;
-- pushing branches, commits, tags, patches, artifacts, or releases to an
-  upstream remote;
-- maintainer outreach or contribution-package preparation;
-- connector/API writes against upstream or third-party repositories.
-
-External specifications and reference implementations may be inspected
-read-only. Violation is a stop condition and invalidates affected evidence.
+All work is internal to `eggstack/emissary`. External specifications/reference implementations are read-only. No plan authorizes an upstream issue, pull request, review, discussion, submission, adoption request, merge request, maintainer outreach, contribution package, branch/tag/release push, or connector write against an upstream/third-party repository.
 
 ## Current handoff
 
-The corrective sequence is closed through M044. No implementation plan is
-currently dependency-ready; deferred RouterInfo sources and unsupported tunnel
-families remain outside this roadmap.
+M045 is the only dependency-ready implementation plan:
 
-The sequence corrected the startup-managed generic server cancellation-owner
-regression without changing control-plane ownership, core behavior, protocol,
-or tunnel families.
+- `045-routerinfo-known-peer-directory.md` — ready; hard dependency M044 closed.
 
-## Corrective sequence
+Per `plans/003-planning-process.md`, later plans exist for handoff clarity but are not registered as executable until their hard dependency closes.
 
-| Handoff | Status | Plan | Hard dependency |
-|---|---|---|---|
-| M040 — Startup server cancellation-owner correction | closed | `040-startup-server-cancellation-correction.md` | M039 invalidation recorded |
-| M041 — Authentication throttle source/accounting correction | closed | `041-auth-throttle-source-accounting.md` | M040 closed |
-| M042 — AddressBook subscription commit boundary | closed | `042-addressbook-subscription-commit-boundary.md` | M041 closed |
-| M043 — Corrective runtime regression validation | closed | `043-corrective-runtime-regression-validation.md` | M040–M042 closed |
-| M044 — Corrective final-head reclosure | closed | `044-corrective-final-head-reclosure.md` | M043 closed |
+## RouterInfo source-completion sequence
 
-Only the registry may advance a successor to `ready` after its hard dependency
-and closure evidence are accepted.
+| Handoff | Status | Target fields | Hard dependency |
+|---|---|---:|---|
+| M045 — known-peer directory | ready | 3 | M044 closed |
+| M046 — active-peer inventory + transport limits | blocked | 4 | M045 closure |
+| M047 — active-peer statistics | blocked | 1 | M046 closure |
+| M048 — tunnel-pool counts/details | blocked | 7 | M047 closure |
+| M049 — rolling transit/build metrics + queues | blocked | 4 | M048 closure |
+| M050 — v4/v6 network state | blocked | 5 | M049 closure |
+| M051 — router news + banned peers | blocked | 2 | M050 closure |
+| M052 — integration/containment reclosure | blocked | validation | M045–M051 accepted |
 
-## Why M039 is invalidated
+Plans:
 
-`plans/closure/i2pcontrol-proposal-170/039-closure-invalidation.md` records three
-demonstrated defects:
+- `045-routerinfo-known-peer-directory.md`;
+- `046-routerinfo-active-peer-inventory-and-limits.md`;
+- `047-routerinfo-active-peer-stats.md`;
+- `048-routerinfo-tunnel-pool-sources.md`;
+- `049-routerinfo-rolling-metrics-and-queues.md`;
+- `050-routerinfo-network-state-sources.md`;
+- `051-routerinfo-news-and-banned-peer-semantics.md`;
+- `052-routerinfo-source-integration-and-reclosure.md`.
 
-1. the startup server manager drops its watch sender before entering the reusable
-   runtime, allowing immediate self-cancellation;
-2. failed-auth throttling is keyed by full `SocketAddr` and split across
-   read/sleep/write, permitting ephemeral-port and concurrent-attempt bypass;
-3. `SetSubscriptions` can commit durably and then return failure if refresh
-   scheduling becomes unavailable.
+## Scope and ownership rule
 
-M039's final status is non-controlling until M044. Unaffected M020–M039 evidence
-remains retained.
+The target is exactly the 26 RouterInfo rows currently classified unavailable. All Proposal 170 policy remains under `emissary-cli/src/i2pcontrol/**`: field/source disposition, rolling windows, aggregation, joins, sorting, bounds, wire numeric mappings, JSON types/serialization, compatibility behavior, and sanitized errors.
 
-## Retained capability boundary
+Changes outside `i2pcontrol/**` are exceptional and may only expose neutral bounded read-only facts from canonical owners. They must not contain Proposal 170 terminology or mutable control authority. The machine-readable per-milestone production budgets are in `045-052-routerinfo-source-boundary.toml`.
 
-The corrective sequence does not reopen:
+M045 is intentionally expected to require no core production change. M051/M052 authorize no core production change. M046–M050 enumerate the only core paths they may touch.
 
-- generic control-plane client/server backend architecture;
-- per-name lifecycle supervision and fixed server-secret ownership;
-- startup/control-plane ownership separation;
-- explicit unsupported status for ten tunnel families;
-- RouterInfo's 16 available / 1 neutral / 26 unavailable matrix;
-- AddressBook entry owner coherence and feature isolation;
-- direct/base compatibility inventories;
-- constant-time password comparison;
-- publication confinement/recovery/durability qualification;
-- bounded passive SAM observation;
-- internal-only/no-upstream governance.
+## Source groups
 
-## Runtime tunnel boundary
+The 26 rows are decomposed into:
 
-Under ADR-0002:
+- known public peer directory: 3;
+- active peer list/info + NTCP/SSU limits: 4;
+- active peer stats: 1;
+- participating/exploratory/client tunnel counts/details: 7;
+- transit 15s/recent tunnel success/queue/TBM queue: 4;
+- v4/v6 status/error/testing: 5;
+- router news/banned peers: 2.
 
-- generic `client` and `server` are the only real backends authorized by this
-  roadmap;
-- startup-managed client/server tunnels remain externally owned and read-only;
-- control-plane-created definitions are supervised separately by I2PControl;
-- HTTP, HTTP server/bidirectional server, IRC, SOCKS-IRC, CONNECT, Streamr, and
-  other missing types remain explicit unsupported backends;
-- existing HTTP/SOCKS startup services are not Proposal 170 I2PTunnel backends;
-- no corrective plan may add core behavior or adopt startup tasks.
+The last two are semantic-risk fields. Empty values are not accepted as implementation evidence unless the pinned contract/reference proves they are the authoritative current state for a router without those subsystems.
 
-## Production budgets
+## Cross-cutting prohibitions
 
-### M040
+Throughout M045–M052, do not:
 
-Authorized production path:
-
-- `emissary-cli/src/tunnel/server.rs`
-
-Only cancellation-sender lifetime and directly related focused tests are in
-scope.
-
-### M041
-
-Authorized production paths:
-
-- `emissary-cli/src/i2pcontrol/auth.rs`
-- `emissary-cli/src/i2pcontrol/server.rs`
-
-Only source-IP normalization and atomic failed-auth reservation are in scope.
-
-### M042
-
-Authorized production paths:
-
-- `emissary-cli/src/address_book.rs`
-- narrowly related `emissary-cli/src/i2pcontrol/address_book_runtime.rs`
-- `emissary-cli/src/i2pcontrol/address_book.rs` only if wire translation is
-  directly affected
-
-Only subscription mutation linearization and refresh-result semantics are in
-scope.
-
-### M043/M044
-
-No production changes. A material defect requires a new implementation plan.
-
-## Prohibited throughout
-
-- new tunnel data planes;
-- startup task adoption/control;
-- new RouterInfo sources or fabricated values;
-- router, transport, streaming, LeaseSet, cryptographic, routing, or tunnel
-  algorithm changes;
-- frontend work;
-- repository-wide crate/service refactors;
-- arbitrary request-selected paths;
-- persistent accounts, proxy trust, distributed bans, or firewall integration;
-- general AddressBook scheduler/event bus/second authority;
-- `.github/workflows/**`, remote CI, release/publishing, coverage, fuzz, soak,
-  platform matrices, or generated evidence bundles;
-- upstream activity.
+- add a missing tunnel data plane;
+- modify router/peer selection, NetDB protocol/discovery, tunnel selection/build/routing, transport handshake/retransmission/congestion, cryptographic, LeaseSet, or I2NP behavior;
+- expose sockets, private/session keys, mutable transport/tunnel/session handles, command channels, or message payloads to I2PControl;
+- add new network probes, polling daemons, persistent time-series stores, news feed/downloader, or ban engine solely for observability;
+- substitute fabricated zero/false/empty/null/adjacent metrics for unavailable state;
+- modify AddressBook, proxy/UI, workflows, release/publishing, or unrelated code;
+- broaden base I2PControl compatibility or method inventory;
+- interact with upstream write channels.
 
 ## Handoff discipline
 
-Each implementation milestone must:
+Every milestone must inspect the accepted dependency head, pin exact field semantics before source disposition changes, use focused source/wire tests, preserve no-feature behavior, remain inside its path budget, create an implementation disposition and independent closure record, and report any required scope expansion rather than silently performing it.
 
-1. inspect the accepted dependency head;
-2. add a failing regression for the demonstrated defect;
-3. preserve unrelated retained evidence;
-4. remain within its production budget;
-5. run focused tests before the bounded broad matrix;
-6. create an implementation disposition and independent closure record;
-7. freeze the implementation/test head;
-8. report unresolved findings with severity;
-9. leave final subsystem status to M044;
-10. attest that no upstream interaction occurred.
-
-A code commit, compilation result, or broad test count is not closure by itself.
-
-## Corrective stop rules
-
-### M040
-
-Stop rather than expose startup cancellation to I2PControl, modify core, alter
-server identity, or refactor tunnel supervision broadly.
-
-### M041
-
-Stop rather than add accounts, persistent bans, proxy-header trust, global rate
-limiting, firewall integration, or token/password redesign.
-
-### M042
-
-Stop rather than wait synchronously for downloads, add a scheduler/event bus,
-create a second owner, or expose arbitrary paths/configuration.
-
-### M043/M044
-
-Validation and closure do not patch production. A defect requires a new plan.
+Only the registry advances the next handoff to `ready` after its hard dependency closes.
 
 ## Verification rule
 
-Normal bounded matrix:
+Use focused tests first, then the bounded package matrix. Typical broad commands are:
 
 ```bash
 cargo check -p emissary-cli --no-default-features
 cargo test -p emissary-cli --no-default-features
-cargo clippy -p emissary-cli --no-default-features --all-targets -- -D warnings
 cargo check -p emissary-cli --no-default-features --features i2pcontrol
 cargo test -p emissary-cli --no-default-features --features i2pcontrol
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 cargo check -p emissary-core
-cargo test -p emissary-core sam
+cargo test -p emissary-core --no-fail-fast
 git diff --check
 ```
 
-Each plan adds focused commands. Use targeted formatting. Remote CI, release,
-coverage, fuzz, soak, network farms, and generated evidence bundles are not
-required.
+Each plan narrows/adds focused commands. Use targeted formatting because the repository's formatter baseline mismatch is already documented. Do not add CI/release/coverage/fuzz/soak infrastructure.
 
-## Corrective sequence disposition
+## Final status rule
 
-The M039 invalidation was resolved by the serialized M040–M044 corrective
-sequence. M040–M043 are closed with accepted evidence records; M044 is the
-final independent reclosure. No deferred RouterInfo source or unsupported
-tunnel-family plan became dependency-ready.
+If all 26 become truthful operational sources and M052 accepts the final head, the RouterInfo dimension may move to 42 available + 1 protocol-permitted neutral + 0 unavailable and be closed internally against the pinned revision.
 
-## Final-status rule
+This does not automatically close full Proposal 170: unrelated unsupported tunnel families and other accepted partial dimensions remain outside this roadmap. If M051 proves that news or banned-peer semantics require an absent substantive subsystem, retain the field unavailable and report RouterInfo source completion incomplete rather than expanding scope.
 
-M044 may select:
+## Historical evidence
 
-- `partial Proposal 170 support` only if every implemented/claimed dimension is
-  exact, operational, bounded, and evidenced;
-- `corrective pass required` if any high/medium defect remains;
-- `blocked` if the final head or required evidence cannot be reviewed.
-
-Full completion is unavailable under this roadmap because ten tunnel families
-and 26 RouterInfo additions remain unsupported/unavailable.
-
-No status implies upstream review, acceptance, certification, adoption, or
-merge.
+M040–M044 remain closed retained evidence. M039 remains historical-invalidated. The new roadmap supersedes only the old statement that the 26 RouterInfo sources were outside authorized scope; it does not rewrite prior closure history.

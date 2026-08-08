@@ -1,6 +1,7 @@
-version = 1
-objective = "M045-M052 Proposal 170 RouterInfo source completion with minimal non-i2pcontrol changes"
+version = 2
+objective = "M045-M053 Proposal 170 RouterInfo source completion with minimal non-i2pcontrol changes"
 baseline = "b759038"
+corrective_baseline = "bf9c2eeb"
 
 [always_allowed]
 i2pcontrol = ["emissary-cli/src/i2pcontrol/"]
@@ -9,7 +10,7 @@ planning_tests_docs = ["plans/", "docs/i2pcontrol/", "emissary-cli/tests/"]
 
 [m045]
 core_production = []
-purpose = "known peer directory from existing ProfileStorage read-only APIs"
+purpose = "known peer directory from existing ProfileStorage read-only APIs; blocked because no usable live public enumeration seam exists"
 
 [m046]
 core_production = [
@@ -66,6 +67,20 @@ purpose = "news and banned-peer semantic adjudication; no new router news/ban su
 [m052]
 core_production = []
 purpose = "validation and independent reclosure only"
+
+[m053]
+core_production = [
+  "emissary-core/src/inspection.rs",
+  "emissary-core/src/router/mod.rs",
+]
+purpose = "correct M045 with a neutral cloneable request-time live ProfileStorage-backed peer-directory inspection source"
+forbidden_core_production = [
+  "emissary-core/src/profile.rs",
+  "emissary-core/src/router/context.rs",
+  "emissary-core/src/lib.rs",
+  "emissary-core/src/netdb/",
+]
+required_regression = "construct source, mutate canonical ProfileStorage through existing owner, then observe mutation from same source instance"
 
 [prohibited]
 production_prefixes = [

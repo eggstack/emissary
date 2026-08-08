@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; RouterInfo source completion active; M045 ready
+Status: partial Proposal 170 support; RouterInfo source completion active; M045 conditionally closed
 
 This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -21,9 +21,9 @@ All work is internal to `eggstack/emissary`. External specifications/reference i
 
 ## Current handoff
 
-M045 is the only dependency-ready implementation plan:
+M045 is in closure review; no later plan is dependency-ready:
 
-- `045-routerinfo-known-peer-directory.md` — ready; hard dependency M044 closed.
+- `045-routerinfo-known-peer-directory.md` — conditionally closed; live-source evidence remains outstanding.
 
 Per `plans/003-planning-process.md`, later plans exist for handoff clarity but are not registered as executable until their hard dependency closes.
 
@@ -31,8 +31,8 @@ Per `plans/003-planning-process.md`, later plans exist for handoff clarity but a
 
 | Handoff | Status | Target fields | Hard dependency |
 |---|---|---:|---|
-| M045 — known-peer directory | ready | 3 | M044 closed |
-| M046 — active-peer inventory + transport limits | blocked | 4 | M045 closure |
+| M045 — known-peer directory | conditionally closed | 3 | M044 closed |
+| M046 — active-peer inventory + transport limits | blocked | 4 | M045 live-source closure condition |
 | M047 — active-peer statistics | blocked | 1 | M046 closure |
 | M048 — tunnel-pool counts/details | blocked | 7 | M047 closure |
 | M049 — rolling transit/build metrics + queues | blocked | 4 | M048 closure |

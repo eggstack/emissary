@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 RouterInfo Source-Completion Roadmap
 
-Status: partial Proposal 170 support; RouterInfo source-completion sequence active; M045 ready
+Status: partial Proposal 170 support; RouterInfo source-completion sequence active; M045 conditionally closed
 
 Planning baseline: `b759038` — M044 finalized reviewed head
 
@@ -22,7 +22,7 @@ Canonical internal references:
 
 ## 1. Purpose
 
-M044 truthfully closed the prior corrective sequence with 43 canonical Proposal 170 RouterInfo additions classified as 16 available, 1 protocol-permitted neutral, and 26 unavailable. This roadmap is a new, explicitly authorized line of work limited to creating truthful sources for those 26 unavailable additions while minimizing changes outside `emissary-cli/src/i2pcontrol/**`.
+M044 truthfully closed the prior corrective sequence with 43 canonical Proposal 170 RouterInfo additions classified as 16 available, 1 protocol-permitted neutral, and 26 unavailable. M045 subsequently added the three bounded known-peer directory sources, leaving 19 available, 1 protocol-permitted neutral, and 23 unavailable. This roadmap remains limited to creating truthful sources for the remaining additions while minimizing changes outside `emissary-cli/src/i2pcontrol/**`.
 
 The architecture is intentionally asymmetric: core/runtime code may expose only the smallest neutral bounded read-only facts that only the canonical owner can know. I2PControl owns source composition, rolling windows, aggregation, deterministic ordering, response bounds, Proposal 170 source disposition, numeric/wire mapping, JSON serialization, and failure semantics.
 
@@ -154,11 +154,11 @@ M051 news + banned-peer semantics (2)
 M052 integration/containment reclosure
 ```
 
-The sequence is deliberately serialized. Several source families are technically separable, but serialization gives each non-I2PControl seam an independent closure review before another audited-core exception is added. Per planning governance, only M045 is registered as dependency-ready; M046–M052 remain blocked roadmap successors until their hard dependencies close.
+The sequence is deliberately serialized. Several source families are technically separable, but serialization gives each non-I2PControl seam an independent closure review before another audited-core exception is added. M045 remains in conditional closure; M046–M052 remain blocked roadmap successors until their hard dependencies close.
 
 ## 7. Milestones
 
-### M045 — Known-peer directory sources — ready
+### M045 — Known-peer directory sources — conditionally closed
 
 Plan: `045-routerinfo-known-peer-directory.md`
 
@@ -166,7 +166,7 @@ Fields: `netdb.peers`, `netdb.peers.list`, `netdb.peers.info`.
 
 Use existing `ProfileStorage` read-only APIs. Expected core production changes: zero. Exit: all three fields live/bounded/exact; no core production diff.
 
-### M046 — Active-peer inventory and limits — blocked on M045
+### M046 — Active-peer inventory and limits — blocked on M045 live-source closure
 
 Plan: `046-routerinfo-active-peer-inventory-and-limits.md`
 

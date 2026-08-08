@@ -649,10 +649,7 @@ async fn assemble_response(
     }
 
     // --- NetDB (one group query) ---
-    if key_set
-        .iter()
-        .any(|k| k.starts_with("i2p.router.netdb.") && rpc::router_info_keys::CORE_KEYS.contains(k))
-    {
+    if key_set.iter().any(|k| k.starts_with("i2p.router.netdb.")) {
         if NETDB_UNSUPPORTED.iter().any(|k| key_set.contains(k)) {
             return Err(InspectionError::Unavailable {
                 group: crate::i2pcontrol::router_info::InspectionGroup::NetDb,
@@ -660,18 +657,6 @@ async fn assemble_response(
         }
         let netdb = router_info.netdb_snapshot().await?;
         resolve_netdb_selectors(&mut result, &key_set, &netdb);
-    }
-
-    // --- Proposal 170 public peer directory ---
-    if key_set.iter().any(|key| {
-        matches!(
-            *key,
-            rpc::router_info_keys::P170_NETDB_PEERS
-                | rpc::router_info_keys::P170_NETDB_PEERS_LIST
-                | rpc::router_info_keys::P170_NETDB_PEERS_INFO
-        )
-    }) {
-        resolve_proposal_peer_directory(&mut result, &key_set, router_info).await?;
     }
 
     // --- Bandwidth ---
@@ -1398,68 +1383,6 @@ async fn resolve_peer_selectors(
     Ok(())
 }
 
-/// Resolve the three Proposal 170 fields owned by the public profile
-/// directory. A missing serialized RouterInfo is an incomplete source snapshot
-/// and fails the request; it is never replaced with an empty or adjacent value.
-async fn resolve_proposal_peer_directory(
-    result: &mut serde_json::Map<String, serde_json::Value>,
-    key_set: &HashSet<&str>,
-    router_info: &dyn RouterInfoControl,
-) -> Result<(), InspectionError> {
-    let peers = router_info.known_peers().await?;
-    if peers.len() > MAX_PEER_IDENTITIES {
-        return Err(InspectionError::ResultTooLarge {
-            group: crate::i2pcontrol::router_info::InspectionGroup::PeerList,
-            limit: MAX_PEER_IDENTITIES,
-        });
-    }
-
-    let mut ids: Vec<String> = peers.into_iter().map(|peer| peer.id).collect();
-    ids.sort_unstable();
-    if key_set.contains(rpc::router_info_keys::P170_NETDB_PEERS)
-        || key_set.contains(rpc::router_info_keys::P170_NETDB_PEERS_LIST)
-    {
-        if key_set.contains(rpc::router_info_keys::P170_NETDB_PEERS) {
-            result.insert(
-                rpc::router_info_keys::P170_NETDB_PEERS.to_string(),
-                serde_json::json!(ids),
-            );
-        }
-        if key_set.contains(rpc::router_info_keys::P170_NETDB_PEERS_LIST) {
-            result.insert(
-                rpc::router_info_keys::P170_NETDB_PEERS_LIST.to_string(),
-                serde_json::json!(ids),
-            );
-        }
-    }
-
-    if key_set.contains(rpc::router_info_keys::P170_NETDB_PEERS_INFO) {
-        let mut infos = Vec::with_capacity(ids.len());
-        let mut total_bytes = 0usize;
-        for peer_id in &ids {
-            let Some(info) = router_info.peer_router_info(peer_id).await? else {
-                return Err(InspectionError::TemporarilyUnavailable {
-                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerLookup,
-                });
-            };
-            total_bytes = total_bytes.saturating_add(info.len());
-            if total_bytes > MAX_PEER_RI_BYTES {
-                return Err(InspectionError::ResultTooLarge {
-                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerLookup,
-                    limit: MAX_PEER_RI_BYTES,
-                });
-            }
-            infos.push(info);
-        }
-        result.insert(
-            rpc::router_info_keys::P170_NETDB_PEERS_INFO.to_string(),
-            serde_json::json!(infos),
-        );
-    }
-
-    Ok(())
-}
-
 fn resolve_id(id: &Option<RequestId>) -> RequestId {
     id.clone().unwrap_or(RequestId::Null)
 }
@@ -1557,46 +1480,6 @@ mod tests {
             serde_json::json!([])
         );
         assert_eq!(result["i2p.router.net.tunnels.totalsuccessrate"], 75.0);
-    }
-
-    #[tokio::test]
-    async fn proposal_peer_directory_returns_bounded_public_values() {
-        let ri = FakeRouterInfoControl::new();
-        ri.set_known_peers(vec![
-            PeerIdentity {
-                id: "peer-b".into(),
-                is_active: false,
-            },
-            PeerIdentity {
-                id: "peer-a".into(),
-                is_active: false,
-            },
-        ]);
-        ri.insert_peer_ri("peer-a".into(), "router-info-a".into());
-        ri.insert_peer_ri("peer-b".into(), "router-info-b".into());
-        let state = test_state(ri);
-        let response = handle_router_info(
-            &state,
-            &direct_request(serde_json::json!({
-                rpc::router_info_keys::P170_NETDB_PEERS: false,
-                rpc::router_info_keys::P170_NETDB_PEERS_LIST: null,
-                rpc::router_info_keys::P170_NETDB_PEERS_INFO: true,
-            })),
-        )
-        .await;
-
-        assert_eq!(
-            response["result"][rpc::router_info_keys::P170_NETDB_PEERS],
-            serde_json::json!(["peer-a", "peer-b"])
-        );
-        assert_eq!(
-            response["result"][rpc::router_info_keys::P170_NETDB_PEERS_LIST],
-            serde_json::json!(["peer-a", "peer-b"])
-        );
-        assert_eq!(
-            response["result"][rpc::router_info_keys::P170_NETDB_PEERS_INFO],
-            serde_json::json!(["router-info-a", "router-info-b"])
-        );
     }
 
     #[tokio::test]

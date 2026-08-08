@@ -435,21 +435,6 @@ pub struct UdpPeerStatEntry {
 
 use serde::Serialize;
 
-/// A bounded, owned snapshot of the public peer directory.
-#[derive(Debug, Clone, Default)]
-pub struct PeerDirectorySnapshot {
-    /// Base64 router IDs in deterministic order.
-    pub peer_ids: Vec<String>,
-    /// Base64 router ID to serialized public RouterInfo bytes.
-    pub router_infos: std::collections::BTreeMap<String, Vec<u8>>,
-}
-
-/// Read-only source for the canonical public peer directory.
-pub trait PeerDirectorySource: Send + Sync {
-    /// Return a bounded request-time snapshot of public peer state.
-    fn snapshot(&self) -> Result<PeerDirectorySnapshot, InspectionError>;
-}
-
 /// Read-only inspection boundary for Proposal 170 RouterInfo selectors.
 ///
 /// All methods return immutable snapshots. No method mutates router state,

@@ -27,7 +27,7 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | partial Proposal 170 support; RouterInfo source completion active | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M045 closing | M045 has a named live-source condition; later plans remain blocked |
+| I2PControl Proposal 170 | partial Proposal 170 support; RouterInfo source completion blocked | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M045 blocked | missing neutral ProfileStorage enumeration seam |
 
 ## Dependency-ready implementation plans
 
@@ -41,7 +41,7 @@ Per `plans/003-planning-process.md`, these plans exist for deterministic handoff
 
 | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|
-| M046 — active-peer inventory and transport limits | blocked | `plans/implementation/i2pcontrol-proposal-170/046-routerinfo-active-peer-inventory-and-limits.md` | M045 live-source closure condition |
+| M046 — active-peer inventory and transport limits | blocked | `plans/implementation/i2pcontrol-proposal-170/046-routerinfo-active-peer-inventory-and-limits.md` | M045 corrective live-source seam |
 | M047 — active-peer statistics | blocked | `plans/implementation/i2pcontrol-proposal-170/047-routerinfo-active-peer-stats.md` | M046 closure |
 | M048 — tunnel-pool counts and details | blocked | `plans/implementation/i2pcontrol-proposal-170/048-routerinfo-tunnel-pool-sources.md` | M047 closure |
 | M049 — rolling transit/build metrics and queues | blocked | `plans/implementation/i2pcontrol-proposal-170/049-routerinfo-rolling-metrics-and-queues.md` | M048 closure |
@@ -53,18 +53,18 @@ Per `plans/003-planning-process.md`, these plans exist for deterministic handoff
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M045 | conditionally closed | `plans/closure/i2pcontrol-proposal-170/045-closure.md` | live-source evidence outstanding; M046 remains blocked |
+| I2PControl Proposal 170 | M045 | blocked | `plans/closure/i2pcontrol-proposal-170/045-closure.md` | missing neutral ProfileStorage enumeration seam; M046 remains blocked |
 
 ## Current authorized finding/work scope
 
-M044's accepted source matrix, plus the conditionally closed M045 implementation disposition, remains current repository reality:
+M044's accepted source matrix, plus the blocked M045 implementation disposition, remains current repository reality:
 
 - 43 canonical Proposal 170 RouterInfo additions;
-- 19 available;
+- 16 available;
 - 1 protocol-permitted neutral;
-- 23 unavailable.
+- 26 unavailable.
 
-The maintainer has explicitly authorized work to create truthful sources for the remaining 23 unavailable rows while keeping modifications outside `emissary-cli/src/i2pcontrol/**` minimal.
+The maintainer has explicitly authorized work to create truthful sources for the remaining 26 unavailable rows while keeping modifications outside `emissary-cli/src/i2pcontrol/**` minimal.
 
 The source-completion decomposition is:
 
@@ -121,7 +121,7 @@ Current work is pinned to Proposal 170 `I2PControl Expansion`, status Open, revi
 
 ## Registry maintenance rules
 
-1. No current implementation plan is dependency-ready; M045's live-source condition must be resolved first.
+1. No current implementation plan is dependency-ready; M045's corrective live-source seam must be resolved first.
 2. Register M046 only after M045 implementation and independent closure are accepted; continue serially through M052.
 3. Preserve M020–M044 history/evidence unless a direct new defect is demonstrated.
 4. Keep all Proposal 170 policy under I2PControl; core exceptions are neutral observation only and milestone-budgeted.

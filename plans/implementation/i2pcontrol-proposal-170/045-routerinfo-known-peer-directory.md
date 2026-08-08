@@ -1,6 +1,6 @@
 # M045 — RouterInfo Known-Peer Directory Sources
 
-Status: ready
+Status: blocked — corrective live ProfileStorage seam required
 
 Planning baseline: `b759038`
 
@@ -110,6 +110,18 @@ M045 may close only when all three fields are served from the live canonical kno
 ## 11. Stop conditions
 
 Stop and require a corrective/new plan if the only implementation path requires changing peer discovery/routing behavior, exporting mutable NetDB authority, retaining private material, or modifying core production code.
+
+M045 reached this stop condition during implementation review. `RouterContext::profile_storage()`
+exposes the canonical storage owner, but the public enumeration method requires the private
+`emissary_core::profile::Bucket` type. `emissary-cli` can therefore neither enumerate the live
+directory nor construct a bounded request-time adapter without a new core read-only primitive or
+public type export. M045 authorizes no `emissary-core/**` production change. The existing
+`Router::inspection_snapshot()` adapter is a startup snapshot and is not an acceptable substitute.
+
+The exact corrective requirement is a neutral, cloneable, bounded read-only ProfileStorage
+directory primitive that returns public RouterIds and raw public RouterInfo bytes, with no Proposal
+170 or mutable subsystem types. It must be separately planned and authorized before M045 can be
+reopened.
 
 ## 12. Closure evidence required
 

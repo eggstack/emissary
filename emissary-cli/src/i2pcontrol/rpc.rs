@@ -1266,11 +1266,12 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Available {
-                owner: "profile-storage-read-only"
+            SourceDisposition::Unavailable {
+                owner: "profile-storage-read-only",
+                reason: "no live bounded ProfileStorage directory source"
             },
             "serialize_netdb_peer_hashes",
-            "p170.netdb.peers.string_list",
+            "p170.netdb.peers.unavailable",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1355,11 +1356,12 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS_LIST,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Available {
-                owner: "profile-storage-read-only"
+            SourceDisposition::Unavailable {
+                owner: "profile-storage-read-only",
+                reason: "no live bounded ProfileStorage directory source"
             },
             "serialize_known_peer_hashes",
-            "p170.netdb.peer_list.string_list",
+            "p170.netdb.peer_list.unavailable",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1370,11 +1372,12 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS_INFO,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Available {
-                owner: "profile-storage-read-only"
+            SourceDisposition::Unavailable {
+                owner: "profile-storage-read-only",
+                reason: "no live bounded ProfileStorage directory source"
             },
             "serialize_peer_router_infos",
-            "p170.netdb.peer_info.string_list",
+            "p170.netdb.peer_info.unavailable",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,

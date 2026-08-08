@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; RouterInfo source completion active; M045 conditionally closed
+Status: partial Proposal 170 support; RouterInfo source completion blocked on a corrective live-source seam
 
 This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -21,9 +21,9 @@ All work is internal to `eggstack/emissary`. External specifications/reference i
 
 ## Current handoff
 
-M045 is in closure review; no later plan is dependency-ready:
+M045 is blocked in closure review; no later plan is dependency-ready:
 
-- `045-routerinfo-known-peer-directory.md` — conditionally closed; live-source evidence remains outstanding.
+- `045-routerinfo-known-peer-directory.md` — blocked; a public neutral ProfileStorage enumeration seam is missing.
 
 Per `plans/003-planning-process.md`, later plans exist for handoff clarity but are not registered as executable until their hard dependency closes.
 
@@ -31,8 +31,8 @@ Per `plans/003-planning-process.md`, later plans exist for handoff clarity but a
 
 | Handoff | Status | Target fields | Hard dependency |
 |---|---|---:|---|
-| M045 — known-peer directory | conditionally closed | 3 | M044 closed |
-| M046 — active-peer inventory + transport limits | blocked | 4 | M045 live-source closure condition |
+| M045 — known-peer directory | blocked | 3 | corrective live ProfileStorage seam |
+| M046 — active-peer inventory + transport limits | blocked | 4 | M045 corrective live-source seam |
 | M047 — active-peer statistics | blocked | 1 | M046 closure |
 | M048 — tunnel-pool counts/details | blocked | 7 | M047 closure |
 | M049 — rolling transit/build metrics + queues | blocked | 4 | M048 closure |
@@ -57,7 +57,10 @@ The target is exactly the 26 RouterInfo rows currently classified unavailable. A
 
 Changes outside `i2pcontrol/**` are exceptional and may only expose neutral bounded read-only facts from canonical owners. They must not contain Proposal 170 terminology or mutable control authority. The machine-readable per-milestone production budgets are in `045-052-routerinfo-source-boundary.toml`.
 
-M045 is intentionally expected to require no core production change. M051/M052 authorize no core production change. M046–M050 enumerate the only core paths they may touch.
+M045 is intentionally expected to require no core production change. Its live-source audit found
+that the current public API cannot be used from `emissary-cli` without a separately authorized
+neutral ProfileStorage enumeration seam. M051/M052 authorize no core production change.
+M046–M050 enumerate the only later core paths they may touch.
 
 ## Source groups
 

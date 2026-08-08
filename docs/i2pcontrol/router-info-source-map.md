@@ -6,7 +6,7 @@ This is the reviewed source map for the pinned Proposal 170 revision created and
 last updated on `2026-08-01`. M027 independently revalidated the matrix against
 the external revision. The machine-readable authority is
 `router_info_keys::PROPOSAL_170_CONTRACT` in `emissary-cli/src/i2pcontrol/rpc.rs`.
-Summary: 43 total, 19 available, 1 protocol-permitted neutral, and 23 unavailable.
+Summary: 43 total, 16 available, 1 protocol-permitted neutral, and 26 unavailable.
 The table below is intentionally one row per canonical addition. Base selectors and
 the nested `Selector` compatibility form are not counted in those totals.
 
@@ -55,14 +55,14 @@ is read-only. Actual serialized response size is checked after assembly.
 | `i2p.router.net.tunnels.totalsuccessrate` | number | available | event-metrics | `serialize_total_tunnel_success_rate` | `p170.success_rate.total.percent` | — | — |
 | `i2p.router.net.tunnels.queue` | integer | unavailable | tunnel-pool: no bounded tunnel build queue snapshot | `serialize_tunnel_queue` | `p170.tunnel_queue.unavailable` | — | — |
 | `i2p.router.net.tunnels.tbmqueue` | integer | unavailable | tunnel-pool: no bounded tunnel build message queue snapshot | `serialize_tbm_queue` | `p170.tbm_queue.unavailable` | — | — |
-| `i2p.router.netdb.peers` | array&lt;string&gt; | available | profile-storage-read-only | `serialize_netdb_peer_hashes` | `p170.netdb.peers.string_list` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.peers` | array&lt;string&gt; | unavailable | profile-storage-read-only: no live bounded ProfileStorage directory source | `serialize_netdb_peer_hashes` | `p170.netdb.peers.unavailable` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.activepeers.info` | array&lt;string&gt; | unavailable | netdb: no bounded active-peer RouterInfo snapshot | `serialize_active_peer_router_infos` | `p170.netdb.active_peer_info.unavailable` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.ntcp.limit` | integer | unavailable | peer-limits: no authoritative NTCP limit owner | `serialize_ntcp_limit` | `p170.netdb.ntcp_limit.unavailable` | — | — |
 | `i2p.router.netdb.ssu.limit` | integer | unavailable | peer-limits: no authoritative SSU limit owner | `serialize_ssu_limit` | `p170.netdb.ssu_limit.unavailable` | — | — |
 | `i2p.router.netdb.bannedpeers` | map&lt;string,map&lt;string,object&gt;&gt; | unavailable | ban-list: no authoritative ban owner | `serialize_banned_peers` | `p170.netdb.banned_peers.unavailable` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.activepeers.list` | array&lt;string&gt; | unavailable | peer-list: no bounded active peer RouterInfo snapshot | `serialize_active_peer_hashes` | `p170.netdb.active_peers.unavailable` | 10,000 / 4 MiB | — |
-| `i2p.router.netdb.peers.list` | array&lt;string&gt; | available | profile-storage-read-only | `serialize_known_peer_hashes` | `p170.netdb.peer_list.string_list` | 10,000 / 4 MiB | — |
-| `i2p.router.netdb.peers.info` | array&lt;string&gt; | available | profile-storage-read-only | `serialize_peer_router_infos` | `p170.netdb.peer_info.string_list` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.peers.list` | array&lt;string&gt; | unavailable | profile-storage-read-only: no live bounded ProfileStorage directory source | `serialize_known_peer_hashes` | `p170.netdb.peer_list.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.peers.info` | array&lt;string&gt; | unavailable | profile-storage-read-only: no live bounded ProfileStorage directory source | `serialize_peer_router_infos` | `p170.netdb.peer_info.unavailable` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.activepeers.stats` | array&lt;object&gt; | unavailable | peer-stats: no bounded active peer statistics snapshot | `serialize_active_peer_stats` | `p170.netdb.active_peer_stats.unavailable` | 10,000 / 4 MiB | — |
 | `i2p.router.addressbook.private.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_private_list` | `p170.addressbook.private.list` | 10,000 / 4 MiB | — |
 | `i2p.router.addressbook.local.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_local_list` | `p170.addressbook.local.list` | 10,000 / 4 MiB | — |

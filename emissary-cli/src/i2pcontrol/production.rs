@@ -51,8 +51,9 @@ use crate::{
         observability::LogRing,
         router_info::{
             ActivePeerStats, BannedPeer, ClockSkew, I2PTunnelStats, InspectionError,
-            InspectionGroup, LogEntry, LogSnapshot, NetworkSnapshot, NetworkStatus, PeerIdentity,
-            PeerLimits, RecentTransitTraffic, RouterInfoControl, TransitBytes, TransportBytes,
+            InspectionGroup, LogEntry, LogSnapshot, NetworkSnapshot, NetworkStatus,
+            PeerDirectorySnapshot, PeerDirectorySource, PeerIdentity, PeerLimits,
+            RecentTransitTraffic, RouterInfoControl, TransitBytes, TransportBytes,
             TunnelBuildStats, TunnelSummary,
         },
         server_secret_store::{ServerDestinationStore, StoredDestination},
@@ -60,11 +61,51 @@ use crate::{
     },
 };
 
-use emissary_core::{events::EventHandle, runtime::Runtime, FirewallStatus};
+use emissary_core::{
+    crypto::base64_encode, events::EventHandle, inspection::CoreSnapshot, runtime::Runtime,
+    FirewallStatus,
+};
 
 /// Maximum number of startup and control-plane tunnel definitions exposed by
 /// one logical inventory.
 pub const MAX_TUNNEL_INVENTORY: usize = 1000;
+
+/// Public peer directory backed by the existing bounded core inspection
+/// snapshot. The clone contains only owned public RouterInfo bytes; it is not a
+/// router or NetDB control handle.
+pub struct CoreSnapshotPeerDirectory {
+    snapshot: CoreSnapshot,
+    max_items: usize,
+}
+
+impl CoreSnapshotPeerDirectory {
+    /// Create a bounded public peer directory source.
+    pub fn new(snapshot: CoreSnapshot, max_items: usize) -> Self {
+        Self {
+            snapshot,
+            max_items,
+        }
+    }
+}
+
+impl PeerDirectorySource for CoreSnapshotPeerDirectory {
+    fn snapshot(&self) -> Result<PeerDirectorySnapshot, InspectionError> {
+        if self.snapshot.netdb.known_router_ids.len() > self.max_items {
+            return Err(InspectionError::ResultTooLarge {
+                group: InspectionGroup::PeerList,
+                limit: self.max_items,
+            });
+        }
+
+        let mut peer_ids = self.snapshot.netdb.known_router_ids.clone();
+        peer_ids.sort_unstable();
+
+        Ok(PeerDirectorySnapshot {
+            peer_ids,
+            router_infos: self.snapshot.netdb.peer_router_infos.clone(),
+        })
+    }
+}
 
 /// Parsed startup client tunnel values needed by the I2PControl composition
 /// seam. This deliberately avoids making the library-side I2PControl code
@@ -1094,6 +1135,7 @@ pub struct ProductionRouterInfoControl {
     metrics: Arc<dyn EventMetrics>,
     log_ring: Arc<LogRing>,
     tunnel_manager: Arc<dyn TunnelManagerControl>,
+    peer_directory: Option<Arc<dyn PeerDirectorySource>>,
 }
 
 impl ProductionRouterInfoControl {
@@ -1119,7 +1161,14 @@ impl ProductionRouterInfoControl {
             metrics,
             log_ring,
             tunnel_manager,
+            peer_directory: None,
         }
+    }
+
+    /// Attach the canonical, read-only public peer directory source.
+    pub fn with_peer_directory_source(mut self, source: Arc<dyn PeerDirectorySource>) -> Self {
+        self.peer_directory = Some(source);
+        self
     }
 
     fn firewall_status_to_network(status: FirewallStatus) -> NetworkStatus {
@@ -1247,12 +1296,18 @@ impl RouterInfoControl for ProductionRouterInfoControl {
     }
 
     async fn known_peers(&self) -> Result<Vec<PeerIdentity>, InspectionError> {
-        // Known peer IDs require a bounded current snapshot from the canonical
-        // core profile storage owner. No existing event-metric handle exposes
-        // this list. Return unavailable rather than a stale snapshot.
-        Err(InspectionError::Unavailable {
+        let source = self.peer_directory.as_ref().ok_or(InspectionError::Unavailable {
             group: InspectionGroup::PeerList,
-        })
+        })?;
+        Ok(source
+            .snapshot()?
+            .peer_ids
+            .into_iter()
+            .map(|id| PeerIdentity {
+                id,
+                is_active: false,
+            })
+            .collect())
     }
 
     async fn active_peers(&self) -> Result<Vec<PeerIdentity>, InspectionError> {
@@ -1265,11 +1320,14 @@ impl RouterInfoControl for ProductionRouterInfoControl {
     }
 
     async fn peer_router_info(&self, _peer_id: &str) -> Result<Option<String>, InspectionError> {
-        // Peer RouterInfo lookup requires the bounded snapshot from canonical
-        // core profile storage. No existing event-metric handle provides this.
-        Err(InspectionError::Unavailable {
+        let source = self.peer_directory.as_ref().ok_or(InspectionError::Unavailable {
             group: InspectionGroup::PeerLookup,
-        })
+        })?;
+        let snapshot = source.snapshot()?;
+        let Some(bytes) = snapshot.router_infos.get(_peer_id) else {
+            return Ok(None);
+        };
+        Ok(Some(base64_encode(bytes.clone())))
     }
 
     async fn banned_peers(&self) -> Result<Vec<BannedPeer>, InspectionError> {
@@ -1424,13 +1482,15 @@ mod tests {
         let adapter = ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"));
 
         let mut config = AddressBookConfiguration::new();
-        config.insert("private_addressbook".to_string(), "chosen-by-request".to_string());
+        config.insert(
+            "private_addressbook".to_string(),
+            "chosen-by-request".to_string(),
+        );
         assert!(adapter.set_configuration(config).await.is_err());
         assert!(control.runtime_configuration().await.unwrap().is_empty());
 
-        let subscriptions = SubscriptionSet::from_vec(vec![
-            "https://example.i2p/hosts.txt".to_string(),
-        ]);
+        let subscriptions =
+            SubscriptionSet::from_vec(vec!["https://example.i2p/hosts.txt".to_string()]);
         assert!(adapter.set_subscriptions(subscriptions).await.is_err());
         assert!(control.runtime_subscriptions().await.unwrap().is_empty());
         assert!(!control.runtime_authority_present());

@@ -269,8 +269,9 @@ fn default_registry_covers_all_manifest_types() {
             "streamrclient" => emissary_cli::i2pcontrol::domain::tunnel::TunnelType::StreamrClient,
             "server" => emissary_cli::i2pcontrol::domain::tunnel::TunnelType::Server,
             "httpserver" => emissary_cli::i2pcontrol::domain::tunnel::TunnelType::HttpServer,
-            "httpbidirserver" =>
-                emissary_cli::i2pcontrol::domain::tunnel::TunnelType::HttpBidirServer,
+            "httpbidirserver" => {
+                emissary_cli::i2pcontrol::domain::tunnel::TunnelType::HttpBidirServer
+            }
             "ircserver" => emissary_cli::i2pcontrol::domain::tunnel::TunnelType::IrcServer,
             "streamrserver" => emissary_cli::i2pcontrol::domain::tunnel::TunnelType::StreamrServer,
             _ => panic!("unknown tunnel type in manifest: {}", row.name),
@@ -582,7 +583,7 @@ fn router_info_contract_manifest_has_exact_types_and_source_counts() {
             .iter()
             .filter(|row| matches!(row.source, SourceDisposition::Available { .. }))
             .count(),
-        16
+        19
     );
     assert_eq!(
         contract
@@ -596,7 +597,7 @@ fn router_info_contract_manifest_has_exact_types_and_source_counts() {
             .iter()
             .filter(|row| matches!(row.source, SourceDisposition::Unavailable { .. }))
             .count(),
-        26
+        23
     );
     assert!(contract.iter().all(|row| row.direct_presence && !row.fixture.is_empty()));
 }
@@ -617,7 +618,7 @@ fn router_info_source_map_documents_every_canonical_key_once() {
         );
     }
     assert!(source_map
-        .contains("43 total, 16 available, 1 protocol-permitted neutral, and 26 unavailable"));
+        .contains("43 total, 19 available, 1 protocol-permitted neutral, and 23 unavailable"));
 }
 
 #[test]

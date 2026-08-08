@@ -1266,12 +1266,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "netdb",
-                reason: "no bounded known-peer hash snapshot"
+            SourceDisposition::Available {
+                owner: "profile-storage-read-only"
             },
             "serialize_netdb_peer_hashes",
-            "p170.netdb.peers.unavailable",
+            "p170.netdb.peers.string_list",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1356,12 +1355,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS_LIST,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "peer-list",
-                reason: "no bounded known peer RouterInfo snapshot"
+            SourceDisposition::Available {
+                owner: "profile-storage-read-only"
             },
             "serialize_known_peer_hashes",
-            "p170.netdb.peer_list.unavailable",
+            "p170.netdb.peer_list.string_list",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1372,12 +1370,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS_INFO,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "peer-list",
-                reason: "no bounded peer RouterInfo snapshot"
+            SourceDisposition::Available {
+                owner: "profile-storage-read-only"
             },
             "serialize_peer_router_infos",
-            "p170.netdb.peer_info.unavailable",
+            "p170.netdb.peer_info.string_list",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1558,7 +1555,8 @@ pub mod router_info_keys {
     /// Test whether a selector belongs to the retained/base RouterInfo
     /// inventory, independent of the Proposal 170 additions.
     pub fn is_base_router_info_selector(key: &str) -> bool {
-        BASE_ROUTER_INFO_CORE_KEYS.contains(&key) || BASE_ROUTER_INFO_ADDRESS_BOOK_KEYS.contains(&key)
+        BASE_ROUTER_INFO_CORE_KEYS.contains(&key)
+            || BASE_ROUTER_INFO_ADDRESS_BOOK_KEYS.contains(&key)
     }
 
     /// Test whether a selector is accepted by direct Proposal 170 mode.
@@ -2191,13 +2189,17 @@ mod tests {
             .chain(router_info_keys::BASE_ROUTER_INFO_ADDRESS_BOOK_KEYS.iter())
             .copied()
             .collect();
-        let additions: HashSet<&str> = router_info_keys::PROPOSAL_170_ADDITIONS.iter().copied().collect();
+        let additions: HashSet<&str> =
+            router_info_keys::PROPOSAL_170_ADDITIONS.iter().copied().collect();
         let table: HashSet<&str> = router_info_keys::ROUTER_INFO_SELECTOR_OVERLAPS
             .iter()
             .map(|row| row.key)
             .collect();
 
-        assert_eq!(base.intersection(&additions).copied().collect::<HashSet<_>>(), table);
+        assert_eq!(
+            base.intersection(&additions).copied().collect::<HashSet<_>>(),
+            table
+        );
         assert_eq!(table.len(), 3);
         for row in router_info_keys::ROUTER_INFO_SELECTOR_OVERLAPS {
             assert_ne!(row.base_serializer, row.proposal_170_serializer);
@@ -2208,10 +2210,8 @@ mod tests {
     fn method_support_inventory_matches_dispatcher_surface() {
         use std::collections::HashSet;
 
-        let inventory: HashSet<&str> = methods::SUPPORT_INVENTORY
-            .iter()
-            .map(|entry| entry.method)
-            .collect();
+        let inventory: HashSet<&str> =
+            methods::SUPPORT_INVENTORY.iter().map(|entry| entry.method).collect();
         let protected: HashSet<&str> = methods::PROTECTED_DISPATCH.iter().copied().collect();
         let proposal: HashSet<&str> = methods::PROPOSAL_170.iter().copied().collect();
         let unsupported: HashSet<&str> = methods::UNSUPPORTED_BASE.iter().copied().collect();

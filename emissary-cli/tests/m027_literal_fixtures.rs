@@ -387,7 +387,7 @@ fn router_info_literal_availability_and_bounds_are_partitioned() {
     let contract = rpc::router_info_keys::PROPOSAL_170_CONTRACT;
     assert_eq!(
         contract.iter().filter(|f| f.source.class() == "available").count(),
-        16
+        19
     );
     assert_eq!(
         contract
@@ -398,7 +398,7 @@ fn router_info_literal_availability_and_bounds_are_partitioned() {
     );
     assert_eq!(
         contract.iter().filter(|f| f.source.class() == "unavailable").count(),
-        26
+        23
     );
     assert!(contract.iter().any(|f| f.fixture == "p170.logs.string_list"));
     assert!(contract.iter().any(|f| f.fixture == "p170.clockskew.nullable_integer"));

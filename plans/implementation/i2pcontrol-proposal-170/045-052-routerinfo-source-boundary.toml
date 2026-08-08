@@ -1,0 +1,92 @@
+version = 1
+objective = "M045-M052 Proposal 170 RouterInfo source completion with minimal non-i2pcontrol changes"
+baseline = "b759038"
+
+[always_allowed]
+i2pcontrol = ["emissary-cli/src/i2pcontrol/"]
+composition_only = ["emissary-cli/src/main.rs"]
+planning_tests_docs = ["plans/", "docs/i2pcontrol/", "emissary-cli/tests/"]
+
+[m045]
+core_production = []
+purpose = "known peer directory from existing ProfileStorage read-only APIs"
+
+[m046]
+core_production = [
+  "emissary-core/src/inspection.rs",
+  "emissary-core/src/transport/mod.rs",
+  "emissary-core/src/router/mod.rs",
+]
+purpose = "neutral cloneable active-peer and transport-limit inspection source"
+
+[m047]
+core_production = [
+  "emissary-core/src/inspection.rs",
+  "emissary-core/src/transport/mod.rs",
+  "emissary-core/src/router/mod.rs",
+  "emissary-core/src/transport/ntcp2/",
+  "emissary-core/src/transport/ssu2/",
+]
+purpose = "sanitized active-peer statistics only where exact owners require passive observation"
+
+[m048]
+core_production = [
+  "emissary-core/src/inspection.rs",
+  "emissary-core/src/router/mod.rs",
+  "emissary-core/src/tunnel/mod.rs",
+  "emissary-core/src/tunnel/pool.rs",
+  "emissary-core/src/tunnel/transit.rs",
+]
+purpose = "neutral bounded tunnel-pool lifecycle observation"
+
+[m049]
+core_production = [
+  "emissary-core/src/events.rs",
+  "emissary-core/src/inspection.rs",
+  "emissary-core/src/tunnel/mod.rs",
+  "emissary-core/src/tunnel/pool.rs",
+  "emissary-core/src/tunnel/transit.rs",
+]
+purpose = "exact recent-build gauge only if cumulative counters are insufficient; queue gauges through M048 seam"
+
+[m050]
+core_production = [
+  "emissary-core/src/events.rs",
+  "emissary-core/src/inspection.rs",
+  "emissary-core/src/transport/mod.rs",
+  "emissary-core/src/transport/ntcp2/",
+  "emissary-core/src/transport/ssu2/",
+]
+purpose = "neutral v4/v6 status error testing observation at existing reachability transitions"
+
+[m051]
+core_production = []
+purpose = "news and banned-peer semantic adjudication; no new router news/ban subsystem authorized"
+
+[m052]
+core_production = []
+purpose = "validation and independent reclosure only"
+
+[prohibited]
+production_prefixes = [
+  "emissary-core/src/crypto/",
+  "emissary-core/src/destination/",
+  "emissary-core/src/i2cp/",
+  "emissary-core/src/i2np/",
+  "emissary-cli/src/address_book.rs",
+  "emissary-cli/src/proxy/",
+  "emissary-cli/src/ui/",
+  ".github/workflows/",
+]
+behaviors = [
+  "router or peer selection policy changes",
+  "tunnel selection/build/routing algorithm changes",
+  "transport handshake/retransmission/congestion changes",
+  "NetDB protocol/query/discovery behavior changes",
+  "new network probes or polling solely for I2PControl",
+  "mutable core/session/tunnel/transport handles crossing into I2PControl",
+  "private keys session keys LeaseSet private material or message payloads in inspection DTOs",
+  "fabricated defaults standing in for unavailable sources",
+  "new tunnel data planes",
+  "upstream issue PR review submission adoption merge or maintainer interaction"
+]

@@ -27,13 +27,13 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | partial Proposal 170 support; RouterInfo source completion blocked | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M045 blocked | missing neutral ProfileStorage enumeration seam |
+| I2PControl Proposal 170 | partial Proposal 170 support; RouterInfo source completion active | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M053 ready | correct M045 stale startup-snapshot source with narrow live ProfileStorage inspection seam |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | — | — | — | — |
+| I2PControl Proposal 170 | M053 — M045 live ProfileStorage corrective | ready | `plans/implementation/i2pcontrol-proposal-170/053-m045-live-profile-storage-corrective.md` | M044 closed; M045 blocked finding at `bf9c2eeb` accepted |
 
 ## Blocked roadmap successors
 
@@ -41,7 +41,8 @@ Per `plans/003-planning-process.md`, these plans exist for deterministic handoff
 
 | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|
-| M046 — active-peer inventory and transport limits | blocked | `plans/implementation/i2pcontrol-proposal-170/046-routerinfo-active-peer-inventory-and-limits.md` | M045 corrective live-source seam |
+| M045 — known-peer directory | blocked | `plans/implementation/i2pcontrol-proposal-170/045-routerinfo-known-peer-directory.md` | M053 accepted closure correcting live source |
+| M046 — active-peer inventory and transport limits | blocked | `plans/implementation/i2pcontrol-proposal-170/046-routerinfo-active-peer-inventory-and-limits.md` | corrected M045 closure |
 | M047 — active-peer statistics | blocked | `plans/implementation/i2pcontrol-proposal-170/047-routerinfo-active-peer-stats.md` | M046 closure |
 | M048 — tunnel-pool counts and details | blocked | `plans/implementation/i2pcontrol-proposal-170/048-routerinfo-tunnel-pool-sources.md` | M047 closure |
 | M049 — rolling transit/build metrics and queues | blocked | `plans/implementation/i2pcontrol-proposal-170/049-routerinfo-rolling-metrics-and-queues.md` | M048 closure |
@@ -53,48 +54,52 @@ Per `plans/003-planning-process.md`, these plans exist for deterministic handoff
 
 | Subsystem | Handoff | Status | Evidence | Closure record |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M045 | blocked | `plans/closure/i2pcontrol-proposal-170/045-closure.md` | missing neutral ProfileStorage enumeration seam; M046 remains blocked |
+| I2PControl Proposal 170 | M045 | blocked | rejected stale startup-snapshot attempt `5ae0477`; rollback/planning head `bf9c2eeb` | `plans/closure/i2pcontrol-proposal-170/045-closure.md`; corrected only through M053 closure |
 
 ## Current authorized finding/work scope
 
-M044's accepted source matrix, plus the blocked M045 implementation disposition, remains current repository reality:
+Current truthful RouterInfo source matrix:
 
 - 43 canonical Proposal 170 RouterInfo additions;
 - 16 available;
 - 1 protocol-permitted neutral;
 - 26 unavailable.
 
-The maintainer has explicitly authorized work to create truthful sources for the remaining 26 unavailable rows while keeping modifications outside `emissary-cli/src/i2pcontrol/**` minimal.
+M045 failed because its source retained a one-shot `Router::inspection_snapshot()` from I2PControl startup. Shape/bounds tests passed, but the source did not observe later canonical peer-directory mutation. The promotion of the three known-peer fields was therefore rolled back.
 
-The source-completion decomposition is:
+M053 is authorized to correct only that defect and complete the original three-field M045 capability. The required architecture is a neutral cloneable request-time live `ProfileStorage`-backed inspection source inside core, with Proposal 170 policy remaining in I2PControl.
 
-- M045 known public peer directory: 3;
-- M046 active peer inventory + NTCP/SSU limits: 4;
-- M047 active peer stats: 1;
-- M048 participating/exploratory/client tunnel counts/details: 7;
-- M049 transit 15s/recent success/queue/TBM queue: 4;
-- M050 v4/v6 status/error/testing: 5;
-- M051 news/banned peers: 2;
-- M052 final integration/containment review.
-
-## RouterInfo source containment guard
+## M053 containment guard
 
 Machine-readable authority:
 
 - `plans/implementation/i2pcontrol-proposal-170/045-052-routerinfo-source-boundary.toml`
 
-General rule: Proposal 170 source policy, aggregation, rolling windows, joins, bounds, wire mappings, serialization, compatibility behavior, and errors remain in `emissary-cli/src/i2pcontrol/**`. Outside changes may only expose neutral bounded read-only facts from canonical owners and must remain inside the active milestone's explicit path budget.
+Detailed handoff:
 
-M045 production budget is I2PControl + `main.rs` composition only; no `emissary-core/**` production change is authorized.
+- `plans/implementation/i2pcontrol-proposal-170/053-m045-live-profile-storage-corrective.md`
 
-Later core exceptions are narrow and milestone-specific. They do not authorize algorithm changes, general management handles, mutable subsystem authority, network probes, or broad refactors.
+Authorized core production paths:
 
-## Prohibited scope throughout M045–M052
+- `emissary-core/src/inspection.rs`;
+- `emissary-core/src/router/mod.rs`.
+
+Authorized non-core production work:
+
+- `emissary-cli/src/main.rs` composition only;
+- `emissary-cli/src/i2pcontrol/**` for adapter/contract/handler behavior.
+
+M053 explicitly does not authorize changes to `emissary-core/src/profile.rs`, `router/context.rs`, NetDB, or `lib.rs` public re-exports. It also does not authorize M046 fields.
+
+Required regression: construct the inspection source, mutate canonical `ProfileStorage` afterward through its existing normal owner/test path, and prove a subsequent snapshot/request using the same source instance observes the new/current public peer data. Startup snapshot fixtures alone are insufficient.
+
+## Prohibited scope throughout the RouterInfo roadmap
 
 - new HTTP, HTTP server/bidirectional server, IRC, SOCKS-IRC, CONNECT, Streamr, or other tunnel data planes;
 - startup task adoption/control;
 - router/peer selection, NetDB protocol/discovery, tunnel selection/build/routing, transport handshake/retransmission/congestion, cryptographic, LeaseSet, or I2NP behavior changes;
 - fabricated RouterInfo values or placeholder promotion;
+- public export of mutable ProfileStorage/NetDB/router authority for inspection convenience;
 - sockets, keys, mutable session/tunnel/transport handles, channels, or message payloads crossing the inspection boundary;
 - new network probes, polling daemons, persistent metric stores, news downloader/feed, or ban engine solely for observability;
 - AddressBook/`SetConfig`, proxy/UI, frontend, or broad crate/service refactors;
@@ -111,9 +116,8 @@ Later core exceptions are narrow and milestone-specific. They do not authorize a
 | M038 | bounded live child-process evidence | retained |
 | M039 | final review record | historical-invalidated |
 | M040–M043 | corrective implementation/regression sequence | closed retained evidence |
-| M044 | accepted corrected final-head reclosure | closed; baseline for M045 |
-
-The new roadmap supersedes only the earlier planning statement that the 26 RouterInfo sources were deferred/out of scope. It does not invalidate M044's correctness judgment for the head it reviewed.
+| M044 | accepted corrected final-head reclosure | closed; baseline for RouterInfo source work |
+| M045 attempt | bounded startup peer snapshot | rejected as stale; retained corrective evidence only |
 
 ## Pinned authority
 
@@ -121,11 +125,11 @@ Current work is pinned to Proposal 170 `I2PControl Expansion`, status Open, revi
 
 ## Registry maintenance rules
 
-1. No current implementation plan is dependency-ready; M045's corrective live-source seam must be resolved first.
-2. Register M046 only after M045 implementation and independent closure are accepted; continue serially through M052.
-3. Preserve M020–M044 history/evidence unless a direct new defect is demonstrated.
+1. M053 is the only current dependency-ready plan.
+2. Do not register M046 until M053 closure explicitly corrects/closes M045.
+3. Preserve M020–M045 history/evidence unless a direct new defect is demonstrated.
 4. Keep all Proposal 170 policy under I2PControl; core exceptions are neutral observation only and milestone-budgeted.
-5. Do not mark a source available before its production owner, exact fixture, bounds, and failure semantics are evidenced.
+5. Do not mark a source available before its production owner, exact fixture, bounds, live/churn behavior, and failure semantics are evidenced.
 6. Keep verification local/package-scoped; do not add CI/release infrastructure.
 7. Overall Proposal 170 status remains partial unless separately authorized work closes unrelated unsupported dimensions.
 8. No upstream interaction is authorized.

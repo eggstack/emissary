@@ -1381,12 +1381,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_ACTIVE_PEERS_STATS,
             JsonType::ArrayOfObjects,
-            SourceDisposition::Unavailable {
-                owner: "peer-stats",
-                reason: "no bounded active peer statistics snapshot"
+            SourceDisposition::Available {
+                owner: "transport-manager-inspection"
             },
             "serialize_active_peer_stats",
-            "p170.netdb.active_peer_stats.unavailable",
+            "p170.netdb.active_peer_stats",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -2061,7 +2060,7 @@ mod tests {
     }
 
     #[test]
-    fn conformance_manifest_has_m053_source_counts() {
+    fn conformance_manifest_has_m047_source_counts() {
         use router_info_keys::{SourceDisposition, PROPOSAL_170_CONTRACT as C};
 
         let available = C
@@ -2077,7 +2076,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (23, 1, 19));
+        assert_eq!((available, neutral, unavailable), (24, 1, 18));
     }
 
     #[test]

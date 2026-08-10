@@ -20,6 +20,7 @@ use crate::{
     constants::{self, ssu2},
     crypto::{noise::NoiseContext, sha256::Sha256, StaticPrivateKey},
     error::{ChannelError, DialError, RelayError, Ssu2Error},
+    inspection::TransportInspection,
     primitives::{MlKemPreference, RouterAddress, RouterId, RouterInfo},
     router::context::RouterContext,
     runtime::{Counter, Gauge, Histogram, JoinSet, MetricsHandle, Runtime, UdpSocket},
@@ -286,6 +287,9 @@ pub struct Ssu2Socket<R: Runtime> {
     /// TX channel for sending events to `SubsystemManager`.
     transport_tx: Sender<SubsystemEvent>,
 
+    /// Neutral, read-only observation sink for active session byte counts.
+    transport_inspection: TransportInspection,
+
     /// Unvalidated sessions.
     unvalidated_sessions: HashMap<RouterId, PendingSessionKind>,
 
@@ -301,6 +305,7 @@ pub struct Ssu2Socket<R: Runtime> {
 
 impl<R: Runtime> Ssu2Socket<R> {
     /// Create new [`Ssu2Socket`].
+    #[allow(dead_code)]
     pub fn new(
         ipv4_socket: Option<R::UdpSocket>,
         ipv4_mtu: Option<usize>,
@@ -315,6 +320,41 @@ impl<R: Runtime> Ssu2Socket<R> {
         firewalled: bool,
         disable_pq: bool,
         max_connections: Option<NonZeroUsize>,
+    ) -> Self {
+        Self::new_with_inspection(
+            ipv4_socket,
+            ipv4_mtu,
+            ipv4_ml_kem,
+            ipv6_socket,
+            ipv6_mtu,
+            ipv6_ml_kem,
+            static_key,
+            intro_key,
+            transport_tx,
+            router_ctx,
+            firewalled,
+            disable_pq,
+            max_connections,
+            TransportInspection::default(),
+        )
+    }
+
+    /// Create a socket with the shared neutral inspection source.
+    pub fn new_with_inspection(
+        ipv4_socket: Option<R::UdpSocket>,
+        ipv4_mtu: Option<usize>,
+        ipv4_ml_kem: Option<MlKemPreference>,
+        ipv6_socket: Option<R::UdpSocket>,
+        ipv6_mtu: Option<usize>,
+        ipv6_ml_kem: Option<MlKemPreference>,
+        static_key: StaticPrivateKey,
+        intro_key: [u8; 32],
+        transport_tx: Sender<SubsystemEvent>,
+        router_ctx: RouterContext<R>,
+        firewalled: bool,
+        disable_pq: bool,
+        max_connections: Option<NonZeroUsize>,
+        transport_inspection: TransportInspection,
     ) -> Self {
         let public_key = static_key.public();
         let make_key_context = |protocol_name: &str| -> ProtocolState {
@@ -391,6 +431,7 @@ impl<R: Runtime> Ssu2Socket<R> {
             terminating_session: R::join_set(),
             tokens: HashSet::new(),
             transport_tx,
+            transport_inspection,
             unvalidated_sessions: HashMap::new(),
             waker: None,
             write_state: WriteState::GetPacket,
@@ -1254,13 +1295,14 @@ impl<R: Runtime> Ssu2Socket<R> {
         let socket = self.socket_for_address(&context.address);
 
         self.active_sessions.push(
-            Ssu2Session::<R>::new(
+            Ssu2Session::<R>::new_with_inspection(
                 context,
                 socket,
                 self.transport_tx.clone(),
                 self.router_ctx.clone(),
                 peer_test_handle,
                 relay_handle,
+                self.transport_inspection.clone(),
             )
             .run(),
         );

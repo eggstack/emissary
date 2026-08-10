@@ -21,6 +21,7 @@ use crate::{
     constants::ssu2,
     crypto::StaticPrivateKey,
     error::{ConnectionError, Error},
+    inspection::TransportInspection,
     primitives::{MlKemPreference, RouterAddress, RouterId, RouterInfo, TransportKind},
     router::context::RouterContext,
     runtime::{MetricType, Runtime, UdpSocket},
@@ -139,11 +140,29 @@ pub struct Ssu2Transport<R: Runtime> {
 
 impl<R: Runtime> Ssu2Transport<R> {
     /// Create new [`Ssu2Transport`].
+    #[allow(dead_code)]
     pub fn new(
         context: Ssu2Context<R>,
         allow_local: bool,
         router_ctx: RouterContext<R>,
         transport_tx: Sender<SubsystemEvent>,
+    ) -> Self {
+        Self::with_inspection(
+            context,
+            allow_local,
+            router_ctx,
+            transport_tx,
+            TransportInspection::default(),
+        )
+    }
+
+    /// Create a transport with the shared neutral inspection source.
+    pub fn with_inspection(
+        context: Ssu2Context<R>,
+        allow_local: bool,
+        router_ctx: RouterContext<R>,
+        transport_tx: Sender<SubsystemEvent>,
+        transport_inspection: TransportInspection,
     ) -> Self {
         let Ssu2Context {
             config,
@@ -171,7 +190,7 @@ impl<R: Runtime> Ssu2Transport<R> {
         );
 
         Self {
-            socket: Ssu2Socket::<R>::new(
+            socket: Ssu2Socket::<R>::new_with_inspection(
                 ipv4_socket,
                 ipv4_mtu,
                 ipv4_ml_kem,
@@ -185,6 +204,7 @@ impl<R: Runtime> Ssu2Transport<R> {
                 firewalled,
                 config.disable_pq,
                 config.max_connections,
+                transport_inspection,
             ),
         }
     }

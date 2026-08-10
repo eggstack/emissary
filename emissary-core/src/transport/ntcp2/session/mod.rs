@@ -34,6 +34,7 @@ use crate::{
     crypto::{noise::NoiseContext, sha256::Sha256, siphash::SipHash, StaticPrivateKey},
     error::Ntcp2Error,
     events::EventHandle,
+    inspection::TransportInspection,
     primitives::{RouterAddress, RouterId, RouterInfo, Str},
     profile::ProfileStorage,
     router::context::RouterContext,
@@ -311,6 +312,9 @@ pub struct SessionManager<R: Runtime> {
 
     /// TX channel for sending events to `SubsystemManager`.
     transport_tx: Sender<SubsystemEvent>,
+
+    /// Neutral, read-only observation sink for active session byte counts.
+    transport_inspection: TransportInspection,
 }
 
 impl<R: Runtime> SessionManager<R> {
@@ -321,6 +325,7 @@ impl<R: Runtime> SessionManager<R> {
     /// See the beginning of [1] for steps on generating start state.
     ///
     /// [1]: https://geti2p.net/spec/ntcp2#key-derivation-function-kdf-for-handshake-message-1
+    #[allow(dead_code)]
     pub fn new(
         static_key: StaticPrivateKey,
         local_iv: [u8; 16],
@@ -328,6 +333,27 @@ impl<R: Runtime> SessionManager<R> {
         allow_local: bool,
         allow_pq: bool,
         transport_tx: Sender<SubsystemEvent>,
+    ) -> Self {
+        Self::new_with_inspection(
+            static_key,
+            local_iv,
+            router_ctx,
+            allow_local,
+            allow_pq,
+            transport_tx,
+            TransportInspection::default(),
+        )
+    }
+
+    /// Create a session manager with the shared neutral inspection source.
+    pub fn new_with_inspection(
+        static_key: StaticPrivateKey,
+        local_iv: [u8; 16],
+        router_ctx: RouterContext<R>,
+        allow_local: bool,
+        allow_pq: bool,
+        transport_tx: Sender<SubsystemEvent>,
+        transport_inspection: TransportInspection,
     ) -> Self {
         let public_key = static_key.public();
         let make_key_context = |protocol_name: &str| -> ([u8; 32], [u8; 32], [u8; 32]) {
@@ -372,6 +398,7 @@ impl<R: Runtime> SessionManager<R> {
             static_key,
             router_ctx,
             transport_tx,
+            transport_inspection,
         }
     }
 
@@ -390,6 +417,7 @@ impl<R: Runtime> SessionManager<R> {
         metrics_handle: R::MetricsHandle,
         ipv4: bool,
         ipv6: bool,
+        transport_inspection: TransportInspection,
     ) -> Result<Ntcp2Session<R>, Ntcp2Error> {
         let router_id = router_info.identity.id();
 
@@ -548,6 +576,7 @@ impl<R: Runtime> SessionManager<R> {
             started,
             metrics_handle,
             encryption,
+            transport_inspection,
         ))
     }
 
@@ -577,6 +606,7 @@ impl<R: Runtime> SessionManager<R> {
         let transport_tx = self.transport_tx.clone();
         let metrics_handle = self.router_ctx.metrics_handle().clone();
         let outbound_state = Arc::clone(&self.outbound);
+        let transport_inspection = self.transport_inspection.clone();
         let started = R::now();
 
         async move {
@@ -594,6 +624,7 @@ impl<R: Runtime> SessionManager<R> {
                 metrics_handle,
                 ipv4,
                 ipv6,
+                transport_inspection,
             )
             .await
             {
@@ -640,6 +671,7 @@ impl<R: Runtime> SessionManager<R> {
         transport_tx: Sender<SubsystemEvent>,
         started: R::Instant,
         metrics_handle: R::MetricsHandle,
+        transport_inspection: TransportInspection,
     ) -> Result<Ntcp2Session<R>, Ntcp2Error> {
         tracing::trace!(
             target: LOG_TARGET,
@@ -708,6 +740,7 @@ impl<R: Runtime> SessionManager<R> {
                     started,
                     metrics_handle,
                     encryption,
+                    transport_inspection,
                 ))
             }
             Err(error) => {
@@ -738,6 +771,7 @@ impl<R: Runtime> SessionManager<R> {
         let transport_tx = self.transport_tx.clone();
         let metrics_handle = self.router_ctx.metrics_handle().clone();
         let inbound_state = self.inbound.clone();
+        let transport_inspection = self.transport_inspection.clone();
         let started = R::now();
 
         async move {
@@ -754,6 +788,7 @@ impl<R: Runtime> SessionManager<R> {
                 transport_tx,
                 started,
                 metrics_handle,
+                transport_inspection,
             )
             .await
             .map_err(|error| (None, error))

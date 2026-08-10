@@ -363,6 +363,30 @@ fn transport_inspection_handle_contains_only_owned_snapshot_state() {
 }
 
 #[test]
+fn transport_peer_inspection_contains_only_sanitized_facts() {
+    let src = std::fs::read_to_string(
+        workspace_root().join("emissary-core/src/inspection.rs"),
+    )
+    .expect("core inspection source must exist");
+    let start = src
+        .find("pub struct TransportPeerInspection {")
+        .expect("peer inspection DTO must exist");
+    let end = src[start..]
+        .find("\n}\n")
+        .map(|offset| start + offset);
+    let fields = &src[start..end.expect("peer inspection DTO must be closed")];
+    for forbidden in [
+        "Socket", "Session", "Sender", "Receiver", "EventHandle", "RouterContext", "Key",
+        "Channel", "Private",
+    ] {
+        assert!(!fields.contains(forbidden), "sensitive type leaked into peer DTO: {forbidden}");
+    }
+    for required in ["peer_id", "inbound", "connected", "bytes_received", "bytes_sent"] {
+        assert!(fields.contains(required), "peer DTO lost required neutral fact: {required}");
+    }
+}
+
+#[test]
 fn production_adapter_does_not_silently_truncate() {
     // Log snapshot and netdb use real sources; empty/zero is a truthful
     // result when the source reports it, not a fabrication.

@@ -6,7 +6,7 @@ This is the reviewed source map for the pinned Proposal 170 revision created and
 last updated on `2026-08-08`. M027 independently revalidated the matrix against
 the external revision. The machine-readable authority is
 `router_info_keys::PROPOSAL_170_CONTRACT` in `emissary-cli/src/i2pcontrol/rpc.rs`.
-Summary: 43 total, 23 available, 1 protocol-permitted neutral, and 19 unavailable.
+Summary: 43 total, 24 available, 1 protocol-permitted neutral, and 18 unavailable.
 The table below is intentionally one row per canonical addition. Base selectors and
 the nested `Selector` compatibility form are not counted in those totals.
 
@@ -63,7 +63,7 @@ is read-only. Actual serialized response size is checked after assembly.
 | `i2p.router.netdb.activepeers.list` | array&lt;string&gt; | available | transport-manager-inspection | `serialize_active_peer_hashes` | `p170.netdb.active_peers` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.peers.list` | array&lt;string&gt; | available | live-profile-storage-inspection | `serialize_known_peer_hashes` | `p170.netdb.peer_list` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.peers.info` | array&lt;string&gt; | available | live-profile-storage-inspection | `serialize_peer_router_infos` | `p170.netdb.peer_info` | 10,000 / 4 MiB | — |
-| `i2p.router.netdb.activepeers.stats` | array&lt;object&gt; | unavailable | peer-stats: no bounded active peer statistics snapshot | `serialize_active_peer_stats` | `p170.netdb.active_peer_stats.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.activepeers.stats` | array&lt;object&gt; | available | transport-manager-inspection: bounded current active session facts | `serialize_active_peer_stats` | `p170.netdb.active_peer_stats` | 10,000 / 4 MiB | — |
 | `i2p.router.addressbook.private.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_private_list` | `p170.addressbook.private.list` | 10,000 / 4 MiB | — |
 | `i2p.router.addressbook.local.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_local_list` | `p170.addressbook.local.list` | 10,000 / 4 MiB | — |
 | `i2p.router.addressbook.router.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_router_list` | `p170.addressbook.router.list` | 10,000 / 4 MiB | — |

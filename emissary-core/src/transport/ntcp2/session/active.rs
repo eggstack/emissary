@@ -23,6 +23,7 @@
 use crate::{
     crypto::{chachapoly::ChaChaPoly, siphash::SipHash},
     events::EventHandle,
+    inspection::TransportInspection,
     primitives::{RouterId, RouterInfo},
     runtime::{AsyncRead, AsyncWrite, Counter, Histogram, Instant, MetricsHandle, Runtime},
     subsystem::{OutboundMessage, OutboundMessageRecycle, SubsystemEvent},
@@ -199,6 +200,9 @@ pub struct Ntcp2Session<R: Runtime> {
     /// TX channel for sending events to `SubsystemManager`.
     transport_tx: Sender<SubsystemEvent>,
 
+    /// Neutral, read-only observation sink for active session byte counts.
+    transport_inspection: TransportInspection,
+
     /// Write state.
     write_state: WriteState,
 }
@@ -217,6 +221,7 @@ impl<R: Runtime> Ntcp2Session<R> {
         started: R::Instant,
         metrics_handle: R::MetricsHandle,
         encryption: EncryptionKind,
+        transport_inspection: TransportInspection,
     ) -> Self {
         let KeyContext {
             send_key,
@@ -250,6 +255,7 @@ impl<R: Runtime> Ntcp2Session<R> {
             started,
             stream,
             transport_tx,
+            transport_inspection,
             write_state: WriteState::GetMessage,
         }
     }
@@ -398,7 +404,13 @@ impl<R: Runtime> Future for Ntcp2Session<R> {
                                 };
                                 continue;
                             }
-                            this.inbound_bandwidth += this.read_buffer[..size].len();
+                            let received = this.read_buffer[..size].len();
+                            this.inbound_bandwidth += received;
+                            this.transport_inspection.record_peer_bytes(
+                                this.router.to_base64(),
+                                received as u64,
+                                0,
+                            );
                             this.metrics_handle
                                 .histogram(MESSAGE_SIZES)
                                 .record(this.read_buffer[..size].len() as f64);
@@ -610,6 +622,11 @@ impl<R: Runtime> Future for Ntcp2Session<R> {
                     Poll::Ready(Ok(0)) => return Poll::Ready(Some(TerminationReason::IoError)),
                     Poll::Ready(Ok(nwritten)) => {
                         this.outbound_bandwidth += nwritten;
+                        this.transport_inspection.record_peer_bytes(
+                            this.router.to_base64(),
+                            0,
+                            nwritten as u64,
+                        );
 
                         match nwritten + offset == size.len() {
                             true => {
@@ -648,6 +665,11 @@ impl<R: Runtime> Future for Ntcp2Session<R> {
                     Poll::Ready(Ok(0)) => return Poll::Ready(Some(TerminationReason::IoError)),
                     Poll::Ready(Ok(nwritten)) => {
                         this.outbound_bandwidth += nwritten;
+                        this.transport_inspection.record_peer_bytes(
+                            this.router.to_base64(),
+                            0,
+                            nwritten as u64,
+                        );
                         this.metrics_handle.counter(OUTBOUND_BW).increment(nwritten);
 
                         match nwritten + offset == message.len() {

@@ -20,6 +20,7 @@ use crate::{
     crypto::{chachapoly::ChaChaPoly, SigningPublicKey},
     error::Ssu2Error,
     events::EventHandle,
+    inspection::TransportInspection,
     i2np::Message,
     primitives::{RouterId, RouterInfo},
     router::context::RouterContext,
@@ -264,6 +265,9 @@ pub struct Ssu2Session<R: Runtime> {
     /// TX channel for communicating with `SubsystemManager`.
     transport_tx: Sender<SubsystemEvent>,
 
+    /// Neutral, read-only observation sink for active session byte counts.
+    transport_inspection: TransportInspection,
+
     /// Verifying key of remote router.
     verifying_key: SigningPublicKey,
 
@@ -273,6 +277,7 @@ pub struct Ssu2Session<R: Runtime> {
 
 impl<R: Runtime> Ssu2Session<R> {
     /// Create new [`Ssu2Session`].
+    #[allow(dead_code)]
     pub fn new(
         context: Ssu2SessionContext,
         socket: R::UdpSocket,
@@ -280,6 +285,27 @@ impl<R: Runtime> Ssu2Session<R> {
         router_ctx: RouterContext<R>,
         peer_test_handle: PeerTestHandle<R>,
         relay_handle: RelayHandle<R>,
+    ) -> Self {
+        Self::new_with_inspection(
+            context,
+            socket,
+            transport_tx,
+            router_ctx,
+            peer_test_handle,
+            relay_handle,
+            TransportInspection::default(),
+        )
+    }
+
+    /// Create an active session with the shared neutral inspection source.
+    pub fn new_with_inspection(
+        context: Ssu2SessionContext,
+        socket: R::UdpSocket,
+        transport_tx: Sender<SubsystemEvent>,
+        router_ctx: RouterContext<R>,
+        peer_test_handle: PeerTestHandle<R>,
+        relay_handle: RelayHandle<R>,
+        transport_inspection: TransportInspection,
     ) -> Self {
         let (msg_tx, msg_rx) = with_recycle(CMD_CHANNEL_SIZE, OutboundMessageRecycle::default());
         let metrics = router_ctx.metrics_handle().clone();
@@ -328,6 +354,7 @@ impl<R: Runtime> Ssu2Session<R> {
             ),
             socket,
             transport_tx,
+            transport_inspection,
             verifying_key: context.verifying_key,
             write_buffer: VecDeque::new(),
         }
@@ -634,6 +661,11 @@ impl<R: Runtime> Future for Ssu2Session<R> {
                 Poll::Ready(None) => return Poll::Ready(TerminationReason::Unspecified),
                 Poll::Ready(Some(pkt)) => {
                     self.inbound_bandwidth += pkt.pkt.len();
+                    self.transport_inspection.record_peer_bytes(
+                        self.router_id.to_base64(),
+                        pkt.pkt.len() as u64,
+                        0,
+                    );
 
                     match self.handle_packet(pkt) {
                         Ok(()) => {}
@@ -696,7 +728,13 @@ impl<R: Runtime> Future for Ssu2Session<R> {
                     ) {
                         Poll::Pending => {}
                         Poll::Ready(None) => return Poll::Ready(TerminationReason::RouterShutdown),
-                        Poll::Ready(Some(_)) => {}
+                        Poll::Ready(Some(nwritten)) => {
+                            self.transport_inspection.record_peer_bytes(
+                                self.router_id.to_base64(),
+                                0,
+                                nwritten as u64,
+                            );
+                        }
                     }
                 }
             }
@@ -759,13 +797,23 @@ impl<R: Runtime> Future for Ssu2Session<R> {
                         break;
                     }
                     Poll::Ready(None) => return Poll::Ready(TerminationReason::RouterShutdown),
-                    Poll::Ready(Some(nwritten)) => {
+                Poll::Ready(Some(nwritten)) => {
+                    self.transport_inspection.record_peer_bytes(
+                        self.router_id.to_base64(),
+                        0,
+                        nwritten as u64,
+                    );
                         self.router_ctx
                             .metrics_handle()
                             .counter(OUTBOUND_BANDWIDTH)
                             .increment(nwritten);
                         self.router_ctx.metrics_handle().counter(OUTBOUND_PKTS).increment(1);
                         self.outbound_bandwidth += nwritten;
+                        self.transport_inspection.record_peer_bytes(
+                            self.router_id.to_base64(),
+                            0,
+                            nwritten as u64,
+                        );
                     }
                 }
             }
@@ -798,6 +846,11 @@ impl<R: Runtime> Future for Ssu2Session<R> {
                                     .counter(OUTBOUND_PKTS)
                                     .increment(1);
                                 self.outbound_bandwidth += nwritten;
+                                self.transport_inspection.record_peer_bytes(
+                                    self.router_id.to_base64(),
+                                    0,
+                                    nwritten as u64,
+                                );
                             }
                         }
                     }

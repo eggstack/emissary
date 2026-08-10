@@ -155,6 +155,26 @@ impl ActivePeerSource for LiveActivePeerSource {
             peer_ids: snapshot.connected_peer_ids,
             ntcp_limit: snapshot.ntcp2_limit,
             ssu_limit: snapshot.ssu2_limit,
+            stats: snapshot
+                .peer_stats
+                .into_iter()
+                .map(|peer| ActivePeerStats {
+                    peer_id: peer.peer_id,
+                    direction: if peer.inbound {
+                        "inbound".to_owned()
+                    } else {
+                        "outbound".to_owned()
+                    },
+                    state: if peer.connected {
+                        "connected".to_owned()
+                    } else {
+                        "disconnected".to_owned()
+                    },
+                    bytes_received: peer.bytes_received,
+                    bytes_sent: peer.bytes_sent,
+                    avg_latency_ms: None,
+                })
+                .collect(),
         })
     }
 }
@@ -1424,9 +1444,12 @@ impl RouterInfoControl for ProductionRouterInfoControl {
     }
 
     async fn active_peer_stats(&self) -> Result<Vec<ActivePeerStats>, InspectionError> {
-        Err(InspectionError::Unavailable {
+        let source = self.active_peer_source.as_ref().ok_or(InspectionError::Unavailable {
             group: InspectionGroup::PeerStats,
-        })
+        })?;
+        let mut stats = source.snapshot()?.stats;
+        stats.sort_unstable_by(|left, right| left.peer_id.cmp(&right.peer_id));
+        Ok(stats)
     }
 
     async fn i2ptunnel_stats(&self) -> Result<I2PTunnelStats, InspectionError> {

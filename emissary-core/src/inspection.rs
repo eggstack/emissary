@@ -135,6 +135,26 @@ pub struct TransportInspectionSnapshot {
     /// Finite SSU2 connection limit, or `None` when SSU2 is disabled or
     /// configured as unlimited.
     pub ssu2_limit: Option<usize>,
+    /// Current peer statistics copied from established transport sessions.
+    pub peer_stats: Vec<TransportPeerInspection>,
+}
+
+/// Bounded, owned facts about one established transport session.
+///
+/// The boolean fields intentionally remain neutral core facts. I2PControl
+/// owns their wire labels and any compatibility mapping.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransportPeerInspection {
+    /// Base64 router ID of the connected peer.
+    pub peer_id: String,
+    /// Whether the connection was accepted inbound.
+    pub inbound: bool,
+    /// Whether the transport manager still owns this connection.
+    pub connected: bool,
+    /// Bytes received by the active transport session.
+    pub bytes_received: u64,
+    /// Bytes sent by the active transport session.
+    pub bytes_sent: u64,
 }
 
 /// Cloneable, read-only access to current transport inspection facts.
@@ -145,6 +165,12 @@ pub struct TransportInspectionSnapshot {
 #[derive(Clone)]
 pub struct TransportInspection {
     snapshot: Arc<RwLock<TransportInspectionSnapshot>>,
+}
+
+impl Default for TransportInspection {
+    fn default() -> Self {
+        Self::new(TransportInspectionSnapshot::default())
+    }
 }
 
 impl TransportInspection {
@@ -162,14 +188,66 @@ impl TransportInspection {
         max_items: usize,
     ) -> Result<TransportInspectionSnapshot, TransportInspectionError> {
         let snapshot = self.snapshot.read();
-        if snapshot.connected_peer_ids.len() > max_items {
+        if snapshot.connected_peer_ids.len() > max_items || snapshot.peer_stats.len() > max_items {
             return Err(TransportInspectionError::ItemLimitExceeded { limit: max_items });
         }
         Ok(snapshot.clone())
     }
 
+    #[allow(dead_code)]
     pub(crate) fn update_connected_peer_ids(&self, connected_peer_ids: Vec<String>) {
-        self.snapshot.write().connected_peer_ids = connected_peer_ids;
+        let mut snapshot = self.snapshot.write();
+        snapshot.connected_peer_ids = connected_peer_ids.clone();
+        snapshot.peer_stats.retain(|peer| connected_peer_ids.contains(&peer.peer_id));
+        for peer_id in connected_peer_ids {
+            if !snapshot.peer_stats.iter().any(|peer| peer.peer_id == peer_id) {
+                snapshot.peer_stats.push(TransportPeerInspection {
+                    peer_id,
+                    inbound: false,
+                    connected: true,
+                    bytes_received: 0,
+                    bytes_sent: 0,
+                });
+            }
+        }
+    }
+
+    pub(crate) fn set_ntcp2_limit(&self, limit: Option<usize>) {
+        self.snapshot.write().ntcp2_limit = limit;
+    }
+
+    pub(crate) fn set_ssu2_limit(&self, limit: Option<usize>) {
+        self.snapshot.write().ssu2_limit = limit;
+    }
+
+    pub(crate) fn peer_connected(&self, peer_id: String, inbound: bool) {
+        let mut snapshot = self.snapshot.write();
+        snapshot.connected_peer_ids.retain(|id| id != &peer_id);
+        snapshot.connected_peer_ids.push(peer_id.clone());
+        snapshot.connected_peer_ids.sort_unstable();
+        snapshot.peer_stats.retain(|peer| peer.peer_id != peer_id);
+        snapshot.peer_stats.push(TransportPeerInspection {
+            peer_id,
+            inbound,
+            connected: true,
+            bytes_received: 0,
+            bytes_sent: 0,
+        });
+        snapshot.peer_stats.sort_unstable_by(|left, right| left.peer_id.cmp(&right.peer_id));
+    }
+
+    pub(crate) fn peer_disconnected(&self, peer_id: &str) {
+        let mut snapshot = self.snapshot.write();
+        snapshot.connected_peer_ids.retain(|id| id != peer_id);
+        snapshot.peer_stats.retain(|peer| peer.peer_id != peer_id);
+    }
+
+    pub(crate) fn record_peer_bytes(&self, peer_id: &str, received: u64, sent: u64) {
+        let mut snapshot = self.snapshot.write();
+        if let Some(peer) = snapshot.peer_stats.iter_mut().find(|peer| peer.peer_id == peer_id) {
+            peer.bytes_received = peer.bytes_received.saturating_add(received);
+            peer.bytes_sent = peer.bytes_sent.saturating_add(sent);
+        }
     }
 }
 
@@ -258,6 +336,7 @@ mod tests {
             connected_peer_ids: vec!["peer-b".into(), "peer-a".into()],
             ntcp2_limit: Some(64),
             ssu2_limit: None,
+            peer_stats: Vec::new(),
         });
         let clone = inspection.clone();
 
@@ -274,6 +353,26 @@ mod tests {
 
         inspection.update_connected_peer_ids(vec!["peer-c".into()]);
         assert_eq!(clone.snapshot(2).unwrap().connected_peer_ids, ["peer-c"]);
+    }
+
+    #[test]
+    fn transport_peer_stats_are_live_bounded_and_removed_with_sessions() {
+        let inspection = TransportInspection::new(TransportInspectionSnapshot::default());
+        inspection.peer_connected("peer-b".into(), false);
+        inspection.peer_connected("peer-a".into(), true);
+        inspection.record_peer_bytes("peer-a", 7, 11);
+
+        let snapshot = inspection.snapshot(2).unwrap();
+        assert_eq!(snapshot.connected_peer_ids, ["peer-a", "peer-b"]);
+        assert_eq!(snapshot.peer_stats[0].peer_id, "peer-a");
+        assert!(snapshot.peer_stats[0].inbound);
+        assert!(snapshot.peer_stats[0].connected);
+        assert_eq!(snapshot.peer_stats[0].bytes_received, 7);
+        assert_eq!(snapshot.peer_stats[0].bytes_sent, 11);
+
+        assert_eq!(inspection.snapshot(1), Err(TransportInspectionError::ItemLimitExceeded { limit: 1 }));
+        inspection.peer_disconnected("peer-a");
+        assert_eq!(inspection.snapshot(2).unwrap().peer_stats.len(), 1);
     }
 }
 

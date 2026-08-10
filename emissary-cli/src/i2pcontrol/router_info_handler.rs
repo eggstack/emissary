@@ -189,7 +189,9 @@ fn estimate_response_budget(key_set: &HashSet<&str>) -> Result<(), String> {
     }
 
     // Active peer stats
-    if key_set.contains(rpc::router_info_keys::PEERS_ACTIVE_STATS) {
+    if key_set.contains(rpc::router_info_keys::PEERS_ACTIVE_STATS)
+        || key_set.contains(rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_STATS)
+    {
         estimated_bytes += MAX_ACTIVE_PEER_STATS * 128;
     }
 
@@ -683,6 +685,14 @@ async fn assemble_response(
         )
     }) {
         resolve_proposal_active_peers(&mut result, &key_set, router_info).await?;
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_STATS) {
+        resolve_active_peer_stats(
+            &mut result,
+            rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_STATS,
+            router_info,
+        )
+        .await?;
     }
     if key_set.iter().any(|key| {
         matches!(
@@ -1415,30 +1425,41 @@ async fn resolve_peer_selectors(
         );
     }
     if key_set.contains(rpc::router_info_keys::PEERS_ACTIVE_STATS) {
-        let stats = router_info.active_peer_stats().await?;
-        if stats.len() > MAX_ACTIVE_PEER_STATS {
-            return Err(InspectionError::ResultTooLarge {
-                group: crate::i2pcontrol::router_info::InspectionGroup::PeerStats,
-                limit: MAX_ACTIVE_PEER_STATS,
-            });
-        }
-        let entries: Vec<serde_json::Value> = stats
-            .iter()
-            .map(|s| {
-                serde_json::json!({
-                    "peerId": s.peer_id,
-                    "direction": s.direction,
-                    "state": s.state,
-                    "bytesReceived": s.bytes_received,
-                    "bytesSent": s.bytes_sent,
-                })
-            })
-            .collect();
-        result.insert(
-            rpc::router_info_keys::PEERS_ACTIVE_STATS.to_string(),
-            serde_json::json!(entries),
-        );
+        resolve_active_peer_stats(
+            result,
+            rpc::router_info_keys::PEERS_ACTIVE_STATS,
+            router_info,
+        )
+        .await?;
     }
+    Ok(())
+}
+
+async fn resolve_active_peer_stats(
+    result: &mut serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    router_info: &dyn RouterInfoControl,
+) -> Result<(), InspectionError> {
+    let stats = router_info.active_peer_stats().await?;
+    if stats.len() > MAX_ACTIVE_PEER_STATS {
+        return Err(InspectionError::ResultTooLarge {
+            group: crate::i2pcontrol::router_info::InspectionGroup::PeerStats,
+            limit: MAX_ACTIVE_PEER_STATS,
+        });
+    }
+    let entries: Vec<serde_json::Value> = stats
+        .iter()
+        .map(|s| {
+            serde_json::json!({
+                "peerId": s.peer_id,
+                "direction": s.direction,
+                "state": s.state,
+                "bytesReceived": s.bytes_received,
+                "bytesSent": s.bytes_sent,
+            })
+        })
+        .collect();
+    result.insert(key.to_owned(), serde_json::json!(entries));
     Ok(())
 }
 

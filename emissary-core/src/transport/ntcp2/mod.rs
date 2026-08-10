@@ -20,6 +20,7 @@ use crate::{
     config::Ntcp2Config,
     crypto::StaticPrivateKey,
     error::{ConnectionError, DialError, Error, Ntcp2Error},
+    inspection::TransportInspection,
     primitives::{RouterAddress, RouterId, RouterInfo, TransportKind},
     router::context::RouterContext,
     runtime::{
@@ -150,11 +151,29 @@ pub struct Ntcp2Transport<R: Runtime> {
 
 impl<R: Runtime> Ntcp2Transport<R> {
     /// Create new [`Ntcp2Transport`].
+    #[allow(dead_code)]
     pub fn new(
         context: Ntcp2Context<R>,
         allow_local: bool,
         router_ctx: RouterContext<R>,
         transport_tx: Sender<SubsystemEvent>,
+    ) -> Self {
+        Self::with_inspection(
+            context,
+            allow_local,
+            router_ctx,
+            transport_tx,
+            TransportInspection::default(),
+        )
+    }
+
+    /// Create a transport with the shared neutral inspection source.
+    pub fn with_inspection(
+        context: Ntcp2Context<R>,
+        allow_local: bool,
+        router_ctx: RouterContext<R>,
+        transport_tx: Sender<SubsystemEvent>,
+        transport_inspection: TransportInspection,
     ) -> Self {
         let Ntcp2Context {
             config,
@@ -165,13 +184,14 @@ impl<R: Runtime> Ntcp2Transport<R> {
             static_key,
         } = context;
 
-        let session_manager = SessionManager::new(
+        let session_manager = SessionManager::new_with_inspection(
             static_key,
             config.iv,
             router_ctx.clone(),
             allow_local,
             !config.disable_pq,
             transport_tx,
+            transport_inspection,
         );
 
         tracing::info!(

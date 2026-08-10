@@ -336,6 +336,8 @@ pub struct ActivePeerSnapshot {
     pub ntcp_limit: Option<usize>,
     /// Finite SSU2 limit; `None` means disabled or unlimited.
     pub ssu_limit: Option<usize>,
+    /// Current statistics for the same active transport population.
+    pub stats: Vec<ActivePeerStats>,
 }
 
 /// Read-only source for current transport facts.

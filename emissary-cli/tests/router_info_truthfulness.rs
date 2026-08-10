@@ -237,6 +237,43 @@ async fn active_peer_stats_unavailable_returns_error() {
 }
 
 #[tokio::test]
+async fn proposal_active_peer_stats_returns_exact_bounded_objects() {
+    let ri = FakeRouterInfoControl::new();
+    ri.set_active_peer_stats(vec![ActivePeerStats {
+        peer_id: "peer-a".to_owned(),
+        direction: "inbound".to_owned(),
+        state: "connected".to_owned(),
+        bytes_received: 17,
+        bytes_sent: 29,
+        avg_latency_ms: None,
+    }]);
+    let state = test_state(ri);
+    let req = emissary_cli::i2pcontrol::rpc::JsonRpcRequest {
+        jsonrpc: "2.0".to_owned(),
+        method: "RouterInfo".to_owned(),
+        params: Some(
+            serde_json::json!({"i2p.router.netdb.activepeers.stats": true})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        ),
+        id: Some(rpc::RequestId::Number(1)),
+    };
+    let resp =
+        emissary_cli::i2pcontrol::router_info_handler::handle_router_info(&state, &req).await;
+    assert_eq!(
+        resp["result"]["i2p.router.netdb.activepeers.stats"],
+        serde_json::json!([{
+            "peerId": "peer-a",
+            "direction": "inbound",
+            "state": "connected",
+            "bytesReceived": 17,
+            "bytesSent": 29,
+        }])
+    );
+}
+
+#[tokio::test]
 async fn i2ptunnel_stats_unavailable_returns_error() {
     let ri = FakeRouterInfoControl::new();
     let state = test_state(ri);

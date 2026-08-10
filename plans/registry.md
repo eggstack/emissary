@@ -27,13 +27,14 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | partial Proposal 170 support; RouterInfo source completion active | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M049 ready | M048 closed; M049 rolling metrics follows the accepted tunnel-pool source seam |
+| I2PControl Proposal 170 | partial Proposal 170 support; RouterInfo source completion active | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M050 ready | M049 closed; M050 follows the accepted rolling-metrics and queue sources |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
 | I2PControl Proposal 170 | M048 — tunnel-pool counts and details | closed | `plans/implementation/i2pcontrol-proposal-170/048-routerinfo-tunnel-pool-sources.md` | `048-closure.md` |
+| I2PControl Proposal 170 | M050 — v4/v6 network status/error/testing | ready | `plans/implementation/i2pcontrol-proposal-170/050-routerinfo-network-state-sources.md` | M049 closure |
 
 ## Blocked roadmap successors
 
@@ -45,8 +46,7 @@ Per `plans/003-planning-process.md`, these plans exist for deterministic handoff
 | M046 — active-peer inventory and transport limits | closed | `plans/implementation/i2pcontrol-proposal-170/046-routerinfo-active-peer-inventory-and-limits.md` | `046-closure.md` |
 | M047 — active-peer statistics | closed | `plans/implementation/i2pcontrol-proposal-170/047-routerinfo-active-peer-stats.md` | M046 closure; `047-closure.md` |
 | M048 — tunnel-pool counts and details | closed | `plans/implementation/i2pcontrol-proposal-170/048-routerinfo-tunnel-pool-sources.md` | `048-closure.md` |
-| M049 — rolling transit/build metrics and queues | ready | `plans/implementation/i2pcontrol-proposal-170/049-routerinfo-rolling-metrics-and-queues.md` | M048 closure |
-| M050 — v4/v6 network status/error/testing | blocked | `plans/implementation/i2pcontrol-proposal-170/050-routerinfo-network-state-sources.md` | M049 closure |
+| M049 — rolling transit/build metrics and queues | closed | `plans/implementation/i2pcontrol-proposal-170/049-routerinfo-rolling-metrics-and-queues.md` | `049-closure.md` |
 | M051 — router news and banned-peer semantics | blocked | `plans/implementation/i2pcontrol-proposal-170/051-routerinfo-news-and-banned-peer-semantics.md` | M050 closure |
 | M052 — 26-source integration and containment reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/052-routerinfo-source-integration-and-reclosure.md` | M045–M051 accepted |
 
@@ -64,13 +64,13 @@ Per `plans/003-planning-process.md`, these plans exist for deterministic handoff
 Current truthful RouterInfo source matrix:
 
 - 43 canonical Proposal 170 RouterInfo additions;
-- 31 available;
+- 35 available;
 - 1 protocol-permitted neutral;
-- 11 unavailable.
+- 7 unavailable.
 
 M045 initially failed because its source retained a one-shot `Router::inspection_snapshot()` from I2PControl startup. M053 corrected that defect with a live canonical `ProfileStorage` inspection handle, and the three known-peer fields are now promoted with post-construction churn evidence.
 
-M053 corrected only the M045 stale-source defect and completed the original three-field capability. M046 added the neutral cloneable current transport inspection source and completed the four active-peer/finite-limit fields. M047 completed the active-peer statistics object from that seam. M048 completed the seven live tunnel-pool sources and unblocked M049. Proposal 170 policy remains in I2PControl; core carries only sanitized owned observations.
+M053 corrected only the M045 stale-source defect and completed the original three-field capability. M046 added the neutral cloneable current transport inspection source and completed the four active-peer/finite-limit fields. M047 completed the active-peer statistics object from that seam. M048 completed the seven live tunnel-pool sources. M049 completed four rolling/queue sources and unblocked M050. Proposal 170 policy remains in I2PControl; core carries only sanitized owned observations.
 
 ## M053 containment guard
 
@@ -128,8 +128,8 @@ Current work is pinned to Proposal 170 `I2PControl Expansion`, status Open, revi
 
 ## Registry maintenance rules
 
-1. M049 is the only current dependency-ready plan.
-2. M050 and later successors remain blocked until their named predecessors close.
+1. M050 is the only current dependency-ready plan.
+2. M051 and later successors remain blocked until their named predecessors close.
 3. Preserve M020–M045 history/evidence unless a direct new defect is demonstrated.
 4. Keep all Proposal 170 policy under I2PControl; core exceptions are neutral observation only and milestone-budgeted.
 5. Do not mark a source available before its production owner, exact fixture, bounds, live/churn behavior, and failure semantics are evidenced.

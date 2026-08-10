@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 RouterInfo Source-Completion Roadmap
 
-Status: partial Proposal 170 support; RouterInfo source-completion sequence active; M049 ready
+Status: partial Proposal 170 support; RouterInfo source-completion sequence active; M050 ready
 
 Planning baseline: `b759038` — M044 finalized reviewed head
 
@@ -20,6 +20,7 @@ Canonical internal references:
 - `plans/adrs/ADR-0002-control-plane-tunnel-runtime-ownership.md`;
 - `plans/closure/i2pcontrol-proposal-170/044-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/045-closure.md`;
+- `plans/closure/i2pcontrol-proposal-170/049-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/053-closure.md`;
 - `plans/implementation/i2pcontrol-proposal-170/README.md`;
 - `plans/implementation/i2pcontrol-proposal-170/045-052-routerinfo-source-boundary.toml`;
@@ -29,7 +30,7 @@ Canonical internal references:
 
 M044 truthfully closed the prior corrective sequence with 43 canonical Proposal 170 RouterInfo additions classified as 16 available, 1 protocol-permitted neutral, and 26 unavailable. M045 then attempted to implement three known-peer fields using a bounded `Router::inspection_snapshot()` captured at I2PControl startup. Closure rejected that source because it was safe but stale: peer churn after composition was not visible.
 
-M053 corrected that exact defect with the smallest neutral live core inspection seam required to expose the canonical `ProfileStorage` directory without making `ProfileStorage`, `Bucket`, NetDB authority, or mutable router state public. M045 is corrected/closed through the accepted M053 closure. M046 then added the neutral live transport inspection seam and completed active-peer inventory and finite-limit sources. M047 added bounded current active-session statistics; M048 added bounded live tunnel-pool sources. The matrix is now 31 available, 1 protocol-permitted neutral, and 11 unavailable.
+M053 corrected that exact defect with the smallest neutral live core inspection seam required to expose the canonical `ProfileStorage` directory without making `ProfileStorage`, `Bucket`, NetDB authority, or mutable router state public. M045 is corrected/closed through the accepted M053 closure. M046 then added the neutral live transport inspection seam and completed active-peer inventory and finite-limit sources. M047 added bounded current active-session statistics; M048 added bounded live tunnel-pool sources; M049 added rolling transit/recent-success metrics and live queue depths. The matrix is now 35 available, 1 protocol-permitted neutral, and 7 unavailable.
 
 The architecture remains asymmetric: core/runtime code may expose only the smallest neutral bounded read-only facts that only the canonical owner can know. I2PControl owns source composition, rolling windows, aggregation, deterministic ordering, response bounds, Proposal 170 source disposition, numeric/wire mapping, JSON serialization, and failure semantics.
 
@@ -37,27 +38,15 @@ This roadmap does not reopen the ten unsupported tunnel data planes, `SetConfig`
 
 ## 2. Target fields
 
-The 11 remaining target rows are exactly the current unavailable rows in `router_info_keys::PROPOSAL_170_CONTRACT` and `docs/i2pcontrol/router-info-source-map.md`:
+The 7 remaining target rows are exactly the current unavailable rows in `router_info_keys::PROPOSAL_170_CONTRACT` and `docs/i2pcontrol/router-info-source-map.md`:
 
 1. `i2p.router.news`;
-2. `i2p.router.net.bw.transit.15s`;
-3. `i2p.router.net.tunnels.participating.info`;
-4. `i2p.router.net.tunnels.exploratory.inbound`;
-5. `i2p.router.net.tunnels.exploratory.outbound`;
-6. `i2p.router.net.tunnels.exploratory.info.list`;
-7. `i2p.router.net.tunnels.client.inbound`;
-8. `i2p.router.net.tunnels.client.outbound`;
-9. `i2p.router.net.tunnels.client.info.list`;
-10. `i2p.router.net.status.v6`;
-11. `i2p.router.net.error`;
-12. `i2p.router.net.error.v6`;
-13. `i2p.router.net.testing`;
-14. `i2p.router.net.testing.v6`;
-15. `i2p.router.net.tunnels.successrate`;
-16. `i2p.router.net.tunnels.queue`;
-17. `i2p.router.net.tunnels.tbmqueue`;
-18. `i2p.router.netdb.bannedpeers`;
-19. `i2p.router.netdb.activepeers.stats`.
+2. `i2p.router.net.status.v6`;
+3. `i2p.router.net.error`;
+4. `i2p.router.net.error.v6`;
+5. `i2p.router.net.testing`;
+6. `i2p.router.net.testing.v6`;
+7. `i2p.router.netdb.bannedpeers`.
 
 No additional RouterInfo/base selector work is authorized unless a direct regression is discovered and separately planned.
 
@@ -155,7 +144,7 @@ M051 news + banned-peer semantics (2)
 M052 integration/containment reclosure
 ```
 
-The sequence remains serialized so every new audited-core observation seam receives independent closure before the next one is introduced. M048 is closed, M049 is now the only dependency-ready handoff, and M050–M052 remain blocked until their named predecessors close.
+The sequence remains serialized so every new audited-core observation seam receives independent closure before the next one is introduced. M049 is closed, M050 is now the only dependency-ready handoff, and M051–M052 remain blocked until their named predecessors close.
 
 ## 7. Milestones
 
@@ -197,13 +186,15 @@ Plan: `048-routerinfo-tunnel-pool-sources.md`.
 
 Fields: participating detail; exploratory in/out/detail; client in/out/detail. Implemented through a neutral bounded lifecycle source shared by canonical pool/transit owners; I2PControl owns grouping, counts, deterministic row mapping, and response bounds. Closure: `plans/closure/i2pcontrol-proposal-170/048-closure.md`.
 
-### M049 — Rolling metrics and queues — ready
+### M049 — Rolling metrics and queues — closed
 
 Plan: `049-routerinfo-rolling-metrics-and-queues.md`.
 
 Fields: transit 15s, recent tunnel success, queue, TBM queue. Compute rolling transit in I2PControl; match reference recent-success semantics; add only neutral core gauges that cannot be reconstructed truthfully.
 
-### M050 — Network status/error/testing — blocked on M049
+Closure: `plans/closure/i2pcontrol-proposal-170/049-closure.md`.
+
+### M050 — Network status/error/testing — ready
 
 Plan: `050-routerinfo-network-state-sources.md`.
 

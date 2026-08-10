@@ -342,6 +342,27 @@ fn m053_composes_live_peer_directory_without_startup_snapshot() {
 }
 
 #[test]
+fn transport_inspection_handle_contains_only_owned_snapshot_state() {
+    let src = std::fs::read_to_string(
+        workspace_root().join("emissary-core/src/inspection.rs"),
+    )
+    .expect("core inspection source must exist");
+    let start = src
+        .find("pub struct TransportInspection {")
+        .expect("transport inspection handle must exist");
+    let end = src[start..]
+        .find("\n}\n\nimpl TransportInspection")
+        .map(|offset| start + offset);
+    let fields = &src[start..end.expect("transport inspection handle must be closed")];
+    assert!(fields.contains("snapshot: Arc<RwLock<TransportInspectionSnapshot>>"));
+    for forbidden in [
+        "Socket", "Session", "Sender", "Receiver", "EventHandle", "RouterContext", "PrivateKey",
+    ] {
+        assert!(!fields.contains(forbidden), "live/control type leaked into handle: {forbidden}");
+    }
+}
+
+#[test]
 fn production_adapter_does_not_silently_truncate() {
     // Log snapshot and netdb use real sources; empty/zero is a truthful
     // result when the source reports it, not a fabrication.

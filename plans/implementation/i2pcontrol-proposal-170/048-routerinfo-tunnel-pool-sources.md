@@ -1,6 +1,6 @@
 # M048 — RouterInfo Tunnel-Pool Counts and Detail Sources
 
-Status: blocked
+Status: closed
 
 Planning baseline: `b759038`
 

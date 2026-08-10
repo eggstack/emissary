@@ -14,7 +14,7 @@ Repository baseline reviewed: `b759038` planning baseline; implementation head r
 
 Implementation commit:
 
-- `<final implementation commit>` — bounded RouterInfo active-peer statistics from the neutral transport inspection seam
+- `fc7d067` — bounded RouterInfo active-peer statistics from the neutral transport inspection seam
 
 Pinned Proposal 170 revision: `2026-05-20`, Open.
 

@@ -494,6 +494,11 @@ impl<R: Runtime> Router<R> {
         crate::inspection::PeerDirectoryInspection::new(self.router_ctx.profile_storage().clone())
     }
 
+    /// Get a cloneable, read-only handle for current transport facts.
+    pub fn transport_inspection(&self) -> crate::inspection::TransportInspection {
+        self.transport_manager.inspection()
+    }
+
     /// Get reference to [`EventHandle`] for read-only metric snapshots.
     ///
     /// Used by I2PControl to read transport/transit byte counters,

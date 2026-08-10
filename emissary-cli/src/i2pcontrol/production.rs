@@ -50,11 +50,11 @@ use crate::{
         },
         observability::LogRing,
         router_info::{
-            ActivePeerStats, BannedPeer, ClockSkew, I2PTunnelStats, InspectionError,
-            InspectionGroup, LogEntry, LogSnapshot, NetworkSnapshot, NetworkStatus,
-            PeerDirectorySnapshot, PeerDirectorySource, PeerIdentity, PeerLimits,
-            RecentTransitTraffic, RouterInfoControl, TransitBytes, TransportBytes,
-            TunnelBuildStats, TunnelSummary,
+            ActivePeerSnapshot, ActivePeerSource, ActivePeerStats, BannedPeer, ClockSkew,
+            I2PTunnelStats, InspectionError, InspectionGroup, LogEntry, LogSnapshot,
+            NetworkSnapshot, NetworkStatus, PeerDirectorySnapshot, PeerDirectorySource,
+            PeerIdentity, PeerLimits, RecentTransitTraffic, RouterInfoControl, TransitBytes,
+            TransportBytes, TransportLimits, TunnelBuildStats, TunnelSummary,
         },
         server_secret_store::{ServerDestinationStore, StoredDestination},
         stores::{address_book_store::AddressBookStore, tunnel_store::TunnelStore},
@@ -64,7 +64,10 @@ use crate::{
 use emissary_core::{
     crypto::base64_encode,
     events::EventHandle,
-    inspection::{PeerDirectoryInspection, PeerDirectoryInspectionError},
+    inspection::{
+        PeerDirectoryInspection, PeerDirectoryInspectionError, TransportInspection,
+        TransportInspectionError,
+    },
     runtime::Runtime,
     FirewallStatus,
 };
@@ -118,6 +121,40 @@ impl<R: Runtime + Sync> PeerDirectorySource for LivePeerDirectorySource<R> {
         Ok(PeerDirectorySnapshot {
             peer_ids,
             router_infos,
+        })
+    }
+}
+
+/// Current transport source backed by the canonical transport manager.
+pub struct LiveActivePeerSource {
+    inspection: TransportInspection,
+    max_items: usize,
+}
+
+impl LiveActivePeerSource {
+    /// Create a bounded request-time transport source.
+    pub fn new(inspection: TransportInspection, max_items: usize) -> Self {
+        Self {
+            inspection,
+            max_items,
+        }
+    }
+}
+
+impl ActivePeerSource for LiveActivePeerSource {
+    fn snapshot(&self) -> Result<ActivePeerSnapshot, InspectionError> {
+        let snapshot = self.inspection.snapshot(self.max_items).map_err(|error| match error {
+            TransportInspectionError::ItemLimitExceeded { limit } => {
+                InspectionError::ResultTooLarge {
+                    group: InspectionGroup::PeerList,
+                    limit,
+                }
+            }
+        })?;
+        Ok(ActivePeerSnapshot {
+            peer_ids: snapshot.connected_peer_ids,
+            ntcp_limit: snapshot.ntcp2_limit,
+            ssu_limit: snapshot.ssu2_limit,
         })
     }
 }
@@ -1151,6 +1188,7 @@ pub struct ProductionRouterInfoControl {
     log_ring: Arc<LogRing>,
     tunnel_manager: Arc<dyn TunnelManagerControl>,
     peer_directory: Option<Arc<dyn PeerDirectorySource>>,
+    active_peer_source: Option<Arc<dyn ActivePeerSource>>,
 }
 
 impl ProductionRouterInfoControl {
@@ -1177,12 +1215,19 @@ impl ProductionRouterInfoControl {
             log_ring,
             tunnel_manager,
             peer_directory: None,
+            active_peer_source: None,
         }
     }
 
     /// Attach the canonical live public peer directory source.
     pub fn with_peer_directory_source(mut self, source: Arc<dyn PeerDirectorySource>) -> Self {
         self.peer_directory = Some(source);
+        self
+    }
+
+    /// Attach the canonical live transport source.
+    pub fn with_active_peer_source(mut self, source: Arc<dyn ActivePeerSource>) -> Self {
+        self.active_peer_source = Some(source);
         self
     }
 
@@ -1326,12 +1371,18 @@ impl RouterInfoControl for ProductionRouterInfoControl {
     }
 
     async fn active_peers(&self) -> Result<Vec<PeerIdentity>, InspectionError> {
-        // Active peer IDs require a bounded current snapshot from the canonical
-        // core transport owner. No existing event-metric handle exposes this
-        // list. Return unavailable rather than a stale snapshot.
-        Err(InspectionError::Unavailable {
+        let source = self.active_peer_source.as_ref().ok_or(InspectionError::Unavailable {
             group: InspectionGroup::PeerList,
-        })
+        })?;
+        Ok(source
+            .snapshot()?
+            .peer_ids
+            .into_iter()
+            .map(|id| PeerIdentity {
+                id,
+                is_active: true,
+            })
+            .collect())
     }
 
     async fn peer_router_info(&self, peer_id: &str) -> Result<Option<String>, InspectionError> {
@@ -1358,6 +1409,17 @@ impl RouterInfoControl for ProductionRouterInfoControl {
     async fn peer_limits(&self) -> Result<PeerLimits, InspectionError> {
         Err(InspectionError::Unavailable {
             group: InspectionGroup::PeerStats,
+        })
+    }
+
+    async fn transport_limits(&self) -> Result<TransportLimits, InspectionError> {
+        let source = self.active_peer_source.as_ref().ok_or(InspectionError::Unavailable {
+            group: InspectionGroup::PeerStats,
+        })?;
+        let snapshot = source.snapshot()?;
+        Ok(TransportLimits {
+            ntcp_limit: snapshot.ntcp_limit,
+            ssu_limit: snapshot.ssu_limit,
         })
     }
 

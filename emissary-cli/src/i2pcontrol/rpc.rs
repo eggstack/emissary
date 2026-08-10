@@ -1281,12 +1281,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_ACTIVE_PEERS_INFO,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "netdb",
-                reason: "no bounded active-peer RouterInfo snapshot"
+            SourceDisposition::Available {
+                owner: "transport-and-live-profile-storage-inspection"
             },
             "serialize_active_peer_router_infos",
-            "p170.netdb.active_peer_info.unavailable",
+            "p170.netdb.active_peer_info",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1297,12 +1296,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_NTCP_LIMIT,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "peer-limits",
-                reason: "no authoritative NTCP limit owner"
+            SourceDisposition::Available {
+                owner: "transport-manager-configuration"
             },
             "serialize_ntcp_limit",
-            "p170.netdb.ntcp_limit.unavailable",
+            "p170.netdb.ntcp_limit",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1310,12 +1308,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_SSU_LIMIT,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "peer-limits",
-                reason: "no authoritative SSU limit owner"
+            SourceDisposition::Available {
+                owner: "transport-manager-configuration"
             },
             "serialize_ssu_limit",
-            "p170.netdb.ssu_limit.unavailable",
+            "p170.netdb.ssu_limit",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1339,12 +1336,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_ACTIVE_PEERS_LIST,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "peer-list",
-                reason: "no bounded active peer RouterInfo snapshot"
+            SourceDisposition::Available {
+                owner: "transport-manager-inspection"
             },
             "serialize_active_peer_hashes",
-            "p170.netdb.active_peers.unavailable",
+            "p170.netdb.active_peers",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -2081,7 +2077,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (19, 1, 23));
+        assert_eq!((available, neutral, unavailable), (23, 1, 19));
     }
 
     #[test]

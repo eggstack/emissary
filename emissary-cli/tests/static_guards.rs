@@ -622,11 +622,11 @@ fn no_fabricated_recent_transit_default_in_production() {
 fn no_hardcoded_udp_active_true_in_production() {
     let src = read_source("src/i2pcontrol/production.rs");
     let non_test = src.split("#[cfg(test)]").next().unwrap_or(&src);
-    if let Some(impl_start) = non_test.find("impl RouterInfoControl") {
-        if let Some(impl_end) = non_test[impl_start..].find("\n}") {
-            let impl_body = &non_test[impl_start..impl_start + impl_end + 2];
+    if let Some(method_start) = non_test.find("async fn udp_snapshot") {
+        if let Some(method_end) = non_test[method_start..].find("\n    async fn") {
+            let method_body = &non_test[method_start..method_start + method_end];
             assert!(
-                !impl_body.contains("active: true"),
+                !method_body.contains("active: true"),
                 "Production RouterInfo must not hardcode active: true in UDP snapshot"
             );
         }

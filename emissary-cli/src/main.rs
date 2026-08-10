@@ -605,6 +605,12 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                         10_000,
                     ),
                 ))
+                .with_active_peer_source(Arc::new(
+                    i2pcontrol::production::LiveActivePeerSource::new(
+                        router.transport_inspection(),
+                        10_000,
+                    ),
+                ))
                 .with_event_metrics(metrics)
                 .with_share_ratio(share_ratio)
                 .with_configured_bandwidth(bw_in, bw_out)

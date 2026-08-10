@@ -327,6 +327,23 @@ pub trait PeerDirectorySource: Send + Sync {
     fn snapshot(&self) -> Result<PeerDirectorySnapshot, InspectionError>;
 }
 
+/// Bounded current transport facts used by the canonical active-peer fields.
+#[derive(Debug, Clone, Default)]
+pub struct ActivePeerSnapshot {
+    /// Base64 router IDs for currently connected peers.
+    pub peer_ids: Vec<String>,
+    /// Finite NTCP2 limit; `None` means disabled or unlimited.
+    pub ntcp_limit: Option<usize>,
+    /// Finite SSU2 limit; `None` means disabled or unlimited.
+    pub ssu_limit: Option<usize>,
+}
+
+/// Read-only source for current transport facts.
+pub trait ActivePeerSource: Send + Sync {
+    /// Return a bounded, owned snapshot of active peer IDs and limits.
+    fn snapshot(&self) -> Result<ActivePeerSnapshot, InspectionError>;
+}
+
 /// Peer connection limits.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default)]
@@ -335,6 +352,13 @@ pub struct PeerLimits {
     pub configured_outbound: usize,
     pub effective_inbound: usize,
     pub effective_outbound: usize,
+}
+
+/// Finite transport limits for Proposal 170's canonical limit selectors.
+#[derive(Debug, Clone, Default)]
+pub struct TransportLimits {
+    pub ntcp_limit: Option<usize>,
+    pub ssu_limit: Option<usize>,
 }
 
 /// Banned peer entry.
@@ -528,6 +552,10 @@ pub trait RouterInfoControl: Send + Sync {
     /// Get configured and effective peer/transport limits.
     async fn peer_limits(&self) -> Result<PeerLimits, InspectionError>;
 
+    /// Get finite current NTCP2/SSU2 limits. `None` is an unavailable wire
+    /// value because the canonical selectors require an integer.
+    async fn transport_limits(&self) -> Result<TransportLimits, InspectionError>;
+
     /// Get active peer transport statistics.
     async fn active_peer_stats(&self) -> Result<Vec<ActivePeerStats>, InspectionError>;
 
@@ -583,6 +611,7 @@ struct FakeInner {
     peer_directory: Result<PeerDirectorySnapshot, InspectionError>,
     banned_peers: Result<Vec<BannedPeer>, InspectionError>,
     peer_limits: Result<PeerLimits, InspectionError>,
+    transport_limits: Result<TransportLimits, InspectionError>,
     active_peer_stats: Result<Vec<ActivePeerStats>, InspectionError>,
     i2ptunnel_stats: Result<I2PTunnelStats, InspectionError>,
     log_entries: Vec<LogEntry>,
@@ -621,6 +650,7 @@ impl FakeRouterInfoControl {
                 peer_directory: Err(unavailable(InspectionGroup::PeerList)),
                 banned_peers: Err(unavailable(InspectionGroup::PeerStats)),
                 peer_limits: Err(unavailable(InspectionGroup::PeerStats)),
+                transport_limits: Err(unavailable(InspectionGroup::PeerStats)),
                 active_peer_stats: Err(unavailable(InspectionGroup::PeerStats)),
                 i2ptunnel_stats: Err(unavailable(InspectionGroup::I2PTunnel)),
                 log_entries: Vec::new(),
@@ -744,6 +774,12 @@ impl FakeRouterInfoControl {
     pub fn set_peer_limits(&self, limits: PeerLimits) {
         let mut inner = self.inner.lock().unwrap();
         inner.peer_limits = Ok(limits);
+    }
+
+    /// Set finite transport limits for tests.
+    pub fn set_transport_limits(&self, limits: TransportLimits) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.transport_limits = Ok(limits);
     }
 
     /// Set active peer stats for tests.
@@ -878,6 +914,11 @@ impl RouterInfoControl for FakeRouterInfoControl {
     async fn peer_limits(&self) -> Result<PeerLimits, InspectionError> {
         let inner = self.inner.lock().unwrap();
         inner.peer_limits.clone()
+    }
+
+    async fn transport_limits(&self) -> Result<TransportLimits, InspectionError> {
+        let inner = self.inner.lock().unwrap();
+        inner.transport_limits.clone()
     }
 
     async fn active_peer_stats(&self) -> Result<Vec<ActivePeerStats>, InspectionError> {

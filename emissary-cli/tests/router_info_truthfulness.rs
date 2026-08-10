@@ -30,7 +30,7 @@ use emissary_cli::i2pcontrol::{
     router_info::{
         ActivePeerStats, BannedPeer, ClockSkew, FakeRouterInfoControl, I2PTunnelStats,
         InspectionError, NetworkSnapshot, PeerIdentity, PeerLimits, RouterInfoControl,
-        TunnelBuildStats, TunnelSummary, UdpSnapshot,
+        TransportLimits, TunnelBuildStats, TunnelSummary, UdpSnapshot,
     },
     rpc,
 };
@@ -573,6 +573,9 @@ async fn udp_group_queried_once_for_multiple_selectors() {
         }
         async fn peer_limits(&self) -> Result<PeerLimits, InspectionError> {
             self.inner.peer_limits().await
+        }
+        async fn transport_limits(&self) -> Result<TransportLimits, InspectionError> {
+            self.inner.transport_limits().await
         }
         async fn active_peer_stats(&self) -> Result<Vec<ActivePeerStats>, InspectionError> {
             self.inner.active_peer_stats().await

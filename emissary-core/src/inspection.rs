@@ -35,7 +35,12 @@ use crate::{
     runtime::Runtime,
 };
 
-use alloc::{string::String, vec::Vec};
+#[cfg(feature = "std")]
+use parking_lot::RwLock;
+#[cfg(feature = "no_std")]
+use spin::rwlock::RwLock;
+
+use alloc::{string::String, sync::Arc, vec::Vec};
 use core::fmt;
 
 /// A public router identity and its serialized public RouterInfo.
@@ -118,6 +123,73 @@ impl<R: Runtime> PeerDirectoryInspection<R> {
     }
 }
 
+/// Bounded, owned facts about the current transport population and finite
+/// connection limits.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TransportInspectionSnapshot {
+    /// Base64 router IDs for currently connected peers.
+    pub connected_peer_ids: Vec<String>,
+    /// Finite NTCP2 connection limit, or `None` when NTCP2 is disabled or
+    /// configured as unlimited.
+    pub ntcp2_limit: Option<usize>,
+    /// Finite SSU2 connection limit, or `None` when SSU2 is disabled or
+    /// configured as unlimited.
+    pub ssu2_limit: Option<usize>,
+}
+
+/// Cloneable, read-only access to current transport inspection facts.
+///
+/// The transport manager owns the mutable connection map and configuration.
+/// This handle contains only an owned snapshot updated by that manager; it
+/// has no socket, session, channel, key, or transport-control operation.
+#[derive(Clone)]
+pub struct TransportInspection {
+    snapshot: Arc<RwLock<TransportInspectionSnapshot>>,
+}
+
+impl TransportInspection {
+    pub(crate) fn new(snapshot: TransportInspectionSnapshot) -> Self {
+        Self {
+            snapshot: Arc::new(RwLock::new(snapshot)),
+        }
+    }
+
+    /// Copy current transport facts, enforcing the peer-item bound before
+    /// returning. The synchronization guard is released before the caller
+    /// can serialize or await on the owned result.
+    pub fn snapshot(
+        &self,
+        max_items: usize,
+    ) -> Result<TransportInspectionSnapshot, TransportInspectionError> {
+        let snapshot = self.snapshot.read();
+        if snapshot.connected_peer_ids.len() > max_items {
+            return Err(TransportInspectionError::ItemLimitExceeded { limit: max_items });
+        }
+        Ok(snapshot.clone())
+    }
+
+    pub(crate) fn update_connected_peer_ids(&self, connected_peer_ids: Vec<String>) {
+        self.snapshot.write().connected_peer_ids = connected_peer_ids;
+    }
+}
+
+/// Failure while collecting transport inspection facts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransportInspectionError {
+    /// The caller-supplied peer-item bound would be exceeded.
+    ItemLimitExceeded { limit: usize },
+}
+
+impl fmt::Display for TransportInspectionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ItemLimitExceeded { limit } => {
+                write!(f, "connected peer inventory exceeds item bound of {limit}")
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,6 +250,30 @@ mod tests {
             inspection.snapshot(10),
             Err(PeerDirectoryInspectionError::IncompleteEntry)
         ));
+    }
+
+    #[test]
+    fn transport_inspection_is_cloneable_bounded_and_live() {
+        let inspection = TransportInspection::new(TransportInspectionSnapshot {
+            connected_peer_ids: vec!["peer-b".into(), "peer-a".into()],
+            ntcp2_limit: Some(64),
+            ssu2_limit: None,
+        });
+        let clone = inspection.clone();
+
+        assert_eq!(
+            clone.snapshot(2).unwrap().connected_peer_ids,
+            ["peer-b", "peer-a"]
+        );
+        assert_eq!(clone.snapshot(2).unwrap().ntcp2_limit, Some(64));
+        assert_eq!(clone.snapshot(2).unwrap().ssu2_limit, None);
+        assert!(matches!(
+            inspection.snapshot(1),
+            Err(TransportInspectionError::ItemLimitExceeded { limit: 1 })
+        ));
+
+        inspection.update_connected_peer_ids(vec!["peer-c".into()]);
+        assert_eq!(clone.snapshot(2).unwrap().connected_peer_ids, ["peer-c"]);
     }
 }
 

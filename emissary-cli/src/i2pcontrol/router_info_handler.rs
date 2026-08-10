@@ -674,6 +674,50 @@ async fn assemble_response(
         resolve_proposal_peer_directory(&mut result, &key_set, router_info).await?;
     }
 
+    // --- Proposal 170 active peers and finite transport limits ---
+    if key_set.iter().any(|key| {
+        matches!(
+            *key,
+            rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_LIST
+                | rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO
+        )
+    }) {
+        resolve_proposal_active_peers(&mut result, &key_set, router_info).await?;
+    }
+    if key_set.iter().any(|key| {
+        matches!(
+            *key,
+            rpc::router_info_keys::P170_NETDB_NTCP_LIMIT
+                | rpc::router_info_keys::P170_NETDB_SSU_LIMIT
+        )
+    }) {
+        let limits = router_info.transport_limits().await?;
+        if key_set.contains(rpc::router_info_keys::P170_NETDB_NTCP_LIMIT) {
+            let Some(limit) = limits.ntcp_limit else {
+                return Err(InspectionError::UnavailableReason {
+                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerStats,
+                    reason: "finite NTCP2 connection limit unavailable",
+                });
+            };
+            result.insert(
+                rpc::router_info_keys::P170_NETDB_NTCP_LIMIT.to_string(),
+                serde_json::json!(limit),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NETDB_SSU_LIMIT) {
+            let Some(limit) = limits.ssu_limit else {
+                return Err(InspectionError::UnavailableReason {
+                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerStats,
+                    reason: "finite SSU2 connection limit unavailable",
+                });
+            };
+            result.insert(
+                rpc::router_info_keys::P170_NETDB_SSU_LIMIT.to_string(),
+                serde_json::json!(limit),
+            );
+        }
+    }
+
     // --- Bandwidth ---
     if key_set.iter().any(|k| k.starts_with("i2p.router.bw.")) {
         let router_info = state.router_info();
@@ -1402,6 +1446,61 @@ fn resolve_id(id: &Option<RequestId>) -> RequestId {
     id.clone().unwrap_or(RequestId::Null)
 }
 
+/// Resolve active peer IDs and, when requested, join them to the live public
+/// RouterInfo directory. The active source is authoritative for membership;
+/// a missing directory entry is a churn/incomplete-join error, never an
+/// invented RouterInfo value.
+async fn resolve_proposal_active_peers(
+    result: &mut serde_json::Map<String, serde_json::Value>,
+    key_set: &HashSet<&str>,
+    router_info: &dyn RouterInfoControl,
+) -> Result<(), InspectionError> {
+    let active = router_info.active_peers().await?;
+    if active.len() > MAX_PEER_IDENTITIES {
+        return Err(InspectionError::ResultTooLarge {
+            group: crate::i2pcontrol::router_info::InspectionGroup::PeerList,
+            limit: MAX_PEER_IDENTITIES,
+        });
+    }
+
+    let mut ids: Vec<String> = active.into_iter().map(|peer| peer.id).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    if key_set.contains(rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_LIST) {
+        result.insert(
+            rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_LIST.to_string(),
+            serde_json::json!(ids),
+        );
+    }
+
+    if key_set.contains(rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO) {
+        let directory = router_info.peer_directory().await?;
+        let mut infos = Vec::with_capacity(ids.len());
+        let mut total_bytes = 0usize;
+        for peer_id in &ids {
+            let Some(bytes) = directory.router_infos.get(peer_id) else {
+                return Err(InspectionError::TemporarilyUnavailable {
+                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerLookup,
+                });
+            };
+            total_bytes = total_bytes.saturating_add(bytes.len());
+            if total_bytes > MAX_PEER_RI_BYTES {
+                return Err(InspectionError::ResultTooLarge {
+                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerLookup,
+                    limit: MAX_PEER_RI_BYTES,
+                });
+            }
+            infos.push(emissary_core::crypto::base64_encode(bytes.clone()));
+        }
+        result.insert(
+            rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO.to_string(),
+            serde_json::json!(infos),
+        );
+    }
+
+    Ok(())
+}
+
 /// Resolve the three canonical fields owned by the live public peer directory.
 /// A missing serialized RouterInfo is an incomplete source snapshot and fails
 /// the request; it is never replaced with an empty or adjacent value.
@@ -1695,6 +1794,106 @@ mod tests {
             resp["result"]["i2p.router.netdb.peers.info"],
             serde_json::json!(["AQI=", "AwQ="])
         );
+    }
+
+    #[tokio::test]
+    async fn canonical_active_peer_inventory_and_limits_return_exact_wire_values() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_active_peers(vec![
+            PeerIdentity {
+                id: "peer-b".into(),
+                is_active: true,
+            },
+            PeerIdentity {
+                id: "peer-a".into(),
+                is_active: true,
+            },
+            PeerIdentity {
+                id: "peer-a".into(),
+                is_active: true,
+            },
+        ]);
+        ri.set_peer_directory(PeerDirectorySnapshot {
+            peer_ids: vec!["peer-a".into(), "peer-b".into()],
+            router_infos: std::collections::BTreeMap::from([
+                ("peer-a".into(), vec![1, 2]),
+                ("peer-b".into(), vec![3, 4]),
+            ]),
+        });
+        ri.set_transport_limits(TransportLimits {
+            ntcp_limit: Some(64),
+            ssu_limit: Some(128),
+        });
+        let response = handle_router_info(
+            &test_state(ri),
+            &direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_LIST: true,
+                rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO: true,
+                rpc::router_info_keys::P170_NETDB_NTCP_LIMIT: true,
+                rpc::router_info_keys::P170_NETDB_SSU_LIMIT: true,
+            })),
+        )
+        .await;
+
+        assert_eq!(
+            response["result"][rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_LIST],
+            serde_json::json!(["peer-a", "peer-b"])
+        );
+        assert_eq!(
+            response["result"][rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO],
+            serde_json::json!(["AQI=", "AwQ="])
+        );
+        assert_eq!(
+            response["result"][rpc::router_info_keys::P170_NETDB_NTCP_LIMIT],
+            64
+        );
+        assert_eq!(
+            response["result"][rpc::router_info_keys::P170_NETDB_SSU_LIMIT],
+            128
+        );
+    }
+
+    #[tokio::test]
+    async fn active_peer_router_info_join_fails_closed_on_source_churn() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_active_peers(vec![PeerIdentity {
+            id: "peer-missing".into(),
+            is_active: true,
+        }]);
+        ri.set_peer_directory(PeerDirectorySnapshot::default());
+        let response = handle_router_info(
+            &test_state(ri),
+            &direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO: true,
+            })),
+        )
+        .await;
+
+        assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
+        assert!(response["result"].is_null());
+    }
+
+    #[tokio::test]
+    async fn unlimited_transport_limit_is_unavailable_not_a_sentinel() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_transport_limits(TransportLimits {
+            ntcp_limit: None,
+            ssu_limit: Some(128),
+        });
+        let response = handle_router_info(
+            &test_state(ri),
+            &direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NETDB_NTCP_LIMIT: true,
+            })),
+        )
+        .await;
+
+        assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
+        assert!(response["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("finite NTCP2 connection limit unavailable"));
+        assert!(response["result"].is_null());
     }
 
     #[tokio::test]

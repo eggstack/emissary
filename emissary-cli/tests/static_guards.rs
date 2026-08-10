@@ -387,6 +387,41 @@ fn transport_peer_inspection_contains_only_sanitized_facts() {
 }
 
 #[test]
+fn tunnel_inspection_contains_only_bounded_public_facts() {
+    let src = std::fs::read_to_string(workspace_root().join("emissary-core/src/inspection.rs"))
+        .expect("core inspection source must exist");
+    let start = src
+        .find("pub struct TunnelInspectionEntry {")
+        .expect("tunnel inspection DTO must exist");
+    let end = src[start..]
+        .find("\n}\n")
+        .map(|offset| start + offset)
+        .expect("tunnel inspection DTO must be closed");
+    let fields = &src[start..start + end];
+    for forbidden in [
+        "TunnelPool<",
+        "InboundTunnel",
+        "OutboundTunnel",
+        "TransitTunnel",
+        "RouterContext",
+        "PrivateKey",
+        "Receiver",
+        "Sender",
+    ] {
+        assert!(
+            !fields.contains(forbidden),
+            "live/control type leaked into tunnel DTO: {forbidden}"
+        );
+    }
+    for required in ["pool_id", "tunnel_id", "pool_kind", "direction"] {
+        assert!(
+            fields.contains(required),
+            "tunnel DTO lost required neutral fact: {required}"
+        );
+    }
+}
+
+#[test]
 fn production_adapter_does_not_silently_truncate() {
     // Log snapshot and netdb use real sources; empty/zero is a truthful
     // result when the source reports it, not a fabrication.

@@ -49,6 +49,19 @@ const MAX_BANNED_PEERS: usize = 10000;
 /// Maximum number of entries exposed by the shared startup tunnel inventory.
 const MAX_I2PTUNNEL_INFO_ENTRIES: usize = 1000;
 
+/// Maximum number of rows in any live tunnel-detail response.
+const MAX_TUNNEL_DETAIL_ENTRIES: usize = 10000;
+
+const TUNNEL_DETAIL_KEYS: &[&str] = &[
+    rpc::router_info_keys::P170_NET_TUNNELS_PARTICIPATING_INFO,
+    rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INBOUND,
+    rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_OUTBOUND,
+    rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INFO_LIST,
+    rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INBOUND,
+    rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_OUTBOUND,
+    rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INFO_LIST,
+];
+
 /// Maximum serialized RouterInfo response size, including the JSON-RPC
 /// envelope. The final response is checked after actual serialization.
 const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
@@ -206,6 +219,14 @@ fn estimate_response_budget(key_set: &HashSet<&str>) -> Result<(), String> {
     if key_set.contains(rpc::router_info_keys::LOG_SNAPSHOT) {
         estimated_bytes += MAX_LOG_ENTRIES * 256;
     }
+
+    // Proposal 170 tunnel pool detail lists contain only bounded primitive
+    // rows. Account for every requested list before querying the shared source.
+    let tunnel_detail_lists = TUNNEL_DETAIL_KEYS
+        .iter()
+        .filter(|key| key_set.contains(**key))
+        .count();
+    estimated_bytes += tunnel_detail_lists * MAX_TUNNEL_DETAIL_ENTRIES * 128;
 
     // Coarse pre-query response cap. Actual serialized output is checked after
     // assembly because source payload sizes are not predictable.
@@ -535,6 +556,12 @@ async fn assemble_response(
             rpc::router_info_keys::P170_NET_TUNNELS_TOTAL_SUCCESS_RATE.to_string(),
             serde_json::json!(rate),
         );
+    }
+
+    // --- Proposal 170 live tunnel pools (one owner snapshot) ---
+    if key_set.iter().any(|key| TUNNEL_DETAIL_KEYS.contains(key)) {
+        let details = router_info.tunnel_details().await?;
+        resolve_proposal_tunnel_details(&mut result, &key_set, &details)?;
     }
 
     // --- Identity and static router data (retained group) ---
@@ -1460,6 +1487,105 @@ async fn resolve_active_peer_stats(
         })
         .collect();
     result.insert(key.to_owned(), serde_json::json!(entries));
+    Ok(())
+}
+
+fn tunnel_detail_value(
+    details: &[crate::i2pcontrol::router_info::TunnelDetail],
+) -> Result<serde_json::Value, InspectionError> {
+    if details.len() > MAX_TUNNEL_DETAIL_ENTRIES {
+        return Err(InspectionError::ResultTooLarge {
+            group: crate::i2pcontrol::router_info::InspectionGroup::TunnelSummary,
+            limit: MAX_TUNNEL_DETAIL_ENTRIES,
+        });
+    }
+    let entries: Vec<serde_json::Value> = details
+        .iter()
+        .map(|detail| {
+            let mut object = serde_json::Map::new();
+            object.insert("tunnelId".to_owned(), serde_json::json!(detail.tunnel_id));
+            if let Some(pool_id) = detail.pool_id {
+                object.insert("poolId".to_owned(), serde_json::json!(pool_id));
+            }
+            if let Some(direction) = &detail.direction {
+                object.insert("direction".to_owned(), serde_json::json!(direction));
+            }
+            serde_json::Value::Object(object)
+        })
+        .collect();
+    let value = serde_json::Value::Array(entries);
+    if serde_json::to_vec(&value).map_or(true, |bytes| bytes.len() > MAX_PEER_RI_BYTES) {
+        return Err(InspectionError::ResultTooLarge {
+            group: crate::i2pcontrol::router_info::InspectionGroup::TunnelSummary,
+            limit: MAX_TUNNEL_DETAIL_ENTRIES,
+        });
+    }
+    Ok(value)
+}
+
+fn resolve_proposal_tunnel_details(
+    result: &mut serde_json::Map<String, serde_json::Value>,
+    key_set: &HashSet<&str>,
+    details: &crate::i2pcontrol::router_info::TunnelDetails,
+) -> Result<(), InspectionError> {
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_PARTICIPATING_INFO) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_PARTICIPATING_INFO.to_owned(),
+            tunnel_detail_value(&details.participating)?,
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INBOUND) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INBOUND.to_owned(),
+            serde_json::json!(details
+                .exploratory
+                .iter()
+                .filter(|detail| detail.direction.as_deref() == Some("inbound"))
+                .count()),
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_OUTBOUND) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_OUTBOUND.to_owned(),
+            serde_json::json!(details
+                .exploratory
+                .iter()
+                .filter(|detail| detail.direction.as_deref() == Some("outbound"))
+                .count()),
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INFO_LIST) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INFO_LIST.to_owned(),
+            tunnel_detail_value(&details.exploratory)?,
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INBOUND) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INBOUND.to_owned(),
+            serde_json::json!(details
+                .client
+                .iter()
+                .filter(|detail| detail.direction.as_deref() == Some("inbound"))
+                .count()),
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_OUTBOUND) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_OUTBOUND.to_owned(),
+            serde_json::json!(details
+                .client
+                .iter()
+                .filter(|detail| detail.direction.as_deref() == Some("outbound"))
+                .count()),
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INFO_LIST) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INFO_LIST.to_owned(),
+            tunnel_detail_value(&details.client)?,
+        );
+    }
     Ok(())
 }
 

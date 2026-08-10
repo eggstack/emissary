@@ -220,6 +220,27 @@ pub struct TunnelSummary {
     pub queue_depth: usize,
 }
 
+/// One sanitized live tunnel row for the Proposal 170 tunnel detail fields.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TunnelDetail {
+    pub tunnel_id: u32,
+    pub pool_id: Option<u64>,
+    pub direction: Option<String>,
+}
+
+/// Bounded current tunnel details grouped by canonical owner.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TunnelDetails {
+    pub participating: Vec<TunnelDetail>,
+    pub exploratory: Vec<TunnelDetail>,
+    pub client: Vec<TunnelDetail>,
+}
+
+/// Read-only source for bounded current tunnel details.
+pub trait TunnelSource: Send + Sync {
+    fn snapshot(&self) -> Result<TunnelDetails, InspectionError>;
+}
+
 /// Network reachability snapshot.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -524,6 +545,9 @@ pub trait RouterInfoControl: Send + Sync {
     /// Get tunnel summary counts.
     async fn tunnel_summary(&self) -> Result<TunnelSummary, InspectionError>;
 
+    /// Get bounded current tunnel details from canonical tunnel owners.
+    async fn tunnel_details(&self) -> Result<TunnelDetails, InspectionError>;
+
     /// Get NetDB summary.
     async fn netdb_snapshot(&self) -> Result<NetDbSnapshot, InspectionError>;
 
@@ -604,6 +628,7 @@ struct FakeInner {
     transit_bytes: Result<TransitBytes, InspectionError>,
     build_stats: Result<TunnelBuildStats, InspectionError>,
     tunnel_summary: Result<TunnelSummary, InspectionError>,
+    tunnel_details: Result<TunnelDetails, InspectionError>,
     netdb: Result<NetDbSnapshot, InspectionError>,
     udp: Result<UdpSnapshot, InspectionError>,
     tcp: Result<TcpSnapshot, InspectionError>,
@@ -643,6 +668,7 @@ impl FakeRouterInfoControl {
                 transit_bytes: Err(unavailable(InspectionGroup::TrafficMetrics)),
                 build_stats: Err(unavailable(InspectionGroup::TrafficMetrics)),
                 tunnel_summary: Err(unavailable(InspectionGroup::TunnelSummary)),
+                tunnel_details: Err(unavailable(InspectionGroup::TunnelSummary)),
                 netdb: Err(unavailable(InspectionGroup::NetDb)),
                 udp: Err(unavailable(InspectionGroup::UdpTransport)),
                 tcp: Err(unavailable(InspectionGroup::TcpTransport)),
@@ -722,6 +748,12 @@ impl FakeRouterInfoControl {
     pub fn set_tunnel_summary(&self, summary: TunnelSummary) {
         let mut inner = self.inner.lock().unwrap();
         inner.tunnel_summary = Ok(summary);
+    }
+
+    /// Set tunnel details for tests.
+    pub fn set_tunnel_details(&self, details: TunnelDetails) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.tunnel_details = Ok(details);
     }
 
     /// Set netdb snapshot for tests.
@@ -871,6 +903,11 @@ impl RouterInfoControl for FakeRouterInfoControl {
     async fn tunnel_summary(&self) -> Result<TunnelSummary, InspectionError> {
         let inner = self.inner.lock().unwrap();
         inner.tunnel_summary.clone()
+    }
+
+    async fn tunnel_details(&self) -> Result<TunnelDetails, InspectionError> {
+        let inner = self.inner.lock().unwrap();
+        inner.tunnel_details.clone()
     }
 
     async fn netdb_snapshot(&self) -> Result<NetDbSnapshot, InspectionError> {

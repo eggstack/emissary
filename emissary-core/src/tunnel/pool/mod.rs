@@ -24,6 +24,7 @@ use crate::{
         garlic::{DeliveryInstructions, GarlicMessageBuilder},
         MessageBuilder, MessageType, I2NP_MESSAGE_EXPIRATION,
     },
+    inspection::{TunnelDirection, TunnelInspection, TunnelInspectionEntry, TunnelPoolKind},
     primitives::{Lease, Mapping, MessageId, RouterId, Str, TunnelId},
     router::context::RouterContext,
     runtime::{Counter, Gauge, Histogram, Instant, JoinSet, MetricsHandle, Runtime},
@@ -77,6 +78,42 @@ mod listener;
 mod selector;
 mod timer;
 mod zero_hop;
+
+/// Narrow passive observation metadata supplied by the tunnel manager.
+#[derive(Clone)]
+pub(crate) struct TunnelPoolObservation {
+    source: TunnelInspection,
+    pool_id: u64,
+    pool_kind: TunnelPoolKind,
+}
+
+impl TunnelPoolObservation {
+    pub(crate) fn new(source: TunnelInspection, pool_id: u64, pool_kind: TunnelPoolKind) -> Self {
+        Self {
+            source,
+            pool_id,
+            pool_kind,
+        }
+    }
+
+    fn publish(&self, tunnel_id: TunnelId, direction: TunnelDirection) {
+        let _ = self.source.publish(TunnelInspectionEntry {
+            pool_id: self.pool_id,
+            tunnel_id: tunnel_id.into(),
+            pool_kind: self.pool_kind,
+            direction: Some(direction),
+        });
+    }
+
+    fn remove(&self, tunnel_id: TunnelId, direction: TunnelDirection) {
+        self.source.remove(TunnelInspectionEntry {
+            pool_id: self.pool_id,
+            tunnel_id: tunnel_id.into(),
+            pool_kind: self.pool_kind,
+            direction: Some(direction),
+        });
+    }
+}
 
 /// Logging target for the file.
 const LOG_TARGET: &str = "emissary::tunnel::pool";
@@ -237,15 +274,36 @@ pub struct TunnelPool<R: Runtime, S: TunnelSelector + HopSelector> {
 
     /// Expiration timers for inbound/outbound tunnels.
     tunnel_timers: TunnelTimer<R>,
+
+    /// Passive, bounded lifecycle observation.
+    observation: Option<TunnelPoolObservation>,
 }
 
 impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
     /// Create new [`TunnelPool`].
+    #[allow(dead_code)]
     pub fn new(
         build_parameters: TunnelPoolBuildParameters,
         selector: S,
         subsystem_handle: SubsystemHandle,
         router_ctx: RouterContext<R>,
+    ) -> (Self, TunnelPoolHandle) {
+        Self::new_with_observation(
+            build_parameters,
+            selector,
+            subsystem_handle,
+            router_ctx,
+            None,
+        )
+    }
+
+    /// Create a tunnel pool with passive lifecycle observation.
+    pub(crate) fn new_with_observation(
+        build_parameters: TunnelPoolBuildParameters,
+        selector: S,
+        subsystem_handle: SubsystemHandle,
+        router_ctx: RouterContext<R>,
+        observation: Option<TunnelPoolObservation>,
     ) -> (Self, TunnelPoolHandle) {
         let TunnelPoolBuildParameters {
             config,
@@ -293,6 +351,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
                 selector,
                 shutdown_rx: Some(shutdown_rx),
                 tunnel_timers: TunnelTimer::new(),
+                observation,
             },
             tunnel_pool_handle,
         )
@@ -812,8 +871,9 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
 
                         match select(message_rx, pin!(R::delay(TUNNEL_TEST_EXPIRATION))).await {
                             Either::Right((_, _)) => (outbound, inbound, Err(Error::Timeout)),
-                            Either::Left((Err(_), _)) =>
-                                (outbound, inbound, Err(Error::Channel(ChannelError::Closed))),
+                            Either::Left((Err(_), _)) => {
+                                (outbound, inbound, Err(Error::Channel(ChannelError::Closed)))
+                            }
                             Either::Left((Ok(_), _)) => (outbound, inbound, Ok(started.elapsed())),
                         }
                     }),
@@ -834,6 +894,26 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
 
                 debug_assert!(messages.next().is_none());
             });
+    }
+
+    fn publish_tunnel(&self, tunnel_id: TunnelId, direction: TunnelDirection) {
+        if let Some(observation) = &self.observation {
+            observation.publish(tunnel_id, direction);
+        }
+    }
+
+    fn remove_tunnel_observation(&self, tunnel_id: TunnelId, direction: TunnelDirection) {
+        if let Some(observation) = &self.observation {
+            observation.remove(tunnel_id, direction);
+        }
+    }
+}
+
+impl<R: Runtime, S: TunnelSelector + HopSelector> Drop for TunnelPool<R, S> {
+    fn drop(&mut self) {
+        if let Some(observation) = &self.observation {
+            observation.source.remove_pool(observation.pool_kind, observation.pool_id);
+        }
     }
 }
 
@@ -882,6 +962,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                     self.selector.add_outbound_tunnel(tunnel_id, tunnel.hops());
                     self.outbound.insert(tunnel_id, tunnel);
                     self.tunnel_timers.add_outbound_tunnel(tunnel_id);
+                    self.publish_tunnel(tunnel_id, TunnelDirection::Outbound);
                     self.router_ctx
                         .metrics_handle()
                         .gauge(NUM_PENDING_OUTBOUND_TUNNELS)
@@ -953,6 +1034,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                     );
                     self.inbound_tunnels.insert(gateway_tunnel_id, (tunnel_id, router_id.clone()));
                     self.tunnel_timers.add_inbound_tunnel(gateway_tunnel_id);
+                    self.publish_tunnel(gateway_tunnel_id, TunnelDirection::Inbound);
                     self.num_tunnels_built += 1;
 
                     // inform the owner of the tunnel pool that a new inbound tunnel has been built
@@ -1005,6 +1087,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                     self.subsystem_handle.remove_tunnel(&tunnel_id);
                     self.selector.remove_inbound_tunnel(&gateway_tunnel_id);
                     self.inbound_tunnels.remove(&gateway_tunnel_id);
+                    self.remove_tunnel_observation(gateway_tunnel_id, TunnelDirection::Inbound);
                     self.router_ctx.metrics_handle().gauge(NUM_INBOUND_TUNNELS).decrement(1);
 
                     // inform the owner of the tunnel pool that an inbound tunnel has expired
@@ -1357,6 +1440,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                     self.outbound.remove(&tunnel_id);
                     self.expiring_outbound.remove(&tunnel_id);
                     self.selector.remove_outbound_tunnel(&tunnel_id);
+                    self.remove_tunnel_observation(tunnel_id, TunnelDirection::Outbound);
                     self.router_ctx.metrics_handle().gauge(NUM_OUTBOUND_TUNNELS).decrement(1);
 
                     // inform the owner of the tunnel pool that an inbound tunnel has expired

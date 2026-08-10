@@ -233,7 +233,9 @@ impl TransportInspection {
             bytes_received: 0,
             bytes_sent: 0,
         });
-        snapshot.peer_stats.sort_unstable_by(|left, right| left.peer_id.cmp(&right.peer_id));
+        snapshot
+            .peer_stats
+            .sort_unstable_by(|left, right| left.peer_id.cmp(&right.peer_id));
     }
 
     pub(crate) fn peer_disconnected(&self, peer_id: &str) {
@@ -256,6 +258,180 @@ impl TransportInspection {
 pub enum TransportInspectionError {
     /// The caller-supplied peer-item bound would be exceeded.
     ItemLimitExceeded { limit: usize },
+}
+
+/// The neutral owner of a tunnel observed by the inspection seam.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TunnelPoolKind {
+    /// A tunnel used by the router's own exploratory traffic.
+    Exploratory,
+    /// A tunnel owned by a client destination.
+    Client,
+    /// A tunnel accepted for transit traffic.
+    Participating,
+}
+
+/// Direction of a tunnel owned by a pool.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TunnelDirection {
+    /// Traffic enters the local destination through this tunnel.
+    Inbound,
+    /// Traffic leaves the local destination through this tunnel.
+    Outbound,
+}
+
+/// Sanitized identity facts for one live tunnel.
+///
+/// The numeric tunnel ID is the public protocol identifier already used by
+/// the routing table. No tunnel object, hop, RouterId, destination, key, or
+/// message data is retained here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct TunnelInspectionEntry {
+    /// Stable identity of the pool within this process, when pool-owned.
+    pub pool_id: u64,
+    /// Public tunnel identifier used by the local routing owner.
+    pub tunnel_id: u32,
+    /// Neutral owner classification.
+    pub pool_kind: TunnelPoolKind,
+    /// Pool direction, or `None` for a participating tunnel.
+    pub direction: Option<TunnelDirection>,
+}
+
+/// Bounded, owned facts about currently live tunnel owners.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TunnelInspectionSnapshot {
+    /// Current live tunnel entries in deterministic order.
+    pub entries: Vec<TunnelInspectionEntry>,
+}
+
+/// Cloneable, read-only access to current tunnel lifecycle facts.
+#[derive(Clone)]
+pub struct TunnelInspection {
+    snapshot: Arc<RwLock<TunnelInspectionState>>,
+}
+
+#[derive(Debug, Default)]
+struct TunnelInspectionState {
+    entries: Vec<TunnelInspectionEntry>,
+    complete: bool,
+}
+
+/// Maximum number of live tunnel facts retained by the neutral source.
+pub const MAX_TUNNEL_INSPECTION_ENTRIES: usize = 10_000;
+
+impl Default for TunnelInspection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TunnelInspection {
+    pub(crate) fn new() -> Self {
+        Self {
+            snapshot: Arc::new(RwLock::new(TunnelInspectionState {
+                entries: Vec::new(),
+                complete: true,
+            })),
+        }
+    }
+
+    /// Copy current tunnel facts, failing closed if an owner update overflowed
+    /// or the caller's bound is smaller than the owned snapshot.
+    pub fn snapshot(
+        &self,
+        max_items: usize,
+    ) -> Result<TunnelInspectionSnapshot, TunnelInspectionError> {
+        let state = self.snapshot.read();
+        if !state.complete {
+            return Err(TunnelInspectionError::Incomplete);
+        }
+        if state.entries.len() > max_items {
+            return Err(TunnelInspectionError::ItemLimitExceeded { limit: max_items });
+        }
+        Ok(TunnelInspectionSnapshot {
+            entries: state.entries.clone(),
+        })
+    }
+
+    pub(crate) fn publish(
+        &self,
+        entry: TunnelInspectionEntry,
+    ) -> Result<(), TunnelInspectionError> {
+        let mut state = self.snapshot.write();
+        if let Some(existing) = state.entries.iter_mut().find(|existing| {
+            existing.pool_id == entry.pool_id
+                && existing.tunnel_id == entry.tunnel_id
+                && existing.pool_kind == entry.pool_kind
+                && existing.direction == entry.direction
+        }) {
+            *existing = entry;
+            return Ok(());
+        }
+        if state.entries.len() >= MAX_TUNNEL_INSPECTION_ENTRIES {
+            state.complete = false;
+            return Err(TunnelInspectionError::ItemLimitExceeded {
+                limit: MAX_TUNNEL_INSPECTION_ENTRIES,
+            });
+        }
+        state.entries.push(entry);
+        state.entries.sort_unstable();
+        Ok(())
+    }
+
+    pub(crate) fn remove(&self, entry: TunnelInspectionEntry) {
+        let mut state = self.snapshot.write();
+        state.entries.retain(|existing| existing != &entry);
+    }
+
+    pub(crate) fn remove_pool(&self, pool_kind: TunnelPoolKind, pool_id: u64) {
+        let mut state = self.snapshot.write();
+        state
+            .entries
+            .retain(|entry| entry.pool_kind != pool_kind || entry.pool_id != pool_id);
+    }
+
+    /// Replace the complete source at an owner-provided recovery point.
+    #[allow(dead_code)]
+    pub(crate) fn recover(
+        &self,
+        entries: Vec<TunnelInspectionEntry>,
+    ) -> Result<(), TunnelInspectionError> {
+        if entries.len() > MAX_TUNNEL_INSPECTION_ENTRIES {
+            return Err(TunnelInspectionError::ItemLimitExceeded {
+                limit: MAX_TUNNEL_INSPECTION_ENTRIES,
+            });
+        }
+        let mut sorted = entries;
+        sorted.sort_unstable();
+        sorted.dedup();
+        let mut state = self.snapshot.write();
+        state.entries = sorted;
+        state.complete = true;
+        Ok(())
+    }
+}
+
+/// Failure while collecting tunnel inspection facts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TunnelInspectionError {
+    /// The source lost completeness and must be recovered by an owner snapshot.
+    Incomplete,
+    /// The caller or source exceeded its item bound.
+    ItemLimitExceeded { limit: usize },
+}
+
+impl fmt::Display for TunnelInspectionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Incomplete => write!(f, "tunnel inspection snapshot is incomplete"),
+            Self::ItemLimitExceeded { limit } => {
+                write!(
+                    f,
+                    "tunnel inspection snapshot exceeds bound of {limit} items"
+                )
+            }
+        }
+    }
 }
 
 impl fmt::Display for TransportInspectionError {
@@ -370,9 +546,62 @@ mod tests {
         assert_eq!(snapshot.peer_stats[0].bytes_received, 7);
         assert_eq!(snapshot.peer_stats[0].bytes_sent, 11);
 
-        assert_eq!(inspection.snapshot(1), Err(TransportInspectionError::ItemLimitExceeded { limit: 1 }));
+        assert_eq!(
+            inspection.snapshot(1),
+            Err(TransportInspectionError::ItemLimitExceeded { limit: 1 })
+        );
         inspection.peer_disconnected("peer-a");
         assert_eq!(inspection.snapshot(2).unwrap().peer_stats.len(), 1);
+    }
+
+    #[test]
+    fn tunnel_inspection_is_live_bounded_and_recoverable() {
+        let inspection = TunnelInspection::default();
+        let entry = TunnelInspectionEntry {
+            pool_id: 7,
+            tunnel_id: 42,
+            pool_kind: TunnelPoolKind::Client,
+            direction: Some(TunnelDirection::Outbound),
+        };
+        inspection.publish(entry).unwrap();
+        assert_eq!(inspection.snapshot(1).unwrap().entries, vec![entry]);
+
+        inspection.remove(entry);
+        assert!(inspection.snapshot(1).unwrap().entries.is_empty());
+
+        inspection.recover(vec![entry]).unwrap();
+        assert_eq!(inspection.snapshot(1).unwrap().entries, vec![entry]);
+    }
+
+    #[test]
+    fn tunnel_inspection_fails_closed_after_overflow_until_recovery() {
+        let inspection = TunnelInspection::default();
+        inspection
+            .recover(
+                (0..MAX_TUNNEL_INSPECTION_ENTRIES)
+                    .map(|tunnel_id| TunnelInspectionEntry {
+                        pool_id: 1,
+                        tunnel_id: tunnel_id as u32,
+                        pool_kind: TunnelPoolKind::Exploratory,
+                        direction: Some(TunnelDirection::Inbound),
+                    })
+                    .collect(),
+            )
+            .unwrap();
+        assert!(inspection
+            .publish(TunnelInspectionEntry {
+                pool_id: 1,
+                tunnel_id: u32::MAX,
+                pool_kind: TunnelPoolKind::Exploratory,
+                direction: Some(TunnelDirection::Inbound),
+            })
+            .is_err());
+        assert_eq!(
+            inspection.snapshot(MAX_TUNNEL_INSPECTION_ENTRIES),
+            Err(TunnelInspectionError::Incomplete)
+        );
+        inspection.recover(Vec::new()).unwrap();
+        assert!(inspection.snapshot(0).unwrap().entries.is_empty());
     }
 }
 

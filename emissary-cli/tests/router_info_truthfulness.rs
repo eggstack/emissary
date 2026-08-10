@@ -30,7 +30,7 @@ use emissary_cli::i2pcontrol::{
     router_info::{
         ActivePeerStats, BannedPeer, ClockSkew, FakeRouterInfoControl, I2PTunnelStats,
         InspectionError, NetworkSnapshot, PeerIdentity, PeerLimits, RouterInfoControl,
-        TransportLimits, TunnelBuildStats, TunnelSummary, UdpSnapshot,
+        TransportLimits, TunnelBuildStats, TunnelDetail, TunnelDetails, TunnelSummary, UdpSnapshot,
     },
     rpc,
 };
@@ -234,6 +234,81 @@ async fn active_peer_stats_unavailable_returns_error() {
         emissary_cli::i2pcontrol::router_info_handler::handle_router_info(&state, &req).await;
     assert!(resp.get("error").is_some());
     assert!(resp.get("result").is_none());
+}
+
+#[tokio::test]
+async fn proposal_tunnel_sources_return_exact_live_rows_and_counts() {
+    let ri = FakeRouterInfoControl::new();
+    ri.set_tunnel_details(TunnelDetails {
+        participating: vec![TunnelDetail {
+            tunnel_id: 9,
+            pool_id: None,
+            direction: None,
+        }],
+        exploratory: vec![
+            TunnelDetail {
+                tunnel_id: 2,
+                pool_id: Some(0),
+                direction: Some("inbound".to_owned()),
+            },
+            TunnelDetail {
+                tunnel_id: 3,
+                pool_id: Some(0),
+                direction: Some("outbound".to_owned()),
+            },
+        ],
+        client: vec![TunnelDetail {
+            tunnel_id: 4,
+            pool_id: Some(1),
+            direction: Some("outbound".to_owned()),
+        }],
+    });
+    let state = test_state(ri);
+    let req = emissary_cli::i2pcontrol::rpc::JsonRpcRequest {
+        jsonrpc: "2.0".to_owned(),
+        method: "RouterInfo".to_owned(),
+        params: Some(
+            serde_json::json!({
+                "i2p.router.net.tunnels.participating.info": true,
+                "i2p.router.net.tunnels.exploratory.inbound": true,
+                "i2p.router.net.tunnels.exploratory.outbound": true,
+                "i2p.router.net.tunnels.exploratory.info.list": true,
+                "i2p.router.net.tunnels.client.inbound": true,
+                "i2p.router.net.tunnels.client.outbound": true,
+                "i2p.router.net.tunnels.client.info.list": true,
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
+        ),
+        id: Some(rpc::RequestId::Number(1)),
+    };
+    let response =
+        emissary_cli::i2pcontrol::router_info_handler::handle_router_info(&state, &req).await;
+    assert_eq!(
+        response["result"]["i2p.router.net.tunnels.participating.info"],
+        serde_json::json!([{"tunnelId": 9}])
+    );
+    assert_eq!(
+        response["result"]["i2p.router.net.tunnels.exploratory.inbound"],
+        1
+    );
+    assert_eq!(
+        response["result"]["i2p.router.net.tunnels.exploratory.outbound"],
+        1
+    );
+    assert_eq!(
+        response["result"]["i2p.router.net.tunnels.client.inbound"],
+        0
+    );
+    assert_eq!(
+        response["result"]["i2p.router.net.tunnels.client.outbound"],
+        1
+    );
+    assert_eq!(
+        response["result"]["i2p.router.net.tunnels.client.info.list"],
+        serde_json::json!([{"tunnelId": 4, "poolId": 1, "direction": "outbound"}])
+    );
 }
 
 #[tokio::test]
@@ -575,6 +650,11 @@ async fn udp_group_queried_once_for_multiple_selectors() {
         }
         async fn tunnel_summary(&self) -> Result<TunnelSummary, InspectionError> {
             self.inner.tunnel_summary().await
+        }
+        async fn tunnel_details(
+            &self,
+        ) -> Result<emissary_cli::i2pcontrol::router_info::TunnelDetails, InspectionError> {
+            self.inner.tunnel_details().await
         }
         async fn netdb_snapshot(
             &self,

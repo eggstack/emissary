@@ -29,6 +29,7 @@ use crate::{
         },
         HopRole, Message, MessageBuilder, MessageType, I2NP_MESSAGE_EXPIRATION,
     },
+    inspection::{TunnelInspection, TunnelInspectionEntry, TunnelPoolKind},
     primitives::{RouterId, TunnelId},
     router::context::RouterContext,
     runtime::{Counter, JoinSet, MetricsHandle, Runtime},
@@ -132,16 +133,39 @@ pub struct TransitTunnelManager<R: Runtime> {
 
     /// Active transit tunnels.
     tunnels: R::JoinSet<Result<TunnelId, TunnelId>>,
+
+    /// Passive bounded lifecycle observation.
+    inspection: Option<TunnelInspection>,
 }
 
 impl<R: Runtime> TransitTunnelManager<R> {
     /// Create new [`TransitTunnelManager`].
+    #[allow(dead_code)]
     pub fn new(
         config: Option<TransitConfig>,
         router_ctx: RouterContext<R>,
         subsystem_handle: SubsystemHandle,
         message_rx: Receiver<Vec<(RouterId, Message)>>,
         shutdown_handle: ShutdownHandle,
+    ) -> Self {
+        Self::new_with_inspection(
+            config,
+            router_ctx,
+            subsystem_handle,
+            message_rx,
+            shutdown_handle,
+            None,
+        )
+    }
+
+    /// Create a transit manager with passive lifecycle observation.
+    pub(crate) fn new_with_inspection(
+        config: Option<TransitConfig>,
+        router_ctx: RouterContext<R>,
+        subsystem_handle: SubsystemHandle,
+        message_rx: Receiver<Vec<(RouterId, Message)>>,
+        shutdown_handle: ShutdownHandle,
+        inspection: Option<TunnelInspection>,
     ) -> Self {
         match &config {
             Some(TransitConfig { max_tunnels }) => tracing::info!(
@@ -166,6 +190,36 @@ impl<R: Runtime> TransitTunnelManager<R> {
             subsystem_handle,
             shutdown_handle,
             tunnels: R::join_set(),
+            inspection,
+        }
+    }
+
+    fn publish_tunnel(&self, tunnel_id: TunnelId) {
+        if let Some(inspection) = &self.inspection {
+            let _ = inspection.publish(TunnelInspectionEntry {
+                pool_id: 0,
+                tunnel_id: tunnel_id.into(),
+                pool_kind: TunnelPoolKind::Participating,
+                direction: None,
+            });
+        }
+    }
+
+    fn remove_tunnel(&self, tunnel_id: TunnelId) {
+        if let Some(inspection) = &self.inspection {
+            inspection.remove(TunnelInspectionEntry {
+                pool_id: 0,
+                tunnel_id: tunnel_id.into(),
+                pool_kind: TunnelPoolKind::Participating,
+                direction: None,
+            });
+        }
+    }
+
+    /// Remove the manager's passive observations when the owner is dropped.
+    fn clear_inspection(&self) {
+        if let Some(inspection) = &self.inspection {
+            inspection.remove_pool(TunnelPoolKind::Participating, 0);
         }
     }
 
@@ -334,6 +388,7 @@ impl<R: Runtime> TransitTunnelManager<R> {
                 None
             }
             Some(receiver) => {
+                self.publish_tunnel(tunnel_id);
                 self.router_ctx
                     .metrics_handle()
                     .counter(NUM_TRANSIT_TUNNELS_ACCEPTED)
@@ -624,6 +679,7 @@ impl<R: Runtime> TransitTunnelManager<R> {
                 }
             }
             Some(receiver) => {
+                self.publish_tunnel(tunnel_id);
                 self.router_ctx
                     .metrics_handle()
                     .counter(NUM_TRANSIT_TUNNELS_ACCEPTED)
@@ -831,6 +887,12 @@ impl<R: Runtime> TransitTunnelManager<R> {
     }
 }
 
+impl<R: Runtime> Drop for TransitTunnelManager<R> {
+    fn drop(&mut self) {
+        self.clear_inspection();
+    }
+}
+
 impl<R: Runtime> Future for TransitTunnelManager<R> {
     type Output = ();
 
@@ -866,10 +928,11 @@ impl<R: Runtime> Future for TransitTunnelManager<R> {
 
                 match result {
                     Ok((router, message, maybe_feedback_tx)) => match maybe_feedback_tx {
-                        None =>
+                        None => {
                             if let Err(error) = self.subsystem_handle.send(&router, message) {
                                 tracing::error!(target: LOG_TARGET, ?error, "failed to send message");
-                            },
+                            }
+                        }
                         Some(tx) => {
                             if let Err(error) =
                                 self.subsystem_handle.send_with_feedback(&router, message, tx)
@@ -912,6 +975,7 @@ impl<R: Runtime> Future for TransitTunnelManager<R> {
 
             match result {
                 Ok(tunnel_id) => {
+                    self.remove_tunnel(tunnel_id);
                     tracing::debug!(
                         target: LOG_TARGET,
                         %tunnel_id,
@@ -919,6 +983,7 @@ impl<R: Runtime> Future for TransitTunnelManager<R> {
                     );
                 }
                 Err(tunnel_id) => {
+                    self.remove_tunnel(tunnel_id);
                     tracing::debug!(
                         target: LOG_TARGET,
                         %tunnel_id,

@@ -54,7 +54,8 @@ use crate::{
             I2PTunnelStats, InspectionError, InspectionGroup, LogEntry, LogSnapshot,
             NetworkSnapshot, NetworkStatus, PeerDirectorySnapshot, PeerDirectorySource,
             PeerIdentity, PeerLimits, RecentTransitTraffic, RouterInfoControl, TransitBytes,
-            TransportBytes, TransportLimits, TunnelBuildStats, TunnelSummary,
+            TransportBytes, TransportLimits, TunnelBuildStats, TunnelDetail, TunnelDetails,
+            TunnelSource, TunnelSummary,
         },
         server_secret_store::{ServerDestinationStore, StoredDestination},
         stores::{address_book_store::AddressBookStore, tunnel_store::TunnelStore},
@@ -66,7 +67,7 @@ use emissary_core::{
     events::EventHandle,
     inspection::{
         PeerDirectoryInspection, PeerDirectoryInspectionError, TransportInspection,
-        TransportInspectionError,
+        TransportInspectionError, TunnelInspection, TunnelInspectionError, TunnelPoolKind,
     },
     runtime::Runtime,
     FirewallStatus,
@@ -176,6 +177,55 @@ impl ActivePeerSource for LiveActivePeerSource {
                 })
                 .collect(),
         })
+    }
+}
+
+/// Current tunnel source backed by the canonical core tunnel owners.
+pub struct LiveTunnelSource {
+    inspection: TunnelInspection,
+    max_items: usize,
+}
+
+impl LiveTunnelSource {
+    /// Create a bounded request-time tunnel source.
+    pub fn new(inspection: TunnelInspection, max_items: usize) -> Self {
+        Self {
+            inspection,
+            max_items,
+        }
+    }
+}
+
+impl TunnelSource for LiveTunnelSource {
+    fn snapshot(&self) -> Result<TunnelDetails, InspectionError> {
+        let snapshot = self.inspection.snapshot(self.max_items).map_err(|error| match error {
+            TunnelInspectionError::Incomplete => InspectionError::TemporarilyUnavailable {
+                group: InspectionGroup::TunnelSummary,
+            },
+            TunnelInspectionError::ItemLimitExceeded { limit } => InspectionError::ResultTooLarge {
+                group: InspectionGroup::TunnelSummary,
+                limit,
+            },
+        })?;
+
+        let mut details = TunnelDetails::default();
+        for entry in snapshot.entries {
+            let detail = TunnelDetail {
+                tunnel_id: entry.tunnel_id,
+                pool_id: (entry.pool_kind != TunnelPoolKind::Participating)
+                    .then_some(entry.pool_id),
+                direction: entry.direction.map(|direction| match direction {
+                    emissary_core::inspection::TunnelDirection::Inbound => "inbound".to_owned(),
+                    emissary_core::inspection::TunnelDirection::Outbound => "outbound".to_owned(),
+                }),
+            };
+            match entry.pool_kind {
+                TunnelPoolKind::Participating => details.participating.push(detail),
+                TunnelPoolKind::Exploratory => details.exploratory.push(detail),
+                TunnelPoolKind::Client => details.client.push(detail),
+            }
+        }
+        Ok(details)
     }
 }
 
@@ -1209,6 +1259,7 @@ pub struct ProductionRouterInfoControl {
     tunnel_manager: Arc<dyn TunnelManagerControl>,
     peer_directory: Option<Arc<dyn PeerDirectorySource>>,
     active_peer_source: Option<Arc<dyn ActivePeerSource>>,
+    tunnel_source: Option<Arc<dyn TunnelSource>>,
 }
 
 impl ProductionRouterInfoControl {
@@ -1236,6 +1287,7 @@ impl ProductionRouterInfoControl {
             tunnel_manager,
             peer_directory: None,
             active_peer_source: None,
+            tunnel_source: None,
         }
     }
 
@@ -1248,6 +1300,12 @@ impl ProductionRouterInfoControl {
     /// Attach the canonical live transport source.
     pub fn with_active_peer_source(mut self, source: Arc<dyn ActivePeerSource>) -> Self {
         self.active_peer_source = Some(source);
+        self
+    }
+
+    /// Attach the canonical live tunnel source.
+    pub fn with_tunnel_source(mut self, source: Arc<dyn TunnelSource>) -> Self {
+        self.tunnel_source = Some(source);
         self
     }
 
@@ -1342,6 +1400,13 @@ impl RouterInfoControl for ProductionRouterInfoControl {
             client_outbound: 0,
             queue_depth: 0,
         })
+    }
+
+    async fn tunnel_details(&self) -> Result<TunnelDetails, InspectionError> {
+        let source = self.tunnel_source.as_ref().ok_or(InspectionError::Unavailable {
+            group: InspectionGroup::TunnelSummary,
+        })?;
+        source.snapshot()
     }
 
     async fn netdb_snapshot(

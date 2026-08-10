@@ -1035,12 +1035,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_PARTICIPATING_INFO,
             JsonType::ArrayOfObjects,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded participating tunnel detail snapshot"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_participating_tunnel_info",
-            "p170.participating_info.unavailable",
+            "p170.participating_info.rows",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1066,12 +1065,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_EXPLORATORY_INBOUND,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded exploratory tunnel count source"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_exploratory_inbound",
-            "p170.exploratory_inbound.unavailable",
+            "p170.exploratory_inbound.count",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1079,12 +1077,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_EXPLORATORY_OUTBOUND,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded exploratory tunnel count source"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_exploratory_outbound",
-            "p170.exploratory_outbound.unavailable",
+            "p170.exploratory_outbound.count",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1092,12 +1089,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_EXPLORATORY_INFO_LIST,
             JsonType::ArrayOfObjects,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded exploratory tunnel detail snapshot"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_exploratory_info_list",
-            "p170.exploratory_info.unavailable",
+            "p170.exploratory_info.rows",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1108,12 +1104,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_CLIENT_INBOUND,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded client tunnel count source"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_client_inbound",
-            "p170.client_inbound.unavailable",
+            "p170.client_inbound.count",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1121,12 +1116,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_CLIENT_OUTBOUND,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded client tunnel count source"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_client_outbound",
-            "p170.client_outbound.unavailable",
+            "p170.client_outbound.count",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1134,12 +1128,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_CLIENT_INFO_LIST,
             JsonType::ArrayOfObjects,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded client tunnel detail snapshot"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_client_info_list",
-            "p170.client_info.unavailable",
+            "p170.client_info.rows",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -2076,7 +2069,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (24, 1, 18));
+        assert_eq!((available, neutral, unavailable), (31, 1, 11));
     }
 
     #[test]

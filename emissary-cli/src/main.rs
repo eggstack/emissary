@@ -611,6 +611,10 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                         10_000,
                     ),
                 ))
+                .with_tunnel_source(Arc::new(i2pcontrol::production::LiveTunnelSource::new(
+                    router.tunnel_inspection(),
+                    10_000,
+                )))
                 .with_event_metrics(metrics)
                 .with_share_ratio(share_ratio)
                 .with_configured_bandwidth(bw_in, bw_out)

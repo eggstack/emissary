@@ -44,7 +44,7 @@ use super::{
         EventMetrics, ProductionAddressBookControl, ProductionControlPlane,
         ProductionRouterInfoControl, ProductionTunnelManagerControl, StartupTunnelInventory,
     },
-    router_info::{ActivePeerSource, PeerDirectorySource, RouterInfoControl},
+    router_info::{ActivePeerSource, PeerDirectorySource, RouterInfoControl, TunnelSource},
     rpc::{
         self, AuthenticateParams, AuthenticateResult, JsonRpcErrorResponse, JsonRpcRequest,
         JsonRpcSuccess, RequestId,
@@ -645,6 +645,8 @@ pub struct ServerInitContext {
     pub peer_directory: Option<Arc<dyn PeerDirectorySource>>,
     /// Canonical bounded current transport source.
     pub active_peer_source: Option<Arc<dyn ActivePeerSource>>,
+    /// Canonical bounded current tunnel source.
+    pub tunnel_source: Option<Arc<dyn TunnelSource>>,
 }
 
 impl ServerInitContext {
@@ -667,6 +669,7 @@ impl ServerInitContext {
             sam_tcp_port: None,
             peer_directory: None,
             active_peer_source: None,
+            tunnel_source: None,
         }
     }
 
@@ -748,6 +751,12 @@ impl ServerInitContext {
     /// Inject the canonical current transport source.
     pub fn with_active_peer_source(mut self, source: Arc<dyn ActivePeerSource>) -> Self {
         self.active_peer_source = Some(source);
+        self
+    }
+
+    /// Inject the canonical current tunnel source.
+    pub fn with_tunnel_source(mut self, source: Arc<dyn TunnelSource>) -> Self {
+        self.tunnel_source = Some(source);
         self
     }
 }
@@ -854,6 +863,9 @@ pub async fn init_server(
     }
     if let Some(source) = ctx.active_peer_source {
         router_info_control = router_info_control.with_active_peer_source(source);
+    }
+    if let Some(source) = ctx.tunnel_source {
+        router_info_control = router_info_control.with_tunnel_source(source);
     }
     let router_info: Arc<dyn RouterInfoControl> = Arc::new(router_info_control);
 

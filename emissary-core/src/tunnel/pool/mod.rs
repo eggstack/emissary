@@ -113,6 +113,10 @@ impl TunnelPoolObservation {
             direction: Some(direction),
         });
     }
+
+    fn set_queue_depth(&self, depth: usize) {
+        self.source.set_pool_queue_depth(self.pool_kind, self.pool_id, depth);
+    }
 }
 
 /// Logging target for the file.
@@ -492,6 +496,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
                                 message_rx,
                                 dial_rx,
                             );
+                            self.publish_queue_depth();
                             self.router_ctx
                                 .metrics_handle()
                                 .gauge(NUM_PENDING_OUTBOUND_TUNNELS)
@@ -592,6 +597,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
                                 message_rx,
                                 dial_rx,
                             );
+                            self.publish_queue_depth();
                             self.router_ctx
                                 .metrics_handle()
                                 .gauge(NUM_PENDING_OUTBOUND_TUNNELS)
@@ -684,6 +690,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
                         message_rx,
                         dial_rx,
                     );
+                    self.publish_queue_depth();
                     self.router_ctx
                         .metrics_handle()
                         .gauge(NUM_PENDING_INBOUND_TUNNELS)
@@ -902,6 +909,12 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
         }
     }
 
+    fn publish_queue_depth(&self) {
+        if let Some(observation) = &self.observation {
+            observation.set_queue_depth(self.pending_inbound.len() + self.pending_outbound.len());
+        }
+    }
+
     fn remove_tunnel_observation(&self, tunnel_id: TunnelId, direction: TunnelDirection) {
         if let Some(observation) = &self.observation {
             observation.remove(tunnel_id, direction);
@@ -950,6 +963,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                         .gauge(NUM_PENDING_OUTBOUND_TUNNELS)
                         .decrement(1);
                     self.num_tunnel_build_failures += 1;
+                    self.event_handle.tunnel_build_result(false);
                 }
                 Ok((tunnel, started)) => {
                     tracing::info!(
@@ -974,6 +988,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                         .histogram(TUNNEL_BUILD_DURATIONS)
                         .record(started.elapsed().as_millis() as f64);
                     self.num_tunnels_built += 1;
+                    self.event_handle.tunnel_build_result(true);
 
                     // inform the owner of the tunnel pool that a new outbound tunnel has been built
                     if let Err(error) = self.context.register_outbound_tunnel_built(tunnel_id) {
@@ -989,6 +1004,8 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
             }
         }
 
+        self.publish_queue_depth();
+
         // poll pending inbound tunnels
         while let Poll::Ready(Some((tunnel_id, event))) = self.pending_inbound.poll_next_unpin(cx) {
             match event {
@@ -1003,6 +1020,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                     num_failed_builds += 1;
 
                     self.num_tunnel_build_failures += 1;
+                    self.event_handle.tunnel_build_result(false);
                     self.subsystem_handle.remove_tunnel(&tunnel_id);
                     self.router_ctx
                         .metrics_handle()
@@ -1036,6 +1054,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                     self.tunnel_timers.add_inbound_tunnel(gateway_tunnel_id);
                     self.publish_tunnel(gateway_tunnel_id, TunnelDirection::Inbound);
                     self.num_tunnels_built += 1;
+                    self.event_handle.tunnel_build_result(true);
 
                     // inform the owner of the tunnel pool that a new inbound tunnel has been built
                     if let Err(error) = self.context.register_inbound_tunnel_built(
@@ -1069,6 +1088,8 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                 }
             }
         }
+
+        self.publish_queue_depth();
 
         // poll event loops of inbound tunnels
         while let Poll::Ready(event) = self.inbound.poll_next_unpin(cx) {

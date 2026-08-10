@@ -234,6 +234,8 @@ pub struct TunnelDetails {
     pub participating: Vec<TunnelDetail>,
     pub exploratory: Vec<TunnelDetail>,
     pub client: Vec<TunnelDetail>,
+    pub queue_depth: usize,
+    pub tbm_queue_depth: usize,
 }
 
 /// Read-only source for bounded current tunnel details.
@@ -539,8 +541,22 @@ pub trait RouterInfoControl: Send + Sync {
     /// Get cumulative transit bytes.
     async fn transit_bytes(&self) -> Result<TransitBytes, InspectionError>;
 
+    /// Get the bounded rolling 15-second transit bandwidth in bytes per second.
+    async fn transit_bandwidth_15s(&self) -> Result<u64, InspectionError> {
+        Err(InspectionError::Unavailable {
+            group: InspectionGroup::TrafficMetrics,
+        })
+    }
+
     /// Get tunnel build success/failure stats.
     async fn tunnel_build_stats(&self) -> Result<TunnelBuildStats, InspectionError>;
+
+    /// Get the reference-style recent tunnel build success rate in percent.
+    async fn recent_tunnel_success_rate(&self) -> Result<f64, InspectionError> {
+        Err(InspectionError::Unavailable {
+            group: InspectionGroup::TrafficMetrics,
+        })
+    }
 
     /// Get tunnel summary counts.
     async fn tunnel_summary(&self) -> Result<TunnelSummary, InspectionError>;
@@ -626,7 +642,9 @@ struct FakeInner {
     transport_bytes: Result<TransportBytes, InspectionError>,
     recent_transit: Result<RecentTransitTraffic, InspectionError>,
     transit_bytes: Result<TransitBytes, InspectionError>,
+    transit_bandwidth_15s: Result<u64, InspectionError>,
     build_stats: Result<TunnelBuildStats, InspectionError>,
+    recent_tunnel_success_rate: Result<f64, InspectionError>,
     tunnel_summary: Result<TunnelSummary, InspectionError>,
     tunnel_details: Result<TunnelDetails, InspectionError>,
     netdb: Result<NetDbSnapshot, InspectionError>,
@@ -666,7 +684,9 @@ impl FakeRouterInfoControl {
                 transport_bytes: Err(unavailable(InspectionGroup::TrafficMetrics)),
                 recent_transit: Err(unavailable(InspectionGroup::TrafficMetrics)),
                 transit_bytes: Err(unavailable(InspectionGroup::TrafficMetrics)),
+                transit_bandwidth_15s: Err(unavailable(InspectionGroup::TrafficMetrics)),
                 build_stats: Err(unavailable(InspectionGroup::TrafficMetrics)),
+                recent_tunnel_success_rate: Err(unavailable(InspectionGroup::TrafficMetrics)),
                 tunnel_summary: Err(unavailable(InspectionGroup::TunnelSummary)),
                 tunnel_details: Err(unavailable(InspectionGroup::TunnelSummary)),
                 netdb: Err(unavailable(InspectionGroup::NetDb)),
@@ -736,6 +756,18 @@ impl FakeRouterInfoControl {
     pub fn set_transit_bytes(&self, bytes: TransitBytes) {
         let mut inner = self.inner.lock().unwrap();
         inner.transit_bytes = Ok(bytes);
+    }
+
+    /// Set the rolling transit bandwidth for tests.
+    pub fn set_transit_bandwidth_15s(&self, bandwidth: u64) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.transit_bandwidth_15s = Ok(bandwidth);
+    }
+
+    /// Set the recent tunnel build success rate for tests.
+    pub fn set_recent_tunnel_success_rate(&self, rate: f64) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.recent_tunnel_success_rate = Ok(rate);
     }
 
     /// Set tunnel build stats for tests.
@@ -895,9 +927,19 @@ impl RouterInfoControl for FakeRouterInfoControl {
         inner.transit_bytes.clone()
     }
 
+    async fn transit_bandwidth_15s(&self) -> Result<u64, InspectionError> {
+        let inner = self.inner.lock().unwrap();
+        inner.transit_bandwidth_15s.clone()
+    }
+
     async fn tunnel_build_stats(&self) -> Result<TunnelBuildStats, InspectionError> {
         let inner = self.inner.lock().unwrap();
         inner.build_stats.clone()
+    }
+
+    async fn recent_tunnel_success_rate(&self) -> Result<f64, InspectionError> {
+        let inner = self.inner.lock().unwrap();
+        inner.recent_tunnel_success_rate.clone()
     }
 
     async fn tunnel_summary(&self) -> Result<TunnelSummary, InspectionError> {

@@ -1010,12 +1010,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_BW_TRANSIT_15S,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "traffic-metrics",
-                reason: "no rolling 15s transit source"
+            SourceDisposition::Available {
+                owner: "traffic-metrics"
             },
             "serialize_transit_bandwidth_15s",
-            "p170.transit_15s.unavailable",
+            "p170.transit_15s.bytes_per_second",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1208,12 +1207,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_SUCCESS_RATE,
             JsonType::Number,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-build-metrics",
-                reason: "no rolling tunnel build success-rate source"
+            SourceDisposition::Available {
+                owner: "tunnel-build-metrics"
             },
             "serialize_tunnel_success_rate",
-            "p170.success_rate.recent.unavailable",
+            "p170.success_rate.recent.percent",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1233,12 +1231,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_QUEUE,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded tunnel build queue snapshot"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_tunnel_queue",
-            "p170.tunnel_queue.unavailable",
+            "p170.tunnel_queue.depth",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1246,12 +1243,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_TBM_QUEUE,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded tunnel build message queue snapshot"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_tbm_queue",
-            "p170.tbm_queue.unavailable",
+            "p170.tbm_queue.depth",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -2069,7 +2065,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (31, 1, 11));
+        assert_eq!((available, neutral, unavailable), (35, 1, 7));
     }
 
     #[test]

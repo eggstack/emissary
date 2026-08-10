@@ -262,6 +262,7 @@ async fn proposal_tunnel_sources_return_exact_live_rows_and_counts() {
             pool_id: Some(1),
             direction: Some("outbound".to_owned()),
         }],
+        ..Default::default()
     });
     let state = test_state(ri);
     let req = emissary_cli::i2pcontrol::rpc::JsonRpcRequest {

@@ -897,6 +897,9 @@ impl<R: Runtime> Future for TransitTunnelManager<R> {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if let Some(inspection) = &self.inspection {
+            inspection.set_tbm_queue_depth(self.message_rx.len());
+        }
         while let Poll::Ready(event) = self.message_rx.poll_recv(cx) {
             let Some(messages) = event else {
                 return Poll::Ready(());
@@ -948,6 +951,10 @@ impl<R: Runtime> Future for TransitTunnelManager<R> {
                     ),
                 }
             }
+        }
+
+        if let Some(inspection) = &self.inspection {
+            inspection.set_tbm_queue_depth(self.message_rx.len());
         }
 
         if self.shutdown_handle.poll_unpin(cx).is_ready() {

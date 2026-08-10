@@ -6,7 +6,7 @@ This is the reviewed source map for the pinned Proposal 170 revision created and
 last updated on `2026-08-10`. M027 independently revalidated the matrix against
 the external revision. The machine-readable authority is
 `router_info_keys::PROPOSAL_170_CONTRACT` in `emissary-cli/src/i2pcontrol/rpc.rs`.
-Summary: 43 total, 31 available, 1 protocol-permitted neutral, and 11 unavailable.
+Summary: 43 total, 35 available, 1 protocol-permitted neutral, and 7 unavailable.
 The table below is intentionally one row per canonical addition. Base selectors and
 the nested `Selector` compatibility form are not counted in those totals.
 
@@ -36,7 +36,7 @@ is read-only. Actual serialized response size is checked after assembly.
 | `i2p.router.net.total.received.bytes` | integer | available | event-metrics | `serialize_total_received_bytes` | `p170.total_received.integer` | — | — |
 | `i2p.router.net.total.sent.bytes` | integer | available | event-metrics | `serialize_total_sent_bytes` | `p170.total_sent.integer` | — | — |
 | `i2p.router.net.total.transit.bytes` | integer | available | event-metrics | `serialize_total_transit_bytes` | `p170.total_transit.integer` | — | — |
-| `i2p.router.net.bw.transit.15s` | integer | unavailable | traffic-metrics: no rolling 15s transit source | `serialize_transit_bandwidth_15s` | `p170.transit_15s.unavailable` | — | — |
+| `i2p.router.net.bw.transit.15s` | integer | available | traffic-metrics: bounded rolling transit sampler | `serialize_transit_bandwidth_15s` | `p170.transit_15s.bytes_per_second` | 16 samples | — |
 | `i2p.router.net.tunnels.shareratio` | number | available | retained-configuration | `serialize_tunnel_share_ratio` | `p170.share_ratio.number` | — | — |
 | `i2p.router.net.tunnels.participating.info` | array&lt;object&gt; | available | tunnel-inspection | `serialize_participating_tunnel_info` | `p170.participating_info.rows` | 10,000 / 4 MiB | — |
 | `i2p.router.net.tunnels.i2ptunnel` | array&lt;object&gt; | available | startup-tunnel-inventory | `serialize_i2ptunnel_quick_info` | `p170.i2ptunnel.quick_info` | 1,000 / 4 MiB | — |
@@ -51,10 +51,10 @@ is read-only. Actual serialized response size is checked after assembly.
 | `i2p.router.net.error.v6` | integer | unavailable | network: no transport-specific v6 error code mapping | `serialize_network_error_v6` | `p170.error_v6.unavailable` | — | — |
 | `i2p.router.net.testing` | integer | unavailable | network: no canonical v4 testing-state source | `serialize_network_testing` | `p170.testing_v4.unavailable` | — | — |
 | `i2p.router.net.testing.v6` | integer | unavailable | network: no canonical v6 testing-state source | `serialize_network_testing_v6` | `p170.testing_v6.unavailable` | — | — |
-| `i2p.router.net.tunnels.successrate` | number | unavailable | tunnel-build-metrics: no rolling tunnel build success-rate source | `serialize_tunnel_success_rate` | `p170.success_rate.recent.unavailable` | — | — |
+| `i2p.router.net.tunnels.successrate` | number | available | tunnel-build-metrics: ordered reference EWMA | `serialize_tunnel_success_rate` | `p170.success_rate.recent.percent` | — | — |
 | `i2p.router.net.tunnels.totalsuccessrate` | number | available | event-metrics | `serialize_total_tunnel_success_rate` | `p170.success_rate.total.percent` | — | — |
-| `i2p.router.net.tunnels.queue` | integer | unavailable | tunnel-pool: no bounded tunnel build queue snapshot | `serialize_tunnel_queue` | `p170.tunnel_queue.unavailable` | — | — |
-| `i2p.router.net.tunnels.tbmqueue` | integer | unavailable | tunnel-pool: no bounded tunnel build message queue snapshot | `serialize_tbm_queue` | `p170.tbm_queue.unavailable` | — | — |
+| `i2p.router.net.tunnels.queue` | integer | available | tunnel-inspection: live pending build depth | `serialize_tunnel_queue` | `p170.tunnel_queue.depth` | bounded | — |
+| `i2p.router.net.tunnels.tbmqueue` | integer | available | tunnel-inspection: live transit build-message depth | `serialize_tbm_queue` | `p170.tbm_queue.depth` | bounded | — |
 | `i2p.router.netdb.peers` | array&lt;string&gt; | available | live-profile-storage-inspection | `serialize_netdb_peer_hashes` | `p170.netdb.peer_hashes` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.activepeers.info` | array&lt;string&gt; | available | transport-and-live-profile-storage-inspection | `serialize_active_peer_router_infos` | `p170.netdb.active_peer_info` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.ntcp.limit` | integer | available | transport-manager-configuration | `serialize_ntcp_limit` | `p170.netdb.ntcp_limit` | — | — |

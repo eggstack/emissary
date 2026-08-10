@@ -26,9 +26,9 @@
 //! subscriber consumption, and no private key exposure.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
     path::PathBuf,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use async_trait::async_trait;
@@ -208,7 +208,11 @@ impl TunnelSource for LiveTunnelSource {
             },
         })?;
 
-        let mut details = TunnelDetails::default();
+        let mut details = TunnelDetails {
+            queue_depth: snapshot.queue_depth,
+            tbm_queue_depth: snapshot.tbm_queue_depth,
+            ..Default::default()
+        };
         for entry in snapshot.entries {
             let detail = TunnelDetail {
                 tunnel_id: entry.tunnel_id,
@@ -409,6 +413,10 @@ pub trait EventMetrics: Send + Sync {
     fn tunnel_build_successes(&self) -> u64;
     /// Cumulative tunnel build failures.
     fn tunnel_build_failures(&self) -> u64;
+    /// Recent tunnel build success rate in reference-rounded percentage points.
+    fn tunnel_build_success_rate(&self) -> f64 {
+        0.0
+    }
     /// Latest IPv4 firewall status.
     fn ipv4_firewall_status(&self) -> FirewallStatus;
     /// Latest IPv6 firewall status.
@@ -453,11 +461,61 @@ impl<R: Runtime> EventMetrics for EventHandleMetrics<R> {
     fn tunnel_build_failures(&self) -> u64 {
         self.handle.tunnel_build_failures()
     }
+    fn tunnel_build_success_rate(&self) -> f64 {
+        self.handle.tunnel_build_success_rate()
+    }
     fn ipv4_firewall_status(&self) -> FirewallStatus {
         self.handle.ipv4_firewall_status()
     }
     fn ipv6_firewall_status(&self) -> FirewallStatus {
         self.handle.ipv6_firewall_status()
+    }
+}
+
+const TRANSIT_BANDWIDTH_WINDOW_MS: u64 = 15_000;
+const MAX_TRANSIT_BANDWIDTH_SAMPLES: usize = 16;
+
+#[derive(Debug, Default)]
+struct TransitBandwidthSampler {
+    samples: VecDeque<(u64, u64)>,
+}
+
+impl TransitBandwidthSampler {
+    fn sample(&mut self, now_ms: u64, total_transit_bytes: u64) -> u64 {
+        if self
+            .samples
+            .back()
+            .is_some_and(|(_, previous_bytes)| total_transit_bytes < *previous_bytes)
+        {
+            self.samples.clear();
+        }
+
+        if self.samples.back().is_some_and(|(last_ms, _)| *last_ms == now_ms) {
+            *self.samples.back_mut().expect("sample exists") = (now_ms, total_transit_bytes);
+        } else {
+            self.samples.push_back((now_ms, total_transit_bytes));
+        }
+
+        while self.samples.front().is_some_and(|(timestamp, _)| {
+            now_ms.saturating_sub(*timestamp) > TRANSIT_BANDWIDTH_WINDOW_MS
+        }) {
+            self.samples.pop_front();
+        }
+        while self.samples.len() > MAX_TRANSIT_BANDWIDTH_SAMPLES {
+            self.samples.pop_front();
+        }
+
+        let Some((oldest_ms, oldest_bytes)) = self.samples.front().copied() else {
+            return 0;
+        };
+        let elapsed_ms = now_ms.saturating_sub(oldest_ms);
+        if elapsed_ms < TRANSIT_BANDWIDTH_WINDOW_MS {
+            return 0;
+        }
+        let Some(delta_bytes) = total_transit_bytes.checked_sub(oldest_bytes) else {
+            return 0;
+        };
+        ((u128::from(delta_bytes) * 1000) / u128::from(elapsed_ms)).min(u128::from(u64::MAX)) as u64
     }
 }
 
@@ -1255,6 +1313,7 @@ pub struct ProductionRouterInfoControl {
     configured_bandwidth_in: u64,
     configured_bandwidth_out: u64,
     metrics: Arc<dyn EventMetrics>,
+    transit_bandwidth_sampler: Mutex<TransitBandwidthSampler>,
     log_ring: Arc<LogRing>,
     tunnel_manager: Arc<dyn TunnelManagerControl>,
     peer_directory: Option<Arc<dyn PeerDirectorySource>>,
@@ -1283,6 +1342,7 @@ impl ProductionRouterInfoControl {
             configured_bandwidth_in,
             configured_bandwidth_out,
             metrics,
+            transit_bandwidth_sampler: Mutex::new(TransitBandwidthSampler::default()),
             log_ring,
             tunnel_manager,
             peer_directory: None,
@@ -1366,6 +1426,17 @@ impl RouterInfoControl for ProductionRouterInfoControl {
         })
     }
 
+    async fn transit_bandwidth_15s(&self) -> Result<u64, InspectionError> {
+        let mut sampler = self
+            .transit_bandwidth_sampler
+            .lock()
+            .map_err(|_| InspectionError::InternalInvariant)?;
+        Ok(sampler.sample(
+            self.startup.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,
+            self.metrics.transit_outbound_bytes(),
+        ))
+    }
+
     async fn transit_bytes(&self) -> Result<TransitBytes, InspectionError> {
         Ok(TransitBytes {
             received: self.metrics.transit_inbound_bytes(),
@@ -1378,6 +1449,10 @@ impl RouterInfoControl for ProductionRouterInfoControl {
             successes: self.metrics.tunnel_build_successes(),
             failures: self.metrics.tunnel_build_failures(),
         })
+    }
+
+    async fn recent_tunnel_success_rate(&self) -> Result<f64, InspectionError> {
+        Ok(self.metrics.tunnel_build_success_rate())
     }
 
     async fn tunnel_summary(&self) -> Result<TunnelSummary, InspectionError> {
@@ -1582,6 +1657,24 @@ mod tests {
         base64_encode(
             emissary_core::primitives::Destination::new::<TokioRuntime>(key.public()).serialize(),
         )
+    }
+
+    #[test]
+    fn transit_sampler_is_zero_until_a_full_window_then_uses_bytes_per_second() {
+        let mut sampler = TransitBandwidthSampler::default();
+        assert_eq!(sampler.sample(0, 0), 0);
+        assert_eq!(sampler.sample(7_500, 7_500), 0);
+        assert_eq!(sampler.sample(15_000, 30_000), 2_000);
+        assert_eq!(sampler.sample(30_000, 30_000), 0);
+    }
+
+    #[test]
+    fn transit_sampler_handles_zero_traffic_and_counter_reset() {
+        let mut sampler = TransitBandwidthSampler::default();
+        assert_eq!(sampler.sample(0, 100), 0);
+        assert_eq!(sampler.sample(15_000, 100), 0);
+        assert_eq!(sampler.sample(16_000, 10), 0);
+        assert_eq!(sampler.sample(31_000, 10), 0);
     }
 
     #[tokio::test]

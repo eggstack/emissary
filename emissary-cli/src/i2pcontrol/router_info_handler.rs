@@ -60,6 +60,8 @@ const TUNNEL_DETAIL_KEYS: &[&str] = &[
     rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INBOUND,
     rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_OUTBOUND,
     rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INFO_LIST,
+    rpc::router_info_keys::P170_NET_TUNNELS_QUEUE,
+    rpc::router_info_keys::P170_NET_TUNNELS_TBM_QUEUE,
 ];
 
 /// Maximum serialized RouterInfo response size, including the JSON-RPC
@@ -224,7 +226,11 @@ fn estimate_response_budget(key_set: &HashSet<&str>) -> Result<(), String> {
     // rows. Account for every requested list before querying the shared source.
     let tunnel_detail_lists = TUNNEL_DETAIL_KEYS
         .iter()
-        .filter(|key| key_set.contains(**key))
+        .filter(|key| {
+            key_set.contains(**key)
+                && **key != rpc::router_info_keys::P170_NET_TUNNELS_QUEUE
+                && **key != rpc::router_info_keys::P170_NET_TUNNELS_TBM_QUEUE
+        })
         .count();
     estimated_bytes += tunnel_detail_lists * MAX_TUNNEL_DETAIL_ENTRIES * 128;
 
@@ -456,6 +462,23 @@ async fn assemble_response(
         } else {
             None
         };
+    let transit_bandwidth_15s_snapshot =
+        if key_set.contains(rpc::router_info_keys::P170_NET_BW_TRANSIT_15S) {
+            Some(router_info.transit_bandwidth_15s().await?)
+        } else {
+            None
+        };
+    let recent_tunnel_success_rate_snapshot =
+        if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_SUCCESS_RATE) {
+            Some(router_info.recent_tunnel_success_rate().await?)
+        } else {
+            None
+        };
+    let tunnel_details_snapshot = if key_set.iter().any(|key| TUNNEL_DETAIL_KEYS.contains(key)) {
+        Some(router_info.tunnel_details().await?)
+    } else {
+        None
+    };
 
     // Exact Proposal 170 retained and metric fields.
     if key_set.contains(rpc::router_info_keys::P170_ID) {
@@ -512,6 +535,12 @@ async fn assemble_response(
             serde_json::json!(bytes.sent),
         );
     }
+    if key_set.contains(rpc::router_info_keys::P170_NET_BW_TRANSIT_15S) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_BW_TRANSIT_15S.to_string(),
+            serde_json::json!(transit_bandwidth_15s_snapshot.expect("transit 15s was queried")),
+        );
+    }
     if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_SHARE_RATIO) {
         let ratio = share_ratio_snapshot.as_ref().expect("share ratio was queried");
         result.insert(
@@ -557,11 +586,30 @@ async fn assemble_response(
             serde_json::json!(rate),
         );
     }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_SUCCESS_RATE) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_SUCCESS_RATE.to_string(),
+            serde_json::json!(recent_tunnel_success_rate_snapshot
+                .expect("recent tunnel success rate was queried")),
+        );
+    }
 
     // --- Proposal 170 live tunnel pools (one owner snapshot) ---
     if key_set.iter().any(|key| TUNNEL_DETAIL_KEYS.contains(key)) {
-        let details = router_info.tunnel_details().await?;
-        resolve_proposal_tunnel_details(&mut result, &key_set, &details)?;
+        let details = tunnel_details_snapshot.as_ref().expect("tunnel details were queried");
+        resolve_proposal_tunnel_details(&mut result, &key_set, details)?;
+        if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_QUEUE) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_TUNNELS_QUEUE.to_string(),
+                serde_json::json!(details.queue_depth),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_TBM_QUEUE) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_TUNNELS_TBM_QUEUE.to_string(),
+                serde_json::json!(details.tbm_queue_depth),
+            );
+        }
     }
 
     // --- Identity and static router data (retained group) ---
@@ -1800,6 +1848,33 @@ mod tests {
             serde_json::json!([])
         );
         assert_eq!(result["i2p.router.net.tunnels.totalsuccessrate"], 75.0);
+    }
+
+    #[tokio::test]
+    async fn m049_wire_fixture_returns_rolling_metric_and_live_queues() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_transit_bandwidth_15s(2048);
+        ri.set_recent_tunnel_success_rate(73.0);
+        ri.set_tunnel_details(TunnelDetails {
+            queue_depth: 4,
+            tbm_queue_depth: 7,
+            ..Default::default()
+        });
+        let state = test_state(ri);
+        let req = direct_request(serde_json::json!({
+            "i2p.router.net.bw.transit.15s": false,
+            "i2p.router.net.tunnels.successrate": null,
+            "i2p.router.net.tunnels.queue": true,
+            "i2p.router.net.tunnels.tbmqueue": {},
+        }));
+        let resp = handle_router_info(&state, &req).await;
+        let result = resp["result"]
+            .as_object()
+            .unwrap_or_else(|| panic!("M049 fixture response: {resp}"));
+        assert_eq!(result["i2p.router.net.bw.transit.15s"], 2048);
+        assert_eq!(result["i2p.router.net.tunnels.successrate"], 73.0);
+        assert_eq!(result["i2p.router.net.tunnels.queue"], 4);
+        assert_eq!(result["i2p.router.net.tunnels.tbmqueue"], 7);
     }
 
     #[tokio::test]

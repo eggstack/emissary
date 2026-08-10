@@ -40,7 +40,7 @@ use parking_lot::RwLock;
 #[cfg(feature = "no_std")]
 use spin::rwlock::RwLock;
 
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 use core::fmt;
 
 /// A public router identity and its serialized public RouterInfo.
@@ -302,6 +302,10 @@ pub struct TunnelInspectionEntry {
 pub struct TunnelInspectionSnapshot {
     /// Current live tunnel entries in deterministic order.
     pub entries: Vec<TunnelInspectionEntry>,
+    /// Current number of local tunnel build requests in progress.
+    pub queue_depth: usize,
+    /// Current number of transit tunnel-build messages awaiting handling.
+    pub tbm_queue_depth: usize,
 }
 
 /// Cloneable, read-only access to current tunnel lifecycle facts.
@@ -314,6 +318,8 @@ pub struct TunnelInspection {
 struct TunnelInspectionState {
     entries: Vec<TunnelInspectionEntry>,
     complete: bool,
+    queue_depths: BTreeMap<(TunnelPoolKind, u64), usize>,
+    tbm_queue_depth: usize,
 }
 
 /// Maximum number of live tunnel facts retained by the neutral source.
@@ -331,6 +337,8 @@ impl TunnelInspection {
             snapshot: Arc::new(RwLock::new(TunnelInspectionState {
                 entries: Vec::new(),
                 complete: true,
+                queue_depths: BTreeMap::new(),
+                tbm_queue_depth: 0,
             })),
         }
     }
@@ -350,7 +358,24 @@ impl TunnelInspection {
         }
         Ok(TunnelInspectionSnapshot {
             entries: state.entries.clone(),
+            queue_depth: state.queue_depths.values().copied().fold(0, usize::saturating_add),
+            tbm_queue_depth: state.tbm_queue_depth,
         })
+    }
+
+    /// Publish the current pending-build count for one canonical tunnel pool.
+    pub(crate) fn set_pool_queue_depth(
+        &self,
+        pool_kind: TunnelPoolKind,
+        pool_id: u64,
+        depth: usize,
+    ) {
+        self.snapshot.write().queue_depths.insert((pool_kind, pool_id), depth);
+    }
+
+    /// Publish the current transit tunnel-build message queue depth.
+    pub(crate) fn set_tbm_queue_depth(&self, depth: usize) {
+        self.snapshot.write().tbm_queue_depth = depth;
     }
 
     pub(crate) fn publish(
@@ -388,6 +413,7 @@ impl TunnelInspection {
         state
             .entries
             .retain(|entry| entry.pool_kind != pool_kind || entry.pool_id != pool_id);
+        state.queue_depths.remove(&(pool_kind, pool_id));
     }
 
     /// Replace the complete source at an owner-provided recovery point.
@@ -407,6 +433,8 @@ impl TunnelInspection {
         let mut state = self.snapshot.write();
         state.entries = sorted;
         state.complete = true;
+        state.queue_depths.clear();
+        state.tbm_queue_depth = 0;
         Ok(())
     }
 }
@@ -571,6 +599,23 @@ mod tests {
 
         inspection.recover(vec![entry]).unwrap();
         assert_eq!(inspection.snapshot(1).unwrap().entries, vec![entry]);
+    }
+
+    #[test]
+    fn tunnel_queue_gauges_are_live_and_removed_with_pool() {
+        let inspection = TunnelInspection::default();
+        inspection.set_pool_queue_depth(TunnelPoolKind::Exploratory, 0, 3);
+        inspection.set_pool_queue_depth(TunnelPoolKind::Client, 4, 2);
+        inspection.set_tbm_queue_depth(5);
+        let snapshot = inspection.snapshot(0).unwrap();
+        assert_eq!(snapshot.queue_depth, 5);
+        assert_eq!(snapshot.tbm_queue_depth, 5);
+
+        inspection.set_pool_queue_depth(TunnelPoolKind::Client, 4, 0);
+        inspection.remove_pool(TunnelPoolKind::Exploratory, 0);
+        let snapshot = inspection.snapshot(0).unwrap();
+        assert_eq!(snapshot.queue_depth, 0);
+        assert_eq!(snapshot.tbm_queue_depth, 5);
     }
 
     #[test]

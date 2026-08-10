@@ -48,6 +48,29 @@ use std::sync::Mutex;
 const UPDATE_INTERVAL: Duration = Duration::from_secs(1);
 
 #[cfg(feature = "events")]
+const TUNNEL_SUCCESS_RATE_SMOOTHING: f64 = 0.0005;
+
+#[cfg(feature = "events")]
+const TUNNEL_SUCCESS_RATE_START: f64 = 0.1;
+
+#[cfg(feature = "events")]
+#[derive(Debug)]
+struct RecentTunnelBuildSuccessRate {
+    attempts: u64,
+    rate: f64,
+}
+
+#[cfg(feature = "events")]
+impl Default for RecentTunnelBuildSuccessRate {
+    fn default() -> Self {
+        Self {
+            attempts: 0,
+            rate: TUNNEL_SUCCESS_RATE_START,
+        }
+    }
+}
+
+#[cfg(feature = "events")]
 pub const TRANSIT_INBOUND_BANDWIDTH: &str = "transit_inbound_bandwidth_total";
 #[cfg(feature = "events")]
 pub const TRANSIT_OUTBOUND_BANDWIDTH: &str = "transit_outbound_bandwidth_total";
@@ -130,6 +153,9 @@ pub struct EventHandle<R: Runtime> {
     /// Latest IPv6 firewall status (cache for I2PControl read-only access).
     ipv6_firewall_status: Arc<AtomicUsize>,
 
+    /// Recent tunnel build success rate, updated at each ordered build result.
+    recent_tunnel_build_success_rate: Arc<Mutex<RecentTunnelBuildSuccessRate>>,
+
     /// Update interval.
     update_interval: Duration,
 
@@ -155,6 +181,7 @@ impl<R: Runtime> Clone for EventHandle<R> {
             transit_outbound_bandwidth: Arc::clone(&self.transit_outbound_bandwidth),
             ipv4_firewall_status: Arc::clone(&self.ipv4_firewall_status),
             ipv6_firewall_status: Arc::clone(&self.ipv6_firewall_status),
+            recent_tunnel_build_success_rate: Arc::clone(&self.recent_tunnel_build_success_rate),
             update_interval: self.update_interval,
             timer: Some(Mutex::new(R::timer(self.update_interval))),
         }
@@ -241,6 +268,19 @@ impl<R: Runtime> EventHandle<R> {
         #[cfg(feature = "events")]
         self.num_tunnel_build_failures
             .fetch_add(_num_tunnel_build_failures, Ordering::Release);
+    }
+
+    /// Record one ordered tunnel build result for the recent success-rate EWMA.
+    #[inline(always)]
+    pub fn tunnel_build_result(&self, _success: bool) {
+        #[cfg(feature = "events")]
+        if let Ok(mut state) = self.recent_tunnel_build_success_rate.lock() {
+            state.attempts = state.attempts.saturating_add(1);
+            let alpha = TUNNEL_SUCCESS_RATE_SMOOTHING
+                + (1.0 - TUNNEL_SUCCESS_RATE_SMOOTHING) / state.attempts as f64;
+            let outcome = if _success { 1.0 } else { 0.0 };
+            state.rate = alpha * outcome + (1.0 - alpha) * state.rate;
+        }
     }
 
     // --- Read-only snapshot accessors for I2PControl metrics ---
@@ -331,6 +371,20 @@ impl<R: Runtime> EventHandle<R> {
     #[cfg(not(feature = "events"))]
     pub fn tunnel_build_failures(&self) -> u64 {
         0
+    }
+
+    /// Recent tunnel build success rate in rounded percentage points.
+    #[cfg(feature = "events")]
+    pub fn tunnel_build_success_rate(&self) -> f64 {
+        self.recent_tunnel_build_success_rate
+            .lock()
+            .map(|state| (state.rate * 100.0).round())
+            .unwrap_or(0.0)
+    }
+
+    #[cfg(not(feature = "events"))]
+    pub fn tunnel_build_success_rate(&self) -> f64 {
+        0.0
     }
 
     /// Notify the [`EventManager`] that a server destination was started.
@@ -425,6 +479,7 @@ impl<R: Runtime> EventHandle<R> {
             transit_outbound_bandwidth: Default::default(),
             ipv4_firewall_status: Default::default(),
             ipv6_firewall_status: Default::default(),
+            recent_tunnel_build_success_rate: Default::default(),
             update_interval: UPDATE_INTERVAL,
             timer: None,
         }
@@ -629,6 +684,7 @@ impl<R: Runtime> EventManager<R> {
             transit_outbound_bandwidth: Default::default(),
             ipv4_firewall_status: Default::default(),
             ipv6_firewall_status: Default::default(),
+            recent_tunnel_build_success_rate: Default::default(),
             update_interval,
             timer: None,
         };
@@ -649,6 +705,9 @@ impl<R: Runtime> EventManager<R> {
                     transit_outbound_bandwidth: Arc::clone(&handle.transit_outbound_bandwidth),
                     ipv4_firewall_status: Arc::clone(&handle.ipv4_firewall_status),
                     ipv6_firewall_status: Arc::clone(&handle.ipv6_firewall_status),
+                    recent_tunnel_build_success_rate: Arc::clone(
+                        &handle.recent_tunnel_build_success_rate,
+                    ),
                     update_interval,
                     timer: None,
                 },
@@ -867,5 +926,28 @@ mod tests {
         for _ in 0..3 {
             assert!(tokio::time::timeout(Duration::from_secs(5), &mut new_handle).await.is_ok());
         }
+    }
+
+    #[tokio::test]
+    async fn recent_tunnel_success_rate_matches_reference_ewma() {
+        let handle = EventHandle::<MockRuntime>::new_for_tests();
+        let outcomes = [true, false, true, false, false, true];
+        let mut attempts = 0u64;
+        let mut expected = TUNNEL_SUCCESS_RATE_START;
+        for success in outcomes {
+            attempts += 1;
+            let alpha = TUNNEL_SUCCESS_RATE_SMOOTHING
+                + (1.0 - TUNNEL_SUCCESS_RATE_SMOOTHING) / attempts as f64;
+            expected = alpha * f64::from(success as u8) + (1.0 - alpha) * expected;
+            handle.tunnel_build_result(success);
+        }
+        assert_eq!(
+            handle.tunnel_build_success_rate(),
+            (expected * 100.0).round()
+        );
+        assert_eq!(
+            handle.clone().tunnel_build_success_rate(),
+            (expected * 100.0).round()
+        );
     }
 }

@@ -20,15 +20,14 @@ All work is internal to `eggstack/emissary`. External specifications/reference i
 
 ## Current handoff
 
-M055 is the sole dependency-ready implementation plan:
+M055 is closed and M056 is the sole dependency-ready implementation plan:
 
 - `054-m049-transit-15s-corrective.md` — closed; transit-15s is explicitly unavailable because no request-independent owner fits the bounded budget.
-- `055-m050-network-error-truthfulness-corrective.md` — ready; correct the unowned v4/v6 network-error rows.
+- `055-m050-network-error-truthfulness-corrective.md` — closed; both unowned v4/v6 network-error rows are unavailable and dead error scaffolding was removed.
 
 Blocked successors:
 
-- `055-m050-network-error-truthfulness-corrective.md` — blocked on accepted M054 closure;
-- `056-m049-m050-corrective-reclosure.md` — blocked on accepted M054 and M055 closures.
+- `056-m049-m050-corrective-reclosure.md` — ready after accepted M054 and M055 closures.
 
 ## Why the corrective sequence was reopened
 
@@ -56,8 +55,8 @@ M054 may restore transit-15s to available only with a request-independent source
 | M051 — router news + banned peers | blocked with accepted limitation | 2 fields remain unavailable | retained `051-closure.md` |
 | M052 — integration/containment reclosure | corrective pass required for final matrix | historical `40/1/2` count invalidated | M056 |
 | M054 — transit 15s corrective | closed | truthful transit-15s unavailability; request-local sampler removed | `054` closure |
-| M055 — network-error truthfulness | ready | demote unowned v4/v6 error rows; remove dead scaffold where safe | M054 closure |
-| M056 — corrective integration reclosure | blocked | no production changes; reconcile all 43 rows | M054 + M055 closures |
+| M055 — network-error truthfulness | closed | both error rows unavailable; dead error scaffold removed | `055` closure |
+| M056 — corrective integration reclosure | ready | no production changes; reconcile all 43 rows | M054 + M055 closures |
 
 Plans:
 
@@ -123,8 +122,8 @@ Throughout the roadmap, do not:
 
 Every milestone must inspect its accepted dependency head, pin exact semantics before source-disposition changes, use focused source/wire regressions, preserve no-feature behavior, remain inside its path budget, and create an independent closure record. Material scope expansion is a blocker, not permission to improvise.
 
-Only the registry advances the next handoff to `ready`. M055 is now the sole
-ready plan; M056 remains blocked behind M055.
+Only the registry advances the next handoff to `ready`. M056 is now the sole
+ready plan; M051 remains blocked behind its absent substantive owners.
 
 ## Verification rule
 

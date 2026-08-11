@@ -277,14 +277,15 @@ M028 does not alter these sources. M029 revalidated them.
 
 Current source matrix:
 
-- 39 available;
+- 37 available;
 - 1 protocol-permitted neutral;
-- 3 unavailable.
+- 5 unavailable.
 
 Available selectors have bounded current owners. Clock skew uses `null` only
-when the protocol permits it. Unavailable selectors fail with sanitized errors
-before assembly and never return fabricated zero, false, empty, partial, or
-semantically adjacent values.
+when the protocol permits it. Unavailable selectors—including both network-error
+selectors, for which Emissary has no canonical error owner—fail with sanitized
+errors before assembly and never return fabricated zero, false, empty, partial,
+or semantically adjacent values.
 
 M026 found no additional in-scope authoritative source. M028/M029 do not repeat
 that audit or authorize new telemetry/core inspection.

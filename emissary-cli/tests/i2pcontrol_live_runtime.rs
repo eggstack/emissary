@@ -495,8 +495,6 @@ async fn live_runtime_interoperability() {
         "i2p.router.net.tunnels.queue",
         "i2p.router.net.tunnels.tbmqueue",
         "i2p.router.net.status.v6",
-        "i2p.router.net.error",
-        "i2p.router.net.error.v6",
         "i2p.router.net.testing",
         "i2p.router.net.testing.v6",
     ];
@@ -514,6 +512,24 @@ async fn live_runtime_interoperability() {
             result(&response).get(*selector).is_some(),
             "live RouterInfo response omitted {selector}"
         );
+    }
+
+    for (index, selector) in ["i2p.router.net.error", "i2p.router.net.error.v6"].iter().enumerate()
+    {
+        let response = protected(
+            &client,
+            &endpoint,
+            63 + index as u64,
+            &token,
+            "RouterInfo",
+            serde_json::Map::from_iter([(selector.to_string(), json!(false))]),
+        )
+        .await;
+        assert_eq!(response["error"]["code"], -32603);
+        assert!(response["result"].is_null());
+        assert!(response["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("no canonical network-error owner")));
     }
 
     let transit_unavailable = protected(

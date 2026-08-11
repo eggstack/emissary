@@ -44,31 +44,11 @@ use spin::rwlock::RwLock;
 use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 use core::fmt;
 
-/// Neutral reason for a network failure known by a canonical runtime owner.
-///
-/// This enum deliberately contains no wire values. The administrative
-/// adapter owns any compatibility mapping required by a control protocol.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NetworkErrorReason {
-    /// The local clock is outside the accepted network skew.
-    ClockSkew,
-    /// The network is currently offline.
-    Offline,
-    /// The local endpoint is behind a symmetric NAT.
-    SymmetricNat,
-    /// The local endpoint is behind a full-cone NAT.
-    FullConeNat,
-    /// No usable network descriptors are available.
-    NoDescriptors,
-}
-
 /// Current, independently tracked network state for one address family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NetworkState {
     /// Reachability state observed by the transport owner.
     pub status: FirewallStatus,
-    /// A failure reason only when a canonical owner knows one.
-    pub error: Option<NetworkErrorReason>,
     /// Whether an existing reachability test is currently running.
     pub testing: bool,
 }
@@ -77,7 +57,6 @@ impl Default for NetworkState {
     fn default() -> Self {
         Self {
             status: FirewallStatus::Unknown,
-            error: None,
             testing: false,
         }
     }

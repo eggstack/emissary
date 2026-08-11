@@ -1,6 +1,6 @@
 # M055 — M050 Corrective Network-Error Truthfulness
 
-Status: ready
+Status: closed
 
 Planning baseline: `970252c` — merged M053–M052 implementation/reclosure head
 
@@ -238,4 +238,5 @@ Stop rather than:
 
 The closure record must include the production-writer audit, failing-before zero-without-owner proof, direct/combined unavailable regression, changed-path/core-scaffold audit, retained status/testing evidence, exact source-count reconciliation, no-feature verification, security/compatibility review, and internal-only attestation.
 
-M056 remains blocked until M054 and M055 both have accepted closure dispositions.
+M056 is unblocked and ready for integrated reclosure now that M054 and M055
+both have accepted closure dispositions.

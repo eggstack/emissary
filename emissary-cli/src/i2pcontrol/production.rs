@@ -1376,8 +1376,6 @@ impl RouterInfoControl for ProductionRouterInfoControl {
         Ok(NetworkSnapshot {
             ipv4_status: ipv4,
             ipv6_status: ipv6,
-            ipv4_error: ipv4_state.error,
-            ipv6_error: ipv6_state.error,
             ipv4_testing: ipv4_state.testing,
             ipv6_testing: ipv6_state.testing,
             firewalled,

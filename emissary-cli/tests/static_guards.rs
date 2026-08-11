@@ -343,6 +343,41 @@ fn transit_bandwidth_15s_has_no_request_local_sampler() {
 }
 
 #[test]
+fn network_error_rows_require_an_authoritative_owner() {
+    let handler = read_source("src/i2pcontrol/router_info_handler.rs");
+    let events = std::fs::read_to_string(workspace_root().join("emissary-core/src/events.rs"))
+        .expect("core events source must exist");
+    let inspection =
+        std::fs::read_to_string(workspace_root().join("emissary-core/src/inspection.rs"))
+            .expect("core inspection source must exist");
+
+    for key in [
+        rpc::router_info_keys::P170_NET_ERROR,
+        rpc::router_info_keys::P170_NET_ERROR_V6,
+    ] {
+        let row = rpc::router_info_keys::PROPOSAL_170_CONTRACT
+            .iter()
+            .find(|field| field.key == key)
+            .expect("network-error selector must remain in the canonical contract");
+        assert!(matches!(
+            row.source,
+            rpc::router_info_keys::SourceDisposition::Unavailable { .. }
+        ));
+        assert_eq!(
+            row.source.reason(),
+            Some("no canonical network-error owner")
+        );
+        assert_eq!(row.serializer, "unavailable");
+    }
+
+    assert!(!handler.contains("fn network_error_code"));
+    assert!(!handler.contains("NetworkErrorReason"));
+    assert!(!events.contains("set_ipv4_network_error"));
+    assert!(!events.contains("set_ipv6_network_error"));
+    assert!(!inspection.contains("NetworkErrorReason"));
+}
+
+#[test]
 fn m053_composes_live_peer_directory_without_startup_snapshot() {
     let main = read_source("src/main.rs");
     assert!(main.contains("LivePeerDirectorySource::new"));
@@ -352,10 +387,8 @@ fn m053_composes_live_peer_directory_without_startup_snapshot() {
 
 #[test]
 fn transport_inspection_handle_contains_only_owned_snapshot_state() {
-    let src = std::fs::read_to_string(
-        workspace_root().join("emissary-core/src/inspection.rs"),
-    )
-    .expect("core inspection source must exist");
+    let src = std::fs::read_to_string(workspace_root().join("emissary-core/src/inspection.rs"))
+        .expect("core inspection source must exist");
     let start = src
         .find("pub struct TransportInspection {")
         .expect("transport inspection handle must exist");
@@ -365,33 +398,57 @@ fn transport_inspection_handle_contains_only_owned_snapshot_state() {
     let fields = &src[start..end.expect("transport inspection handle must be closed")];
     assert!(fields.contains("snapshot: Arc<RwLock<TransportInspectionSnapshot>>"));
     for forbidden in [
-        "Socket", "Session", "Sender", "Receiver", "EventHandle", "RouterContext", "PrivateKey",
+        "Socket",
+        "Session",
+        "Sender",
+        "Receiver",
+        "EventHandle",
+        "RouterContext",
+        "PrivateKey",
     ] {
-        assert!(!fields.contains(forbidden), "live/control type leaked into handle: {forbidden}");
+        assert!(
+            !fields.contains(forbidden),
+            "live/control type leaked into handle: {forbidden}"
+        );
     }
 }
 
 #[test]
 fn transport_peer_inspection_contains_only_sanitized_facts() {
-    let src = std::fs::read_to_string(
-        workspace_root().join("emissary-core/src/inspection.rs"),
-    )
-    .expect("core inspection source must exist");
+    let src = std::fs::read_to_string(workspace_root().join("emissary-core/src/inspection.rs"))
+        .expect("core inspection source must exist");
     let start = src
         .find("pub struct TransportPeerInspection {")
         .expect("peer inspection DTO must exist");
-    let end = src[start..]
-        .find("\n}\n")
-        .map(|offset| start + offset);
+    let end = src[start..].find("\n}\n").map(|offset| start + offset);
     let fields = &src[start..end.expect("peer inspection DTO must be closed")];
     for forbidden in [
-        "Socket", "Session", "Sender", "Receiver", "EventHandle", "RouterContext", "Key",
-        "Channel", "Private",
+        "Socket",
+        "Session",
+        "Sender",
+        "Receiver",
+        "EventHandle",
+        "RouterContext",
+        "Key",
+        "Channel",
+        "Private",
     ] {
-        assert!(!fields.contains(forbidden), "sensitive type leaked into peer DTO: {forbidden}");
+        assert!(
+            !fields.contains(forbidden),
+            "sensitive type leaked into peer DTO: {forbidden}"
+        );
     }
-    for required in ["peer_id", "inbound", "connected", "bytes_received", "bytes_sent"] {
-        assert!(fields.contains(required), "peer DTO lost required neutral fact: {required}");
+    for required in [
+        "peer_id",
+        "inbound",
+        "connected",
+        "bytes_received",
+        "bytes_sent",
+    ] {
+        assert!(
+            fields.contains(required),
+            "peer DTO lost required neutral fact: {required}"
+        );
     }
 }
 

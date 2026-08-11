@@ -157,7 +157,7 @@ M054 — M049 transit-15s corrective — CLOSED
 M055 — M050 network-error truthfulness corrective — READY
    |
    v
-M056 — corrective integration reclosure — blocked on M054 + M055
+M056 — corrective integration reclosure — ready after M054 + M055
 ```
 
 The corrective sequence is serialized to keep one dependency-ready handoff in the registry and to preserve independent closure evidence for each semantic defect.
@@ -247,20 +247,22 @@ Exit is truthful unavailability with a precise missing-owner reason, direct and
 combined no-partial-result regressions, and a static guard against restoring the
 request-local sampler.
 
-### M055 — M050 network-error truthfulness corrective — ready
+### M055 — M050 network-error truthfulness corrective — closed
 
 Plan: `055-m050-network-error-truthfulness-corrective.md`.
 
 Audit production writers, then demote both error selectors unless a real existing canonical owner is found. Remove dead error-only atomics/enums/setters where safe, while leaving status/testing observations untouched.
 
-M054's accepted closure unblocks this plan. Expected final disposition is
-unavailable for both error rows under current evidence.
+M055's accepted closure demoted both error rows to unavailable because the
+production-writer audit found no canonical owner. It also removed the neutral
+core error enum, fields, setters, and mapper scaffolding that had no retained
+production consumer. Status.v6 and testing v4/v6 remain accepted unchanged.
 
-### M056 — Corrective integration reclosure — blocked
+### M056 — Corrective integration reclosure — ready
 
 Plan: `056-m049-m050-corrective-reclosure.md`.
 
-No production changes. Validate the accepted M054/M055 dispositions, rerun retained source/child-process evidence, reconcile all 43 rows, and supersede only the invalidated M049/M050/M052 findings.
+No production changes. Validate the accepted M054/M055 dispositions, rerun retained source/child-process evidence, reconcile all 43 rows, and supersede only the invalidated M049/M050/M052 findings. M054 and M055 are both accepted, so M056 is now dependency-ready.
 
 ## 8. Failure, cancellation, restart, and contention policy
 
@@ -315,10 +317,9 @@ Because upstream Emissary is treated as heavily security-reviewed, corrective wo
 
 The pre-review `40 available + 1 neutral + 2 unavailable` matrix is historical
 only and is no longer accepted as truthful. M054's accepted implementation
-currently leaves `39 available + 1 neutral + 3 unavailable`: transit 15s, news,
-and banned peers. M055 is ready to reconcile the two network-error rows, after
-which the expected integrated disposition is `37 available + 1 neutral + 5
-unavailable` if no owner is discovered.
+currently leaves `37 available + 1 neutral + 5 unavailable`: transit 15s, news,
+banned peers, and both network-error rows. M056 is ready to reconcile the
+integrated disposition.
 
 After M054/M055:
 

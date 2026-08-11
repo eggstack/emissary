@@ -28,9 +28,10 @@ closed the authorized workstream as partial support.
 The expected bounded final status remains `partial Proposal 170 support` while
 27 RouterInfo selectors lack bounded authoritative sources and missing tunnel
 data planes remain explicit unsupported runtimes. The canonical 43-addition
-matrix currently contains 39 available selectors, one protocol-permitted
-neutral selector, and three unavailable selectors; the unavailable rows are
-router news, banned peers, and transit bandwidth over 15 seconds.
+matrix currently contains 37 available selectors, one protocol-permitted
+neutral selector, and five unavailable selectors; the unavailable rows are
+router news, banned peers, transit bandwidth over 15 seconds, and both
+network-error selectors.
 
 ## Compile feature
 
@@ -208,9 +209,9 @@ backend stubs are not operational coverage.
 
 The retained matrix contains:
 
-- 39 available selectors;
+- 37 available selectors;
 - 1 protocol-permitted neutral selector;
-- 3 unavailable selectors.
+- 5 unavailable selectors.
 
 Unavailable selectors fail explicitly and are never substituted with zero,
 false, empty, or semantically adjacent values.

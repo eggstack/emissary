@@ -27,13 +27,13 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | partial Proposal 170 support; RouterInfo corrective truthfulness sequence active | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M055 ready | M054 closed transit-15s as unavailable; v4/v6 error source truthfulness remains |
+| I2PControl Proposal 170 | partial Proposal 170 support; RouterInfo corrective truthfulness sequence active | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M056 ready | M054 and M055 closed; final integrated source reclosure remains |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M055 — M050 network-error truthfulness corrective | ready | `plans/implementation/i2pcontrol-proposal-170/055-m050-network-error-truthfulness-corrective.md` | M054 accepted closure; M048 retained closed |
+| I2PControl Proposal 170 | M056 — M049/M050 corrective integration reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/056-m049-m050-corrective-reclosure.md` | M054 and M055 accepted closures |
 
 ## Blocked roadmap successors
 
@@ -41,7 +41,6 @@ Per `plans/003-planning-process.md`, these plans exist for deterministic handoff
 
 | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|
-| M056 — M049/M050 corrective integration reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/056-m049-m050-corrective-reclosure.md` | accepted M054 + M055 closures |
 | M051 — router news and banned peers | blocked with accepted semantic limitation | `plans/implementation/i2pcontrol-proposal-170/051-routerinfo-news-and-banned-peer-semantics.md` | substantive news/ban owners absent; no current owner-specific plan authorized |
 
 ## Retained and corrective milestone disposition
@@ -53,9 +52,9 @@ Per `plans/003-planning-process.md`, these plans exist for deterministic handoff
 | M047 — active-peer statistics | closed | `047-closure.md` |
 | M048 — tunnel-pool counts/details | closed | `048-closure.md` |
 | M049 — rolling metrics/queues | corrected/closed through M054 | recent success + queue/TBM retained; transit 15s explicitly unavailable |
-| M050 — v4/v6 network state | corrective pass required for error v4/v6 only | status.v6 + testing v4/v6 retained; error rows corrected by M055 |
+| M050 — v4/v6 network state | corrected/closed through M055 | status.v6 + testing v4/v6 retained; error rows unavailable with no canonical owner |
 | M051 — news/banned peers | blocked with accepted limitation | `051-closure.md`; both rows remain unavailable |
-| M052 — integration reclosure | corrective pass required for final source accounting | historical `052-closure.md` `40/1/2` matrix invalidated; M056 will reclose |
+| M052 — integration reclosure | corrective pass required for final source accounting | historical `052-closure.md` `40/1/2` matrix invalidated; M056 is ready to reclose |
 
 ## Current review finding/work scope
 
@@ -72,7 +71,7 @@ Post-closure source-truthfulness review invalidated three of those `available` c
 - `i2p.router.net.error` — no canonical error owner; unset state maps to `0` / `No error`;
 - `i2p.router.net.error.v6` — same defect.
 
-The accepted M054 disposition leaves the machine-readable implementation matrix at **39 available / 1 neutral / 3 unavailable**: transit 15s, news, and banned peers are unavailable. M055 is ready to reconcile the two network-error rows, which are still available in the current code. The M052 `40/1/2` count remains historical evidence only.
+The accepted M054/M055 dispositions leave the machine-readable implementation matrix at **37 available / 1 neutral / 5 unavailable**: transit 15s, news, banned peers, and both network-error rows are unavailable. The M052 `40/1/2` count remains historical evidence only; M056 is ready to reconcile the integrated head.
 
 M054 may restore transit-15s to available only if the source is request-independent and reference-correct. M055 is expected to demote both error rows under current evidence. M056 owns final integrated source accounting.
 
@@ -150,9 +149,9 @@ Current work is pinned to Proposal 170 `I2PControl Expansion`, status Open, revi
 
 ## Registry maintenance rules
 
-1. M055 is the only current dependency-ready plan.
-2. Do not register M056 until M055 has an accepted closure disposition.
-3. Do not register M056 until M054 and M055 are accepted.
+1. M056 is the only current dependency-ready plan.
+2. M055 has an accepted closure disposition.
+3. M054 and M055 are accepted; M056 is registered as ready.
 4. Preserve M053/M045 and M046–M048 closure history unless a direct new defect is demonstrated.
 5. Preserve M049/M050 historical records but mark only their named invalidated findings as corrective.
 6. Keep all Proposal 170 policy under I2PControl; core exceptions are neutral observation only and milestone-budgeted.

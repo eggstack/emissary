@@ -16,11 +16,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use crate::{
-    inspection::{NetworkErrorReason, NetworkState},
-    runtime::Runtime,
-    transport::FirewallStatus,
-};
+use crate::{inspection::NetworkState, runtime::Runtime, transport::FirewallStatus};
 
 #[cfg(feature = "events")]
 use crate::runtime::{Counter, MetricType, MetricsHandle};
@@ -43,9 +39,9 @@ use alloc::sync::Arc;
 #[cfg(feature = "events")]
 use core::mem;
 #[cfg(feature = "events")]
-use core::sync::atomic::{AtomicUsize, Ordering};
-#[cfg(feature = "events")]
 use core::sync::atomic::AtomicBool;
+#[cfg(feature = "events")]
+use core::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "events")]
 use std::sync::Mutex;
 
@@ -159,12 +155,6 @@ pub struct EventHandle<R: Runtime> {
     /// Latest IPv6 firewall status (cache for I2PControl read-only access).
     ipv6_firewall_status: Arc<AtomicUsize>,
 
-    /// Latest independently known IPv4 network error.
-    ipv4_network_error: Arc<AtomicUsize>,
-
-    /// Latest independently known IPv6 network error.
-    ipv6_network_error: Arc<AtomicUsize>,
-
     /// Whether an existing IPv4 reachability test is active.
     ipv4_testing: Arc<AtomicBool>,
 
@@ -199,8 +189,6 @@ impl<R: Runtime> Clone for EventHandle<R> {
             transit_outbound_bandwidth: Arc::clone(&self.transit_outbound_bandwidth),
             ipv4_firewall_status: Arc::clone(&self.ipv4_firewall_status),
             ipv6_firewall_status: Arc::clone(&self.ipv6_firewall_status),
-            ipv4_network_error: Arc::clone(&self.ipv4_network_error),
-            ipv6_network_error: Arc::clone(&self.ipv6_network_error),
             ipv4_testing: Arc::clone(&self.ipv4_testing),
             ipv6_testing: Arc::clone(&self.ipv6_testing),
             recent_tunnel_build_success_rate: Arc::clone(&self.recent_tunnel_build_success_rate),
@@ -484,20 +472,6 @@ impl<R: Runtime> EventHandle<R> {
         FirewallStatus::Unknown
     }
 
-    /// Set the independently observed IPv4 network error.
-    #[inline(always)]
-    pub fn set_ipv4_network_error(&self, error: Option<NetworkErrorReason>) {
-        #[cfg(feature = "events")]
-        self.ipv4_network_error.store(network_error_to_atomic(error), Ordering::Release);
-    }
-
-    /// Set the independently observed IPv6 network error.
-    #[inline(always)]
-    pub fn set_ipv6_network_error(&self, error: Option<NetworkErrorReason>) {
-        #[cfg(feature = "events")]
-        self.ipv6_network_error.store(network_error_to_atomic(error), Ordering::Release);
-    }
-
     /// Publish whether an existing IPv4 reachability test is active.
     #[inline(always)]
     pub fn set_ipv4_testing(&self, testing: bool) {
@@ -517,7 +491,6 @@ impl<R: Runtime> EventHandle<R> {
     pub fn ipv4_network_state(&self) -> NetworkState {
         NetworkState {
             status: self.ipv4_firewall_status(),
-            error: network_error_from_atomic(self.ipv4_network_error.load(Ordering::Acquire)),
             testing: self.ipv4_testing.load(Ordering::Acquire),
         }
     }
@@ -532,7 +505,6 @@ impl<R: Runtime> EventHandle<R> {
     pub fn ipv6_network_state(&self) -> NetworkState {
         NetworkState {
             status: self.ipv6_firewall_status(),
-            error: network_error_from_atomic(self.ipv6_network_error.load(Ordering::Acquire)),
             testing: self.ipv6_testing.load(Ordering::Acquire),
         }
     }
@@ -559,38 +531,12 @@ impl<R: Runtime> EventHandle<R> {
             transit_outbound_bandwidth: Default::default(),
             ipv4_firewall_status: Default::default(),
             ipv6_firewall_status: Default::default(),
-            ipv4_network_error: Default::default(),
-            ipv6_network_error: Default::default(),
             ipv4_testing: Default::default(),
             ipv6_testing: Default::default(),
             recent_tunnel_build_success_rate: Default::default(),
             update_interval: UPDATE_INTERVAL,
             timer: None,
         }
-    }
-}
-
-#[cfg(feature = "events")]
-fn network_error_to_atomic(error: Option<NetworkErrorReason>) -> usize {
-    match error {
-        None => 0,
-        Some(NetworkErrorReason::ClockSkew) => 1,
-        Some(NetworkErrorReason::Offline) => 2,
-        Some(NetworkErrorReason::SymmetricNat) => 3,
-        Some(NetworkErrorReason::FullConeNat) => 4,
-        Some(NetworkErrorReason::NoDescriptors) => 5,
-    }
-}
-
-#[cfg(feature = "events")]
-fn network_error_from_atomic(value: usize) -> Option<NetworkErrorReason> {
-    match value {
-        1 => Some(NetworkErrorReason::ClockSkew),
-        2 => Some(NetworkErrorReason::Offline),
-        3 => Some(NetworkErrorReason::SymmetricNat),
-        4 => Some(NetworkErrorReason::FullConeNat),
-        5 => Some(NetworkErrorReason::NoDescriptors),
-        _ => None,
     }
 }
 
@@ -792,8 +738,6 @@ impl<R: Runtime> EventManager<R> {
             transit_outbound_bandwidth: Default::default(),
             ipv4_firewall_status: Default::default(),
             ipv6_firewall_status: Default::default(),
-            ipv4_network_error: Default::default(),
-            ipv6_network_error: Default::default(),
             ipv4_testing: Default::default(),
             ipv6_testing: Default::default(),
             recent_tunnel_build_success_rate: Default::default(),
@@ -817,8 +761,6 @@ impl<R: Runtime> EventManager<R> {
                     transit_outbound_bandwidth: Arc::clone(&handle.transit_outbound_bandwidth),
                     ipv4_firewall_status: Arc::clone(&handle.ipv4_firewall_status),
                     ipv6_firewall_status: Arc::clone(&handle.ipv6_firewall_status),
-                    ipv4_network_error: Arc::clone(&handle.ipv4_network_error),
-                    ipv6_network_error: Arc::clone(&handle.ipv6_network_error),
                     ipv4_testing: Arc::clone(&handle.ipv4_testing),
                     ipv6_testing: Arc::clone(&handle.ipv6_testing),
                     recent_tunnel_build_success_rate: Arc::clone(
@@ -916,7 +858,7 @@ impl<R: Runtime> Future for EventManager<R> {
                 Poll::Ready(Some(SubsystemEvent::ServerDestinationStarted { name, address })) => {
                     self.pending_server_updates.push((name, address));
                 }
-                Poll::Ready(Some(SubsystemEvent::FirewallStatus { status, ipv4 })) =>
+                Poll::Ready(Some(SubsystemEvent::FirewallStatus { status, ipv4 })) => {
                     self.firewall_statuses.push((
                         match status {
                             FirewallStatus::Unknown => "Testing".to_string(),
@@ -925,7 +867,8 @@ impl<R: Runtime> Future for EventManager<R> {
                             FirewallStatus::SymmetricNat => "Symmetric NAT".to_string(),
                         },
                         ipv4,
-                    )),
+                    ))
+                }
             }
         }
 
@@ -1068,21 +1011,18 @@ mod tests {
     }
 
     #[test]
-    fn network_state_tracks_families_errors_and_testing_independently() {
+    fn network_state_tracks_families_status_and_testing_independently() {
         let handle = EventHandle::<MockRuntime>::new_for_tests();
 
         handle.set_ipv4_status(FirewallStatus::Firewalled);
-        handle.set_ipv4_network_error(Some(NetworkErrorReason::ClockSkew));
         handle.set_ipv4_testing(true);
         handle.set_ipv6_status(FirewallStatus::SymmetricNat);
-        handle.set_ipv6_network_error(None);
         handle.set_ipv6_testing(false);
 
         assert_eq!(
             handle.ipv4_network_state(),
             NetworkState {
                 status: FirewallStatus::Firewalled,
-                error: Some(NetworkErrorReason::ClockSkew),
                 testing: true,
             }
         );
@@ -1090,17 +1030,11 @@ mod tests {
             handle.ipv6_network_state(),
             NetworkState {
                 status: FirewallStatus::SymmetricNat,
-                error: None,
                 testing: false,
             }
         );
 
         handle.set_ipv4_testing(false);
-        handle.set_ipv4_network_error(Some(NetworkErrorReason::NoDescriptors));
         assert!(!handle.ipv4_network_state().testing);
-        assert_eq!(
-            handle.ipv4_network_state().error,
-            Some(NetworkErrorReason::NoDescriptors)
-        );
     }
 }

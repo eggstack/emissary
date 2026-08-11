@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; RouterInfo corrective truthfulness sequence closed
+Status: partial Proposal 170 support; M057 post-M056 planning-record consistency corrective ready
 
 This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -20,27 +20,27 @@ All work is internal to `eggstack/emissary`. External specifications/reference i
 
 ## Current handoff
 
-M056 is closed. The corrective RouterInfo truthfulness sequence has no current
-dependency-ready successor:
+M054, M055, and M056 are closed. M057 is now the sole dependency-ready handoff:
+
+- `057-post-m056-planning-record-consistency-corrective.md` — ready; documentation/control-surface consistency only, with zero production authority.
+
+The accepted production disposition remains unchanged:
 
 - `054-m049-transit-15s-corrective.md` — closed; transit-15s is explicitly unavailable because no request-independent owner fits the bounded budget.
 - `055-m050-network-error-truthfulness-corrective.md` — closed; both unowned v4/v6 network-error rows are unavailable and dead error scaffolding was removed.
-
-Completed corrective successor:
-
 - `056-m049-m050-corrective-reclosure.md` — closed; final integrated matrix is 37 available / 1 neutral / 5 unavailable.
 
-## Why the corrective sequence was reopened
+M057 exists only because a small number of active planning sentences remained stale after M056: the roadmap dependency graph still labels M055 ready, and historical/current source-count wording must consistently distinguish the pre-corrective `970252c` 40/1/2 claim from the accepted post-M056 37/1/5 state. M057 must not change code, source disposition, runtime support, or the accepted closure records.
+
+## Why the corrective source sequence was reopened
 
 The merged post-M052 head `970252c` was reviewed after the original source-completion sequence closed. That review found three overclaimed rows:
 
-1. `i2p.router.net.bw.transit.15s` is backed by an I2PControl request-local sampler. Traffic history only advances when the field is queried, so first reads and reads after a long API gap can return zero despite recent transit traffic.
-2. `i2p.router.net.error` has no canonical Emissary error owner but maps unset internal state to code `0`, whose adopted reference meaning is `No error`.
-3. `i2p.router.net.error.v6` has the same defect.
+1. `i2p.router.net.bw.transit.15s` was backed by an I2PControl request-local sampler. Traffic history only advanced when the field was queried, so first reads and reads after a long API gap could return zero despite recent transit traffic.
+2. `i2p.router.net.error` had no canonical Emissary error owner but mapped unset internal state to code `0`, whose adopted reference meaning is `No error`.
+3. `i2p.router.net.error.v6` had the same defect.
 
-The pre-review `40 available / 1 neutral / 2 unavailable` matrix is therefore no longer accepted. The review-corrected disposition before implementation is 37 available / 1 neutral / 5 unavailable.
-
-M054 may restore transit-15s to available only with a request-independent source. M055 is expected to retain both error rows unavailable unless a real existing owner is discovered. M056 owns the final integrated count/reclosure.
+The pre-corrective `40 available / 1 neutral / 2 unavailable` matrix is historical only. M054/M055 corrected production truthfulness, and M056 accepted the final 37 available / 1 neutral / 5 unavailable matrix.
 
 ## RouterInfo source-completion sequence
 
@@ -55,9 +55,10 @@ M054 may restore transit-15s to available only with a request-independent source
 | M050 — v4/v6 network state | corrected/closed through M055 and M056 | status.v6 + testing v4/v6 retained; error v4/v6 unavailable | accepted corrective closures |
 | M051 — router news + banned peers | blocked with accepted limitation | 2 fields remain unavailable | retained `051-closure.md` |
 | M052 — integration/containment reclosure | corrected/closed through M056 | historical `40/1/2` count superseded by final `37/1/5` audit | `056-closure.md` |
-| M054 — transit 15s corrective | closed | truthful transit-15s unavailability; request-local sampler removed | `054` closure |
-| M055 — network-error truthfulness | closed | both error rows unavailable; dead error scaffold removed | `055` closure |
+| M054 — transit 15s corrective | closed | truthful transit-15s unavailability; request-local sampler removed | `054-closure.md` |
+| M055 — network-error truthfulness | closed | both error rows unavailable; dead error scaffold removed | `055-closure.md` |
 | M056 — corrective integration reclosure | closed | no production changes; final 43-row audit accepted | `056-closure.md` |
+| M057 — post-M056 planning-record consistency | ready | reconcile active planning statuses/baselines only; no production changes | M054–M056 accepted closures |
 
 Plans:
 
@@ -72,7 +73,8 @@ Plans:
 - `053-m045-live-profile-storage-corrective.md`;
 - `054-m049-transit-15s-corrective.md`;
 - `055-m050-network-error-truthfulness-corrective.md`;
-- `056-m049-m050-corrective-reclosure.md`.
+- `056-m049-m050-corrective-reclosure.md`;
+- `057-post-m056-planning-record-consistency-corrective.md`.
 
 ## Corrective boundaries
 
@@ -82,27 +84,30 @@ M054:
 
 - core production allowance: `emissary-core/src/events.rs` only;
 - no tunnel/transport/router/NetDB data-plane path changes;
-- no new I2PControl-specific sampler task or polling daemon;
-- required regression: traffic/source history advances with zero RouterInfo reads, and a later read plus a >15-second API-gap case still reflects the current reference window.
+- no new I2PControl-specific sampler task or polling daemon.
 
 M055:
 
 - core production allowance: `emissary-core/src/events.rs` and `emissary-core/src/inspection.rs` only for dead error-scaffold cleanup;
-- no transport/SSU2 changes to retained status/testing behavior;
-- required regression: v4/v6 error requests fail unavailable and never serialize `0` solely because internal state is unset.
+- no transport/SSU2 changes to retained status/testing behavior.
 
 M056:
 
 - no production changes;
 - closure-only integrated source audit and retained regression matrix.
 
+M057:
+
+- no production changes and no core paths;
+- planning/control-surface consistency only;
+- broad Rust verification is not required unless the changed-file boundary is violated;
+- accepted M054–M056 closure records remain immutable historical evidence.
+
 ## Scope and ownership rule
 
 Proposal 170 policy remains under `emissary-cli/src/i2pcontrol/**`: field/source disposition, aggregation, joins, sorting, bounds, Base64/numeric wire mapping, JSON types/serialization, compatibility behavior, and sanitized errors.
 
-Changes outside I2PControl are exceptional and may only expose neutral bounded read-only facts from canonical owners. They must not contain Proposal 170 terminology or mutable control authority.
-
-A request-local cache/history is not sufficient evidence for a router-owned rolling metric. A numeric mapping is not sufficient evidence for a network-error source owner.
+Changes outside I2PControl are exceptional and may only expose neutral bounded read-only facts from canonical owners. They must not contain Proposal 170 terminology or mutable control authority. M057 is even narrower: it has no production authority at all.
 
 ## Cross-cutting prohibitions
 
@@ -121,43 +126,22 @@ Throughout the roadmap, do not:
 
 ## Handoff discipline
 
-Every milestone must inspect its accepted dependency head, pin exact semantics before source-disposition changes, use focused source/wire regressions, preserve no-feature behavior, remain inside its path budget, and create an independent closure record. Material scope expansion is a blocker, not permission to improvise.
+Every milestone must inspect its accepted dependency head, preserve exact semantics and scope, remain inside its path budget, and create an independent closure record. Material scope expansion is a blocker, not permission to improvise.
 
-Only the registry advances the next handoff to `ready`. No current plan is
-dependency-ready after M056; M051 remains blocked behind its absent substantive
-owners.
+Only the registry advances the next handoff to `ready`. M057 is the sole current ready plan. After accepted M057 closure, no successor should be registered unless separately authorized; M051 remains blocked behind absent substantive news/ban owners.
 
 ## Verification rule
 
-Use focused semantic tests first, then the bounded package matrix. Typical broad commands remain:
+M057 uses targeted planning-integrity checks, `git diff --check`, and a changed-path audit. It must not rerun or expand the broad Rust/CI apparatus solely for documentation edits. The previously accepted M056 product verification remains controlling for production behavior.
 
-```bash
-cargo check -p emissary-cli --no-default-features
-cargo test -p emissary-cli --no-default-features
-cargo check -p emissary-cli --no-default-features --features i2pcontrol
-cargo test -p emissary-cli --no-default-features --features i2pcontrol
-cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
-cargo check -p emissary-core
-cargo test -p emissary-core --no-fail-fast
-cargo clippy -p emissary-core --all-targets -- -D warnings
-git diff --check
-```
-
-Use targeted formatting because the repository's stable/nightly formatter qualification is already documented. Do not add CI/release/coverage/fuzz/soak infrastructure.
+Do not add CI/release/coverage/fuzz/soak infrastructure.
 
 ## Final status rule
 
-M056 independently derived and validated the final matrix as 37 available / 1
-protocol-permitted neutral / 5 unavailable. RouterInfo source completion remains
-partial under current owners because news, banned peers, transit-15s, and both
-network-error rows are unavailable. Broader Proposal 170 support also retains
-unrelated previously accepted partial dimensions.
+M056 independently derived and validated the final matrix as 37 available / 1 protocol-permitted neutral / 5 unavailable. RouterInfo source completion remains partial under current owners because news, banned peers, transit-15s, and both network-error rows are unavailable. Broader Proposal 170 support also retains unrelated previously accepted partial dimensions.
+
+M057 may close only planning-record consistency. It cannot change this final support disposition.
 
 ## Historical evidence
 
-M040–M044 remain closed retained evidence. M039 remains historical-invalidated.
-The M045 stale-snapshot attempt and blocked closure remain corrective history;
-M053/M045 and M046–M048 remain accepted. M049/M050 historical closures are
-partially superseded by M054/M055 and this M056 reclosure. M052's `40/1/2`
-matrix is historical-invalidated and superseded by the accepted M056 `37/1/5`
-audit.
+M040–M044 remain closed retained evidence. M039 remains historical-invalidated. The M045 stale-snapshot attempt and blocked closure remain corrective history; M053/M045 and M046–M048 remain accepted. M049/M050 historical closures are partially superseded by M054/M055 and M056. M052's `40/1/2` matrix is historical-invalidated and superseded by the accepted M056 `37/1/5` audit.

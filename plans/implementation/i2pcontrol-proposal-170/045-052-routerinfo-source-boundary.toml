@@ -1,8 +1,9 @@
-version = 3
-objective = "M045-M056 Proposal 170 RouterInfo source completion and corrective truthfulness with minimal non-i2pcontrol changes"
+version = 4
+objective = "M045-M057 Proposal 170 RouterInfo source completion, corrective truthfulness, and post-reclosure planning consistency with minimal non-i2pcontrol changes"
 baseline = "b759038"
 corrective_baseline = "bf9c2eeb"
 post_m052_review_baseline = "970252c"
+post_m056_planning_baseline = "cdbc3a4"
 
 [always_allowed]
 i2pcontrol = ["emissary-cli/src/i2pcontrol/"]
@@ -114,6 +115,12 @@ required_regression = "prove direct and combined v4/v6 network-error requests fa
 core_production = []
 purpose = "independent corrective integration reclosure for M049 transit 15s, M050 network errors, and affected M052 source accounting"
 required_regression = "rerun accepted M054/M055 semantic regressions at the integrated head and reconcile every one of the 43 canonical source rows"
+
+[m057]
+core_production = []
+production_changes = []
+purpose = "post-M056 planning-record consistency only; reconcile stale milestone labels and historical baseline/source-count wording without changing runtime, source disposition, tests, or product behavior"
+required_regression = "active planning records contain no stale current-state M055/M056 readiness wording or conflation of historical 970252c 40/1/2 state with the accepted post-M056 37/1/5 state"
 
 [prohibited]
 production_prefixes = [

@@ -14,11 +14,10 @@ The `RouterInfo` method allows authenticated callers to request specific router 
 Proposal 170 addition manifest. The 121-key catalog is not counted as Proposal
 170 coverage. The machine-readable manifest declares exact nested JSON types,
 direct-presence semantics, mutation, owner, serializer, fixture, bound, and
-source disposition for every addition: 19 available, 1 protocol-permitted
-neutral, and 23 unavailable. The known-peer directory fields use the live,
-bounded ProfileStorage inspection seam; active-peer, transport, tunnel,
-network-error, news, and ban fields remain unavailable until their canonical
-owners are independently wired.
+source disposition for every addition: 40 available, 1 protocol-permitted
+neutral, and 2 unavailable. Known-peer, active-peer, transport, tunnel, and
+v4/v6 network-state fields use bounded live owners; router news and ban fields
+remain unavailable until their canonical owners are independently wired.
 
 Canonical Proposal 170 additions are selected by direct parameter presence and
 are returned under the exact same key. Values are ignored. All four address-book
@@ -150,9 +149,8 @@ Available canonical fields include retained identity/info, cumulative byte
 counters, share ratio, I2PTunnel controller info, total success rate, logs,
 log clear, and all six address-book objects/lists. Clock skew is the one
 protocol-permitted neutral field and returns `null` when no estimate exists.
-Router news, recent transit rate, transport-specific status/error/testing,
-tunnel-pool, NetDB, and peer fields without an authoritative bounded source
-  return the established JSON-RPC unavailable error; M026 found no adjacent
+Router news and banned-peer fields without an authoritative bounded source
+return the established JSON-RPC unavailable error; M026 found no adjacent
   authoritative bounded owner to add, and Emissary never substitutes
 zero, false, or an empty collection.
 
@@ -161,7 +159,8 @@ zero, false, or an empty collection.
 - Clock skew: `null` when not yet determined (protocol-permitted nullable)
 - Router news: unavailable because Emissary has no news owner
 - Peer RouterInfo: `null` when no peer ID specified
-- Network status: exact string codes ("OK", "Firewalled", "Testing", etc.)
+- Network status: exact string compatibility codes and Proposal 170 numeric
+  status/error/testing mappings from independent v4/v6 state
 - Share ratio: from retained configuration
 - Unavailable non-null selectors: return JSON-RPC error with no partial result
 - Available-zero selectors: return successful zero/empty values

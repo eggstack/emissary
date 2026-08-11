@@ -279,6 +279,17 @@ pub struct PeerTestManager<R: Runtime> {
 }
 
 impl<R: Runtime> PeerTestManager<R> {
+    /// Publish the current local reachability-test state without creating a
+    /// probe. The peer-test manager remains the sole owner of this fact.
+    fn publish_testing_state(&self) {
+        self.router_ctx.event_handle().set_ipv4_testing(
+            self.active.values().any(|test| test.is_ipv4()),
+        );
+        self.router_ctx.event_handle().set_ipv6_testing(
+            self.active.values().any(|test| !test.is_ipv4()),
+        );
+    }
+
     /// Create new `PeerTestManager`.
     pub fn new(
         intro_key: [u8; 32],
@@ -1002,6 +1013,7 @@ impl<R: Runtime> PeerTestManager<R> {
             self.router_ctx.metrics_handle().gauge(NUM_ACTIVE_PEER_TESTS).decrement(1);
             self.active.remove(&src_id);
         });
+        self.publish_testing_state();
 
         // if there are still active tests, return early and let them finish
         if !self.active.is_empty() {
@@ -1119,6 +1131,8 @@ impl<R: Runtime> PeerTestManager<R> {
                 ),
             }
         }
+
+        self.publish_testing_state();
 
         (!results.is_empty()).then_some(PeerTestManagerEvent::PeerTestResult { results })
     }

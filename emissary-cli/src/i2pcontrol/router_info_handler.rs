@@ -25,7 +25,7 @@ use std::collections::HashSet;
 
 use crate::i2pcontrol::{
     address_book::{resolve_address_book_selectors_with_mode, RouterInfoAddressBookMode},
-    router_info::{InspectionError, RouterInfoControl},
+    router_info::{InspectionError, NetworkStatus, RouterInfoControl},
     rpc::{self, JsonRpcErrorResponse, JsonRpcRequest, JsonRpcSuccess, RequestId},
 };
 
@@ -67,6 +67,36 @@ const TUNNEL_DETAIL_KEYS: &[&str] = &[
 /// Maximum serialized RouterInfo response size, including the JSON-RPC
 /// envelope. The final response is checked after actual serialization.
 const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
+
+/// Map the supported neutral reachability states to the pinned i2pd status
+/// vocabulary. Emissary currently produces only OK, Firewalled, Unknown, and
+/// Symmetric NAT; the latter has no distinct i2pd status code and remains an
+/// unknown status until a canonical error owner exists.
+fn network_status_code(status: NetworkStatus) -> i64 {
+    match status {
+        NetworkStatus::Ok => 0,
+        NetworkStatus::Firewalled => 1,
+        NetworkStatus::Unknown | NetworkStatus::SymmetricNat => 2,
+        NetworkStatus::Hidden
+        | NetworkStatus::Testing
+        | NetworkStatus::Fail
+        | NetworkStatus::FailTcp
+        | NetworkStatus::FailUdp
+        | NetworkStatus::FailNat => 2,
+    }
+}
+
+/// Map a known neutral failure reason to the pinned i2pd error vocabulary.
+fn network_error_code(error: Option<emissary_core::inspection::NetworkErrorReason>) -> i64 {
+    match error {
+        None => 0,
+        Some(emissary_core::inspection::NetworkErrorReason::ClockSkew) => 1,
+        Some(emissary_core::inspection::NetworkErrorReason::Offline) => 2,
+        Some(emissary_core::inspection::NetworkErrorReason::SymmetricNat) => 3,
+        Some(emissary_core::inspection::NetworkErrorReason::FullConeNat) => 4,
+        Some(emissary_core::inspection::NetworkErrorReason::NoDescriptors) => 5,
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RouterInfoRequestMode {
@@ -479,6 +509,18 @@ async fn assemble_response(
     } else {
         None
     };
+    let network_snapshot = if key_set.contains(rpc::router_info_keys::NET_BW_INBOUND)
+        || key_set.contains(rpc::router_info_keys::NET_BW_OUTBOUND)
+        || key_set.contains(rpc::router_info_keys::P170_NET_STATUS_V6)
+        || key_set.contains(rpc::router_info_keys::P170_NET_ERROR)
+        || key_set.contains(rpc::router_info_keys::P170_NET_ERROR_V6)
+        || key_set.contains(rpc::router_info_keys::P170_NET_TESTING)
+        || key_set.contains(rpc::router_info_keys::P170_NET_TESTING_V6)
+    {
+        Some(router_info.network_snapshot().await?)
+    } else {
+        None
+    };
 
     // Exact Proposal 170 retained and metric fields.
     if key_set.contains(rpc::router_info_keys::P170_ID) {
@@ -664,10 +706,8 @@ async fn assemble_response(
     }
 
     // --- Network status ---
-    if key_set.contains(rpc::router_info_keys::NET_BW_INBOUND)
-        || key_set.contains(rpc::router_info_keys::NET_BW_OUTBOUND)
-    {
-        let network = router_info.network_snapshot().await?;
+    if network_snapshot.is_some() {
+        let network = network_snapshot.as_ref().expect("network snapshot was queried");
         if key_set.contains(rpc::router_info_keys::NET_BW_INBOUND) {
             result.insert(
                 rpc::router_info_keys::NET_BW_INBOUND.to_string(),
@@ -678,6 +718,36 @@ async fn assemble_response(
             result.insert(
                 rpc::router_info_keys::NET_BW_OUTBOUND.to_string(),
                 serde_json::json!(network.ipv6_status.as_str()),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_STATUS_V6) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_STATUS_V6.to_string(),
+                serde_json::json!(network_status_code(network.ipv6_status)),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_ERROR) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_ERROR.to_string(),
+                serde_json::json!(network_error_code(network.ipv4_error)),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_ERROR_V6) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_ERROR_V6.to_string(),
+                serde_json::json!(network_error_code(network.ipv6_error)),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_TESTING) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_TESTING.to_string(),
+                serde_json::json!(if network.ipv4_testing { 1 } else { 0 }),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_TESTING_V6) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_TESTING_V6.to_string(),
+                serde_json::json!(if network.ipv6_testing { 1 } else { 0 }),
             );
         }
     }
@@ -2482,6 +2552,35 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result["i2p.router.net.bw.inbound"], "OK");
         assert_eq!(result["i2p.router.net.bw.outbound"], "Firewalled");
+    }
+
+    #[tokio::test]
+    async fn handle_router_info_network_state_wire_fixture() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_network(NetworkSnapshot {
+            ipv4_status: NetworkStatus::Ok,
+            ipv6_status: NetworkStatus::Firewalled,
+            ipv4_error: Some(emissary_core::inspection::NetworkErrorReason::ClockSkew),
+            ipv6_error: Some(emissary_core::inspection::NetworkErrorReason::SymmetricNat),
+            ipv4_testing: true,
+            ipv6_testing: false,
+            ..Default::default()
+        });
+        let state = test_state(ri);
+        let req = test_request(serde_json::json!({
+            "i2p.router.net.status.v6": false,
+            "i2p.router.net.error": null,
+            "i2p.router.net.error.v6": "ignored",
+            "i2p.router.net.testing": 0,
+            "i2p.router.net.testing.v6": true,
+        }));
+        let resp = handle_router_info(&state, &req).await;
+        let result = resp["result"].as_object().unwrap();
+        assert_eq!(result["i2p.router.net.status.v6"], 1);
+        assert_eq!(result["i2p.router.net.error"], 1);
+        assert_eq!(result["i2p.router.net.error.v6"], 3);
+        assert_eq!(result["i2p.router.net.testing"], 1);
+        assert_eq!(result["i2p.router.net.testing.v6"], 0);
     }
 
     #[tokio::test]

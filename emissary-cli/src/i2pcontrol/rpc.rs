@@ -1142,12 +1142,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_STATUS_V6,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network",
-                reason: "no transport-specific v6 status code mapping"
+            SourceDisposition::Available {
+                owner: "network-state",
             },
             "serialize_network_status_v6",
-            "p170.status_v6.unavailable",
+            "p170.status_v6.integer",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1155,12 +1154,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_ERROR,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network",
-                reason: "no transport-specific v4 error code mapping"
+            SourceDisposition::Available {
+                owner: "network-state",
             },
             "serialize_network_error",
-            "p170.error_v4.unavailable",
+            "p170.error_v4.integer",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1168,12 +1166,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_ERROR_V6,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network",
-                reason: "no transport-specific v6 error code mapping"
+            SourceDisposition::Available {
+                owner: "network-state",
             },
             "serialize_network_error_v6",
-            "p170.error_v6.unavailable",
+            "p170.error_v6.integer",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1181,12 +1178,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TESTING,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network",
-                reason: "no canonical v4 testing-state source"
+            SourceDisposition::Available {
+                owner: "network-state",
             },
             "serialize_network_testing",
-            "p170.testing_v4.unavailable",
+            "p170.testing_v4.integer",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1194,12 +1190,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TESTING_V6,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network",
-                reason: "no canonical v6 testing-state source"
+            SourceDisposition::Available {
+                owner: "network-state",
             },
             "serialize_network_testing_v6",
-            "p170.testing_v6.unavailable",
+            "p170.testing_v6.integer",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -2065,7 +2060,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (35, 1, 7));
+        assert_eq!((available, neutral, unavailable), (40, 1, 2));
     }
 
     #[test]

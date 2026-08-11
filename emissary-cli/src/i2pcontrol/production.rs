@@ -66,7 +66,7 @@ use emissary_core::{
     crypto::base64_encode,
     events::EventHandle,
     inspection::{
-        PeerDirectoryInspection, PeerDirectoryInspectionError, TransportInspection,
+        NetworkState, PeerDirectoryInspection, PeerDirectoryInspectionError, TransportInspection,
         TransportInspectionError, TunnelInspection, TunnelInspectionError, TunnelPoolKind,
     },
     runtime::Runtime,
@@ -421,6 +421,20 @@ pub trait EventMetrics: Send + Sync {
     fn ipv4_firewall_status(&self) -> FirewallStatus;
     /// Latest IPv6 firewall status.
     fn ipv6_firewall_status(&self) -> FirewallStatus;
+    /// Latest independently tracked IPv4 network state.
+    fn ipv4_network_state(&self) -> NetworkState {
+        NetworkState {
+            status: self.ipv4_firewall_status(),
+            ..NetworkState::default()
+        }
+    }
+    /// Latest independently tracked IPv6 network state.
+    fn ipv6_network_state(&self) -> NetworkState {
+        NetworkState {
+            status: self.ipv6_firewall_status(),
+            ..NetworkState::default()
+        }
+    }
 }
 
 /// Adapter that wraps a concrete `EventHandle<R>` and implements
@@ -469,6 +483,14 @@ impl<R: Runtime> EventMetrics for EventHandleMetrics<R> {
     }
     fn ipv6_firewall_status(&self) -> FirewallStatus {
         self.handle.ipv6_firewall_status()
+    }
+
+    fn ipv4_network_state(&self) -> NetworkState {
+        self.handle.ipv4_network_state()
+    }
+
+    fn ipv6_network_state(&self) -> NetworkState {
+        self.handle.ipv6_network_state()
     }
 }
 
@@ -1394,15 +1416,19 @@ impl RouterInfoControl for ProductionRouterInfoControl {
     }
 
     async fn network_snapshot(&self) -> Result<NetworkSnapshot, InspectionError> {
-        let ipv4 = Self::firewall_status_to_network(self.metrics.ipv4_firewall_status());
-        let ipv6 = Self::firewall_status_to_network(self.metrics.ipv6_firewall_status());
+        let ipv4_state = self.metrics.ipv4_network_state();
+        let ipv6_state = self.metrics.ipv6_network_state();
+        let ipv4 = Self::firewall_status_to_network(ipv4_state.status);
+        let ipv6 = Self::firewall_status_to_network(ipv6_state.status);
         let firewalled = ipv4 == NetworkStatus::Firewalled || ipv6 == NetworkStatus::Firewalled;
         let hidden = ipv4 == NetworkStatus::Hidden || ipv6 == NetworkStatus::Hidden;
         Ok(NetworkSnapshot {
             ipv4_status: ipv4,
             ipv6_status: ipv6,
-            error: None,
-            testing: false,
+            ipv4_error: ipv4_state.error,
+            ipv6_error: ipv6_state.error,
+            ipv4_testing: ipv4_state.testing,
+            ipv6_testing: ipv6_state.testing,
             firewalled,
             hidden,
             reachability_disabled: false,

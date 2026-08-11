@@ -1,4 +1,4 @@
-version = 4
+version = 5
 objective = "M045-M057 Proposal 170 RouterInfo source completion, corrective truthfulness, and post-reclosure planning consistency with minimal non-i2pcontrol changes"
 baseline = "b759038"
 corrective_baseline = "bf9c2eeb"

@@ -1,6 +1,6 @@
 # M057 — Post-M056 Planning-Record Consistency Corrective
 
-Status: ready
+Status: closed
 
 Planning baseline: `cdbc3a4` — merged M054–M056 corrective implementation/reclosure head
 

@@ -1,7 +1,8 @@
-version = 2
-objective = "M045-M053 Proposal 170 RouterInfo source completion with minimal non-i2pcontrol changes"
+version = 3
+objective = "M045-M056 Proposal 170 RouterInfo source completion and corrective truthfulness with minimal non-i2pcontrol changes"
 baseline = "b759038"
 corrective_baseline = "bf9c2eeb"
+post_m052_review_baseline = "970252c"
 
 [always_allowed]
 i2pcontrol = ["emissary-cli/src/i2pcontrol/"]
@@ -82,6 +83,38 @@ forbidden_core_production = [
 ]
 required_regression = "construct source, mutate canonical ProfileStorage through existing owner, then observe mutation from same source instance"
 
+[m054]
+core_production = [
+  "emissary-core/src/events.rs",
+]
+purpose = "correct M049 transit 15s with request-independent bounded neutral observation or demote the field truthfully"
+forbidden_core_production = [
+  "emissary-core/src/tunnel/",
+  "emissary-core/src/transport/",
+  "emissary-core/src/router/",
+  "emissary-core/src/netdb/",
+]
+required_regression = "record transit traffic with zero RouterInfo transit-15s reads, then query later from the same production source and observe the reference-correct current rolling value; also cover a RouterInfo query gap longer than 15 seconds"
+
+[m055]
+core_production = [
+  "emissary-core/src/events.rs",
+  "emissary-core/src/inspection.rs",
+]
+purpose = "correct M050 network-error truthfulness by demoting unowned v4/v6 error rows and removing dead error-only observation scaffolding where safe"
+forbidden_core_production = [
+  "emissary-core/src/transport/",
+  "emissary-core/src/tunnel/",
+  "emissary-core/src/router/",
+  "emissary-core/src/netdb/",
+]
+required_regression = "prove direct and combined v4/v6 network-error requests fail unavailable when no production error owner exists and never serialize code 0 solely from unset internal state"
+
+[m056]
+core_production = []
+purpose = "independent corrective integration reclosure for M049 transit 15s, M050 network errors, and affected M052 source accounting"
+required_regression = "rerun accepted M054/M055 semantic regressions at the integrated head and reconcile every one of the 43 canonical source rows"
+
 [prohibited]
 production_prefixes = [
   "emissary-core/src/crypto/",
@@ -99,6 +132,9 @@ behaviors = [
   "transport handshake/retransmission/congestion changes",
   "NetDB protocol/query/discovery behavior changes",
   "new network probes or polling solely for I2PControl",
+  "new background sampler task solely for I2PControl",
+  "request-driven rolling metric history presented as router-owned recent state",
+  "missing source authority mapped to a positive no-error code",
   "mutable core/session/tunnel/transport handles crossing into I2PControl",
   "private keys session keys LeaseSet private material or message payloads in inspection DTOs",
   "fabricated defaults standing in for unavailable sources",

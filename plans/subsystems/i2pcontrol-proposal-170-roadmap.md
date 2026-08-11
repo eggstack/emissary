@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 RouterInfo Source-Completion Roadmap
 
-Status: partial Proposal 170 support; RouterInfo source-completion sequence active; M050 ready
+Status: partial Proposal 170 support; RouterInfo source-completion sequence active; M051 ready
 
 Planning baseline: `b759038` — M044 finalized reviewed head
 
@@ -30,7 +30,7 @@ Canonical internal references:
 
 M044 truthfully closed the prior corrective sequence with 43 canonical Proposal 170 RouterInfo additions classified as 16 available, 1 protocol-permitted neutral, and 26 unavailable. M045 then attempted to implement three known-peer fields using a bounded `Router::inspection_snapshot()` captured at I2PControl startup. Closure rejected that source because it was safe but stale: peer churn after composition was not visible.
 
-M053 corrected that exact defect with the smallest neutral live core inspection seam required to expose the canonical `ProfileStorage` directory without making `ProfileStorage`, `Bucket`, NetDB authority, or mutable router state public. M045 is corrected/closed through the accepted M053 closure. M046 then added the neutral live transport inspection seam and completed active-peer inventory and finite-limit sources. M047 added bounded current active-session statistics; M048 added bounded live tunnel-pool sources; M049 added rolling transit/recent-success metrics and live queue depths. The matrix is now 35 available, 1 protocol-permitted neutral, and 7 unavailable.
+M053 corrected that exact defect with the smallest neutral live core inspection seam required to expose the canonical `ProfileStorage` directory without making `ProfileStorage`, `Bucket`, NetDB authority, or mutable router state public. M045 is corrected/closed through the accepted M053 closure. M046 then added the neutral live transport inspection seam and completed active-peer inventory and finite-limit sources. M047 added bounded current active-session statistics; M048 added bounded live tunnel-pool sources; M049 added rolling transit/recent-success metrics and live queue depths; M050 added independent v4/v6 network state. The matrix is now 40 available, 1 protocol-permitted neutral, and 2 unavailable.
 
 The architecture remains asymmetric: core/runtime code may expose only the smallest neutral bounded read-only facts that only the canonical owner can know. I2PControl owns source composition, rolling windows, aggregation, deterministic ordering, response bounds, Proposal 170 source disposition, numeric/wire mapping, JSON serialization, and failure semantics.
 
@@ -38,15 +38,10 @@ This roadmap does not reopen the ten unsupported tunnel data planes, `SetConfig`
 
 ## 2. Target fields
 
-The 7 remaining target rows are exactly the current unavailable rows in `router_info_keys::PROPOSAL_170_CONTRACT` and `docs/i2pcontrol/router-info-source-map.md`:
+The 2 remaining target rows are exactly the current unavailable rows in `router_info_keys::PROPOSAL_170_CONTRACT` and `docs/i2pcontrol/router-info-source-map.md`:
 
 1. `i2p.router.news`;
-2. `i2p.router.net.status.v6`;
-3. `i2p.router.net.error`;
-4. `i2p.router.net.error.v6`;
-5. `i2p.router.net.testing`;
-6. `i2p.router.net.testing.v6`;
-7. `i2p.router.netdb.bannedpeers`.
+2. `i2p.router.netdb.bannedpeers`.
 
 No additional RouterInfo/base selector work is authorized unless a direct regression is discovered and separately planned.
 
@@ -144,7 +139,7 @@ M051 news + banned-peer semantics (2)
 M052 integration/containment reclosure
 ```
 
-The sequence remains serialized so every new audited-core observation seam receives independent closure before the next one is introduced. M049 is closed, M050 is now the only dependency-ready handoff, and M051–M052 remain blocked until their named predecessors close.
+The sequence remains serialized so every new audited-core observation seam receives independent closure before the next one is introduced. M050 is closed, M051 is now the only dependency-ready handoff, and M052 remains blocked until M051 closes.
 
 ## 7. Milestones
 
@@ -194,13 +189,15 @@ Fields: transit 15s, recent tunnel success, queue, TBM queue. Compute rolling tr
 
 Closure: `plans/closure/i2pcontrol-proposal-170/049-closure.md`.
 
-### M050 — Network status/error/testing — ready
+### M050 — Network status/error/testing — closed
 
 Plan: `050-routerinfo-network-state-sources.md`.
 
 Fields: status.v6; error v4/v6; testing v4/v6. Track independent neutral state at existing reachability transitions and map to wire integers only in I2PControl. No new probes.
 
-### M051 — News and banned-peer semantics — blocked on M050
+Closure: `plans/closure/i2pcontrol-proposal-170/050-closure.md`.
+
+### M051 — News and banned-peer semantics — ready
 
 Plan: `051-routerinfo-news-and-banned-peer-semantics.md`.
 

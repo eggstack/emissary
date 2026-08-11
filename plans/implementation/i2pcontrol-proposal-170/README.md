@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; RouterInfo source completion active; M050 ready
+Status: partial Proposal 170 support; RouterInfo source completion active; M051 ready
 
 This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -29,7 +29,7 @@ dependency-ready handoff:
 
 - `053-m045-live-profile-storage-corrective.md` — closed; corrected M045's rejected stale startup-snapshot source.
 
-M045 is corrected/closed through M053's accepted independent closure, which records the three known-peer fields as live. M046 is closed through `046-closure.md`; M047 is closed through `047-closure.md`; M048 is closed through `048-closure.md`; M049 is closed through `049-closure.md`; M050 is now ready and M051–M052 remain blocked behind their named hard dependencies.
+M045 is corrected/closed through M053's accepted independent closure, which records the three known-peer fields as live. M046 is closed through `046-closure.md`; M047 is closed through `047-closure.md`; M048 is closed through `048-closure.md`; M049 is closed through `049-closure.md`; M050 is closed through `050-closure.md`; M051 is now ready and M052 remains blocked behind its named hard dependency.
 
 ## RouterInfo source-completion sequence
 
@@ -41,8 +41,8 @@ M045 is corrected/closed through M053's accepted independent closure, which reco
 | M047 — active-peer statistics | closed | 1 field | M046 closure; `047-closure.md` |
 | M048 — tunnel-pool counts/details | closed | 7 fields | `048-closure.md` |
 | M049 — rolling transit/build metrics + queues | closed | 4 fields | `049-closure.md` |
-| M050 — v4/v6 network state | ready | 5 fields | M049 closure |
-| M051 — router news + banned peers | blocked | 2 fields | M050 closure |
+| M050 — v4/v6 network state | closed | 5 fields | `050-closure.md` |
+| M051 — router news + banned peers | ready | 2 fields | M050 closure |
 | M052 — integration/containment reclosure | blocked | validation | M045–M051 accepted |
 
 Plans:
@@ -72,7 +72,7 @@ The required regression constructs the source first, mutates canonical ProfileSt
 
 ## Scope and ownership rule
 
-The remaining target is exactly the 7 RouterInfo rows currently classified unavailable. Proposal 170 policy remains under `emissary-cli/src/i2pcontrol/**`: field/source disposition, rolling windows, aggregation, joins, sorting, bounds, Base64/numeric wire mapping, JSON types/serialization, compatibility behavior, and sanitized errors.
+The remaining target is exactly the 2 RouterInfo rows currently classified unavailable. Proposal 170 policy remains under `emissary-cli/src/i2pcontrol/**`: field/source disposition, rolling windows, aggregation, joins, sorting, bounds, Base64/numeric wire mapping, JSON types/serialization, compatibility behavior, and sanitized errors.
 
 Changes outside `i2pcontrol/**` are exceptional and may only expose neutral bounded read-only facts from canonical owners. They must not contain Proposal 170 terminology or mutable control authority. Machine-readable budgets, including the M053 corrective overlay, are in `045-052-routerinfo-source-boundary.toml`.
 
@@ -128,7 +128,7 @@ M053 additionally requires the post-construction peer-directory churn regression
 
 ## Final status rule
 
-If M050–M051 make all remaining 7 fields truthful operational sources, and M052 accepts the final head, the RouterInfo dimension may move to 42 available + 1 protocol-permitted neutral + 0 unavailable and be closed internally against the pinned revision.
+If M051 makes the remaining 2 fields truthful operational sources, and M052 accepts the final head, the RouterInfo dimension may move to 42 available + 1 protocol-permitted neutral + 0 unavailable and be closed internally against the pinned revision.
 
 This does not automatically close full Proposal 170: unrelated unsupported tunnel families and other accepted partial dimensions remain outside this roadmap. If M051 proves that news or banned-peer semantics require an absent substantive subsystem, retain the field unavailable rather than expanding scope.
 

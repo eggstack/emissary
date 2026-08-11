@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 RouterInfo Source-Completion Roadmap
 
-Status: partial Proposal 170 support; RouterInfo source-completion sequence active; M052 ready
+Status: partial Proposal 170 support; RouterInfo source-completion sequence closed with accepted semantic limitation
 
 Planning baseline: `b759038` — M044 finalized reviewed head
 
@@ -139,7 +139,7 @@ M051 news + banned-peer semantics (2)
 M052 integration/containment reclosure
 ```
 
-The sequence remains serialized so every new audited-core observation seam receives independent closure before the next one is introduced. M050 is closed, M051 is blocked with an accepted semantic disposition, and M052 is now the only dependency-ready handoff.
+The sequence remains serialized so every new audited-core observation seam receives independent closure before the next one is introduced. M050 is closed, M051 is blocked with an accepted semantic disposition, and M052 is now closed after validating the final integrated head. No dependency-ready successor remains because the two M051 fields require substantive owners absent from Emissary.
 
 ## 7. Milestones
 
@@ -209,11 +209,11 @@ unavailable. Do not add a news service or ban engine solely for telemetry.
 
 Closure: `plans/closure/i2pcontrol-proposal-170/051-closure.md`.
 
-### M052 — 26-source integration and reclosure — ready
+### M052 — 26-source integration and reclosure — closed with accepted semantic limitation
 
 Plan: `052-routerinfo-source-integration-and-reclosure.md`.
 
-No production changes. Review all 26 target rows, retained 17 rows, child-process behavior, bounds, failure semantics, no-feature behavior, and every core changed path. M051's two semantic limitations are accepted inputs, so the RouterInfo dimension must remain incomplete. A defect requires another corrective plan.
+No production changes. M052 reviewed all 26 target rows, retained rows, child-process behavior, bounds, failure semantics, no-feature behavior, and every core changed path. M051's two semantic limitations are accepted inputs, so the RouterInfo dimension remains incomplete. Closure evidence is in `plans/closure/i2pcontrol-proposal-170/052-closure.md`; a new defect requires another corrective plan.
 
 ## 8. Failure, cancellation, restart, and contention policy
 
@@ -268,7 +268,7 @@ Because upstream Emissary is treated as heavily security-reviewed, a small purpo
 
 ## 13. Final status rule
 
-If M046–M051 make all remaining fields operational and M052 accepts the final head, the RouterInfo dimension may be recorded as 42 available + 1 protocol-permitted neutral + 0 unavailable and `RouterInfo source completion closed internally against pinned revision`.
+If M046–M051 make all remaining fields operational and M052 accepts the final head, the RouterInfo dimension may be recorded as 42 available + 1 protocol-permitted neutral + 0 unavailable and `RouterInfo source completion closed internally against pinned revision`. That condition was not met: the accepted M051 limitation leaves the final matrix at 40 available + 1 protocol-permitted neutral + 2 unavailable.
 
 That does not by itself make the entire Proposal 170 implementation complete. Unrelated accepted unsupported/runtime dimensions remain outside this roadmap.
 

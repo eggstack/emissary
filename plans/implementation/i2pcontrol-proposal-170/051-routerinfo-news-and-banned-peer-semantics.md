@@ -1,6 +1,6 @@
 # M051 — RouterInfo Router-News and Banned-Peer Semantic Sources
 
-Status: ready
+Status: blocked
 
 Planning baseline: `b759038`
 

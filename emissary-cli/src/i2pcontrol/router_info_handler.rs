@@ -706,8 +706,7 @@ async fn assemble_response(
     }
 
     // --- Network status ---
-    if network_snapshot.is_some() {
-        let network = network_snapshot.as_ref().expect("network snapshot was queried");
+    if let Some(network) = network_snapshot.as_ref() {
         if key_set.contains(rpc::router_info_keys::NET_BW_INBOUND) {
             result.insert(
                 rpc::router_info_keys::NET_BW_INBOUND.to_string(),
@@ -2058,6 +2057,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn direct_banned_peers_do_not_promote_fake_or_empty_values() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_banned_peers(vec![BannedPeer {
+            id: "peer-id".into(),
+            reason: "test reason".into(),
+            expires_at: Some(123),
+        }]);
+        let response = handle_router_info(
+            &test_state(ri),
+            &direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NETDB_BANNED_PEERS: true
+            })),
+        )
+        .await;
+
+        assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
+        assert!(response["result"].is_null());
+    }
+
+    #[tokio::test]
     async fn canonical_peer_directory_fields_return_exact_wire_values() {
         let ri = FakeRouterInfoControl::new();
         ri.set_peer_directory(PeerDirectorySnapshot {
@@ -2567,7 +2586,7 @@ mod tests {
             ..Default::default()
         });
         let state = test_state(ri);
-        let req = test_request(serde_json::json!({
+        let req = direct_request(serde_json::json!({
             "i2p.router.net.status.v6": false,
             "i2p.router.net.error": null,
             "i2p.router.net.error.v6": "ignored",

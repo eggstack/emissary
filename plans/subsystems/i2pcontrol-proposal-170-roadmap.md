@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 RouterInfo Source-Completion Roadmap
 
-Status: partial Proposal 170 support; RouterInfo source-completion sequence active; M051 ready
+Status: partial Proposal 170 support; RouterInfo source-completion sequence active; M052 ready
 
 Planning baseline: `b759038` — M044 finalized reviewed head
 
@@ -139,7 +139,7 @@ M051 news + banned-peer semantics (2)
 M052 integration/containment reclosure
 ```
 
-The sequence remains serialized so every new audited-core observation seam receives independent closure before the next one is introduced. M050 is closed, M051 is now the only dependency-ready handoff, and M052 remains blocked until M051 closes.
+The sequence remains serialized so every new audited-core observation seam receives independent closure before the next one is introduced. M050 is closed, M051 is blocked with an accepted semantic disposition, and M052 is now the only dependency-ready handoff.
 
 ## 7. Milestones
 
@@ -197,17 +197,23 @@ Fields: status.v6; error v4/v6; testing v4/v6. Track independent neutral state a
 
 Closure: `plans/closure/i2pcontrol-proposal-170/050-closure.md`.
 
-### M051 — News and banned-peer semantics — ready
+### M051 — News and banned-peer semantics — blocked by accepted semantic limitation
 
 Plan: `051-routerinfo-news-and-banned-peer-semantics.md`.
 
-Fields: router news and banned peers. Authoritative empty values require pinned/reference evidence. Do not add a news service or ban engine solely for telemetry.
+Fields: router news and banned peers. The pinned proposal specifies the string
+and map-of-objects wire types but does not authorize capability-empty values.
+The read-only Java reference requires a NewsFeedHelper owner for news and a
+Banlist owner for bans; Emissary has neither. Both fields therefore remain
+unavailable. Do not add a news service or ban engine solely for telemetry.
 
-### M052 — 26-source integration and reclosure — blocked on M045–M051
+Closure: `plans/closure/i2pcontrol-proposal-170/051-closure.md`.
+
+### M052 — 26-source integration and reclosure — ready
 
 Plan: `052-routerinfo-source-integration-and-reclosure.md`.
 
-No production changes. Review all 26 target rows, retained 17 rows, child-process behavior, bounds, failure semantics, no-feature behavior, and every core changed path. A defect requires another corrective plan.
+No production changes. Review all 26 target rows, retained 17 rows, child-process behavior, bounds, failure semantics, no-feature behavior, and every core changed path. M051's two semantic limitations are accepted inputs, so the RouterInfo dimension must remain incomplete. A defect requires another corrective plan.
 
 ## 8. Failure, cancellation, restart, and contention policy
 
@@ -266,7 +272,9 @@ If M046–M051 make all remaining fields operational and M052 accepts the final 
 
 That does not by itself make the entire Proposal 170 implementation complete. Unrelated accepted unsupported/runtime dimensions remain outside this roadmap.
 
-If M051 proves a field requires an absent substantive subsystem that this roadmap refuses to add, retain that field unavailable rather than broadening scope or fabricating support.
+M051 proved both remaining fields require absent substantive subsystems that this
+roadmap refuses to add; retain them unavailable rather than broadening scope or
+fabricating support.
 
 ## 14. Historical corrective sequence
 

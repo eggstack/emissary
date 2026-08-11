@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; RouterInfo source completion active; M051 ready
+Status: partial Proposal 170 support; RouterInfo source completion active; M052 ready
 
 This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -29,7 +29,7 @@ dependency-ready handoff:
 
 - `053-m045-live-profile-storage-corrective.md` — closed; corrected M045's rejected stale startup-snapshot source.
 
-M045 is corrected/closed through M053's accepted independent closure, which records the three known-peer fields as live. M046 is closed through `046-closure.md`; M047 is closed through `047-closure.md`; M048 is closed through `048-closure.md`; M049 is closed through `049-closure.md`; M050 is closed through `050-closure.md`; M051 is now ready and M052 remains blocked behind its named hard dependency.
+M045 is corrected/closed through M053's accepted independent closure, which records the three known-peer fields as live. M046 is closed through `046-closure.md`; M047 is closed through `047-closure.md`; M048 is closed through `048-closure.md`; M049 is closed through `049-closure.md`; M050 is closed through `050-closure.md`; M051 is blocked by its accepted semantic disposition and M052 is ready to perform the final integration/reclosure review.
 
 ## RouterInfo source-completion sequence
 
@@ -42,8 +42,8 @@ M045 is corrected/closed through M053's accepted independent closure, which reco
 | M048 — tunnel-pool counts/details | closed | 7 fields | `048-closure.md` |
 | M049 — rolling transit/build metrics + queues | closed | 4 fields | `049-closure.md` |
 | M050 — v4/v6 network state | closed | 5 fields | `050-closure.md` |
-| M051 — router news + banned peers | ready | 2 fields | M050 closure |
-| M052 — integration/containment reclosure | blocked | validation | M045–M051 accepted |
+| M051 — router news + banned peers | blocked | 2 fields retained unavailable | `051-closure.md` |
+| M052 — integration/containment reclosure | ready | validation | M045–M051 accepted or semantically blocked |
 
 Plans:
 
@@ -128,7 +128,9 @@ M053 additionally requires the post-construction peer-directory churn regression
 
 ## Final status rule
 
-If M051 makes the remaining 2 fields truthful operational sources, and M052 accepts the final head, the RouterInfo dimension may move to 42 available + 1 protocol-permitted neutral + 0 unavailable and be closed internally against the pinned revision.
+M051 confirmed that both remaining fields require absent substantive owners and
+remain unavailable. M052 is therefore ready to validate the incomplete but
+truthful final matrix; it must not claim RouterInfo source completion.
 
 This does not automatically close full Proposal 170: unrelated unsupported tunnel families and other accepted partial dimensions remain outside this roadmap. If M051 proves that news or banned-peer semantics require an absent substantive subsystem, retain the field unavailable rather than expanding scope.
 

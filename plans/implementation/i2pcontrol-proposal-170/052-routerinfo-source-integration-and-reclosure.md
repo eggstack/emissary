@@ -1,6 +1,6 @@
 # M052 — RouterInfo 26-Source Integration, Containment Review, and Reclosure
 
-Status: blocked
+Status: ready
 
 Planning baseline: `b759038`
 

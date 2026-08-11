@@ -3,10 +3,15 @@
 Status: exact-wire source inventory for the pinned-revision closure
 
 This is the reviewed source map for the pinned Proposal 170 revision created and
-last updated on `2026-08-10`. M027 independently revalidated the matrix against
+last updated on `2026-08-11`. M027 independently revalidated the matrix against
 the external revision. The machine-readable authority is
 `router_info_keys::PROPOSAL_170_CONTRACT` in `emissary-cli/src/i2pcontrol/rpc.rs`.
 Summary: 43 total, 40 available, 1 protocol-permitted neutral, and 2 unavailable.
+M051 adjudicated the two unavailable rows against the pinned proposal and the
+read-only Java reference change: the proposal specifies their wire types, while
+the reference requires substantive news-feed and ban-list owners. Emissary has
+neither owner, so empty string/map values are not authoritative capability-empty
+states and are not emitted.
 The table below is intentionally one row per canonical addition. Base selectors and
 the nested `Selector` compatibility form are not counted in those totals.
 
@@ -27,7 +32,7 @@ is read-only. Actual serialized response size is checked after assembly.
 
 | Wire key | JSON type | Disposition | Owner / reason | Serializer | Fixture | Bound | Base alias |
 |---|---|---|---|---|---|---|---|
-| `i2p.router.news` | string | unavailable | router-news: no router news owner | `serialize_router_news` | `p170.router_news.string` | — | base Router news (same wire key) |
+| `i2p.router.news` | string | unavailable | router-news: no authoritative news-feed owner; empty string is not contract-proven | `serialize_router_news` | `p170.router_news.string` | — | base Router news (same wire key) |
 | `i2p.router.id` | string or null | available | startup-retained | `serialize_router_id` | `p170.router_id.nullable_string` | 4 KiB | — |
 | `i2p.router.clockskew` | integer or null | protocol-permitted neutral | router-info-control: null when no peer estimate exists | `serialize_clockskew` | `p170.clockskew.nullable_integer` | — | — |
 | `i2p.router.info` | string or null | available | startup-retained | `serialize_router_info` | `p170.router_info.nullable_string` | 4 MiB | — |
@@ -59,7 +64,7 @@ is read-only. Actual serialized response size is checked after assembly.
 | `i2p.router.netdb.activepeers.info` | array&lt;string&gt; | available | transport-and-live-profile-storage-inspection | `serialize_active_peer_router_infos` | `p170.netdb.active_peer_info` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.ntcp.limit` | integer | available | transport-manager-configuration | `serialize_ntcp_limit` | `p170.netdb.ntcp_limit` | — | — |
 | `i2p.router.netdb.ssu.limit` | integer | available | transport-manager-configuration | `serialize_ssu_limit` | `p170.netdb.ssu_limit` | — | — |
-| `i2p.router.netdb.bannedpeers` | map&lt;string,map&lt;string,object&gt;&gt; | unavailable | ban-list: no authoritative ban owner | `serialize_banned_peers` | `p170.netdb.banned_peers.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.bannedpeers` | map&lt;string,map&lt;string,object&gt;&gt; | unavailable | ban-list: no authoritative ban owner; empty map is not contract-proven | `serialize_banned_peers` | `p170.netdb.banned_peers.unavailable` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.activepeers.list` | array&lt;string&gt; | available | transport-manager-inspection | `serialize_active_peer_hashes` | `p170.netdb.active_peers` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.peers.list` | array&lt;string&gt; | available | live-profile-storage-inspection | `serialize_known_peer_hashes` | `p170.netdb.peer_list` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.peers.info` | array&lt;string&gt; | available | live-profile-storage-inspection | `serialize_peer_router_infos` | `p170.netdb.peer_info` | 10,000 / 4 MiB | — |

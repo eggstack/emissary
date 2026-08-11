@@ -632,6 +632,33 @@ fn production_router_info_returns_router_news_unavailable() {
 }
 
 #[test]
+fn production_router_info_returns_banned_peers_unavailable() {
+    let metrics = make_metrics();
+    let tunnel_mgr = make_tunnel_manager();
+    let log_ring = Arc::new(LogRing::default());
+    let ri = ProductionRouterInfoControl::new(
+        String::new(),
+        "test".to_string(),
+        0.0,
+        0,
+        0,
+        metrics,
+        log_ring,
+        tunnel_mgr,
+    );
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        assert!(matches!(
+            ri.banned_peers().await,
+            Err(InspectionError::Unavailable {
+                group: InspectionGroup::PeerStats
+            })
+        ));
+    });
+}
+
+#[test]
 fn production_adapter_is_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<ProductionAddressBookControl>();

@@ -1,10 +1,12 @@
 # M052 — RouterInfo 26-Source Integration, Containment Review, and Reclosure
 
-Status: closed
+Status: corrective pass required for final source-accounting closure; historical closure retained
 
 Planning baseline: `b759038`
 
-Closure record: `plans/closure/i2pcontrol-proposal-170/052-closure.md`
+Historical closure record: `plans/closure/i2pcontrol-proposal-170/052-closure.md`
+
+Corrective reclosure authority: `plans/implementation/i2pcontrol-proposal-170/056-m049-m050-corrective-reclosure.md`
 
 Source roadmap: `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 
@@ -16,14 +18,19 @@ Milestone class: closure/evidence gate
 
 Independently validate the complete line of work for the 26 previously unavailable Proposal 170 RouterInfo additions. M052 is validation and reclosure only; it must not patch production code.
 
-The target is RouterInfo-dimension completion against the pinned Proposal 170 revision while preserving the broader repository status as `partial Proposal 170 support` if unrelated unsupported tunnel families, `SetConfig`, or other accepted partial dimensions remain.
+The original M052 closure at the integrated `970252c` line accepted a 40 available / 1 protocol-permitted neutral / 2 unavailable matrix. Post-closure review subsequently invalidated three of those available claims: transit-15s request independence and both v4/v6 network-error source claims. M056 now owns the corrective integrated reclosure after M054/M055.
+
+The target remains truthful RouterInfo behavior against the pinned Proposal 170 revision while preserving the broader repository status as `partial Proposal 170 support` for unrelated accepted unsupported dimensions.
 
 ## 2. Invariants
 
-- No production changes in M052. A material defect creates a new corrective implementation plan.
-- Every field reported available has a named authoritative source and exact type/shape fixture.
-- No literal placeholder zero/false/empty/null is accepted as source evidence unless the contract explicitly permits that neutral/current value and the owner was queried successfully.
-- Core changes from M046–M050 are neutral read-only/passive observation only, contain no Proposal 170/wire terminology, and introduce no mutable control authority.
+- No production changes in M052 or its M056 corrective reclosure. A material production defect creates a corrective implementation plan.
+- Every field reported available has a named authoritative production source and exact type/shape fixture.
+- A serializer, request-local cache, or manually populated test setter is not source-owner evidence.
+- No literal placeholder zero/false/empty/null is accepted unless the contract explicitly permits that current/neutral value and an authoritative owner was queried successfully.
+- Request history may not masquerade as router-owned rolling traffic state.
+- Missing network-error authority may not serialize as code `0` / `No error`.
+- Core changes remain neutral read-only/passive observation only and introduce no mutable control authority.
 - Default/no-feature behavior is unchanged.
 - No upstream interaction is authorized.
 
@@ -41,22 +48,31 @@ Review all 26 original unavailable rows, grouped as:
 
 Also rerun the retained 16 available + 1 protocol-neutral rows to detect composition regressions. Confirm the exact 43-row `PROPOSAL_170_CONTRACT` inventory and source-map documentation agree.
 
+Post-closure corrective focus is limited to:
+
+- `i2p.router.net.bw.transit.15s` through M054;
+- `i2p.router.net.error` and `.error.v6` through M055;
+- final source accounting through M056.
+
 ## 4. Containment audit
 
-Compare the final head against M044 and classify every production change as:
+Compare the final corrective head against the M052 historical head and classify every new production change as:
 
-1. I2PControl policy/adapter code;
-2. CLI composition-only wiring;
-3. neutral core inspection DTO/handle;
-4. minimal passive observation at an authoritative core owner.
+1. I2PControl policy/adapter correction;
+2. neutral core event observation within M054's `events.rs` budget;
+3. error-only core scaffold cleanup within M055's `events.rs`/`inspection.rs` budget.
 
-Any production change outside the authorized M045–M051 path budget is a closure blocker unless separately planned and closed. Specifically inspect crypto, I2NP, routing, tunnel selection/build algorithms, transport state machines, NetDB protocol behavior, proxy/UI, AddressBook, and workflows for unauthorized changes.
+Any production change outside M054/M055's machine-readable budgets is a corrective blocker unless separately planned and closed. M056 itself authorizes no production change.
+
+Specifically inspect crypto, I2NP, routing, tunnel selection/build algorithms, transport state machines, NetDB protocol behavior, proxy/UI, AddressBook, workflows, and release apparatus for unauthorized changes.
 
 ## 5. Operational evidence
 
-Exercise the real feature-enabled child process with TLS/authentication and request each newly available field individually. Exercise representative multi-selector requests from independent source groups. Where deterministic live state is hard to create, pair the process-level smoke path with bounded production-composition fixtures that use the exact production adapter.
+Exercise the real feature-enabled child process with TLS/authentication and representative retained/corrected selectors. Pair process-level smoke evidence with deterministic owner/production-adapter fixtures for semantics that are impractical to create through a live loopback router.
 
-No public-network certification is required; tests may use loopback/fake peer sources where protocol formation is not relevant, but they must exercise the production composition boundary.
+Transit-15s must have deterministic evidence proving that source history advances without RouterInfo reads; a live child process returning syntactically valid zero is not sufficient. Network-error selectors must demonstrate unavailable/no-partial-result behavior unless an independently authorized owner exists.
+
+No public-network certification or elaborate traffic-generation harness is required.
 
 ## 6. Verification commands
 
@@ -81,22 +97,29 @@ Use targeted formatting due the documented formatter baseline mismatch. No new C
 
 ## 7. Acceptance criteria
 
-M052 may close RouterInfo source completion only if every one of the 26 target fields is either:
+M056 may accept the corrected RouterInfo source matrix only when every one of the 26 target fields is either:
 
-- operational from a truthful bounded authoritative source with exact wire evidence; or
-- explicitly retained blocked by an accepted M051-style semantic limitation, in which case RouterInfo completion is not claimed.
+- operational from a truthful bounded authoritative source with exact wire and semantic evidence; or
+- explicitly unavailable with an accepted semantic/owner limitation.
 
-If all 26 become operational, update source counts from 16 available / 1 neutral / 26 unavailable to 42 available / 1 protocol-permitted neutral / 0 unavailable. Confirm no source relies on a placeholder or data-plane mutation.
+The pre-review `40/1/2` matrix must not be reused automatically.
 
-The overall Proposal 170 subsystem must remain `partial Proposal 170 support` unless a separate authorized roadmap closes all other unsupported dimensions. M052 does not authorize that broader claim.
+Expected outcomes under current corrective plans:
+
+- if M054 restores exact request-independent transit-15s: 38 available / 1 neutral / 4 unavailable;
+- if M054 must demote transit-15s: 37 available / 1 neutral / 5 unavailable.
+
+M056 derives the actual count from code and production evidence rather than forcing either result.
+
+The overall Proposal 170 subsystem remains `partial Proposal 170 support` unless a separate authorized roadmap closes all other unsupported dimensions.
 
 ## 8. Stop/disposition rules
 
-- Any high/medium correctness, security, containment, or source-truthfulness defect: `corrective pass required`.
+- Any high/medium correctness, security, containment, or source-truthfulness defect: another `corrective pass required`.
 - Required evidence unavailable: `blocked`.
-- One or more of the 26 remains semantically unavailable: `RouterInfo source completion incomplete`; retain truthful partial matrix.
-- All 26 operational with clean containment: `RouterInfo source completion closed internally against pinned revision`; broader Proposal 170 status remains partial as applicable.
+- Any semantically unavailable row: RouterInfo source completion remains incomplete with truthful partial matrix.
+- No production changes are allowed under M056; required code changes produce another plan.
 
 ## 9. Closure evidence
 
-Create an independent closure record with exact final head, requirement-to-evidence matrix for all 26 target rows, commands/outcomes, changed-path classification, failure/recovery/contention review, source-count reconciliation, documentation review, and explicit read-only-external/internal-only attestation.
+The original M052 closure remains historical evidence and is not rewritten. M056 must create a new independent closure record with exact corrective heads, historical defect reproductions, requirement-to-evidence matrix for the three affected rows, final 43-row source audit, commands/outcomes, changed-path classification, failure/recovery/contention review, documentation reconciliation, residual findings, and explicit read-only-external/internal-only attestation.

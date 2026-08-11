@@ -1,0 +1,630 @@
+version = 1
+fork_baseline = "adb2f52543764b267b2bcb282d093111001ae4b2"
+upstream_baseline = "9b43484a21d5a1291c4881cdae62a36c527f8c0f"
+compare_range = "9b43484a21d5a1291c4881cdae62a36c527f8c0f..adb2f52543764b267b2bcb282d093111001ae4b2"
+
+[counts]
+total_changed_paths = 284
+i2pcontrol_production_paths = 36
+non_i2pcontrol_production_paths = 47
+original_cli_paths = 11
+core_paths = 32
+tests = 18
+docs = 12
+plans = 168
+other = 7
+uncertain = 0
+
+[budgets]
+m059_original_cli = [
+  "emissary-cli/src/address_book.rs",
+  "emissary-cli/src/config.rs",
+  "emissary-cli/src/lib.rs",
+  "emissary-cli/src/logger.rs",
+  "emissary-cli/src/main.rs",
+  "emissary-cli/src/proxy/http/error.rs",
+  "emissary-cli/src/proxy/http/mod.rs",
+  "emissary-cli/src/proxy/http/request.rs",
+  "emissary-cli/src/proxy/socks.rs",
+  "emissary-cli/src/tunnel/client.rs",
+  "emissary-cli/src/tunnel/server.rs",
+]
+m059_conditional_manifests = ["Cargo.toml", "Cargo.lock", "emissary-cli/Cargo.toml"]
+m060_core = [
+  "emissary-core/src/error/mod.rs",
+  "emissary-core/src/events.rs",
+  "emissary-core/src/i2cp/socket.rs",
+  "emissary-core/src/inspection.rs",
+  "emissary-core/src/lib.rs",
+  "emissary-core/src/primitives/router_identity.rs",
+  "emissary-core/src/router/context.rs",
+  "emissary-core/src/router/mod.rs",
+  "emissary-core/src/runtime/mod.rs",
+  "emissary-core/src/sam/mod.rs",
+  "emissary-core/src/sam/parser.rs",
+  "emissary-core/src/sam/pending/connection.rs",
+  "emissary-core/src/sam/protocol/streaming/listener.rs",
+  "emissary-core/src/sam/protocol/streaming/mod.rs",
+  "emissary-core/src/sam/session.rs",
+  "emissary-core/src/sam/socket.rs",
+  "emissary-core/src/subsystem/mod.rs",
+  "emissary-core/src/transport/mod.rs",
+  "emissary-core/src/transport/ntcp2/mod.rs",
+  "emissary-core/src/transport/ntcp2/session/active.rs",
+  "emissary-core/src/transport/ntcp2/session/mod.rs",
+  "emissary-core/src/transport/ssu2/message/data.rs",
+  "emissary-core/src/transport/ssu2/mod.rs",
+  "emissary-core/src/transport/ssu2/peer_test/mod.rs",
+  "emissary-core/src/transport/ssu2/relay/mod.rs",
+  "emissary-core/src/transport/ssu2/session/active/mod.rs",
+  "emissary-core/src/transport/ssu2/session/pending/inbound.rs",
+  "emissary-core/src/transport/ssu2/session/terminating.rs",
+  "emissary-core/src/transport/ssu2/socket.rs",
+  "emissary-core/src/tunnel/mod.rs",
+  "emissary-core/src/tunnel/pool/mod.rs",
+  "emissary-core/src/tunnel/transit/mod.rs",
+]
+
+[[path]]
+name = "Cargo.toml"
+area = "build"
+classification = "required-composition"
+owner = "workspace dependency declaration"
+consumer = "emissary-cli i2pcontrol feature and its TLS/HTTP composition"
+policy_leak = false
+sensitive_path = false
+next_milestone = "M059"
+rationale = "Adds the workspace-scoped subtle dependency consumed by the feature-gated control implementation; no router policy is introduced here. M059 may revisit it only if code movement proves the dependency unused."
+required_regressions = ["cargo check -p emissary-cli --no-default-features --features i2pcontrol", "cargo check -p emissary-cli --no-default-features"]
+
+[[path]]
+name = "Cargo.lock"
+area = "build"
+classification = "required-composition"
+owner = "Cargo dependency resolution"
+consumer = "resolved dependencies for the optional i2pcontrol feature"
+policy_leak = false
+sensitive_path = false
+next_milestone = "M059"
+rationale = "Records the feature dependencies and their transitive resolution. The lockfile delta is not independently behavioral, but must remain synchronized with the manifest until M059 proves any edge removable."
+required_regressions = ["cargo check -p emissary-cli --no-default-features --features i2pcontrol", "cargo check -p emissary-cli --no-default-features"]
+
+[[path]]
+name = "emissary-cli/Cargo.toml"
+area = "build"
+classification = "required-composition"
+owner = "emissary-cli feature and dependency composition"
+consumer = "optional axum/TLS/HTTP/control service and test support"
+policy_leak = false
+sensitive_path = false
+next_milestone = "M059"
+rationale = "Defines the optional i2pcontrol feature and the dependencies needed to serve it. The feature remains disabled by default and the manifest contains no method or source policy."
+required_regressions = ["cargo check -p emissary-cli --no-default-features --features i2pcontrol", "cargo check -p emissary-cli --no-default-features", "cargo test -p emissary-cli --no-default-features --features i2pcontrol"]
+
+[[path]]
+name = "emissary-cli/src/address_book.rs"
+area = "cli"
+classification = "candidate-consolidate"
+owner = "legacy AddressBook runtime and download owner"
+consumer = "normal address resolution plus the i2pcontrol runtime address-book adapter and subscription lifecycle"
+policy_leak = true
+sensitive_path = true
+next_milestone = "M059"
+rationale = "The file still owns ordinary download/parse/resolve behavior, but the fork added runtime subscription validation, administrative commit sequencing, persistence, and the control overlay seam. M059 must move policy to i2pcontrol while retaining one neutral owner callback and the legacy resolver authority."
+required_regressions = ["AddressBook persistence and subscription concurrency tests", "disabled-feature address-book behavior", "full-destination/Base32/Base64 coherence", "static guard proving no administrative schema remains in the legacy module"]
+
+[[path]]
+name = "emissary-cli/src/config.rs"
+area = "cli"
+classification = "required-composition"
+owner = "CLI configuration parser"
+consumer = "feature-gated I2PControl enable/bind/password/certificate/key values and existing bandwidth configuration"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M059"
+rationale = "Adds deserialization/defaulting and composition transport for I2PControl configuration. It does not select methods, classify sources, or own administrative state; M059 should keep only these values and remove any incidental exposure not consumed by composition."
+required_regressions = ["default config keeps I2PControl disabled", "legacy config parsing with no i2pcontrol section", "I2PControl config round-trip/default bind behavior", "no-feature compilation"]
+
+[[path]]
+name = "emissary-cli/src/lib.rs"
+area = "cli"
+classification = "candidate-consolidate"
+owner = "emissary-cli library/composition surface"
+consumer = "feature-gated integration-test and production adapter module exports"
+policy_leak = false
+sensitive_path = false
+next_milestone = "M059"
+rationale = "Introduces a library root and re-exports original runtime modules so the feature can be exercised through integration tests. It is scaffolding rather than router behavior; M059 must prove each public export is needed and remove convenience-only exposure."
+required_regressions = ["i2pcontrol feature integration tests", "production composition tests", "no-feature binary build", "public export/static containment review"]
+
+[[path]]
+name = "emissary-cli/src/logger.rs"
+area = "cli"
+classification = "candidate-consolidate"
+owner = "CLI tracing subscriber composition"
+consumer = "bounded i2pcontrol log observation layer fed by the existing tracing fanout"
+policy_leak = false
+sensitive_path = false
+next_milestone = "M059"
+rationale = "The original logger conditionally installs the bounded log-ring layer owned by i2pcontrol. M059 must retain only composition or a generic passive sink; filtering, bounds, generations, and RPC mapping must remain in i2pcontrol."
+required_regressions = ["bounded log observation and clear behavior", "feature-off logger initialization", "redaction/no-secret log fixtures", "static guard against control-plane policy in the logger"]
+
+[[path]]
+name = "emissary-cli/src/main.rs"
+area = "cli"
+classification = "required-composition"
+owner = "CLI startup/shutdown composition root"
+consumer = "router construction, observer/inspection handle wiring, startup tunnel inventory, and I2PControl service lifecycle"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M059"
+rationale = "The main function is the only current composition point that can connect the router's owner-local handles and existing proxy/tunnel managers to the control service. The added code must remain wiring only; RouterInfo, ClientServicesInfo, TunnelManager, and support policy are not owned here."
+required_regressions = ["production composition tests", "startup cancellation and shutdown behavior", "supported client/server tunnel lifecycle", "37/1/5 RouterInfo source disposition", "no-feature startup path"]
+
+[[path]]
+name = "emissary-cli/src/proxy/http/error.rs"
+area = "cli"
+classification = "candidate-revert"
+owner = "HTTP proxy error formatting"
+consumer = "ordinary HTTP proxy error behavior"
+policy_leak = false
+sensitive_path = false
+next_milestone = "M059"
+rationale = "The pinned diff is formatting-only; no accepted I2PControl fact or owner seam is present. Upstream behavior is sufficient and this path should be reverted as part of M059's original-CLI cleanup."
+required_regressions = ["HTTP proxy error unit tests", "git diff --check", "cargo fmt --all -- --check"]
+
+[[path]]
+name = "emissary-cli/src/proxy/http/mod.rs"
+area = "cli"
+classification = "candidate-consolidate"
+owner = "HTTP proxy listener"
+consumer = "passive local listener address/capability observation for ClientServicesInfo"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M059"
+rationale = "The local_addr accessor reads the authoritative bound listener address without controlling the proxy. M059 must determine whether the higher proxy owner can publish the same lifecycle fact and remove lower-level threading if not needed."
+required_regressions = ["proxy listener-ready observation after successful bind", "proxy failure does not publish active state", "ClientServicesInfo live-service fixture", "no proxy lifecycle control through the observer"]
+
+[[path]]
+name = "emissary-cli/src/proxy/http/request.rs"
+area = "cli"
+classification = "candidate-revert"
+owner = "HTTP proxy request handling"
+consumer = "ordinary HTTP address-book request behavior"
+policy_leak = false
+sensitive_path = false
+next_milestone = "M059"
+rationale = "The pinned diff is formatting-only in request matching. It adds no observation or control policy and can be restored to upstream independently."
+required_regressions = ["HTTP proxy request/address-book tests", "git diff --check", "cargo fmt --all -- --check"]
+
+[[path]]
+name = "emissary-cli/src/proxy/socks.rs"
+area = "cli"
+classification = "candidate-consolidate"
+owner = "SOCKS proxy listener"
+consumer = "passive local listener address/capability observation for ClientServicesInfo"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M059"
+rationale = "The local_addr accessor is a neutral read of the listener owner; the other hunk is formatting-only. M059 must preserve the authoritative bind transition while reverting any unnecessary lower-level or stylistic delta."
+required_regressions = ["SOCKS listener-ready observation after successful bind", "SOCKS failure does not publish active state", "ClientServicesInfo live-service fixture", "ordinary SOCKS proxy tests"]
+
+[[path]]
+name = "emissary-cli/src/tunnel/client.rs"
+area = "cli"
+classification = "candidate-consolidate"
+owner = "existing client tunnel runtime"
+consumer = "supported client tunnel backend and passive ClientServicesInfo lifecycle inventory"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M059"
+rationale = "Adds a reusable cancellable runtime helper and adapter error/configuration types around the existing data path. The fact is owned by the client tunnel runtime, but M059 must leave no TunnelManager, persistence, JSON-RPC, or support policy in this original module."
+required_regressions = ["client tunnel start/ready/cancel/retry lifecycle", "supported client tunnel data path", "unsupported backend remains resource-free", "ClientServicesInfo lifecycle inventory"]
+
+[[path]]
+name = "emissary-cli/src/tunnel/server.rs"
+area = "cli"
+classification = "candidate-consolidate"
+owner = "existing server tunnel runtime"
+consumer = "supported server tunnel backend, persistent destination publication, and passive lifecycle inventory"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M059"
+rationale = "Adds reusable cancellable startup and a passive destination callback at the server runtime owner. The callback is neutral, but M059 must prove it does not expose private material or duplicate TunnelManager policy and must preserve forward/retry/cancellation semantics."
+required_regressions = ["server destination publication uses the actual public destination", "server forward/retry/cancel lifecycle", "private destination is absent from errors/logs", "supported server tunnel lifecycle and resource-free unsupported path"]
+
+[[path]]
+name = "emissary-core/src/error/mod.rs"
+area = "core"
+classification = "candidate-revert"
+owner = "core peer-test error formatting"
+consumer = "ordinary core error display"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "Only rustfmt-style match-arm braces differ from upstream. No inspection consumer exists; restore the upstream implementation during M060's core surface reduction."
+required_regressions = ["core error display tests", "cargo fmt --all -- --check", "git diff --check"]
+
+[[path]]
+name = "emissary-core/src/events.rs"
+area = "core"
+classification = "required-owner-seam"
+owner = "EventHandle and EventManager"
+consumer = "bounded read-only transport/transit counters, firewall state, reachability-test state, and tunnel-build statistics consumed by the i2pcontrol production adapter"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "EventHandle is the canonical owner of these existing counters and firewall events; reconstructing them above the event owner would lose ordering or current values. The seam is passive and bounded, but M060 must remove control-plane wording and retain only generic owner-local snapshots."
+required_regressions = ["EventHandle metric snapshot adapter tests", "independent IPv4/IPv6 firewall and testing state", "EWMA tunnel-build result fixture", "feature-off default behavior", "no lifecycle change when observation is unused"]
+
+[[path]]
+name = "emissary-core/src/i2cp/socket.rs"
+area = "core"
+classification = "candidate-revert"
+owner = "I2CP socket write state machine"
+consumer = "ordinary I2CP message transport"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The pinned hunk is formatting-only and contains no accepted observation. Upstream behavior is sufficient; revert it before treating the I2CP path as part of a control-plane seam."
+required_regressions = ["I2CP socket write-state tests", "I2CP feature/runtime behavior", "cargo fmt --all -- --check"]
+
+[[path]]
+name = "emissary-core/src/inspection.rs"
+area = "core"
+classification = "required-owner-seam"
+owner = "neutral core inspection snapshot sources"
+consumer = "i2pcontrol production adapters for public peer directory, transport bytes/peers, tunnel lifecycle/queues, and bounded immutable snapshots"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "This is the neutral DTO/handle boundary introduced for owner-local facts. It contains no JSON-RPC types or selectors, enforces item bounds, and does not expose mutable owners or secrets. M060 may consolidate its sources but cannot replace authoritative observations with inferred state."
+required_regressions = ["bounded snapshot item-limit and incomplete-state tests", "public RouterInfo bytes contain no private material", "transport/tunnel snapshot adapter tests", "observation failure is passive and fail-closed at the control adapter"]
+
+[[path]]
+name = "emissary-core/src/lib.rs"
+area = "core"
+classification = "required-owner-seam"
+owner = "core public module/export boundary"
+consumer = "CLI production adapters importing neutral inspection DTOs and sanitized SAM lifecycle event traits"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "Exports the neutral inspection module, sanitized SAM observer types, and generic firewall status needed at the composition boundary. M060 must minimize exports without moving Proposal 170 policy into core."
+required_regressions = ["feature-off core build", "i2pcontrol adapter imports", "SAM hook type/object-safety tests", "public API contains no control-plane DTOs"]
+
+[[path]]
+name = "emissary-core/src/primitives/router_identity.rs"
+area = "core"
+classification = "required-owner-seam"
+owner = "RouterId public identity primitive"
+consumer = "transport inspection peer keys and bounded public router identity mapping"
+policy_leak = false
+sensitive_path = false
+next_milestone = "M060"
+rationale = "The full Base64 accessor is a generic public identity conversion; Display intentionally remains abbreviated. It lets owner-local transport facts identify peers without duplicating encoding logic in protocol paths. M060 should retain it only if the generic conversion is still required by a neutral consumer."
+required_regressions = ["full Base64 identity is stable", "abbreviated Display remains unchanged", "transport peer-byte fixture", "no private identity material is exposed"]
+
+[[path]]
+name = "emissary-core/src/router/context.rs"
+area = "core"
+classification = "candidate-consolidate"
+owner = "RouterContext event-handle owner"
+consumer = "peer-test state publication and existing owner-local metric observation"
+policy_leak = true
+sensitive_path = true
+next_milestone = "M060"
+rationale = "Making event_handle public broadens a previously crate-local seam and its documentation names I2PControl. M060 must either replace it with a narrower generic handle or prove that the existing owner-local EventHandle is the smallest truthful boundary."
+required_regressions = ["peer-test IPv4/IPv6 testing transitions", "event snapshot adapter behavior", "no mutable router state escapes RouterContext", "static guard against Proposal 170 terminology in core"]
+
+[[path]]
+name = "emissary-core/src/router/mod.rs"
+area = "core"
+classification = "candidate-consolidate"
+owner = "Router composition root and inspection-handle owner"
+consumer = "CLI startup wiring for profile, transport, tunnel, event, and SAM inspection sources"
+policy_leak = true
+sensitive_path = true
+next_milestone = "M060"
+rationale = "Router is the canonical point where the independent owner handles are assembled, but it also contains an unused aggregate inspection_snapshot with zero placeholders and control-plane wording. M060 must retain only consumed neutral handles, remove fabricated/unused aggregation, and preserve router lifecycle behavior."
+required_regressions = ["Router construction with and without observation hooks", "production adapter source wiring", "37/1/5 RouterInfo disposition", "router startup/shutdown and no-feature behavior", "static guard proving unused aggregate snapshot is absent or neutral"]
+
+[[path]]
+name = "emissary-core/src/runtime/mod.rs"
+area = "core"
+classification = "candidate-revert"
+owner = "test-only runtime module visibility"
+consumer = "core unit tests using MockRuntime"
+policy_leak = false
+sensitive_path = false
+next_milestone = "M060"
+rationale = "The change only exposes the existing mock runtime under cfg(test); it is not runtime behavior or an observation seam. M060 should confirm whether it is still needed after library/test composition is reduced, otherwise restore upstream."
+required_regressions = ["core unit tests using MockRuntime", "no-feature/no-std compilation", "integration-test compilation if the export is removed"]
+
+[[path]]
+name = "emissary-core/src/sam/mod.rs"
+area = "sam"
+classification = "required-owner-seam"
+owner = "SamServer authoritative session lifecycle"
+consumer = "sanitized complete/incomplete ClientServicesInfo session/socket observation"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "SamServer sees accepted peers and authoritative session activation/removal transitions that cannot be reconstructed reliably by the CLI. The optional synchronous hook carries bounded sanitized values only; M060 must keep it passive and preserve accepted recovery semantics."
+required_regressions = ["SAM session/socket activation and removal fixtures", "complete/incomplete observation recovery", "hook rejection does not alter SAM lifecycle", "no socket/session/destination key crosses the hook"]
+
+[[path]]
+name = "emissary-core/src/sam/parser.rs"
+area = "sam"
+classification = "candidate-revert"
+owner = "SAM command display/parser"
+consumer = "ordinary SAM parser diagnostics"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "Only formatting changes are present. No lifecycle fact is known at this parser boundary, so the upstream parser is the correct implementation."
+required_regressions = ["SAM parser rejection/display tests", "cargo fmt --all -- --check"]
+
+[[path]]
+name = "emissary-core/src/sam/pending/connection.rs"
+area = "sam"
+classification = "candidate-consolidate"
+owner = "SAM accepted TCP connection boundary"
+consumer = "sanitized peer address associated with the authoritative SAM socket/session observation"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The accepted peer address is first available at the listener/pending-connection boundary and is threaded into the socket. M060 must test whether SamServer can publish it directly or whether this small propagation is required to preserve session correlation."
+required_regressions = ["accepted peer address reaches the SAM observation fixture", "malformed/failed handshakes do not publish active sessions", "peer address is sanitized and bounded", "ordinary pending connection timeout behavior"]
+
+[[path]]
+name = "emissary-core/src/sam/protocol/streaming/listener.rs"
+area = "sam"
+classification = "required-owner-seam"
+owner = "SAM streaming listener/socket owner"
+consumer = "stable socket identity for stream/listener activation and close correlation"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The listener is the only owner that turns a SamSocket into a stream/listener and can preserve its stable identity at that transition. Removing the field would lose correlation for close/reject events."
+required_regressions = ["stream listener activation identity", "ephemeral and persistent listener close cleanup", "failed registration removes the observation", "stream protocol behavior unchanged"]
+
+[[path]]
+name = "emissary-core/src/sam/protocol/streaming/mod.rs"
+area = "sam"
+classification = "required-owner-seam"
+owner = "SAM StreamManager active-stream lifecycle"
+consumer = "stream rejected/closed events used to remove bounded ClientServicesInfo socket observations"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "StreamManager owns the active stream map and is the only place that sees the exact rejection/closure transition. The socket ID is sanitized metadata, not a handle; M060 must seek a smaller owner-level event shape without losing closure ordering."
+required_regressions = ["stream rejected event removes the correct socket", "stream closed event removes the correct socket", "forwarded streams remain uncorrelated as designed", "SAM data path and shutdown behavior"]
+
+[[path]]
+name = "emissary-core/src/sam/session.rs"
+area = "sam"
+classification = "required-owner-seam"
+owner = "SamSession stream/listener lifecycle"
+consumer = "bounded socket inventory and cleanup in the i2pcontrol SAM observer"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "SamSession owns stream/listener creation and receives StreamManager close/reject events, so it is the canonical correlator for socket lifecycle. M060 must preserve complete/incomplete semantics and ensure hook failure cannot change the underlying session."
+required_regressions = ["SAM stream/listener activation fixtures", "close/reject cleanup and session removal", "hook rejection is non-fatal", "bounded socket inventory and no secret/destination key leakage"]
+
+[[path]]
+name = "emissary-core/src/sam/socket.rs"
+area = "sam"
+classification = "required-owner-seam"
+owner = "SamSocket identity/peer owner"
+consumer = "stable bounded socket ID and sanitized accepted peer metadata"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The socket owns the stable identity and accepted TCP peer value used to correlate lifecycle events. It exposes only copied scalar/address data; M060 may consolidate the ID allocation but cannot infer it after ownership is moved."
+required_regressions = ["socket IDs are unique and stable for one socket", "peer metadata is optional and bounded", "socket write state behavior", "no socket handle crosses the observer seam"]
+
+[[path]]
+name = "emissary-core/src/subsystem/mod.rs"
+area = "core"
+classification = "candidate-revert"
+owner = "generic subsystem message dispatch"
+consumer = "ordinary DeliveryStatus handling"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The pinned hunk only adds braces around an existing match arm. It has no inspection consumer and should be restored to upstream."
+required_regressions = ["subsystem DeliveryStatus dispatch tests", "cargo fmt --all -- --check"]
+
+[[path]]
+name = "emissary-core/src/transport/mod.rs"
+area = "transport"
+classification = "required-owner-seam"
+owner = "TransportManager"
+consumer = "shared transport inspection source, connected-peer snapshot, and EventHandle metrics"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "TransportManager owns the set of active sessions and is the correct common source for peer identity/status snapshots. It can distribute a passive source to protocol owners without changing handshake or routing decisions."
+required_regressions = ["connected-peer bounded snapshot", "transport inspection source is no-op when unused", "NTCP2/SSU2 lifecycle and byte-accounting fixtures", "transport startup/shutdown behavior"]
+
+[[path]]
+name = "emissary-core/src/transport/ntcp2/mod.rs"
+area = "transport"
+classification = "candidate-consolidate"
+owner = "Ntcp2Transport/session-manager composition"
+consumer = "shared NTCP2 peer-byte inspection source"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The module only threads the neutral source from the transport owner into SessionManager. M060 must determine whether a manager-issued handle can reduce this propagation while retaining exact active-session accounting."
+required_regressions = ["NTCP2 inspection source reaches active sessions", "NTCP2 handshake/session lifecycle unchanged", "no-op construction path", "exact peer byte totals"]
+
+[[path]]
+name = "emissary-core/src/transport/ntcp2/session/active.rs"
+area = "transport"
+classification = "required-owner-seam"
+owner = "Ntcp2 active session I/O"
+consumer = "exact per-peer inbound/outbound byte observation"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "Only the active session sees the actual successful read/write byte counts at the protocol I/O boundary. Moving accounting to a higher owner would risk losing partial writes or double-counting, so M060 needs an exact before/after byte fixture before consolidation."
+required_regressions = ["NTCP2 partial-read/partial-write byte accounting", "per-peer identity mapping", "handshake/retransmission behavior unchanged", "inspection failure cannot fail the session"]
+
+[[path]]
+name = "emissary-core/src/transport/ntcp2/session/mod.rs"
+area = "transport"
+classification = "candidate-consolidate"
+owner = "Ntcp2 SessionManager"
+consumer = "construction and propagation of the shared active-session inspection source"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The manager forwards a cloneable neutral source through inbound/outbound session setup. It is likely reducible if the transport owner can issue a smaller session-local sink, but exact byte semantics must be proven first."
+required_regressions = ["NTCP2 inbound/outbound session construction", "active-session byte fixture", "session cancellation/error behavior", "no mutable manager state crosses the seam"]
+
+[[path]]
+name = "emissary-core/src/transport/ssu2/message/data.rs"
+area = "transport"
+classification = "candidate-revert"
+owner = "SSU2 data message sizing"
+consumer = "ordinary SSU2 relay-block sizing"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The pinned hunk is formatting-only and does not produce an observation. Restore upstream behavior."
+required_regressions = ["SSU2 data sizing tests", "cargo fmt --all -- --check"]
+
+[[path]]
+name = "emissary-core/src/transport/ssu2/mod.rs"
+area = "transport"
+classification = "candidate-consolidate"
+owner = "Ssu2Transport/socket composition"
+consumer = "shared SSU2 peer-byte inspection source"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The module forwards a neutral source into Ssu2Socket while retaining the upstream constructor as a default path. M060 must decide whether the source can be attached at the common transport owner with fewer protocol signatures."
+required_regressions = ["SSU2 inspection source reaches active sessions", "SSU2 constructor/default behavior", "peer byte totals for inbound/outbound packets", "SSU2 protocol lifecycle unchanged"]
+
+[[path]]
+name = "emissary-core/src/transport/ssu2/peer_test/mod.rs"
+area = "transport"
+classification = "required-owner-seam"
+owner = "SSU2 PeerTestManager"
+consumer = "independent IPv4/IPv6 reachability-test state in the network source"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "PeerTestManager owns the active test set and therefore the authoritative family-specific testing state. The hook publishes a boolean snapshot and does not create probes or alter test scheduling."
+required_regressions = ["IPv4 and IPv6 testing state transitions", "no probe/task added by observation", "peer-test completion/rejection lifecycle", "network-state source remains independent by family"]
+
+[[path]]
+name = "emissary-core/src/transport/ssu2/relay/mod.rs"
+area = "transport"
+classification = "candidate-revert"
+owner = "SSU2 relay manager tests"
+consumer = "ordinary relay failure test formatting"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "All pinned changes are formatting-only test-arm braces. No observation or behavior is added; restore upstream."
+required_regressions = ["SSU2 relay failure tests", "cargo fmt --all -- --check"]
+
+[[path]]
+name = "emissary-core/src/transport/ssu2/session/active/mod.rs"
+area = "transport"
+classification = "required-owner-seam"
+owner = "Ssu2 active session packet I/O"
+consumer = "exact per-peer inbound/outbound byte observation"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The active session sees packet receipt and successful write completion, including partial writes, so it is the only truthful source for exact byte accounting. M060 must check for duplicate writes and prove any higher-level replacement equivalent."
+required_regressions = ["SSU2 partial-write and packet byte accounting", "per-peer identity mapping", "session termination behavior", "inspection failure cannot affect packet handling"]
+
+[[path]]
+name = "emissary-core/src/transport/ssu2/session/pending/inbound.rs"
+area = "transport"
+classification = "candidate-revert"
+owner = "SSU2 pending inbound handshake"
+consumer = "ordinary SSU2 handshake state machine"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The pinned hunk is formatting-only. It has no inspection consumer and should be restored to upstream."
+required_regressions = ["SSU2 pending inbound handshake tests", "cargo fmt --all -- --check"]
+
+[[path]]
+name = "emissary-core/src/transport/ssu2/session/terminating.rs"
+area = "transport"
+classification = "candidate-revert"
+owner = "SSU2 terminating session"
+consumer = "ordinary termination packet handling"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "The pinned hunk is formatting-only and has no observation consumer. Restore upstream."
+required_regressions = ["SSU2 terminating-session tests", "cargo fmt --all -- --check"]
+
+[[path]]
+name = "emissary-core/src/transport/ssu2/socket.rs"
+area = "transport"
+classification = "candidate-consolidate"
+owner = "Ssu2Socket/session composition"
+consumer = "propagation of the shared peer-byte inspection source to active sessions"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "Ssu2Socket owns active-session creation and therefore can pass a neutral source, but the signature expansion is deep. M060 must seek a manager-level or socket-local seam that preserves packet byte semantics with fewer audited paths."
+required_regressions = ["SSU2 active-session source wiring", "socket constructor/default behavior", "peer byte totals and session cleanup", "no socket/mutable owner crosses inspection boundary"]
+
+[[path]]
+name = "emissary-core/src/tunnel/mod.rs"
+area = "tunnel"
+classification = "required-owner-seam"
+owner = "TunnelManager"
+consumer = "bounded exploratory/client/participating tunnel inspection source and build-result accounting"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "TunnelManager is the canonical owner that creates exploratory/client pools and the transit manager, so it can issue pool identity and observation handles without exposing tunnel control. M060 must preserve unsupported data-plane behavior and avoid sampling."
+required_regressions = ["exploratory/client/participating tunnel inventory", "pool identity and queue bounds", "tunnel build success/failure accounting", "unsupported tunnel types remain resource-free"]
+
+[[path]]
+name = "emissary-core/src/tunnel/pool/mod.rs"
+area = "tunnel"
+classification = "required-owner-seam"
+owner = "TunnelPool"
+consumer = "actual tunnel lifecycle direction and pool queue-depth snapshots"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "TunnelPool owns pending queues and the exact successful/failed tunnel lifecycle transitions; a higher observer cannot reconstruct those facts without inference. The metadata sink is bounded/passive and has no control authority."
+required_regressions = ["inbound/outbound tunnel publish/remove balance", "pool queue-depth bounds", "build result success/failure counters", "pool drop releases observations", "no tunnel data-plane change"]
+
+[[path]]
+name = "emissary-core/src/tunnel/transit/mod.rs"
+area = "tunnel"
+classification = "required-owner-seam"
+owner = "TransitTunnelManager"
+consumer = "participating tunnel count and transit message-queue depth"
+policy_leak = false
+sensitive_path = true
+next_milestone = "M060"
+rationale = "TransitTunnelManager owns participating tunnel insertion/removal and its message receiver queue. These are exact owner-local facts, while the unavailable rolling 15-second transit field remains deliberately unimplemented; M060 must not add a sampler."
+required_regressions = ["participating tunnel publish/remove balance", "TBM queue-depth snapshot", "transit 15-second selector remains unavailable", "transit lifecycle and shutdown behavior"]
+
+[[path]]
+name = "examples/rust-tutorial/src/main.rs"
+area = "build"
+classification = "candidate-revert"
+owner = "rust-tutorial example"
+consumer = "ordinary tutorial startup/error handling"
+policy_leak = false
+sensitive_path = false
+next_milestone = "none"
+rationale = "The pinned hunk is formatting-only and does not reflect constructor churn or a Proposal 170 dependency. It should be reverted independently and is outside both containment implementation budgets."
+required_regressions = ["cargo fmt --all -- --check", "rust-tutorial example check"]

@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; containment corrective sequence active with M058 ready
+Status: partial Proposal 170 support; containment corrective sequence active with M059 ready
 
 This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -21,9 +21,10 @@ All work is internal to `eggstack/emissary`. External specifications/reference i
 
 ## Current handoff
 
-M058 is the sole dependency-ready handoff:
+M059 is the sole dependency-ready handoff:
 
-- `058-non-i2pcontrol-delta-inventory.md` — **ready**; audit-only complete upstream/fork non-`i2pcontrol` production delta and create a machine-readable containment ledger. Production changes are forbidden.
+- `058-non-i2pcontrol-delta-inventory.md` — **closed**; audit-only complete upstream/fork non-`i2pcontrol` production delta and create a machine-readable containment ledger. Production changes were forbidden.
+- `059-cli-runtime-containment.md` — **ready**; reduce the original CLI/runtime delta using the accepted M058 path budget.
 
 Future containment handoffs exist for deterministic planning but are not registered ready until predecessors close:
 
@@ -66,8 +67,8 @@ This is primarily a security-review surface reduction.
 
 | Handoff | Status | Objective | Hard dependency |
 |---|---|---|---|
-| M058 — non-I2PControl delta inventory | ready | freeze upstream/fork baselines; classify every outside production path; create exact M059/M060 budgets | M057 closed |
-| M059 — original CLI/runtime containment | planned | move residual control policy under `i2pcontrol`; revert/consolidate original AddressBook/config/logger/proxy/tunnel integration where safe | accepted M058 closure |
+| M058 — non-I2PControl delta inventory | closed | 47-path ledger accepted; exact M059/M060 budgets frozen; no production changes | `058-closure.md` |
+| M059 — original CLI/runtime containment | ready | move residual control policy under `i2pcontrol`; revert/consolidate original AddressBook/config/logger/proxy/tunnel integration where safe | accepted M058 closure |
 | M060 — core observation containment | planned | reduce audited-core inspection/SAM/I2CP/transport/tunnel delta to minimum neutral owner seams | M059 closure |
 | M061 — independent containment reclosure | planned | production-free recompute/review; create current exact-path manifest and static guard | M060 closure |
 

@@ -1,6 +1,6 @@
 # M059 — Original CLI and Runtime Adapter Containment
 
-Status: planned; hard-blocked on M058 closure
+Status: ready
 
 Planning baseline: to be pinned by accepted M058 closure
 
@@ -8,9 +8,9 @@ Source roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md`
 
-Hard dependency:
+Accepted predecessor and budget:
 
-- M058 accepted closure and machine-readable containment ledger;
+- M058 closure and machine-readable containment ledger;
 - exact M059 changed-path budget frozen by M058;
 - no `uncertain` ledger entry may be modified under this milestone.
 

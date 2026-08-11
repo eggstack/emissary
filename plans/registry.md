@@ -28,15 +28,15 @@ Canonical direction:
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
-| I2PControl Proposal 170 containment | active | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M058 — non-I2PControl fork-delta inventory | M057 closed; M058 has no remaining hard dependency |
+| I2PControl Proposal 170 containment | active | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M059 — original CLI/runtime adapter containment | M058 closed; M060 remains blocked on M059 closure |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 containment | M058 — non-I2PControl fork-delta inventory and containment ledger | ready | `plans/implementation/i2pcontrol-proposal-170/058-non-i2pcontrol-delta-inventory.md` | M057 closed; fork baseline `adb2f52543764b267b2bcb282d093111001ae4b2`; upstream merge-base comparison `9b43484a21d5a1291c4881cdae62a36c527f8c0f` |
+| I2PControl Proposal 170 containment | M059 — original CLI/runtime adapter containment | ready | `plans/implementation/i2pcontrol-proposal-170/059-cli-runtime-containment.md` | M058 closed; exact original-CLI budget in `058-containment-ledger.toml` |
 
-M059–M061 exist as deterministic future handoffs in the containment roadmap but are not registered as dependency-ready until their predecessor closures are accepted, per `plans/003-planning-process.md`.
+M060–M061 remain deterministic future handoffs in the containment roadmap but are not registered as dependency-ready until their predecessor closures are accepted, per `plans/003-planning-process.md`.
 
 ## Blocked roadmap successors
 
@@ -44,7 +44,7 @@ M059–M061 exist as deterministic future handoffs in the containment roadmap bu
 |---|---|---|---|
 | M051 — router news and banned peers | blocked with accepted semantic limitation | `plans/implementation/i2pcontrol-proposal-170/051-routerinfo-news-and-banned-peer-semantics.md` | substantive news/ban owners absent; no current owner-specific plan authorized |
 
-The containment successors M059–M061 are dependency-ordered planned milestones rather than semantic blockers and therefore remain in `i2pcontrol-proposal-170-containment-roadmap.md` until ready.
+The containment successors M060–M061 are dependency-ordered planned milestones rather than semantic blockers and therefore remain in `i2pcontrol-proposal-170-containment-roadmap.md` until ready. M059 is now registered as the sole dependency-ready successor.
 
 ## Current containment corrective scope
 
@@ -57,11 +57,11 @@ The current review established that most Proposal 170 policy is correctly concen
 The containment sequence is:
 
 1. M058 — audit-only complete non-`i2pcontrol` fork-delta ledger; zero production changes.
-2. M059 — original CLI/runtime adapter containment; hard-blocked until M058 accepts an exact path budget.
+2. M059 — original CLI/runtime adapter containment; ready after accepted M058 ledger/closure.
 3. M060 — audited-core observation seam consolidation; hard-blocked until M059 closes.
 4. M061 — production-free independent reclosure and current static containment guard; hard-blocked until M060 closes.
 
-Only M058 is currently executable.
+Only M059 is currently executable.
 
 ### Containment ownership rule
 
@@ -94,8 +94,8 @@ M058 closure must prove the inventory is complete and freeze the exact M059 path
 | M052 — integration reclosure | corrected/closed through M056 | historical `40/1/2` matrix superseded by accepted `37/1/5` audit |
 | M054–M056 | closed | transit/error truthfulness and integrated source reclosure accepted |
 | M057 | closed | planning-record consistency accepted; no production changes |
-| M058 | ready | current dependency-ready containment audit handoff |
-| M059 | planned, not registered ready | waits for accepted M058 ledger/closure |
+| M058 | closed | `058-closure.md` accepted; 47-path ledger and M059/M060 budgets frozen |
+| M059 | ready | exact original-CLI budget accepted from M058 |
 | M060 | planned, not registered ready | waits for M059 closure |
 | M061 | planned, not registered ready | waits for M060 closure |
 
@@ -134,16 +134,15 @@ Upstream `eepnet/emissary` is accessed read-only for containment comparison. The
 
 ## Registry maintenance rules
 
-1. M058 is the sole dependency-ready containment handoff.
-2. Do not register M059 until M058 closure accepts the complete ledger and exact M059 path budget.
-3. Do not register M060 until M059 closes; do not register M061 until M060 closes.
-4. Preserve M037 as historical evidence rather than rewriting its boundary to include later RouterInfo work.
-5. Preserve M053/M045 and M046–M048 closure history unless a direct new defect is demonstrated.
-6. Preserve M049/M050/M052 historical records while retaining only their named superseded findings.
-7. M054–M057 remain closed and are not reopened by containment refactoring absent a direct behavior defect.
-8. Keep Proposal 170 policy under I2PControl; outside changes must be neutral owner/composition seams only.
-9. Do not mark a retained outside path required until its canonical owner, consumer, necessity, bounds, and regression evidence are recorded.
-10. Keep verification local/package-scoped and proportional; do not expand CI/release apparatus.
-11. Overall Proposal 170 remains partial; containment completion does not imply source completeness.
-12. M051 remains blocked by absent substantive news/ban owners.
-13. No upstream interaction is authorized.
+1. M059 is the sole dependency-ready containment handoff; M058 is closed.
+2. Do not register M060 until M059 closes; do not register M061 until M060 closes.
+3. Preserve M037 as historical evidence rather than rewriting its boundary to include later RouterInfo work.
+4. Preserve M053/M045 and M046–M048 closure history unless a direct new defect is demonstrated.
+5. Preserve M049/M050/M052 historical records while retaining only their named superseded findings.
+6. M054–M057 remain closed and are not reopened by containment refactoring absent a direct behavior defect.
+7. Keep Proposal 170 policy under I2PControl; outside changes must be neutral owner/composition seams only.
+8. Do not mark a retained outside path required until its canonical owner, consumer, necessity, bounds, and regression evidence are recorded.
+9. Keep verification local/package-scoped and proportional; do not expand CI/release apparatus.
+10. Overall Proposal 170 remains partial; containment completion does not imply source completeness.
+11. M051 remains blocked by absent substantive news/ban owners.
+12. No upstream interaction is authorized.

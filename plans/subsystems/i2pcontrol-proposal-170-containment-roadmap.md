@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Containment Corrective Roadmap
 
-Status: active; M058 ready
+Status: active; M059 ready
 
 Planning baseline: `adb2f52543764b267b2bcb282d093111001ae4b2` — merged M057 closure head
 
@@ -145,7 +145,7 @@ M057 closed source/truthfulness planning state
 M058 — non-i2pcontrol fork-delta inventory and containment ledger — READY
    |
    v
-M059 — original CLI/runtime adapter containment — planned; hard-blocked on M058
+M059 — original CLI/runtime adapter containment — ready; M058 closed
    |
    v
 M060 — core observation seam consolidation — planned; hard-blocked on M059
@@ -271,8 +271,8 @@ The completion criterion is **minimum justified delta**, not a predetermined num
 
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
-| M058 | ready | `plans/implementation/i2pcontrol-proposal-170/058-non-i2pcontrol-delta-inventory.md` | to be created | none; M057 closed |
-| M059 | planned | `plans/implementation/i2pcontrol-proposal-170/059-cli-runtime-containment.md` | to be created after implementation | hard: accepted M058 ledger/closure |
+| M058 | closed | `plans/implementation/i2pcontrol-proposal-170/058-non-i2pcontrol-delta-inventory.md` | `plans/closure/i2pcontrol-proposal-170/058-closure.md` | audit-only; 47 paths classified; no production changes |
+| M059 | ready | `plans/implementation/i2pcontrol-proposal-170/059-cli-runtime-containment.md` | to be created after implementation | accepted M058 ledger/closure; exact original-CLI budget frozen |
 | M060 | planned | `plans/implementation/i2pcontrol-proposal-170/060-core-observation-containment.md` | to be created after implementation | hard: M059 closure |
 | M061 | planned | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | to be created after implementation | hard: M060 closure |
 

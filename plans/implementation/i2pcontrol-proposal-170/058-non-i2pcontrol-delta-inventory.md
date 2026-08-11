@@ -1,6 +1,6 @@
 # M058 — Non-I2PControl Fork-Delta Inventory and Containment Ledger
 
-Status: ready
+Status: closed
 
 Planning baseline: `adb2f52543764b267b2bcb282d093111001ae4b2` — merged M057 closure head
 

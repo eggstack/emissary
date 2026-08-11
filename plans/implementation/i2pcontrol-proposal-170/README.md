@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; RouterInfo source completion active; M053 ready
+Status: partial Proposal 170 support; RouterInfo source completion closed with accepted semantic limitation
 
 This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -13,6 +13,7 @@ Authoritative direction:
 - `plans/implementation/i2pcontrol-proposal-170/045-052-routerinfo-source-boundary.toml`;
 - retained M044 closure: `plans/closure/i2pcontrol-proposal-170/044-closure.md`;
 - blocked M045 closure: `plans/closure/i2pcontrol-proposal-170/045-closure.md`.
+- accepted M049 closure: `plans/closure/i2pcontrol-proposal-170/049-closure.md`.
 
 Pinned external authority: Proposal 170 `I2PControl Expansion`, Open, revision `2026-05-20`, plus existing I2PControl authentication/JSON-RPC contract.
 
@@ -22,25 +23,27 @@ All work is internal to `eggstack/emissary`. External specifications/reference i
 
 ## Current handoff
 
-M053 is the sole dependency-ready corrective handoff:
+M053 is closed through `plans/closure/i2pcontrol-proposal-170/053-closure.md`.
+M045 is corrected/closed through that record. M052 is closed through
+`plans/closure/i2pcontrol-proposal-170/052-closure.md`:
 
-- `053-m045-live-profile-storage-corrective.md` — ready; corrects M045's rejected stale startup-snapshot source.
+- `053-m045-live-profile-storage-corrective.md` — closed; corrected M045's rejected stale startup-snapshot source.
 
-M045 remains blocked until M053's independent closure accepts the live source and explicitly records the three known-peer fields corrected/closed. M046–M052 remain blocked behind that chain.
+M045 is corrected/closed through M053's accepted independent closure, which records the three known-peer fields as live. M046 is closed through `046-closure.md`; M047 is closed through `047-closure.md`; M048 is closed through `048-closure.md`; M049 is closed through `049-closure.md`; M050 is closed through `050-closure.md`; M051 remains blocked by its accepted semantic disposition; M052 is closed after final integration/reclosure review. No dependency-ready successor remains: the two M051 fields require substantive owners that are outside this roadmap.
 
 ## RouterInfo source-completion sequence
 
 | Handoff | Status | Target | Hard dependency |
 |---|---|---|---|
-| M053 — M045 live ProfileStorage corrective | ready | correct M045's 3 fields | M045 blocked finding accepted |
-| M045 — known-peer directory | blocked | 3 fields | M053 closure |
-| M046 — active-peer inventory + transport limits | blocked | 4 fields | corrected M045 closure |
-| M047 — active-peer statistics | blocked | 1 field | M046 closure |
-| M048 — tunnel-pool counts/details | blocked | 7 fields | M047 closure |
-| M049 — rolling transit/build metrics + queues | blocked | 4 fields | M048 closure |
-| M050 — v4/v6 network state | blocked | 5 fields | M049 closure |
-| M051 — router news + banned peers | blocked | 2 fields | M050 closure |
-| M052 — integration/containment reclosure | blocked | validation | M045–M051 accepted |
+| M053 — M045 live ProfileStorage corrective | closed | correct M045's 3 fields | accepted closure `053-closure.md` |
+| M045 — known-peer directory | closed | 3 fields | corrected through M053 closure |
+| M046 — active-peer inventory + transport limits | closed | 4 fields | `046-closure.md` |
+| M047 — active-peer statistics | closed | 1 field | M046 closure; `047-closure.md` |
+| M048 — tunnel-pool counts/details | closed | 7 fields | `048-closure.md` |
+| M049 — rolling transit/build metrics + queues | closed | 4 fields | `049-closure.md` |
+| M050 — v4/v6 network state | closed | 5 fields | `050-closure.md` |
+| M051 — router news + banned peers | blocked | 2 fields retained unavailable | `051-closure.md` |
+| M052 — integration/containment reclosure | closed | 40 available + 1 neutral + 2 unavailable retained truthfully | M045–M051 accepted or semantically blocked; `052-closure.md` |
 
 Plans:
 
@@ -69,19 +72,19 @@ The required regression constructs the source first, mutates canonical ProfileSt
 
 ## Scope and ownership rule
 
-The target remains exactly the 26 RouterInfo rows currently classified unavailable. Proposal 170 policy remains under `emissary-cli/src/i2pcontrol/**`: field/source disposition, rolling windows, aggregation, joins, sorting, bounds, Base64/numeric wire mapping, JSON types/serialization, compatibility behavior, and sanitized errors.
+The remaining target is exactly the 2 RouterInfo rows currently classified unavailable. Proposal 170 policy remains under `emissary-cli/src/i2pcontrol/**`: field/source disposition, rolling windows, aggregation, joins, sorting, bounds, Base64/numeric wire mapping, JSON types/serialization, compatibility behavior, and sanitized errors.
 
 Changes outside `i2pcontrol/**` are exceptional and may only expose neutral bounded read-only facts from canonical owners. They must not contain Proposal 170 terminology or mutable control authority. Machine-readable budgets, including the M053 corrective overlay, are in `045-052-routerinfo-source-boundary.toml`.
 
 ## Source groups
 
-The 26 rows are decomposed into:
+The RouterInfo source-completion subset is decomposed into:
 
-- known public peer directory: 3;
-- active peer list/info + NTCP/SSU limits: 4;
+- known public peer directory: 3 (closed);
+- active peer list/info + NTCP/SSU limits: 4 (closed);
 - active peer stats: 1;
 - participating/exploratory/client tunnel counts/details: 7;
-- transit 15s/recent tunnel success/queue/TBM queue: 4;
+- transit 15s/recent tunnel success/queue/TBM queue: 4 (closed);
 - v4/v6 status/error/testing: 5;
 - router news/banned peers: 2.
 
@@ -125,7 +128,9 @@ M053 additionally requires the post-construction peer-directory churn regression
 
 ## Final status rule
 
-If M053 corrects M045, all remaining 23 fields become truthful operational sources, and M052 accepts the final head, the RouterInfo dimension may move to 42 available + 1 protocol-permitted neutral + 0 unavailable and be closed internally against the pinned revision.
+M051 confirmed that both remaining fields require absent substantive owners and
+remain unavailable. M052 validated the incomplete but truthful final matrix;
+it does not claim RouterInfo source completion.
 
 This does not automatically close full Proposal 170: unrelated unsupported tunnel families and other accepted partial dimensions remain outside this roadmap. If M051 proves that news or banned-peer semantics require an absent substantive subsystem, retain the field unavailable rather than expanding scope.
 

@@ -25,7 +25,7 @@ use std::collections::HashSet;
 
 use crate::i2pcontrol::{
     address_book::{resolve_address_book_selectors_with_mode, RouterInfoAddressBookMode},
-    router_info::{InspectionError, RouterInfoControl},
+    router_info::{InspectionError, NetworkStatus, RouterInfoControl},
     rpc::{self, JsonRpcErrorResponse, JsonRpcRequest, JsonRpcSuccess, RequestId},
 };
 
@@ -49,9 +49,54 @@ const MAX_BANNED_PEERS: usize = 10000;
 /// Maximum number of entries exposed by the shared startup tunnel inventory.
 const MAX_I2PTUNNEL_INFO_ENTRIES: usize = 1000;
 
+/// Maximum number of rows in any live tunnel-detail response.
+const MAX_TUNNEL_DETAIL_ENTRIES: usize = 10000;
+
+const TUNNEL_DETAIL_KEYS: &[&str] = &[
+    rpc::router_info_keys::P170_NET_TUNNELS_PARTICIPATING_INFO,
+    rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INBOUND,
+    rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_OUTBOUND,
+    rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INFO_LIST,
+    rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INBOUND,
+    rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_OUTBOUND,
+    rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INFO_LIST,
+    rpc::router_info_keys::P170_NET_TUNNELS_QUEUE,
+    rpc::router_info_keys::P170_NET_TUNNELS_TBM_QUEUE,
+];
+
 /// Maximum serialized RouterInfo response size, including the JSON-RPC
 /// envelope. The final response is checked after actual serialization.
 const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
+
+/// Map the supported neutral reachability states to the pinned i2pd status
+/// vocabulary. Emissary currently produces only OK, Firewalled, Unknown, and
+/// Symmetric NAT; the latter has no distinct i2pd status code and remains an
+/// unknown status until a canonical error owner exists.
+fn network_status_code(status: NetworkStatus) -> i64 {
+    match status {
+        NetworkStatus::Ok => 0,
+        NetworkStatus::Firewalled => 1,
+        NetworkStatus::Unknown | NetworkStatus::SymmetricNat => 2,
+        NetworkStatus::Hidden
+        | NetworkStatus::Testing
+        | NetworkStatus::Fail
+        | NetworkStatus::FailTcp
+        | NetworkStatus::FailUdp
+        | NetworkStatus::FailNat => 2,
+    }
+}
+
+/// Map a known neutral failure reason to the pinned i2pd error vocabulary.
+fn network_error_code(error: Option<emissary_core::inspection::NetworkErrorReason>) -> i64 {
+    match error {
+        None => 0,
+        Some(emissary_core::inspection::NetworkErrorReason::ClockSkew) => 1,
+        Some(emissary_core::inspection::NetworkErrorReason::Offline) => 2,
+        Some(emissary_core::inspection::NetworkErrorReason::SymmetricNat) => 3,
+        Some(emissary_core::inspection::NetworkErrorReason::FullConeNat) => 4,
+        Some(emissary_core::inspection::NetworkErrorReason::NoDescriptors) => 5,
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RouterInfoRequestMode {
@@ -189,7 +234,9 @@ fn estimate_response_budget(key_set: &HashSet<&str>) -> Result<(), String> {
     }
 
     // Active peer stats
-    if key_set.contains(rpc::router_info_keys::PEERS_ACTIVE_STATS) {
+    if key_set.contains(rpc::router_info_keys::PEERS_ACTIVE_STATS)
+        || key_set.contains(rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_STATS)
+    {
         estimated_bytes += MAX_ACTIVE_PEER_STATS * 128;
     }
 
@@ -204,6 +251,18 @@ fn estimate_response_budget(key_set: &HashSet<&str>) -> Result<(), String> {
     if key_set.contains(rpc::router_info_keys::LOG_SNAPSHOT) {
         estimated_bytes += MAX_LOG_ENTRIES * 256;
     }
+
+    // Proposal 170 tunnel pool detail lists contain only bounded primitive
+    // rows. Account for every requested list before querying the shared source.
+    let tunnel_detail_lists = TUNNEL_DETAIL_KEYS
+        .iter()
+        .filter(|key| {
+            key_set.contains(**key)
+                && **key != rpc::router_info_keys::P170_NET_TUNNELS_QUEUE
+                && **key != rpc::router_info_keys::P170_NET_TUNNELS_TBM_QUEUE
+        })
+        .count();
+    estimated_bytes += tunnel_detail_lists * MAX_TUNNEL_DETAIL_ENTRIES * 128;
 
     // Coarse pre-query response cap. Actual serialized output is checked after
     // assembly because source payload sizes are not predictable.
@@ -433,6 +492,35 @@ async fn assemble_response(
         } else {
             None
         };
+    let transit_bandwidth_15s_snapshot =
+        if key_set.contains(rpc::router_info_keys::P170_NET_BW_TRANSIT_15S) {
+            Some(router_info.transit_bandwidth_15s().await?)
+        } else {
+            None
+        };
+    let recent_tunnel_success_rate_snapshot =
+        if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_SUCCESS_RATE) {
+            Some(router_info.recent_tunnel_success_rate().await?)
+        } else {
+            None
+        };
+    let tunnel_details_snapshot = if key_set.iter().any(|key| TUNNEL_DETAIL_KEYS.contains(key)) {
+        Some(router_info.tunnel_details().await?)
+    } else {
+        None
+    };
+    let network_snapshot = if key_set.contains(rpc::router_info_keys::NET_BW_INBOUND)
+        || key_set.contains(rpc::router_info_keys::NET_BW_OUTBOUND)
+        || key_set.contains(rpc::router_info_keys::P170_NET_STATUS_V6)
+        || key_set.contains(rpc::router_info_keys::P170_NET_ERROR)
+        || key_set.contains(rpc::router_info_keys::P170_NET_ERROR_V6)
+        || key_set.contains(rpc::router_info_keys::P170_NET_TESTING)
+        || key_set.contains(rpc::router_info_keys::P170_NET_TESTING_V6)
+    {
+        Some(router_info.network_snapshot().await?)
+    } else {
+        None
+    };
 
     // Exact Proposal 170 retained and metric fields.
     if key_set.contains(rpc::router_info_keys::P170_ID) {
@@ -489,6 +577,12 @@ async fn assemble_response(
             serde_json::json!(bytes.sent),
         );
     }
+    if key_set.contains(rpc::router_info_keys::P170_NET_BW_TRANSIT_15S) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_BW_TRANSIT_15S.to_string(),
+            serde_json::json!(transit_bandwidth_15s_snapshot.expect("transit 15s was queried")),
+        );
+    }
     if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_SHARE_RATIO) {
         let ratio = share_ratio_snapshot.as_ref().expect("share ratio was queried");
         result.insert(
@@ -533,6 +627,31 @@ async fn assemble_response(
             rpc::router_info_keys::P170_NET_TUNNELS_TOTAL_SUCCESS_RATE.to_string(),
             serde_json::json!(rate),
         );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_SUCCESS_RATE) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_SUCCESS_RATE.to_string(),
+            serde_json::json!(recent_tunnel_success_rate_snapshot
+                .expect("recent tunnel success rate was queried")),
+        );
+    }
+
+    // --- Proposal 170 live tunnel pools (one owner snapshot) ---
+    if key_set.iter().any(|key| TUNNEL_DETAIL_KEYS.contains(key)) {
+        let details = tunnel_details_snapshot.as_ref().expect("tunnel details were queried");
+        resolve_proposal_tunnel_details(&mut result, &key_set, details)?;
+        if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_QUEUE) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_TUNNELS_QUEUE.to_string(),
+                serde_json::json!(details.queue_depth),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_TBM_QUEUE) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_TUNNELS_TBM_QUEUE.to_string(),
+                serde_json::json!(details.tbm_queue_depth),
+            );
+        }
     }
 
     // --- Identity and static router data (retained group) ---
@@ -587,10 +706,7 @@ async fn assemble_response(
     }
 
     // --- Network status ---
-    if key_set.contains(rpc::router_info_keys::NET_BW_INBOUND)
-        || key_set.contains(rpc::router_info_keys::NET_BW_OUTBOUND)
-    {
-        let network = router_info.network_snapshot().await?;
+    if let Some(network) = network_snapshot.as_ref() {
         if key_set.contains(rpc::router_info_keys::NET_BW_INBOUND) {
             result.insert(
                 rpc::router_info_keys::NET_BW_INBOUND.to_string(),
@@ -601,6 +717,36 @@ async fn assemble_response(
             result.insert(
                 rpc::router_info_keys::NET_BW_OUTBOUND.to_string(),
                 serde_json::json!(network.ipv6_status.as_str()),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_STATUS_V6) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_STATUS_V6.to_string(),
+                serde_json::json!(network_status_code(network.ipv6_status)),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_ERROR) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_ERROR.to_string(),
+                serde_json::json!(network_error_code(network.ipv4_error)),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_ERROR_V6) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_ERROR_V6.to_string(),
+                serde_json::json!(network_error_code(network.ipv6_error)),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_TESTING) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_TESTING.to_string(),
+                serde_json::json!(if network.ipv4_testing { 1 } else { 0 }),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_TESTING_V6) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_TESTING_V6.to_string(),
+                serde_json::json!(if network.ipv6_testing { 1 } else { 0 }),
             );
         }
     }
@@ -649,7 +795,10 @@ async fn assemble_response(
     }
 
     // --- NetDB (one group query) ---
-    if key_set.iter().any(|k| k.starts_with("i2p.router.netdb.")) {
+    if key_set
+        .iter()
+        .any(|k| k.starts_with("i2p.router.netdb.") && rpc::router_info_keys::CORE_KEYS.contains(k))
+    {
         if NETDB_UNSUPPORTED.iter().any(|k| key_set.contains(k)) {
             return Err(InspectionError::Unavailable {
                 group: crate::i2pcontrol::router_info::InspectionGroup::NetDb,
@@ -657,6 +806,70 @@ async fn assemble_response(
         }
         let netdb = router_info.netdb_snapshot().await?;
         resolve_netdb_selectors(&mut result, &key_set, &netdb);
+    }
+
+    // --- Proposal 170 public peer directory ---
+    if key_set.iter().any(|key| {
+        matches!(
+            *key,
+            rpc::router_info_keys::P170_NETDB_PEERS
+                | rpc::router_info_keys::P170_NETDB_PEERS_LIST
+                | rpc::router_info_keys::P170_NETDB_PEERS_INFO
+        )
+    }) {
+        resolve_proposal_peer_directory(&mut result, &key_set, router_info).await?;
+    }
+
+    // --- Proposal 170 active peers and finite transport limits ---
+    if key_set.iter().any(|key| {
+        matches!(
+            *key,
+            rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_LIST
+                | rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO
+        )
+    }) {
+        resolve_proposal_active_peers(&mut result, &key_set, router_info).await?;
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_STATS) {
+        resolve_active_peer_stats(
+            &mut result,
+            rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_STATS,
+            router_info,
+        )
+        .await?;
+    }
+    if key_set.iter().any(|key| {
+        matches!(
+            *key,
+            rpc::router_info_keys::P170_NETDB_NTCP_LIMIT
+                | rpc::router_info_keys::P170_NETDB_SSU_LIMIT
+        )
+    }) {
+        let limits = router_info.transport_limits().await?;
+        if key_set.contains(rpc::router_info_keys::P170_NETDB_NTCP_LIMIT) {
+            let Some(limit) = limits.ntcp_limit else {
+                return Err(InspectionError::UnavailableReason {
+                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerStats,
+                    reason: "finite NTCP2 connection limit unavailable",
+                });
+            };
+            result.insert(
+                rpc::router_info_keys::P170_NETDB_NTCP_LIMIT.to_string(),
+                serde_json::json!(limit),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NETDB_SSU_LIMIT) {
+            let Some(limit) = limits.ssu_limit else {
+                return Err(InspectionError::UnavailableReason {
+                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerStats,
+                    reason: "finite SSU2 connection limit unavailable",
+                });
+            };
+            result.insert(
+                rpc::router_info_keys::P170_NETDB_SSU_LIMIT.to_string(),
+                serde_json::json!(limit),
+            );
+        }
     }
 
     // --- Bandwidth ---
@@ -1356,28 +1569,138 @@ async fn resolve_peer_selectors(
         );
     }
     if key_set.contains(rpc::router_info_keys::PEERS_ACTIVE_STATS) {
-        let stats = router_info.active_peer_stats().await?;
-        if stats.len() > MAX_ACTIVE_PEER_STATS {
-            return Err(InspectionError::ResultTooLarge {
-                group: crate::i2pcontrol::router_info::InspectionGroup::PeerStats,
-                limit: MAX_ACTIVE_PEER_STATS,
-            });
-        }
-        let entries: Vec<serde_json::Value> = stats
-            .iter()
-            .map(|s| {
-                serde_json::json!({
-                    "peerId": s.peer_id,
-                    "direction": s.direction,
-                    "state": s.state,
-                    "bytesReceived": s.bytes_received,
-                    "bytesSent": s.bytes_sent,
-                })
+        resolve_active_peer_stats(
+            result,
+            rpc::router_info_keys::PEERS_ACTIVE_STATS,
+            router_info,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+async fn resolve_active_peer_stats(
+    result: &mut serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    router_info: &dyn RouterInfoControl,
+) -> Result<(), InspectionError> {
+    let stats = router_info.active_peer_stats().await?;
+    if stats.len() > MAX_ACTIVE_PEER_STATS {
+        return Err(InspectionError::ResultTooLarge {
+            group: crate::i2pcontrol::router_info::InspectionGroup::PeerStats,
+            limit: MAX_ACTIVE_PEER_STATS,
+        });
+    }
+    let entries: Vec<serde_json::Value> = stats
+        .iter()
+        .map(|s| {
+            serde_json::json!({
+                "peerId": s.peer_id,
+                "direction": s.direction,
+                "state": s.state,
+                "bytesReceived": s.bytes_received,
+                "bytesSent": s.bytes_sent,
             })
-            .collect();
+        })
+        .collect();
+    result.insert(key.to_owned(), serde_json::json!(entries));
+    Ok(())
+}
+
+fn tunnel_detail_value(
+    details: &[crate::i2pcontrol::router_info::TunnelDetail],
+) -> Result<serde_json::Value, InspectionError> {
+    if details.len() > MAX_TUNNEL_DETAIL_ENTRIES {
+        return Err(InspectionError::ResultTooLarge {
+            group: crate::i2pcontrol::router_info::InspectionGroup::TunnelSummary,
+            limit: MAX_TUNNEL_DETAIL_ENTRIES,
+        });
+    }
+    let entries: Vec<serde_json::Value> = details
+        .iter()
+        .map(|detail| {
+            let mut object = serde_json::Map::new();
+            object.insert("tunnelId".to_owned(), serde_json::json!(detail.tunnel_id));
+            if let Some(pool_id) = detail.pool_id {
+                object.insert("poolId".to_owned(), serde_json::json!(pool_id));
+            }
+            if let Some(direction) = &detail.direction {
+                object.insert("direction".to_owned(), serde_json::json!(direction));
+            }
+            serde_json::Value::Object(object)
+        })
+        .collect();
+    let value = serde_json::Value::Array(entries);
+    if serde_json::to_vec(&value).map_or(true, |bytes| bytes.len() > MAX_PEER_RI_BYTES) {
+        return Err(InspectionError::ResultTooLarge {
+            group: crate::i2pcontrol::router_info::InspectionGroup::TunnelSummary,
+            limit: MAX_TUNNEL_DETAIL_ENTRIES,
+        });
+    }
+    Ok(value)
+}
+
+fn resolve_proposal_tunnel_details(
+    result: &mut serde_json::Map<String, serde_json::Value>,
+    key_set: &HashSet<&str>,
+    details: &crate::i2pcontrol::router_info::TunnelDetails,
+) -> Result<(), InspectionError> {
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_PARTICIPATING_INFO) {
         result.insert(
-            rpc::router_info_keys::PEERS_ACTIVE_STATS.to_string(),
-            serde_json::json!(entries),
+            rpc::router_info_keys::P170_NET_TUNNELS_PARTICIPATING_INFO.to_owned(),
+            tunnel_detail_value(&details.participating)?,
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INBOUND) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INBOUND.to_owned(),
+            serde_json::json!(details
+                .exploratory
+                .iter()
+                .filter(|detail| detail.direction.as_deref() == Some("inbound"))
+                .count()),
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_OUTBOUND) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_OUTBOUND.to_owned(),
+            serde_json::json!(details
+                .exploratory
+                .iter()
+                .filter(|detail| detail.direction.as_deref() == Some("outbound"))
+                .count()),
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INFO_LIST) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_EXPLORATORY_INFO_LIST.to_owned(),
+            tunnel_detail_value(&details.exploratory)?,
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INBOUND) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INBOUND.to_owned(),
+            serde_json::json!(details
+                .client
+                .iter()
+                .filter(|detail| detail.direction.as_deref() == Some("inbound"))
+                .count()),
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_OUTBOUND) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_OUTBOUND.to_owned(),
+            serde_json::json!(details
+                .client
+                .iter()
+                .filter(|detail| detail.direction.as_deref() == Some("outbound"))
+                .count()),
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INFO_LIST) {
+        result.insert(
+            rpc::router_info_keys::P170_NET_TUNNELS_CLIENT_INFO_LIST.to_owned(),
+            tunnel_detail_value(&details.client)?,
         );
     }
     Ok(())
@@ -1385,6 +1708,120 @@ async fn resolve_peer_selectors(
 
 fn resolve_id(id: &Option<RequestId>) -> RequestId {
     id.clone().unwrap_or(RequestId::Null)
+}
+
+/// Resolve active peer IDs and, when requested, join them to the live public
+/// RouterInfo directory. The active source is authoritative for membership;
+/// a missing directory entry is a churn/incomplete-join error, never an
+/// invented RouterInfo value.
+async fn resolve_proposal_active_peers(
+    result: &mut serde_json::Map<String, serde_json::Value>,
+    key_set: &HashSet<&str>,
+    router_info: &dyn RouterInfoControl,
+) -> Result<(), InspectionError> {
+    let active = router_info.active_peers().await?;
+    if active.len() > MAX_PEER_IDENTITIES {
+        return Err(InspectionError::ResultTooLarge {
+            group: crate::i2pcontrol::router_info::InspectionGroup::PeerList,
+            limit: MAX_PEER_IDENTITIES,
+        });
+    }
+
+    let mut ids: Vec<String> = active.into_iter().map(|peer| peer.id).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    if key_set.contains(rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_LIST) {
+        result.insert(
+            rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_LIST.to_string(),
+            serde_json::json!(ids),
+        );
+    }
+
+    if key_set.contains(rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO) {
+        let directory = router_info.peer_directory().await?;
+        let mut infos = Vec::with_capacity(ids.len());
+        let mut total_bytes = 0usize;
+        for peer_id in &ids {
+            let Some(bytes) = directory.router_infos.get(peer_id) else {
+                return Err(InspectionError::TemporarilyUnavailable {
+                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerLookup,
+                });
+            };
+            total_bytes = total_bytes.saturating_add(bytes.len());
+            if total_bytes > MAX_PEER_RI_BYTES {
+                return Err(InspectionError::ResultTooLarge {
+                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerLookup,
+                    limit: MAX_PEER_RI_BYTES,
+                });
+            }
+            infos.push(emissary_core::crypto::base64_encode(bytes.clone()));
+        }
+        result.insert(
+            rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO.to_string(),
+            serde_json::json!(infos),
+        );
+    }
+
+    Ok(())
+}
+
+/// Resolve the three canonical fields owned by the live public peer directory.
+/// A missing serialized RouterInfo is an incomplete source snapshot and fails
+/// the request; it is never replaced with an empty or adjacent value.
+async fn resolve_proposal_peer_directory(
+    result: &mut serde_json::Map<String, serde_json::Value>,
+    key_set: &HashSet<&str>,
+    router_info: &dyn RouterInfoControl,
+) -> Result<(), InspectionError> {
+    let snapshot = router_info.peer_directory().await?;
+    if snapshot.peer_ids.len() > MAX_PEER_IDENTITIES {
+        return Err(InspectionError::ResultTooLarge {
+            group: crate::i2pcontrol::router_info::InspectionGroup::PeerList,
+            limit: MAX_PEER_IDENTITIES,
+        });
+    }
+
+    let mut ids = snapshot.peer_ids;
+    ids.sort_unstable();
+    ids.dedup();
+    if key_set.contains(rpc::router_info_keys::P170_NETDB_PEERS) {
+        result.insert(
+            rpc::router_info_keys::P170_NETDB_PEERS.to_string(),
+            serde_json::json!(ids),
+        );
+    }
+    if key_set.contains(rpc::router_info_keys::P170_NETDB_PEERS_LIST) {
+        result.insert(
+            rpc::router_info_keys::P170_NETDB_PEERS_LIST.to_string(),
+            serde_json::json!(ids),
+        );
+    }
+
+    if key_set.contains(rpc::router_info_keys::P170_NETDB_PEERS_INFO) {
+        let mut infos = Vec::with_capacity(ids.len());
+        let mut total_bytes = 0usize;
+        for peer_id in &ids {
+            let Some(bytes) = snapshot.router_infos.get(peer_id) else {
+                return Err(InspectionError::TemporarilyUnavailable {
+                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerLookup,
+                });
+            };
+            total_bytes = total_bytes.saturating_add(bytes.len());
+            if total_bytes > MAX_PEER_RI_BYTES {
+                return Err(InspectionError::ResultTooLarge {
+                    group: crate::i2pcontrol::router_info::InspectionGroup::PeerLookup,
+                    limit: MAX_PEER_RI_BYTES,
+                });
+            }
+            infos.push(emissary_core::crypto::base64_encode(bytes.clone()));
+        }
+        result.insert(
+            rpc::router_info_keys::P170_NETDB_PEERS_INFO.to_string(),
+            serde_json::json!(infos),
+        );
+    }
+
+    Ok(())
 }
 
 fn error_response(id: RequestId, code: i32, message: impl Into<String>) -> serde_json::Value {
@@ -1480,6 +1917,33 @@ mod tests {
             serde_json::json!([])
         );
         assert_eq!(result["i2p.router.net.tunnels.totalsuccessrate"], 75.0);
+    }
+
+    #[tokio::test]
+    async fn m049_wire_fixture_returns_rolling_metric_and_live_queues() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_transit_bandwidth_15s(2048);
+        ri.set_recent_tunnel_success_rate(73.0);
+        ri.set_tunnel_details(TunnelDetails {
+            queue_depth: 4,
+            tbm_queue_depth: 7,
+            ..Default::default()
+        });
+        let state = test_state(ri);
+        let req = direct_request(serde_json::json!({
+            "i2p.router.net.bw.transit.15s": false,
+            "i2p.router.net.tunnels.successrate": null,
+            "i2p.router.net.tunnels.queue": true,
+            "i2p.router.net.tunnels.tbmqueue": {},
+        }));
+        let resp = handle_router_info(&state, &req).await;
+        let result = resp["result"]
+            .as_object()
+            .unwrap_or_else(|| panic!("M049 fixture response: {resp}"));
+        assert_eq!(result["i2p.router.net.bw.transit.15s"], 2048);
+        assert_eq!(result["i2p.router.net.tunnels.successrate"], 73.0);
+        assert_eq!(result["i2p.router.net.tunnels.queue"], 4);
+        assert_eq!(result["i2p.router.net.tunnels.tbmqueue"], 7);
     }
 
     #[tokio::test]
@@ -1593,14 +2057,154 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn canonical_unavailable_field_is_explicit_error() {
-        let state = test_state(FakeRouterInfoControl::new());
+    async fn direct_banned_peers_do_not_promote_fake_or_empty_values() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_banned_peers(vec![BannedPeer {
+            id: "peer-id".into(),
+            reason: "test reason".into(),
+            expires_at: Some(123),
+        }]);
+        let response = handle_router_info(
+            &test_state(ri),
+            &direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NETDB_BANNED_PEERS: true
+            })),
+        )
+        .await;
+
+        assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
+        assert!(response["result"].is_null());
+    }
+
+    #[tokio::test]
+    async fn canonical_peer_directory_fields_return_exact_wire_values() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_peer_directory(PeerDirectorySnapshot {
+            peer_ids: vec!["peer-b".into(), "peer-a".into(), "peer-a".into()],
+            router_infos: std::collections::BTreeMap::from([
+                ("peer-a".into(), vec![1, 2]),
+                ("peer-b".into(), vec![3, 4]),
+            ]),
+        });
+        let state = test_state(ri);
         let req = direct_request(serde_json::json!({
             "i2p.router.netdb.peers": true,
+            "i2p.router.netdb.peers.list": true,
+            "i2p.router.netdb.peers.info": true,
         }));
         let resp = handle_router_info(&state, &req).await;
-        assert_eq!(resp["error"]["code"], -32603);
-        assert!(resp["result"].is_null());
+        assert_eq!(
+            resp["result"]["i2p.router.netdb.peers"],
+            serde_json::json!(["peer-a", "peer-b"])
+        );
+        assert_eq!(
+            resp["result"]["i2p.router.netdb.peers.list"],
+            serde_json::json!(["peer-a", "peer-b"])
+        );
+        assert_eq!(
+            resp["result"]["i2p.router.netdb.peers.info"],
+            serde_json::json!(["AQI=", "AwQ="])
+        );
+    }
+
+    #[tokio::test]
+    async fn canonical_active_peer_inventory_and_limits_return_exact_wire_values() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_active_peers(vec![
+            PeerIdentity {
+                id: "peer-b".into(),
+                is_active: true,
+            },
+            PeerIdentity {
+                id: "peer-a".into(),
+                is_active: true,
+            },
+            PeerIdentity {
+                id: "peer-a".into(),
+                is_active: true,
+            },
+        ]);
+        ri.set_peer_directory(PeerDirectorySnapshot {
+            peer_ids: vec!["peer-a".into(), "peer-b".into()],
+            router_infos: std::collections::BTreeMap::from([
+                ("peer-a".into(), vec![1, 2]),
+                ("peer-b".into(), vec![3, 4]),
+            ]),
+        });
+        ri.set_transport_limits(TransportLimits {
+            ntcp_limit: Some(64),
+            ssu_limit: Some(128),
+        });
+        let response = handle_router_info(
+            &test_state(ri),
+            &direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_LIST: true,
+                rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO: true,
+                rpc::router_info_keys::P170_NETDB_NTCP_LIMIT: true,
+                rpc::router_info_keys::P170_NETDB_SSU_LIMIT: true,
+            })),
+        )
+        .await;
+
+        assert_eq!(
+            response["result"][rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_LIST],
+            serde_json::json!(["peer-a", "peer-b"])
+        );
+        assert_eq!(
+            response["result"][rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO],
+            serde_json::json!(["AQI=", "AwQ="])
+        );
+        assert_eq!(
+            response["result"][rpc::router_info_keys::P170_NETDB_NTCP_LIMIT],
+            64
+        );
+        assert_eq!(
+            response["result"][rpc::router_info_keys::P170_NETDB_SSU_LIMIT],
+            128
+        );
+    }
+
+    #[tokio::test]
+    async fn active_peer_router_info_join_fails_closed_on_source_churn() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_active_peers(vec![PeerIdentity {
+            id: "peer-missing".into(),
+            is_active: true,
+        }]);
+        ri.set_peer_directory(PeerDirectorySnapshot::default());
+        let response = handle_router_info(
+            &test_state(ri),
+            &direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NETDB_ACTIVE_PEERS_INFO: true,
+            })),
+        )
+        .await;
+
+        assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
+        assert!(response["result"].is_null());
+    }
+
+    #[tokio::test]
+    async fn unlimited_transport_limit_is_unavailable_not_a_sentinel() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_transport_limits(TransportLimits {
+            ntcp_limit: None,
+            ssu_limit: Some(128),
+        });
+        let response = handle_router_info(
+            &test_state(ri),
+            &direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NETDB_NTCP_LIMIT: true,
+            })),
+        )
+        .await;
+
+        assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
+        assert!(response["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("finite NTCP2 connection limit unavailable"));
+        assert!(response["result"].is_null());
     }
 
     #[tokio::test]
@@ -1967,6 +2571,35 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result["i2p.router.net.bw.inbound"], "OK");
         assert_eq!(result["i2p.router.net.bw.outbound"], "Firewalled");
+    }
+
+    #[tokio::test]
+    async fn handle_router_info_network_state_wire_fixture() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_network(NetworkSnapshot {
+            ipv4_status: NetworkStatus::Ok,
+            ipv6_status: NetworkStatus::Firewalled,
+            ipv4_error: Some(emissary_core::inspection::NetworkErrorReason::ClockSkew),
+            ipv6_error: Some(emissary_core::inspection::NetworkErrorReason::SymmetricNat),
+            ipv4_testing: true,
+            ipv6_testing: false,
+            ..Default::default()
+        });
+        let state = test_state(ri);
+        let req = direct_request(serde_json::json!({
+            "i2p.router.net.status.v6": false,
+            "i2p.router.net.error": null,
+            "i2p.router.net.error.v6": "ignored",
+            "i2p.router.net.testing": 0,
+            "i2p.router.net.testing.v6": true,
+        }));
+        let resp = handle_router_info(&state, &req).await;
+        let result = resp["result"].as_object().unwrap();
+        assert_eq!(result["i2p.router.net.status.v6"], 1);
+        assert_eq!(result["i2p.router.net.error"], 1);
+        assert_eq!(result["i2p.router.net.error.v6"], 3);
+        assert_eq!(result["i2p.router.net.testing"], 1);
+        assert_eq!(result["i2p.router.net.testing.v6"], 0);
     }
 
     #[tokio::test]

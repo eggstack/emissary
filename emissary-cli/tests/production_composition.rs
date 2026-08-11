@@ -30,7 +30,7 @@
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 
 use emissary_cli::i2pcontrol::{
@@ -40,7 +40,7 @@ use emissary_cli::i2pcontrol::{
         EventMetrics, ProductionControlPlane, ProductionRouterInfoControl,
         ProductionTunnelManagerControl,
     },
-    router_info::{RouterInfoControl, TunnelSummary},
+    router_info::{PeerDirectorySnapshot, PeerDirectorySource, RouterInfoControl, TunnelSummary},
     sam_observer::SamSessionObservationHandle,
     server::{I2pControlState, ProductionControls},
     service_registry::{ObservedServiceState, ServiceCategory, ServiceMetadata, ServiceRegistry},
@@ -92,6 +92,44 @@ impl EventMetrics for TestMetrics {
     fn ipv6_firewall_status(&self) -> FirewallStatus {
         FirewallStatus::Unknown
     }
+}
+
+#[derive(Default)]
+struct MutablePeerDirectory {
+    snapshot: Mutex<PeerDirectorySnapshot>,
+}
+
+impl PeerDirectorySource for MutablePeerDirectory {
+    fn snapshot(
+        &self,
+    ) -> Result<PeerDirectorySnapshot, emissary_cli::i2pcontrol::router_info::InspectionError> {
+        Ok(self.snapshot.lock().unwrap().clone())
+    }
+}
+
+#[tokio::test]
+async fn production_router_info_retains_live_peer_directory_source() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tm = Arc::new(ProductionTunnelManagerControl::new(tmp.path().join("tunnels")).unwrap());
+    tm.load().await.unwrap();
+    let source = Arc::new(MutablePeerDirectory::default());
+    let ri = ProductionRouterInfoControl::new(
+        "test-id".to_string(),
+        "test".to_string(),
+        0.5,
+        512,
+        512,
+        Arc::new(TestMetrics::new()),
+        Arc::new(emissary_cli::i2pcontrol::observability::LogRing::default()),
+        tm as Arc<dyn TunnelManagerControl>,
+    )
+    .with_peer_directory_source(source.clone());
+
+    source.snapshot.lock().unwrap().peer_ids = vec!["before".into()];
+    assert_eq!(ri.peer_directory().await.unwrap().peer_ids, ["before"]);
+
+    source.snapshot.lock().unwrap().peer_ids = vec!["after".into()];
+    assert_eq!(ri.peer_directory().await.unwrap().peer_ids, ["after"]);
 }
 
 // --- Shared identity tests ---

@@ -1,6 +1,6 @@
 # M046 — RouterInfo Active-Peer Inventory and Transport Limits
 
-Status: blocked
+Status: closed
 
 Planning baseline: `b759038`
 
@@ -78,3 +78,5 @@ Stop if truthful limits require changing connection admission policy, or if acti
 ## 10. Closure evidence
 
 Record exact changed paths, before/after source matrix, request fixtures for all four fields, contention/churn evidence, no-feature evidence, and internal-only/no-upstream attestation.
+
+Closure record: `plans/closure/i2pcontrol-proposal-170/046-closure.md`.

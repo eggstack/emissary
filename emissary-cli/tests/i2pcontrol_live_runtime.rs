@@ -15,7 +15,7 @@ use std::{
 
 use emissary_core::{crypto::base64_encode, primitives::Destination};
 use emissary_util::runtime::tokio::Runtime as TokioRuntime;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tokio::{
     io::AsyncReadExt,
     process::{Child, Command},
@@ -90,6 +90,15 @@ ipv4 = true
 ipv6 = false
 publish_ipv4 = false
 publish_ipv6 = false
+max_connections = 64
+
+[ssu2]
+port = 0
+ipv4 = true
+ipv6 = false
+publish_ipv4 = false
+publish_ipv6 = false
+max_connections = 64
 
 [reseed]
 reseed_threshold = 0
@@ -451,7 +460,7 @@ async fn live_runtime_interoperability() {
     )
     .await;
     assert!(result(&available)["i2p.router.logs"].is_array());
-    let unavailable = protected(
+    let peers = protected(
         &client,
         &endpoint,
         13,
@@ -460,11 +469,86 @@ async fn live_runtime_interoperability() {
         serde_json::Map::from_iter([("i2p.router.netdb.peers".into(), json!(false))]),
     )
     .await;
-    assert!(
-        unavailable["error"]["message"]
-            .as_str()
-            .is_some_and(|message| message.contains("unavailable"))
+    assert!(peers["result"]["i2p.router.netdb.peers"].is_array());
+
+    // Exercise every newly available M045-M050 RouterInfo source through the
+    // real TLS/authenticated child process. These selectors are deliberately
+    // requested one at a time so a source-group composition regression cannot
+    // be hidden by a successful neighboring field.
+    let newly_available = [
+        "i2p.router.netdb.peers",
+        "i2p.router.netdb.peers.list",
+        "i2p.router.netdb.peers.info",
+        "i2p.router.netdb.activepeers.list",
+        "i2p.router.netdb.activepeers.info",
+        "i2p.router.netdb.ntcp.limit",
+        "i2p.router.netdb.ssu.limit",
+        "i2p.router.netdb.activepeers.stats",
+        "i2p.router.net.tunnels.participating.info",
+        "i2p.router.net.tunnels.exploratory.inbound",
+        "i2p.router.net.tunnels.exploratory.outbound",
+        "i2p.router.net.tunnels.exploratory.info.list",
+        "i2p.router.net.tunnels.client.inbound",
+        "i2p.router.net.tunnels.client.outbound",
+        "i2p.router.net.tunnels.client.info.list",
+        "i2p.router.net.bw.transit.15s",
+        "i2p.router.net.tunnels.successrate",
+        "i2p.router.net.tunnels.queue",
+        "i2p.router.net.tunnels.tbmqueue",
+        "i2p.router.net.status.v6",
+        "i2p.router.net.error",
+        "i2p.router.net.error.v6",
+        "i2p.router.net.testing",
+        "i2p.router.net.testing.v6",
+    ];
+    for (index, selector) in newly_available.iter().enumerate() {
+        let response = protected(
+            &client,
+            &endpoint,
+            40 + index as u64,
+            &token,
+            "RouterInfo",
+            serde_json::Map::from_iter([(selector.to_string(), json!(false))]),
+        )
+        .await;
+        assert!(
+            result(&response).get(*selector).is_some(),
+            "live RouterInfo response omitted {selector}"
+        );
+    }
+
+    let combined = protected(
+        &client,
+        &endpoint,
+        70,
+        &token,
+        "RouterInfo",
+        serde_json::Map::from_iter([
+            ("i2p.router.netdb.peers".into(), json!(false)),
+            ("i2p.router.netdb.activepeers.stats".into(), json!(false)),
+            ("i2p.router.net.tunnels.queue".into(), json!(false)),
+            ("i2p.router.net.bw.transit.15s".into(), json!(false)),
+            ("i2p.router.net.status.v6".into(), json!(false)),
+        ]),
+    )
+    .await;
+    for selector in [
+        "i2p.router.netdb.peers",
+        "i2p.router.netdb.activepeers.stats",
+        "i2p.router.net.tunnels.queue",
+        "i2p.router.net.bw.transit.15s",
+        "i2p.router.net.status.v6",
+    ] {
+        assert!(
+            result(&combined).get(selector).is_some(),
+            "multi-group RouterInfo response omitted {selector}"
+        );
+    }
+    eprintln!(
+        "M052 phase D: all {} newly available RouterInfo selectors and multi-group composition passed",
+        newly_available.len()
     );
+
     let services = protected(
         &client,
         &endpoint,

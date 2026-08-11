@@ -1,6 +1,6 @@
 # M049 — RouterInfo Rolling Transit, Tunnel Success, and Queue Sources
 
-Status: blocked
+Status: closed
 
 Planning baseline: `b759038`
 

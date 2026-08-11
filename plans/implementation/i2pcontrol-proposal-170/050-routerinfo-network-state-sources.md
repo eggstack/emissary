@@ -1,6 +1,6 @@
 # M050 — RouterInfo IPv4/IPv6 Network State Sources
 
-Status: blocked
+Status: closed
 
 Planning baseline: `b759038`
 

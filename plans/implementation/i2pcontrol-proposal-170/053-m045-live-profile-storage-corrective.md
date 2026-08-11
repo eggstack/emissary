@@ -1,6 +1,6 @@
 # M053 — M045 Corrective Live ProfileStorage Inspection Source
 
-Status: ready
+Status: closed
 
 Planning baseline: `bf9c2eeb` — M045 blocked after stale startup-snapshot rollback
 

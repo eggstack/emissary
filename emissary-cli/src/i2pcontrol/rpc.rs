@@ -1010,12 +1010,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_BW_TRANSIT_15S,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "traffic-metrics",
-                reason: "no rolling 15s transit source"
+            SourceDisposition::Available {
+                owner: "traffic-metrics"
             },
             "serialize_transit_bandwidth_15s",
-            "p170.transit_15s.unavailable",
+            "p170.transit_15s.bytes_per_second",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1035,12 +1034,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_PARTICIPATING_INFO,
             JsonType::ArrayOfObjects,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded participating tunnel detail snapshot"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_participating_tunnel_info",
-            "p170.participating_info.unavailable",
+            "p170.participating_info.rows",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1066,12 +1064,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_EXPLORATORY_INBOUND,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded exploratory tunnel count source"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_exploratory_inbound",
-            "p170.exploratory_inbound.unavailable",
+            "p170.exploratory_inbound.count",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1079,12 +1076,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_EXPLORATORY_OUTBOUND,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded exploratory tunnel count source"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_exploratory_outbound",
-            "p170.exploratory_outbound.unavailable",
+            "p170.exploratory_outbound.count",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1092,12 +1088,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_EXPLORATORY_INFO_LIST,
             JsonType::ArrayOfObjects,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded exploratory tunnel detail snapshot"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_exploratory_info_list",
-            "p170.exploratory_info.unavailable",
+            "p170.exploratory_info.rows",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1108,12 +1103,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_CLIENT_INBOUND,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded client tunnel count source"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_client_inbound",
-            "p170.client_inbound.unavailable",
+            "p170.client_inbound.count",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1121,12 +1115,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_CLIENT_OUTBOUND,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded client tunnel count source"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_client_outbound",
-            "p170.client_outbound.unavailable",
+            "p170.client_outbound.count",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1134,12 +1127,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_CLIENT_INFO_LIST,
             JsonType::ArrayOfObjects,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded client tunnel detail snapshot"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_client_info_list",
-            "p170.client_info.unavailable",
+            "p170.client_info.rows",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1150,12 +1142,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_STATUS_V6,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network",
-                reason: "no transport-specific v6 status code mapping"
+            SourceDisposition::Available {
+                owner: "network-state",
             },
             "serialize_network_status_v6",
-            "p170.status_v6.unavailable",
+            "p170.status_v6.integer",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1163,12 +1154,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_ERROR,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network",
-                reason: "no transport-specific v4 error code mapping"
+            SourceDisposition::Available {
+                owner: "network-state",
             },
             "serialize_network_error",
-            "p170.error_v4.unavailable",
+            "p170.error_v4.integer",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1176,12 +1166,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_ERROR_V6,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network",
-                reason: "no transport-specific v6 error code mapping"
+            SourceDisposition::Available {
+                owner: "network-state",
             },
             "serialize_network_error_v6",
-            "p170.error_v6.unavailable",
+            "p170.error_v6.integer",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1189,12 +1178,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TESTING,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network",
-                reason: "no canonical v4 testing-state source"
+            SourceDisposition::Available {
+                owner: "network-state",
             },
             "serialize_network_testing",
-            "p170.testing_v4.unavailable",
+            "p170.testing_v4.integer",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1202,12 +1190,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TESTING_V6,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network",
-                reason: "no canonical v6 testing-state source"
+            SourceDisposition::Available {
+                owner: "network-state",
             },
             "serialize_network_testing_v6",
-            "p170.testing_v6.unavailable",
+            "p170.testing_v6.integer",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1215,12 +1202,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_SUCCESS_RATE,
             JsonType::Number,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-build-metrics",
-                reason: "no rolling tunnel build success-rate source"
+            SourceDisposition::Available {
+                owner: "tunnel-build-metrics"
             },
             "serialize_tunnel_success_rate",
-            "p170.success_rate.recent.unavailable",
+            "p170.success_rate.recent.percent",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1240,12 +1226,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_QUEUE,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded tunnel build queue snapshot"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_tunnel_queue",
-            "p170.tunnel_queue.unavailable",
+            "p170.tunnel_queue.depth",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1253,12 +1238,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_TUNNELS_TBM_QUEUE,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "tunnel-pool",
-                reason: "no bounded tunnel build message queue snapshot"
+            SourceDisposition::Available {
+                owner: "tunnel-inspection"
             },
             "serialize_tbm_queue",
-            "p170.tbm_queue.unavailable",
+            "p170.tbm_queue.depth",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1266,12 +1250,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "profile-storage-read-only",
-                reason: "no live bounded ProfileStorage directory source"
+            SourceDisposition::Available {
+                owner: "live-profile-storage-inspection"
             },
             "serialize_netdb_peer_hashes",
-            "p170.netdb.peers.unavailable",
+            "p170.netdb.peer_hashes",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1282,12 +1265,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_ACTIVE_PEERS_INFO,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "netdb",
-                reason: "no bounded active-peer RouterInfo snapshot"
+            SourceDisposition::Available {
+                owner: "transport-and-live-profile-storage-inspection"
             },
             "serialize_active_peer_router_infos",
-            "p170.netdb.active_peer_info.unavailable",
+            "p170.netdb.active_peer_info",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1298,12 +1280,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_NTCP_LIMIT,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "peer-limits",
-                reason: "no authoritative NTCP limit owner"
+            SourceDisposition::Available {
+                owner: "transport-manager-configuration"
             },
             "serialize_ntcp_limit",
-            "p170.netdb.ntcp_limit.unavailable",
+            "p170.netdb.ntcp_limit",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1311,12 +1292,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_SSU_LIMIT,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "peer-limits",
-                reason: "no authoritative SSU limit owner"
+            SourceDisposition::Available {
+                owner: "transport-manager-configuration"
             },
             "serialize_ssu_limit",
-            "p170.netdb.ssu_limit.unavailable",
+            "p170.netdb.ssu_limit",
             Mutation::ReadOnly,
             Bound::None,
             None
@@ -1340,12 +1320,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_ACTIVE_PEERS_LIST,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "peer-list",
-                reason: "no bounded active peer RouterInfo snapshot"
+            SourceDisposition::Available {
+                owner: "transport-manager-inspection"
             },
             "serialize_active_peer_hashes",
-            "p170.netdb.active_peers.unavailable",
+            "p170.netdb.active_peers",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1356,12 +1335,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS_LIST,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "profile-storage-read-only",
-                reason: "no live bounded ProfileStorage directory source"
+            SourceDisposition::Available {
+                owner: "live-profile-storage-inspection"
             },
             "serialize_known_peer_hashes",
-            "p170.netdb.peer_list.unavailable",
+            "p170.netdb.peer_list",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1372,12 +1350,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_PEERS_INFO,
             JsonType::ArrayOfStrings,
-            SourceDisposition::Unavailable {
-                owner: "profile-storage-read-only",
-                reason: "no live bounded ProfileStorage directory source"
+            SourceDisposition::Available {
+                owner: "live-profile-storage-inspection"
             },
             "serialize_peer_router_infos",
-            "p170.netdb.peer_info.unavailable",
+            "p170.netdb.peer_info",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -1388,12 +1365,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_ACTIVE_PEERS_STATS,
             JsonType::ArrayOfObjects,
-            SourceDisposition::Unavailable {
-                owner: "peer-stats",
-                reason: "no bounded active peer statistics snapshot"
+            SourceDisposition::Available {
+                owner: "transport-manager-inspection"
             },
             "serialize_active_peer_stats",
-            "p170.netdb.active_peer_stats.unavailable",
+            "p170.netdb.active_peer_stats",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -2068,7 +2044,7 @@ mod tests {
     }
 
     #[test]
-    fn conformance_manifest_has_frozen_m026_source_counts() {
+    fn conformance_manifest_has_m047_source_counts() {
         use router_info_keys::{SourceDisposition, PROPOSAL_170_CONTRACT as C};
 
         let available = C
@@ -2084,7 +2060,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (16, 1, 26));
+        assert_eq!((available, neutral, unavailable), (40, 1, 2));
     }
 
     #[test]

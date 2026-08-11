@@ -16,7 +16,11 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use crate::{runtime::Runtime, transport::FirewallStatus};
+use crate::{
+    inspection::{NetworkErrorReason, NetworkState},
+    runtime::Runtime,
+    transport::FirewallStatus,
+};
 
 #[cfg(feature = "events")]
 use crate::runtime::{Counter, MetricType, MetricsHandle};
@@ -41,11 +45,36 @@ use core::mem;
 #[cfg(feature = "events")]
 use core::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "events")]
+use core::sync::atomic::AtomicBool;
+#[cfg(feature = "events")]
 use std::sync::Mutex;
 
 /// Default update interval.
 #[cfg(feature = "events")]
 const UPDATE_INTERVAL: Duration = Duration::from_secs(1);
+
+#[cfg(feature = "events")]
+const TUNNEL_SUCCESS_RATE_SMOOTHING: f64 = 0.0005;
+
+#[cfg(feature = "events")]
+const TUNNEL_SUCCESS_RATE_START: f64 = 0.1;
+
+#[cfg(feature = "events")]
+#[derive(Debug)]
+struct RecentTunnelBuildSuccessRate {
+    attempts: u64,
+    rate: f64,
+}
+
+#[cfg(feature = "events")]
+impl Default for RecentTunnelBuildSuccessRate {
+    fn default() -> Self {
+        Self {
+            attempts: 0,
+            rate: TUNNEL_SUCCESS_RATE_START,
+        }
+    }
+}
 
 #[cfg(feature = "events")]
 pub const TRANSIT_INBOUND_BANDWIDTH: &str = "transit_inbound_bandwidth_total";
@@ -130,6 +159,21 @@ pub struct EventHandle<R: Runtime> {
     /// Latest IPv6 firewall status (cache for I2PControl read-only access).
     ipv6_firewall_status: Arc<AtomicUsize>,
 
+    /// Latest independently known IPv4 network error.
+    ipv4_network_error: Arc<AtomicUsize>,
+
+    /// Latest independently known IPv6 network error.
+    ipv6_network_error: Arc<AtomicUsize>,
+
+    /// Whether an existing IPv4 reachability test is active.
+    ipv4_testing: Arc<AtomicBool>,
+
+    /// Whether an existing IPv6 reachability test is active.
+    ipv6_testing: Arc<AtomicBool>,
+
+    /// Recent tunnel build success rate, updated at each ordered build result.
+    recent_tunnel_build_success_rate: Arc<Mutex<RecentTunnelBuildSuccessRate>>,
+
     /// Update interval.
     update_interval: Duration,
 
@@ -155,6 +199,11 @@ impl<R: Runtime> Clone for EventHandle<R> {
             transit_outbound_bandwidth: Arc::clone(&self.transit_outbound_bandwidth),
             ipv4_firewall_status: Arc::clone(&self.ipv4_firewall_status),
             ipv6_firewall_status: Arc::clone(&self.ipv6_firewall_status),
+            ipv4_network_error: Arc::clone(&self.ipv4_network_error),
+            ipv6_network_error: Arc::clone(&self.ipv6_network_error),
+            ipv4_testing: Arc::clone(&self.ipv4_testing),
+            ipv6_testing: Arc::clone(&self.ipv6_testing),
+            recent_tunnel_build_success_rate: Arc::clone(&self.recent_tunnel_build_success_rate),
             update_interval: self.update_interval,
             timer: Some(Mutex::new(R::timer(self.update_interval))),
         }
@@ -241,6 +290,19 @@ impl<R: Runtime> EventHandle<R> {
         #[cfg(feature = "events")]
         self.num_tunnel_build_failures
             .fetch_add(_num_tunnel_build_failures, Ordering::Release);
+    }
+
+    /// Record one ordered tunnel build result for the recent success-rate EWMA.
+    #[inline(always)]
+    pub fn tunnel_build_result(&self, _success: bool) {
+        #[cfg(feature = "events")]
+        if let Ok(mut state) = self.recent_tunnel_build_success_rate.lock() {
+            state.attempts = state.attempts.saturating_add(1);
+            let alpha = TUNNEL_SUCCESS_RATE_SMOOTHING
+                + (1.0 - TUNNEL_SUCCESS_RATE_SMOOTHING) / state.attempts as f64;
+            let outcome = if _success { 1.0 } else { 0.0 };
+            state.rate = alpha * outcome + (1.0 - alpha) * state.rate;
+        }
     }
 
     // --- Read-only snapshot accessors for I2PControl metrics ---
@@ -333,6 +395,20 @@ impl<R: Runtime> EventHandle<R> {
         0
     }
 
+    /// Recent tunnel build success rate in rounded percentage points.
+    #[cfg(feature = "events")]
+    pub fn tunnel_build_success_rate(&self) -> f64 {
+        self.recent_tunnel_build_success_rate
+            .lock()
+            .map(|state| (state.rate * 100.0).round())
+            .unwrap_or(0.0)
+    }
+
+    #[cfg(not(feature = "events"))]
+    pub fn tunnel_build_success_rate(&self) -> f64 {
+        0.0
+    }
+
     /// Notify the [`EventManager`] that a server destination was started.
     #[inline(always)]
     pub fn server_destination_started(&self, _name: String, _address: String) {
@@ -408,6 +484,64 @@ impl<R: Runtime> EventHandle<R> {
         FirewallStatus::Unknown
     }
 
+    /// Set the independently observed IPv4 network error.
+    #[inline(always)]
+    pub fn set_ipv4_network_error(&self, error: Option<NetworkErrorReason>) {
+        #[cfg(feature = "events")]
+        self.ipv4_network_error.store(network_error_to_atomic(error), Ordering::Release);
+    }
+
+    /// Set the independently observed IPv6 network error.
+    #[inline(always)]
+    pub fn set_ipv6_network_error(&self, error: Option<NetworkErrorReason>) {
+        #[cfg(feature = "events")]
+        self.ipv6_network_error.store(network_error_to_atomic(error), Ordering::Release);
+    }
+
+    /// Publish whether an existing IPv4 reachability test is active.
+    #[inline(always)]
+    pub fn set_ipv4_testing(&self, testing: bool) {
+        #[cfg(feature = "events")]
+        self.ipv4_testing.store(testing, Ordering::Release);
+    }
+
+    /// Publish whether an existing IPv6 reachability test is active.
+    #[inline(always)]
+    pub fn set_ipv6_testing(&self, testing: bool) {
+        #[cfg(feature = "events")]
+        self.ipv6_testing.store(testing, Ordering::Release);
+    }
+
+    /// Read the current independently tracked IPv4 network state.
+    #[cfg(feature = "events")]
+    pub fn ipv4_network_state(&self) -> NetworkState {
+        NetworkState {
+            status: self.ipv4_firewall_status(),
+            error: network_error_from_atomic(self.ipv4_network_error.load(Ordering::Acquire)),
+            testing: self.ipv4_testing.load(Ordering::Acquire),
+        }
+    }
+
+    #[cfg(not(feature = "events"))]
+    pub fn ipv4_network_state(&self) -> NetworkState {
+        NetworkState::default()
+    }
+
+    /// Read the current independently tracked IPv6 network state.
+    #[cfg(feature = "events")]
+    pub fn ipv6_network_state(&self) -> NetworkState {
+        NetworkState {
+            status: self.ipv6_firewall_status(),
+            error: network_error_from_atomic(self.ipv6_network_error.load(Ordering::Acquire)),
+            testing: self.ipv6_testing.load(Ordering::Acquire),
+        }
+    }
+
+    #[cfg(not(feature = "events"))]
+    pub fn ipv6_network_state(&self) -> NetworkState {
+        NetworkState::default()
+    }
+
     /// Create new `EventHandle` for tests.
     #[cfg(test)]
     pub fn new_for_tests() -> Self {
@@ -425,9 +559,38 @@ impl<R: Runtime> EventHandle<R> {
             transit_outbound_bandwidth: Default::default(),
             ipv4_firewall_status: Default::default(),
             ipv6_firewall_status: Default::default(),
+            ipv4_network_error: Default::default(),
+            ipv6_network_error: Default::default(),
+            ipv4_testing: Default::default(),
+            ipv6_testing: Default::default(),
+            recent_tunnel_build_success_rate: Default::default(),
             update_interval: UPDATE_INTERVAL,
             timer: None,
         }
+    }
+}
+
+#[cfg(feature = "events")]
+fn network_error_to_atomic(error: Option<NetworkErrorReason>) -> usize {
+    match error {
+        None => 0,
+        Some(NetworkErrorReason::ClockSkew) => 1,
+        Some(NetworkErrorReason::Offline) => 2,
+        Some(NetworkErrorReason::SymmetricNat) => 3,
+        Some(NetworkErrorReason::FullConeNat) => 4,
+        Some(NetworkErrorReason::NoDescriptors) => 5,
+    }
+}
+
+#[cfg(feature = "events")]
+fn network_error_from_atomic(value: usize) -> Option<NetworkErrorReason> {
+    match value {
+        1 => Some(NetworkErrorReason::ClockSkew),
+        2 => Some(NetworkErrorReason::Offline),
+        3 => Some(NetworkErrorReason::SymmetricNat),
+        4 => Some(NetworkErrorReason::FullConeNat),
+        5 => Some(NetworkErrorReason::NoDescriptors),
+        _ => None,
     }
 }
 
@@ -629,6 +792,11 @@ impl<R: Runtime> EventManager<R> {
             transit_outbound_bandwidth: Default::default(),
             ipv4_firewall_status: Default::default(),
             ipv6_firewall_status: Default::default(),
+            ipv4_network_error: Default::default(),
+            ipv6_network_error: Default::default(),
+            ipv4_testing: Default::default(),
+            ipv6_testing: Default::default(),
+            recent_tunnel_build_success_rate: Default::default(),
             update_interval,
             timer: None,
         };
@@ -649,6 +817,13 @@ impl<R: Runtime> EventManager<R> {
                     transit_outbound_bandwidth: Arc::clone(&handle.transit_outbound_bandwidth),
                     ipv4_firewall_status: Arc::clone(&handle.ipv4_firewall_status),
                     ipv6_firewall_status: Arc::clone(&handle.ipv6_firewall_status),
+                    ipv4_network_error: Arc::clone(&handle.ipv4_network_error),
+                    ipv6_network_error: Arc::clone(&handle.ipv6_network_error),
+                    ipv4_testing: Arc::clone(&handle.ipv4_testing),
+                    ipv6_testing: Arc::clone(&handle.ipv6_testing),
+                    recent_tunnel_build_success_rate: Arc::clone(
+                        &handle.recent_tunnel_build_success_rate,
+                    ),
                     update_interval,
                     timer: None,
                 },
@@ -867,5 +1042,65 @@ mod tests {
         for _ in 0..3 {
             assert!(tokio::time::timeout(Duration::from_secs(5), &mut new_handle).await.is_ok());
         }
+    }
+
+    #[tokio::test]
+    async fn recent_tunnel_success_rate_matches_reference_ewma() {
+        let handle = EventHandle::<MockRuntime>::new_for_tests();
+        let outcomes = [true, false, true, false, false, true];
+        let mut attempts = 0u64;
+        let mut expected = TUNNEL_SUCCESS_RATE_START;
+        for success in outcomes {
+            attempts += 1;
+            let alpha = TUNNEL_SUCCESS_RATE_SMOOTHING
+                + (1.0 - TUNNEL_SUCCESS_RATE_SMOOTHING) / attempts as f64;
+            expected = alpha * f64::from(success as u8) + (1.0 - alpha) * expected;
+            handle.tunnel_build_result(success);
+        }
+        assert_eq!(
+            handle.tunnel_build_success_rate(),
+            (expected * 100.0).round()
+        );
+        assert_eq!(
+            handle.clone().tunnel_build_success_rate(),
+            (expected * 100.0).round()
+        );
+    }
+
+    #[test]
+    fn network_state_tracks_families_errors_and_testing_independently() {
+        let handle = EventHandle::<MockRuntime>::new_for_tests();
+
+        handle.set_ipv4_status(FirewallStatus::Firewalled);
+        handle.set_ipv4_network_error(Some(NetworkErrorReason::ClockSkew));
+        handle.set_ipv4_testing(true);
+        handle.set_ipv6_status(FirewallStatus::SymmetricNat);
+        handle.set_ipv6_network_error(None);
+        handle.set_ipv6_testing(false);
+
+        assert_eq!(
+            handle.ipv4_network_state(),
+            NetworkState {
+                status: FirewallStatus::Firewalled,
+                error: Some(NetworkErrorReason::ClockSkew),
+                testing: true,
+            }
+        );
+        assert_eq!(
+            handle.ipv6_network_state(),
+            NetworkState {
+                status: FirewallStatus::SymmetricNat,
+                error: None,
+                testing: false,
+            }
+        );
+
+        handle.set_ipv4_testing(false);
+        handle.set_ipv4_network_error(Some(NetworkErrorReason::NoDescriptors));
+        assert!(!handle.ipv4_network_state().testing);
+        assert_eq!(
+            handle.ipv4_network_state().error,
+            Some(NetworkErrorReason::NoDescriptors)
+        );
     }
 }

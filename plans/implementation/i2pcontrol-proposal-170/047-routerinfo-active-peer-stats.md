@@ -1,6 +1,6 @@
 # M047 — RouterInfo Active-Peer Statistics
 
-Status: blocked
+Status: closed
 
 Planning baseline: `b759038`
 
@@ -67,3 +67,5 @@ Stop if completing the object requires new network probes, latency measurement t
 ## 10. Closure evidence
 
 Closure must include the field-owner matrix, exact wire fixture, active-session lifecycle tests, resource bound evidence, changed-path containment review, feature-isolation evidence, and internal-only attestation.
+
+Closure record: `plans/closure/i2pcontrol-proposal-170/047-closure.md`.

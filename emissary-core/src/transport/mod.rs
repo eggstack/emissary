@@ -29,6 +29,7 @@ use crate::{
         SubsystemEvent,
     },
     transport::{metrics::*, ntcp2::Ntcp2Context, ssu2::Ssu2Context},
+    inspection::{TransportInspection, TransportInspectionSnapshot},
     Ntcp2Config, Ssu2Config,
 };
 
@@ -118,6 +119,9 @@ pub struct TransportManagerBuilder<R: Runtime> {
     /// messages to `SubsystemManager` for processing.
     transport_tx: Sender<SubsystemEvent>,
 
+    /// Cloneable, read-only current transport inspection source.
+    transport_inspection: TransportInspection,
+
     /// Enabled transports.
     transports: Vec<Box<dyn Transport<Item = TransportEvent>>>,
 }
@@ -146,6 +150,7 @@ impl<R: Runtime> TransportManagerBuilder<R> {
             transit_tunnels_disabled: false,
             transports: Vec::with_capacity(2),
             transport_tx,
+            transport_inspection: TransportInspection::new(TransportInspectionSnapshot::default()),
         }
     }
 
@@ -153,11 +158,15 @@ impl<R: Runtime> TransportManagerBuilder<R> {
     pub fn register_ntcp2(&mut self, context: Ntcp2Context<R>) {
         self.supported_transports.extend(context.classify());
         self.ntcp2_config = Some(context.config());
-        self.transports.push(Box::new(Ntcp2Transport::new(
+        self.transport_inspection.set_ntcp2_limit(
+            self.ntcp2_config.as_ref().and_then(|config| config.max_connections.map(|limit| limit.get())),
+        );
+        self.transports.push(Box::new(Ntcp2Transport::with_inspection(
             context,
             self.allow_local,
             self.router_ctx.clone(),
             self.transport_tx.clone(),
+            self.transport_inspection.clone(),
         )))
     }
 
@@ -165,11 +174,15 @@ impl<R: Runtime> TransportManagerBuilder<R> {
     pub fn register_ssu2(&mut self, context: Ssu2Context<R>) {
         self.supported_transports.extend(context.classify());
         self.ssu2_config = Some(context.config());
-        self.transports.push(Box::new(Ssu2Transport::new(
+        self.transport_inspection.set_ssu2_limit(
+            self.ssu2_config.as_ref().and_then(|config| config.max_connections.map(|limit| limit.get())),
+        );
+        self.transports.push(Box::new(Ssu2Transport::with_inspection(
             context,
             self.allow_local,
             self.router_ctx.clone(),
             self.transport_tx.clone(),
+            self.transport_inspection.clone(),
         )))
     }
 
@@ -215,6 +228,7 @@ impl<R: Runtime> TransportManagerBuilder<R> {
             ssu2_config: self.ssu2_config,
             supported_transports: self.supported_transports,
             transit_tunnels_disabled: self.transit_tunnels_disabled,
+            transport_inspection: self.transport_inspection,
             transports: self.transports,
             terminated_transports: HashSet::new(),
             transport_tx: self.transport_tx.clone(),
@@ -346,6 +360,9 @@ pub struct TransportManager<R: Runtime> {
     /// Are transit tunnels disabled.
     transit_tunnels_disabled: bool,
 
+    /// Cloneable, read-only current transport inspection source.
+    transport_inspection: TransportInspection,
+
     /// TX channel for sending transport-related events to `SubsystemManager`.
     transport_tx: Sender<SubsystemEvent>,
 
@@ -377,6 +394,16 @@ impl<R: Runtime> TransportManager<R> {
     /// without exposing the internal `routers` HashMap.
     pub fn connected_peer_ids(&self, limit: usize) -> Vec<String> {
         self.routers.keys().take(limit).map(|id| id.to_base64().to_owned()).collect()
+    }
+
+    /// Get the cloneable, read-only transport inspection source.
+    pub fn inspection(&self) -> TransportInspection {
+        self.transport_inspection.clone()
+    }
+
+    fn update_inspection_peer(&self, router_id: &RouterId, direction: Direction) {
+        self.transport_inspection
+            .peer_connected(router_id.to_base64().to_owned(), matches!(direction, Direction::Inbound));
     }
 
     /// Update local router's external addresses to `address`, if published.
@@ -1274,6 +1301,7 @@ impl<R: Runtime> Future for TransportManager<R> {
 
                             this.transports[index].accept(&router_id);
                             this.routers.insert(router_id.clone(), address.is_ipv4());
+                            this.update_inspection_peer(&router_id, direction);
 
                             // if this was a successful connection to an introducer with
                             // active client(s), start
@@ -1397,6 +1425,7 @@ impl<R: Runtime> Future for TransportManager<R> {
                             Some(false) =>
                                 this.router_ctx.metrics_handle().gauge(NUM_IPV6).decrement(1),
                         }
+                        this.transport_inspection.peer_disconnected(router_id.to_base64());
                         this.router_ctx.profile_storage().connection_closed(&router_id);
                         this.router_ctx.metrics_handle().gauge(NUM_ACTIVE_CONNECTIONS).decrement(1);
                         this.router_ctx

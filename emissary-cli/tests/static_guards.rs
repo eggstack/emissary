@@ -300,8 +300,8 @@ fn selector_registry_address_book_partition() {
 
 #[test]
 fn production_adapter_returns_unavailable_for_unimplemented_selectors() {
-    // The production adapter does not yet wire known peers, active peers,
-    // banned peers, peer limits, or netdb summaries. The methods must
+    // The production adapter does not yet wire active peers, banned peers,
+    // peer limits, or netdb summaries. The methods must
     // return Err(Unavailable) rather than fabricated default values.
     let rt = tokio::runtime::Runtime::new().unwrap();
     let ri = make_production_router_info();
@@ -331,6 +331,94 @@ fn production_adapter_returns_unavailable_for_unimplemented_selectors() {
             Err(InspectionError::Unavailable { .. })
         ));
     });
+}
+
+#[test]
+fn m053_composes_live_peer_directory_without_startup_snapshot() {
+    let main = read_source("src/main.rs");
+    assert!(main.contains("LivePeerDirectorySource::new"));
+    assert!(!main.contains("inspection_snapshot"));
+    assert!(!main.contains("CoreSnapshot"));
+}
+
+#[test]
+fn transport_inspection_handle_contains_only_owned_snapshot_state() {
+    let src = std::fs::read_to_string(
+        workspace_root().join("emissary-core/src/inspection.rs"),
+    )
+    .expect("core inspection source must exist");
+    let start = src
+        .find("pub struct TransportInspection {")
+        .expect("transport inspection handle must exist");
+    let end = src[start..]
+        .find("\n}\n\nimpl TransportInspection")
+        .map(|offset| start + offset);
+    let fields = &src[start..end.expect("transport inspection handle must be closed")];
+    assert!(fields.contains("snapshot: Arc<RwLock<TransportInspectionSnapshot>>"));
+    for forbidden in [
+        "Socket", "Session", "Sender", "Receiver", "EventHandle", "RouterContext", "PrivateKey",
+    ] {
+        assert!(!fields.contains(forbidden), "live/control type leaked into handle: {forbidden}");
+    }
+}
+
+#[test]
+fn transport_peer_inspection_contains_only_sanitized_facts() {
+    let src = std::fs::read_to_string(
+        workspace_root().join("emissary-core/src/inspection.rs"),
+    )
+    .expect("core inspection source must exist");
+    let start = src
+        .find("pub struct TransportPeerInspection {")
+        .expect("peer inspection DTO must exist");
+    let end = src[start..]
+        .find("\n}\n")
+        .map(|offset| start + offset);
+    let fields = &src[start..end.expect("peer inspection DTO must be closed")];
+    for forbidden in [
+        "Socket", "Session", "Sender", "Receiver", "EventHandle", "RouterContext", "Key",
+        "Channel", "Private",
+    ] {
+        assert!(!fields.contains(forbidden), "sensitive type leaked into peer DTO: {forbidden}");
+    }
+    for required in ["peer_id", "inbound", "connected", "bytes_received", "bytes_sent"] {
+        assert!(fields.contains(required), "peer DTO lost required neutral fact: {required}");
+    }
+}
+
+#[test]
+fn tunnel_inspection_contains_only_bounded_public_facts() {
+    let src = std::fs::read_to_string(workspace_root().join("emissary-core/src/inspection.rs"))
+        .expect("core inspection source must exist");
+    let start = src
+        .find("pub struct TunnelInspectionEntry {")
+        .expect("tunnel inspection DTO must exist");
+    let end = src[start..]
+        .find("\n}\n")
+        .map(|offset| start + offset)
+        .expect("tunnel inspection DTO must be closed");
+    let fields = &src[start..start + end];
+    for forbidden in [
+        "TunnelPool<",
+        "InboundTunnel",
+        "OutboundTunnel",
+        "TransitTunnel",
+        "RouterContext",
+        "PrivateKey",
+        "Receiver",
+        "Sender",
+    ] {
+        assert!(
+            !fields.contains(forbidden),
+            "live/control type leaked into tunnel DTO: {forbidden}"
+        );
+    }
+    for required in ["pool_id", "tunnel_id", "pool_kind", "direction"] {
+        assert!(
+            fields.contains(required),
+            "tunnel DTO lost required neutral fact: {required}"
+        );
+    }
 }
 
 #[test]
@@ -614,11 +702,11 @@ fn no_fabricated_recent_transit_default_in_production() {
 fn no_hardcoded_udp_active_true_in_production() {
     let src = read_source("src/i2pcontrol/production.rs");
     let non_test = src.split("#[cfg(test)]").next().unwrap_or(&src);
-    if let Some(impl_start) = non_test.find("impl RouterInfoControl") {
-        if let Some(impl_end) = non_test[impl_start..].find("\n}") {
-            let impl_body = &non_test[impl_start..impl_start + impl_end + 2];
+    if let Some(method_start) = non_test.find("async fn udp_snapshot") {
+        if let Some(method_end) = non_test[method_start..].find("\n    async fn") {
+            let method_body = &non_test[method_start..method_start + method_end];
             assert!(
-                !impl_body.contains("active: true"),
+                !method_body.contains("active: true"),
                 "Production RouterInfo must not hardcode active: true in UDP snapshot"
             );
         }

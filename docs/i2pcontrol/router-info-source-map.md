@@ -3,10 +3,15 @@
 Status: exact-wire source inventory for the pinned-revision closure
 
 This is the reviewed source map for the pinned Proposal 170 revision created and
-last updated on `2026-08-01`. M027 independently revalidated the matrix against
+last updated on `2026-08-11`. M027 independently revalidated the matrix against
 the external revision. The machine-readable authority is
 `router_info_keys::PROPOSAL_170_CONTRACT` in `emissary-cli/src/i2pcontrol/rpc.rs`.
-Summary: 43 total, 16 available, 1 protocol-permitted neutral, and 26 unavailable.
+Summary: 43 total, 40 available, 1 protocol-permitted neutral, and 2 unavailable.
+M051 adjudicated the two unavailable rows against the pinned proposal and the
+read-only Java reference change: the proposal specifies their wire types, while
+the reference requires substantive news-feed and ban-list owners. Emissary has
+neither owner, so empty string/map values are not authoritative capability-empty
+states and are not emitted.
 The table below is intentionally one row per canonical addition. Base selectors and
 the nested `Selector` compatibility form are not counted in those totals.
 
@@ -27,7 +32,7 @@ is read-only. Actual serialized response size is checked after assembly.
 
 | Wire key | JSON type | Disposition | Owner / reason | Serializer | Fixture | Bound | Base alias |
 |---|---|---|---|---|---|---|---|
-| `i2p.router.news` | string | unavailable | router-news: no router news owner | `serialize_router_news` | `p170.router_news.string` | — | base Router news (same wire key) |
+| `i2p.router.news` | string | unavailable | router-news: no authoritative news-feed owner; empty string is not contract-proven | `serialize_router_news` | `p170.router_news.string` | — | base Router news (same wire key) |
 | `i2p.router.id` | string or null | available | startup-retained | `serialize_router_id` | `p170.router_id.nullable_string` | 4 KiB | — |
 | `i2p.router.clockskew` | integer or null | protocol-permitted neutral | router-info-control: null when no peer estimate exists | `serialize_clockskew` | `p170.clockskew.nullable_integer` | — | — |
 | `i2p.router.info` | string or null | available | startup-retained | `serialize_router_info` | `p170.router_info.nullable_string` | 4 MiB | — |
@@ -36,34 +41,34 @@ is read-only. Actual serialized response size is checked after assembly.
 | `i2p.router.net.total.received.bytes` | integer | available | event-metrics | `serialize_total_received_bytes` | `p170.total_received.integer` | — | — |
 | `i2p.router.net.total.sent.bytes` | integer | available | event-metrics | `serialize_total_sent_bytes` | `p170.total_sent.integer` | — | — |
 | `i2p.router.net.total.transit.bytes` | integer | available | event-metrics | `serialize_total_transit_bytes` | `p170.total_transit.integer` | — | — |
-| `i2p.router.net.bw.transit.15s` | integer | unavailable | traffic-metrics: no rolling 15s transit source | `serialize_transit_bandwidth_15s` | `p170.transit_15s.unavailable` | — | — |
+| `i2p.router.net.bw.transit.15s` | integer | available | traffic-metrics: bounded rolling transit sampler | `serialize_transit_bandwidth_15s` | `p170.transit_15s.bytes_per_second` | 16 samples | — |
 | `i2p.router.net.tunnels.shareratio` | number | available | retained-configuration | `serialize_tunnel_share_ratio` | `p170.share_ratio.number` | — | — |
-| `i2p.router.net.tunnels.participating.info` | array&lt;object&gt; | unavailable | tunnel-pool: no bounded participating tunnel detail snapshot | `serialize_participating_tunnel_info` | `p170.participating_info.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.net.tunnels.participating.info` | array&lt;object&gt; | available | tunnel-inspection | `serialize_participating_tunnel_info` | `p170.participating_info.rows` | 10,000 / 4 MiB | — |
 | `i2p.router.net.tunnels.i2ptunnel` | array&lt;object&gt; | available | startup-tunnel-inventory | `serialize_i2ptunnel_quick_info` | `p170.i2ptunnel.quick_info` | 1,000 / 4 MiB | — |
-| `i2p.router.net.tunnels.exploratory.inbound` | integer | unavailable | tunnel-pool: no bounded exploratory tunnel count source | `serialize_exploratory_inbound` | `p170.exploratory_inbound.unavailable` | — | — |
-| `i2p.router.net.tunnels.exploratory.outbound` | integer | unavailable | tunnel-pool: no bounded exploratory tunnel count source | `serialize_exploratory_outbound` | `p170.exploratory_outbound.unavailable` | — | — |
-| `i2p.router.net.tunnels.exploratory.info.list` | array&lt;object&gt; | unavailable | tunnel-pool: no bounded exploratory tunnel detail snapshot | `serialize_exploratory_info_list` | `p170.exploratory_info.unavailable` | 10,000 / 4 MiB | — |
-| `i2p.router.net.tunnels.client.inbound` | integer | unavailable | tunnel-pool: no bounded client tunnel count source | `serialize_client_inbound` | `p170.client_inbound.unavailable` | — | — |
-| `i2p.router.net.tunnels.client.outbound` | integer | unavailable | tunnel-pool: no bounded client tunnel count source | `serialize_client_outbound` | `p170.client_outbound.unavailable` | — | — |
-| `i2p.router.net.tunnels.client.info.list` | array&lt;object&gt; | unavailable | tunnel-pool: no bounded client tunnel detail snapshot | `serialize_client_info_list` | `p170.client_info.unavailable` | 10,000 / 4 MiB | — |
-| `i2p.router.net.status.v6` | integer | unavailable | network: no transport-specific v6 status code mapping | `serialize_network_status_v6` | `p170.status_v6.unavailable` | — | — |
-| `i2p.router.net.error` | integer | unavailable | network: no transport-specific v4 error code mapping | `serialize_network_error` | `p170.error_v4.unavailable` | — | — |
-| `i2p.router.net.error.v6` | integer | unavailable | network: no transport-specific v6 error code mapping | `serialize_network_error_v6` | `p170.error_v6.unavailable` | — | — |
-| `i2p.router.net.testing` | integer | unavailable | network: no canonical v4 testing-state source | `serialize_network_testing` | `p170.testing_v4.unavailable` | — | — |
-| `i2p.router.net.testing.v6` | integer | unavailable | network: no canonical v6 testing-state source | `serialize_network_testing_v6` | `p170.testing_v6.unavailable` | — | — |
-| `i2p.router.net.tunnels.successrate` | number | unavailable | tunnel-build-metrics: no rolling tunnel build success-rate source | `serialize_tunnel_success_rate` | `p170.success_rate.recent.unavailable` | — | — |
+| `i2p.router.net.tunnels.exploratory.inbound` | integer | available | tunnel-inspection | `serialize_exploratory_inbound` | `p170.exploratory_inbound.count` | — | — |
+| `i2p.router.net.tunnels.exploratory.outbound` | integer | available | tunnel-inspection | `serialize_exploratory_outbound` | `p170.exploratory_outbound.count` | — | — |
+| `i2p.router.net.tunnels.exploratory.info.list` | array&lt;object&gt; | available | tunnel-inspection | `serialize_exploratory_info_list` | `p170.exploratory_info.rows` | 10,000 / 4 MiB | — |
+| `i2p.router.net.tunnels.client.inbound` | integer | available | tunnel-inspection | `serialize_client_inbound` | `p170.client_inbound.count` | — | — |
+| `i2p.router.net.tunnels.client.outbound` | integer | available | tunnel-inspection | `serialize_client_outbound` | `p170.client_outbound.count` | — | — |
+| `i2p.router.net.tunnels.client.info.list` | array&lt;object&gt; | available | tunnel-inspection | `serialize_client_info_list` | `p170.client_info.rows` | 10,000 / 4 MiB | — |
+| `i2p.router.net.status.v6` | integer | available | network-state: live v6 reachability status | `serialize_network_status_v6` | `p170.status_v6.integer` | — | — |
+| `i2p.router.net.error` | integer | available | network-state: independently known v4 error, none when unknown | `serialize_network_error` | `p170.error_v4.integer` | — | — |
+| `i2p.router.net.error.v6` | integer | available | network-state: independently known v6 error, none when unknown | `serialize_network_error_v6` | `p170.error_v6.integer` | — | — |
+| `i2p.router.net.testing` | integer | available | network-state: active v4 reachability test | `serialize_network_testing` | `p170.testing_v4.integer` | — | — |
+| `i2p.router.net.testing.v6` | integer | available | network-state: active v6 reachability test | `serialize_network_testing_v6` | `p170.testing_v6.integer` | — | — |
+| `i2p.router.net.tunnels.successrate` | number | available | tunnel-build-metrics: ordered reference EWMA | `serialize_tunnel_success_rate` | `p170.success_rate.recent.percent` | — | — |
 | `i2p.router.net.tunnels.totalsuccessrate` | number | available | event-metrics | `serialize_total_tunnel_success_rate` | `p170.success_rate.total.percent` | — | — |
-| `i2p.router.net.tunnels.queue` | integer | unavailable | tunnel-pool: no bounded tunnel build queue snapshot | `serialize_tunnel_queue` | `p170.tunnel_queue.unavailable` | — | — |
-| `i2p.router.net.tunnels.tbmqueue` | integer | unavailable | tunnel-pool: no bounded tunnel build message queue snapshot | `serialize_tbm_queue` | `p170.tbm_queue.unavailable` | — | — |
-| `i2p.router.netdb.peers` | array&lt;string&gt; | unavailable | profile-storage-read-only: no live bounded ProfileStorage directory source | `serialize_netdb_peer_hashes` | `p170.netdb.peers.unavailable` | 10,000 / 4 MiB | — |
-| `i2p.router.netdb.activepeers.info` | array&lt;string&gt; | unavailable | netdb: no bounded active-peer RouterInfo snapshot | `serialize_active_peer_router_infos` | `p170.netdb.active_peer_info.unavailable` | 10,000 / 4 MiB | — |
-| `i2p.router.netdb.ntcp.limit` | integer | unavailable | peer-limits: no authoritative NTCP limit owner | `serialize_ntcp_limit` | `p170.netdb.ntcp_limit.unavailable` | — | — |
-| `i2p.router.netdb.ssu.limit` | integer | unavailable | peer-limits: no authoritative SSU limit owner | `serialize_ssu_limit` | `p170.netdb.ssu_limit.unavailable` | — | — |
-| `i2p.router.netdb.bannedpeers` | map&lt;string,map&lt;string,object&gt;&gt; | unavailable | ban-list: no authoritative ban owner | `serialize_banned_peers` | `p170.netdb.banned_peers.unavailable` | 10,000 / 4 MiB | — |
-| `i2p.router.netdb.activepeers.list` | array&lt;string&gt; | unavailable | peer-list: no bounded active peer RouterInfo snapshot | `serialize_active_peer_hashes` | `p170.netdb.active_peers.unavailable` | 10,000 / 4 MiB | — |
-| `i2p.router.netdb.peers.list` | array&lt;string&gt; | unavailable | profile-storage-read-only: no live bounded ProfileStorage directory source | `serialize_known_peer_hashes` | `p170.netdb.peer_list.unavailable` | 10,000 / 4 MiB | — |
-| `i2p.router.netdb.peers.info` | array&lt;string&gt; | unavailable | profile-storage-read-only: no live bounded ProfileStorage directory source | `serialize_peer_router_infos` | `p170.netdb.peer_info.unavailable` | 10,000 / 4 MiB | — |
-| `i2p.router.netdb.activepeers.stats` | array&lt;object&gt; | unavailable | peer-stats: no bounded active peer statistics snapshot | `serialize_active_peer_stats` | `p170.netdb.active_peer_stats.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.net.tunnels.queue` | integer | available | tunnel-inspection: live pending build depth | `serialize_tunnel_queue` | `p170.tunnel_queue.depth` | bounded | — |
+| `i2p.router.net.tunnels.tbmqueue` | integer | available | tunnel-inspection: live transit build-message depth | `serialize_tbm_queue` | `p170.tbm_queue.depth` | bounded | — |
+| `i2p.router.netdb.peers` | array&lt;string&gt; | available | live-profile-storage-inspection | `serialize_netdb_peer_hashes` | `p170.netdb.peer_hashes` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.activepeers.info` | array&lt;string&gt; | available | transport-and-live-profile-storage-inspection | `serialize_active_peer_router_infos` | `p170.netdb.active_peer_info` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.ntcp.limit` | integer | available | transport-manager-configuration | `serialize_ntcp_limit` | `p170.netdb.ntcp_limit` | — | — |
+| `i2p.router.netdb.ssu.limit` | integer | available | transport-manager-configuration | `serialize_ssu_limit` | `p170.netdb.ssu_limit` | — | — |
+| `i2p.router.netdb.bannedpeers` | map&lt;string,map&lt;string,object&gt;&gt; | unavailable | ban-list: no authoritative ban owner; empty map is not contract-proven | `serialize_banned_peers` | `p170.netdb.banned_peers.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.activepeers.list` | array&lt;string&gt; | available | transport-manager-inspection | `serialize_active_peer_hashes` | `p170.netdb.active_peers` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.peers.list` | array&lt;string&gt; | available | live-profile-storage-inspection | `serialize_known_peer_hashes` | `p170.netdb.peer_list` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.peers.info` | array&lt;string&gt; | available | live-profile-storage-inspection | `serialize_peer_router_infos` | `p170.netdb.peer_info` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.activepeers.stats` | array&lt;object&gt; | available | transport-manager-inspection: bounded current active session facts | `serialize_active_peer_stats` | `p170.netdb.active_peer_stats` | 10,000 / 4 MiB | — |
 | `i2p.router.addressbook.private.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_private_list` | `p170.addressbook.private.list` | 10,000 / 4 MiB | — |
 | `i2p.router.addressbook.local.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_local_list` | `p170.addressbook.local.list` | 10,000 / 4 MiB | — |
 | `i2p.router.addressbook.router.list` | array&lt;map&lt;string,string&gt;&gt; | available | runtime-address-book-handle | `serialize_address_book_router_list` | `p170.addressbook.router.list` | 10,000 / 4 MiB | — |

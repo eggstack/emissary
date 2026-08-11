@@ -1,8 +1,10 @@
 # M052 — RouterInfo 26-Source Integration, Containment Review, and Reclosure
 
-Status: blocked
+Status: closed
 
 Planning baseline: `b759038`
+
+Closure record: `plans/closure/i2pcontrol-proposal-170/052-closure.md`
 
 Source roadmap: `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 

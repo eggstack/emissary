@@ -156,6 +156,9 @@ pub struct Router<R: Runtime> {
 
     /// Handle to [`TunnelManager`].
     _tunnel_manager_handle: TunnelManagerHandle,
+
+    /// Cloneable neutral tunnel lifecycle inspection source.
+    tunnel_inspection: crate::inspection::TunnelInspection,
 }
 
 impl<R: Runtime> Router<R> {
@@ -351,8 +354,8 @@ impl<R: Runtime> Router<R> {
         // initialize and start tunnel manager
         //
         // acquire handle to exploratory tunnel pool which is given to `NetDb`
-        let (tunnel_manager_handle, exploratory_pool_handle) = {
-            let (tunnel_manager, tunnel_manager_handle, tunnel_pool_handle) =
+        let (tunnel_manager_handle, exploratory_pool_handle, tunnel_inspection) = {
+            let (tunnel_manager, tunnel_manager_handle, tunnel_pool_handle, tunnel_inspection) =
                 TunnelManager::<R>::new(
                     router_ctx.clone(),
                     exploratory.into(),
@@ -364,7 +367,7 @@ impl<R: Runtime> Router<R> {
                 );
             R::spawn(tunnel_manager);
 
-            (tunnel_manager_handle, tunnel_pool_handle)
+            (tunnel_manager_handle, tunnel_pool_handle, tunnel_inspection)
         };
 
         // clone router context for storage in Router before NetDb consumes it
@@ -451,6 +454,7 @@ impl<R: Runtime> Router<R> {
                 shutdown_count: 0usize,
                 transport_manager: transport_manager_builder.build(),
                 _tunnel_manager_handle: tunnel_manager_handle,
+                tunnel_inspection,
             },
             event_subscriber,
             serialized_router_info,
@@ -487,6 +491,21 @@ impl<R: Runtime> Router<R> {
     /// Get local router ID.
     pub fn router_id(&self) -> &RouterId {
         &self.router_id
+    }
+
+    /// Get a cloneable, read-only handle for the current public router directory.
+    pub fn peer_directory_inspection(&self) -> crate::inspection::PeerDirectoryInspection<R> {
+        crate::inspection::PeerDirectoryInspection::new(self.router_ctx.profile_storage().clone())
+    }
+
+    /// Get a cloneable, read-only handle for current transport facts.
+    pub fn transport_inspection(&self) -> crate::inspection::TransportInspection {
+        self.transport_manager.inspection()
+    }
+
+    /// Get a cloneable, read-only handle for current tunnel lifecycle facts.
+    pub fn tunnel_inspection(&self) -> crate::inspection::TunnelInspection {
+        self.tunnel_inspection.clone()
     }
 
     /// Get reference to [`EventHandle`] for read-only metric snapshots.

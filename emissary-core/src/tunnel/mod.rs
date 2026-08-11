@@ -19,6 +19,7 @@
 use crate::{
     config::TransitConfig,
     i2np::Message,
+    inspection::{TunnelInspection, TunnelPoolKind},
     primitives::RouterId,
     router::context::RouterContext,
     runtime::{MetricType, Runtime},
@@ -26,7 +27,10 @@ use crate::{
     subsystem::{Source, SubsystemHandle},
     tunnel::{
         handle::{CommandRecycle, TunnelManagerCommand},
-        pool::{ClientSelector, ExploratorySelector, TunnelPool, TunnelPoolBuildParameters},
+        pool::{
+            ClientSelector, ExploratorySelector, TunnelPool, TunnelPoolBuildParameters,
+            TunnelPoolObservation,
+        },
         transit::TransitTunnelManager,
     },
 };
@@ -34,6 +38,7 @@ use crate::{
 use thingbuf::mpsc::Receiver;
 
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicU64, Ordering};
 use core::{
     future::Future,
     pin::Pin,
@@ -81,6 +86,12 @@ pub struct TunnelManager<R: Runtime> {
 
     /// Routing table.
     subsystem_handle: SubsystemHandle,
+
+    /// Unique process-local identity for client pools.
+    next_pool_id: AtomicU64,
+
+    /// Shared bounded tunnel lifecycle inspection source.
+    tunnel_inspection: TunnelInspection,
 }
 
 impl<R: Runtime> TunnelManager<R> {
@@ -96,7 +107,12 @@ impl<R: Runtime> TunnelManager<R> {
         transit_shutdown_handle: ShutdownHandle,
         subsystem_handle: SubsystemHandle,
         subsys_transit_rx: Receiver<Vec<(RouterId, Message)>>,
-    ) -> (Self, TunnelManagerHandle, TunnelPoolHandle) {
+    ) -> (
+        Self,
+        TunnelManagerHandle,
+        TunnelPoolHandle,
+        TunnelInspection,
+    ) {
         tracing::info!(
             target: LOG_TARGET,
             ?insecure_tunnels,
@@ -106,12 +122,15 @@ impl<R: Runtime> TunnelManager<R> {
         // create `TransitTunnelManager` and run it in a separate task
         //
         // `TransitTunnelManager` communicates with the network via `SubsystemHandle`
-        R::spawn(TransitTunnelManager::<R>::new(
+        let tunnel_inspection = TunnelInspection::default();
+
+        R::spawn(TransitTunnelManager::<R>::new_with_inspection(
             transit_config,
             router_ctx.clone(),
             subsystem_handle.clone().with_source(Source::Transit),
             subsys_transit_rx,
             transit_shutdown_handle,
+            Some(tunnel_inspection.clone()),
         ));
 
         // start exploratory tunnel pool
@@ -124,11 +143,17 @@ impl<R: Runtime> TunnelManager<R> {
                 build_parameters.context_handle.clone(),
                 insecure_tunnels,
             );
-            let (tunnel_pool, tunnel_pool_handle) = TunnelPool::<R, _>::new(
+            let observation = TunnelPoolObservation::new(
+                tunnel_inspection.clone(),
+                0,
+                TunnelPoolKind::Exploratory,
+            );
+            let (tunnel_pool, tunnel_pool_handle) = TunnelPool::<R, _>::new_with_observation(
                 build_parameters,
                 selector.clone(),
                 subsystem_handle.clone().with_source(Source::Exploratory),
                 router_ctx.clone(),
+                Some(observation),
             );
             R::spawn(tunnel_pool);
 
@@ -144,9 +169,12 @@ impl<R: Runtime> TunnelManager<R> {
                 exploratory_selector,
                 router_ctx,
                 subsystem_handle: subsystem_handle.with_source(Source::Client),
+                next_pool_id: AtomicU64::new(1),
+                tunnel_inspection: tunnel_inspection.clone(),
             },
             manager_handle,
             pool_handle,
+            tunnel_inspection,
         )
     }
 
@@ -170,11 +198,18 @@ impl<R: Runtime> TunnelManager<R> {
             self.exploratory_selector.clone(),
             build_parameters.context_handle.clone(),
         );
-        let (tunnel_pool, tunnel_pool_handle) = TunnelPool::<R, _>::new(
+        let pool_id = self.next_pool_id.fetch_add(1, Ordering::Relaxed);
+        let observation = TunnelPoolObservation::new(
+            self.tunnel_inspection.clone(),
+            pool_id,
+            TunnelPoolKind::Client,
+        );
+        let (tunnel_pool, tunnel_pool_handle) = TunnelPool::<R, _>::new_with_observation(
             build_parameters,
             selector,
             self.subsystem_handle.clone(),
             self.router_ctx.clone(),
+            Some(observation),
         );
         R::spawn(tunnel_pool);
 

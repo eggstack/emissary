@@ -599,6 +599,22 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                     router.router_id().to_base64().to_owned(),
                     local_router_info.clone(),
                 )
+                .with_peer_directory_source(Arc::new(
+                    i2pcontrol::production::LivePeerDirectorySource::new(
+                        router.peer_directory_inspection(),
+                        10_000,
+                    ),
+                ))
+                .with_active_peer_source(Arc::new(
+                    i2pcontrol::production::LiveActivePeerSource::new(
+                        router.transport_inspection(),
+                        10_000,
+                    ),
+                ))
+                .with_tunnel_source(Arc::new(i2pcontrol::production::LiveTunnelSource::new(
+                    router.tunnel_inspection(),
+                    10_000,
+                )))
                 .with_event_metrics(metrics)
                 .with_share_ratio(share_ratio)
                 .with_configured_bandwidth(bw_in, bw_out)

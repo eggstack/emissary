@@ -44,7 +44,7 @@ use super::{
         EventMetrics, ProductionAddressBookControl, ProductionControlPlane,
         ProductionRouterInfoControl, ProductionTunnelManagerControl, StartupTunnelInventory,
     },
-    router_info::RouterInfoControl,
+    router_info::{ActivePeerSource, PeerDirectorySource, RouterInfoControl, TunnelSource},
     rpc::{
         self, AuthenticateParams, AuthenticateResult, JsonRpcErrorResponse, JsonRpcRequest,
         JsonRpcSuccess, RequestId,
@@ -641,6 +641,12 @@ pub struct ServerInitContext {
     pub startup_tunnel_inventory: Option<StartupTunnelInventory>,
     /// Existing router SAM TCP port used by the control-plane client backend.
     pub sam_tcp_port: Option<u16>,
+    /// Canonical bounded public peer directory source.
+    pub peer_directory: Option<Arc<dyn PeerDirectorySource>>,
+    /// Canonical bounded current transport source.
+    pub active_peer_source: Option<Arc<dyn ActivePeerSource>>,
+    /// Canonical bounded current tunnel source.
+    pub tunnel_source: Option<Arc<dyn TunnelSource>>,
 }
 
 impl ServerInitContext {
@@ -661,6 +667,9 @@ impl ServerInitContext {
             address_book_handle: None,
             startup_tunnel_inventory: None,
             sam_tcp_port: None,
+            peer_directory: None,
+            active_peer_source: None,
+            tunnel_source: None,
         }
     }
 
@@ -730,6 +739,24 @@ impl ServerInitContext {
     /// tunnel composition.
     pub fn with_sam_tcp_port(mut self, port: u16) -> Self {
         self.sam_tcp_port = Some(port);
+        self
+    }
+
+    /// Inject the canonical live public peer directory source.
+    pub fn with_peer_directory_source(mut self, source: Arc<dyn PeerDirectorySource>) -> Self {
+        self.peer_directory = Some(source);
+        self
+    }
+
+    /// Inject the canonical current transport source.
+    pub fn with_active_peer_source(mut self, source: Arc<dyn ActivePeerSource>) -> Self {
+        self.active_peer_source = Some(source);
+        self
+    }
+
+    /// Inject the canonical current tunnel source.
+    pub fn with_tunnel_source(mut self, source: Arc<dyn TunnelSource>) -> Self {
+        self.tunnel_source = Some(source);
         self
     }
 }
@@ -821,7 +848,7 @@ pub async fn init_server(
 
     // --- Build production router info adapter using the shared tunnel service ---
     let log_ring = ctx.log_ring.unwrap_or_default();
-    let router_info_control = ProductionRouterInfoControl::new(
+    let mut router_info_control = ProductionRouterInfoControl::new(
         ctx.router_id.clone(),
         env!("CARGO_PKG_VERSION").to_string(),
         ctx.share_ratio,
@@ -831,6 +858,15 @@ pub async fn init_server(
         log_ring,
         tunnels_shared,
     );
+    if let Some(source) = ctx.peer_directory {
+        router_info_control = router_info_control.with_peer_directory_source(source);
+    }
+    if let Some(source) = ctx.active_peer_source {
+        router_info_control = router_info_control.with_active_peer_source(source);
+    }
+    if let Some(source) = ctx.tunnel_source {
+        router_info_control = router_info_control.with_tunnel_source(source);
+    }
     let router_info: Arc<dyn RouterInfoControl> = Arc::new(router_info_control);
 
     // --- Install the pre-built service registry from the composition root ---

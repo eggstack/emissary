@@ -4,7 +4,7 @@ Status: closed
 
 Reviewed plan: `plans/implementation/i2pcontrol-proposal-170/055-m050-network-error-truthfulness-corrective.md`
 
-Implementation commit: recorded in the final commit history for this closure
+Implementation commit: `b35d231` (`i2pcontrol: close M055 network error corrective`)
 
 Closure date: 2026-08-11
 

@@ -181,7 +181,7 @@ fn production_control_plane_identity_and_uptime() {
 async fn production_address_book_control_crud() {
     let dir = tempfile::tempdir().unwrap();
     let base = dir.keep();
-    let manager = emissary_cli::address_book::AddressBookManager::new_with_control_owner(
+    let (_manager, control) = emissary_cli::i2pcontrol::address_book_runtime::new_controlled_manager(
         base.clone(),
         emissary_cli::config::AddressBookConfig {
             default: None,
@@ -190,7 +190,7 @@ async fn production_address_book_control_crud() {
     )
     .await;
     let ab = ProductionAddressBookControl::new(
-        manager.control_handle().unwrap(),
+        control,
         base.join("addressbooks"),
     );
     ab.load().await.unwrap();
@@ -234,7 +234,7 @@ async fn production_address_book_persistence_round_trip() {
     let dir = tempfile::tempdir().unwrap();
     let base = dir.path().to_path_buf();
     {
-        let manager = emissary_cli::address_book::AddressBookManager::new_with_control_owner(
+        let (_manager, control) = emissary_cli::i2pcontrol::address_book_runtime::new_controlled_manager(
             base.clone(),
             emissary_cli::config::AddressBookConfig {
                 default: None,
@@ -243,7 +243,7 @@ async fn production_address_book_persistence_round_trip() {
         )
         .await;
         let ab = ProductionAddressBookControl::new(
-            manager.control_handle().unwrap(),
+            control,
             base.join("addressbooks"),
         );
         ab.load().await.unwrap();
@@ -265,7 +265,7 @@ async fn production_address_book_persistence_round_trip() {
         .unwrap();
     }
     {
-        let manager = emissary_cli::address_book::AddressBookManager::new_with_control_owner(
+        let (_manager, control) = emissary_cli::i2pcontrol::address_book_runtime::new_controlled_manager(
             base.clone(),
             emissary_cli::config::AddressBookConfig {
                 default: None,
@@ -274,7 +274,7 @@ async fn production_address_book_persistence_round_trip() {
         )
         .await;
         let ab = ProductionAddressBookControl::new(
-            manager.control_handle().unwrap(),
+            control,
             base.join("addressbooks"),
         );
         ab.load().await.unwrap();

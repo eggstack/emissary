@@ -277,6 +277,9 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
     };
     let address_book_config = config.address_book.take().or(default_address_book_config);
 
+    #[cfg(feature = "i2pcontrol")]
+    let mut address_book_control_handle = None;
+
     let (router, events, local_router_info, address_book_manager) = match address_book_config {
         None => Router::<TokioRuntime>::new_with_sam_observation(
             config.into(),
@@ -294,11 +297,13 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
             // create address book, allocate address book handle and pass it to `Router`
             #[cfg(feature = "i2pcontrol")]
             let address_book_manager = if i2pcontrol_enabled {
-                AddressBookManager::new_with_control_owner(
+                let (manager, handle) = i2pcontrol::address_book_runtime::new_controlled_manager(
                     config.base_path.clone(),
                     address_book_config,
                 )
-                .await
+                .await;
+                address_book_control_handle = Some(handle);
+                manager
             } else {
                 AddressBookManager::new(config.base_path.clone(), address_book_config).await
             };
@@ -325,8 +330,7 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
     .map_err(|error| anyhow!(error))?;
 
     #[cfg(feature = "i2pcontrol")]
-    let address_book_handle_for_control =
-        address_book_manager.as_ref().and_then(|manager| manager.control_handle());
+    let address_book_handle_for_control = address_book_control_handle;
 
     #[cfg(feature = "i2pcontrol")]
     if i2pcontrol_enabled {

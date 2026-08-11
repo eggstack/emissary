@@ -874,8 +874,8 @@ async fn tls_test_server_with_connection_limit(
     use tokio_rustls::{rustls::ServerConfig, TlsAcceptor};
 
     let tmp = tempfile::tempdir().unwrap();
-    let address_book_manager =
-        emissary_cli::address_book::AddressBookManager::new_with_control_owner(
+    let (_address_book_manager, address_book_control) =
+        emissary_cli::i2pcontrol::address_book_runtime::new_controlled_manager(
             tmp.path().to_owned(),
             emissary_cli::config::AddressBookConfig {
                 default: None,
@@ -902,7 +902,7 @@ async fn tls_test_server_with_connection_limit(
         ProductionControls {
             address_books: Arc::new(
                 emissary_cli::i2pcontrol::production::ProductionAddressBookControl::new(
-                    address_book_manager.control_handle().unwrap(),
+                    address_book_control,
                     tmp.path().join("ab"),
                 ),
             ),

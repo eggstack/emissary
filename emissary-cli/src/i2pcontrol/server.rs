@@ -53,7 +53,7 @@ use super::{
     tls::TlsConfig,
 };
 
-use crate::address_book::RuntimeAddressBookHandle;
+use crate::i2pcontrol::address_book_runtime::RuntimeAddressBookHandle;
 
 use emissary_core::crypto::base64_encode;
 
@@ -2084,7 +2084,7 @@ mod tests {
                 private_key: None,
             },
         };
-        let manager = crate::address_book::AddressBookManager::new_with_control_owner(
+        let (_manager, control) = crate::i2pcontrol::address_book_runtime::new_controlled_manager(
             tmp.path().to_owned(),
             crate::config::AddressBookConfig {
                 default: None,
@@ -2092,8 +2092,7 @@ mod tests {
             },
         )
         .await;
-        let ctx = ServerInitContext::new("id".into(), vec![])
-            .with_address_book_handle(manager.control_handle().unwrap());
+        let ctx = ServerInitContext::new("id".into(), vec![]).with_address_book_handle(control);
 
         let _ = init_server(&config, tmp.path(), ctx).await.unwrap();
 

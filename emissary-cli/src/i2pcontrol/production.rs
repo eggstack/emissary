@@ -34,11 +34,11 @@ use std::{
 use async_trait::async_trait;
 
 use crate::{
-    address_book::{
-        RuntimeAddressBookEntry, RuntimeAddressBookHandle, RuntimeAddressBookSnapshot,
-        RuntimeAddressBookType,
-    },
     i2pcontrol::{
+        address_book_runtime::{
+            RuntimeAddressBookEntry, RuntimeAddressBookHandle,
+            RuntimeAddressBookSnapshot, RuntimeAddressBookType,
+        },
         backends::{registry::TunnelBackendRegistry, BackendError, TunnelBackend},
         control_plane::{AddressBookControl, ControlPlane, TunnelManagerControl},
         domain::{
@@ -1616,7 +1616,7 @@ impl RouterInfoControl for ProductionRouterInfoControl {
 mod tests {
     use super::*;
     use crate::{
-        address_book::{AddressBookManager, RuntimeAddressBookType},
+        i2pcontrol::address_book_runtime::{new_controlled_manager, RuntimeAddressBookType},
         config::AddressBookConfig,
     };
 
@@ -1643,7 +1643,7 @@ mod tests {
             .await
             .unwrap();
 
-        let manager = AddressBookManager::new_with_control_owner(
+        let (manager, control) = new_controlled_manager(
             base.clone(),
             AddressBookConfig {
                 default: None,
@@ -1651,7 +1651,6 @@ mod tests {
             },
         )
         .await;
-        let control = manager.control_handle().unwrap();
         let adapter = ProductionAddressBookControl::new(control.clone(), legacy_dir.clone());
         adapter.load().await.unwrap();
         assert_eq!(
@@ -1661,7 +1660,7 @@ mod tests {
         assert!(control.runtime_authority_present());
 
         drop(manager);
-        let manager = AddressBookManager::new_with_control_owner(
+        let (_manager, control) = new_controlled_manager(
             base,
             AddressBookConfig {
                 default: None,
@@ -1669,7 +1668,6 @@ mod tests {
             },
         )
         .await;
-        let control = manager.control_handle().unwrap();
         ProductionAddressBookControl::new(control.clone(), legacy_dir)
             .load()
             .await
@@ -1685,7 +1683,7 @@ mod tests {
         use crate::i2pcontrol::control_plane::AddressBookControl;
 
         let base = tempfile::tempdir().unwrap().keep();
-        let manager = AddressBookManager::new_with_control_owner(
+        let (_manager, control) = new_controlled_manager(
             base.clone(),
             AddressBookConfig {
                 default: None,
@@ -1693,7 +1691,7 @@ mod tests {
             },
         )
         .await;
-        let control = manager.control_handle().unwrap();
+        
         let adapter = ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"));
 
         let mut config = AddressBookConfiguration::new();
@@ -1720,7 +1718,7 @@ mod tests {
         configuration.insert("theme".to_string(), "light".to_string());
         legacy.set_configuration(configuration).await.unwrap();
 
-        let manager = AddressBookManager::new_with_control_owner(
+        let (_manager, control) = new_controlled_manager(
             base,
             AddressBookConfig {
                 default: None,
@@ -1728,7 +1726,6 @@ mod tests {
             },
         )
         .await;
-        let control = manager.control_handle().unwrap();
         ProductionAddressBookControl::new(control.clone(), legacy_dir)
             .load()
             .await
@@ -1764,7 +1761,7 @@ mod tests {
             .await
             .unwrap();
 
-        let manager = AddressBookManager::new_with_control_owner(
+        let (_manager, control) = new_controlled_manager(
             base,
             AddressBookConfig {
                 default: None,
@@ -1772,7 +1769,6 @@ mod tests {
             },
         )
         .await;
-        let control = manager.control_handle().unwrap();
         let error = ProductionAddressBookControl::new(control.clone(), legacy_dir)
             .load()
             .await
@@ -1810,7 +1806,7 @@ mod tests {
         .await
         .unwrap();
 
-        let manager = AddressBookManager::new_with_control_owner(
+        let (_manager, control) = new_controlled_manager(
             base.clone(),
             AddressBookConfig {
                 default: None,
@@ -1818,7 +1814,6 @@ mod tests {
             },
         )
         .await;
-        let control = manager.control_handle().unwrap();
         let adapter = ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"));
         adapter.load().await.unwrap();
 
@@ -1879,7 +1874,7 @@ mod tests {
         .await
         .unwrap();
 
-        let manager = AddressBookManager::new_with_control_owner(
+        let (_manager, control) = new_controlled_manager(
             base.clone(),
             AddressBookConfig {
                 default: None,
@@ -1887,7 +1882,6 @@ mod tests {
             },
         )
         .await;
-        let control = manager.control_handle().unwrap();
         ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"))
             .load()
             .await
@@ -1925,7 +1919,7 @@ mod tests {
             .await
             .unwrap();
 
-        let manager = AddressBookManager::new_with_control_owner(
+        let (_manager, control) = new_controlled_manager(
             base.clone(),
             AddressBookConfig {
                 default: None,
@@ -1933,7 +1927,6 @@ mod tests {
             },
         )
         .await;
-        let control = manager.control_handle().unwrap();
         let error = ProductionAddressBookControl::new(control, base.join("addressbooks"))
             .load()
             .await
@@ -1973,7 +1966,7 @@ mod tests {
         .await
         .unwrap();
 
-        let manager = AddressBookManager::new_with_control_owner(
+        let (manager, control) = new_controlled_manager(
             base.clone(),
             AddressBookConfig {
                 default: None,
@@ -1981,7 +1974,6 @@ mod tests {
             },
         )
         .await;
-        let control = manager.control_handle().unwrap();
         let adapter = ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"));
         adapter.load().await.unwrap();
         assert!(control
@@ -1990,7 +1982,7 @@ mod tests {
             .unwrap());
         drop(manager);
 
-        let manager = AddressBookManager::new_with_control_owner(
+        let (_manager, control) = new_controlled_manager(
             base.clone(),
             AddressBookConfig {
                 default: None,
@@ -1998,7 +1990,6 @@ mod tests {
             },
         )
         .await;
-        let control = manager.control_handle().unwrap();
         ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"))
             .load()
             .await

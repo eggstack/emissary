@@ -1,8 +1,8 @@
 # M059 — Original CLI and Runtime Adapter Containment
 
-Status: ready
+Status: closed
 
-Planning baseline: to be pinned by accepted M058 closure
+Planning baseline: `adb2f52543764b267b2bcb282d093111001ae4b` — accepted M058 closure baseline
 
 Source roadmap:
 

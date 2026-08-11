@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Containment Corrective Roadmap
 
-Status: active; M059 ready
+Status: active; M060 ready
 
 Planning baseline: `adb2f52543764b267b2bcb282d093111001ae4b2` — merged M057 closure head
 
@@ -142,19 +142,19 @@ No general event framework is required. Prefer deletion and consolidation over a
 M057 closed source/truthfulness planning state
    |
    v
-M058 — non-i2pcontrol fork-delta inventory and containment ledger — READY
+M058 — non-i2pcontrol fork-delta inventory and containment ledger — closed
    |
    v
-M059 — original CLI/runtime adapter containment — ready; M058 closed
+M059 — original CLI/runtime adapter containment — closed; M058 closed
    |
    v
-M060 — core observation seam consolidation — planned; hard-blocked on M059
+M060 — core observation seam consolidation — ready; M059 closed
    |
    v
 M061 — independent containment reclosure and static-guard refresh — planned; hard-blocked on M060
 ```
 
-M059–M061 are intentionally not dependency-ready in the active registry until their predecessors close.
+M060 is dependency-ready in the active registry. M061 remains planned until M060 closes.
 
 ## 7. Milestones
 
@@ -272,8 +272,8 @@ The completion criterion is **minimum justified delta**, not a predetermined num
 | Milestone | Status | Implementation plan | Closure record | Blockers |
 |---|---|---|---|---|
 | M058 | closed | `plans/implementation/i2pcontrol-proposal-170/058-non-i2pcontrol-delta-inventory.md` | `plans/closure/i2pcontrol-proposal-170/058-closure.md` | audit-only; 47 paths classified; no production changes |
-| M059 | ready | `plans/implementation/i2pcontrol-proposal-170/059-cli-runtime-containment.md` | to be created after implementation | accepted M058 ledger/closure; exact original-CLI budget frozen |
-| M060 | planned | `plans/implementation/i2pcontrol-proposal-170/060-core-observation-containment.md` | to be created after implementation | hard: M059 closure |
+| M059 | closed | `plans/implementation/i2pcontrol-proposal-170/059-cli-runtime-containment.md` | `plans/closure/i2pcontrol-proposal-170/059-closure.md` | exact original-CLI budget implemented; no core changes |
+| M060 | ready | `plans/implementation/i2pcontrol-proposal-170/060-core-observation-containment.md` | to be created after implementation | M059 closure accepted; exact core budget frozen |
 | M061 | planned | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | to be created after implementation | hard: M060 closure |
 
 M051 from the source-completion roadmap remains independently blocked by absent substantive news/ban owners and is not a dependency of this containment sequence.

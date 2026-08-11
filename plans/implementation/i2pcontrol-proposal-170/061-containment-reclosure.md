@@ -1,8 +1,8 @@
 # M061 — Independent Containment Reclosure and Static-Guard Refresh
 
-Status: planned; hard-blocked on M060 closure
+Status: ready
 
-Planning baseline: to be pinned by accepted M060 closure
+Planning baseline: `6085eca` — accepted M060 implementation head
 
 Source roadmap:
 

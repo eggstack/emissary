@@ -1,6 +1,6 @@
 # M060 — Core Observation Seam Consolidation and Containment
 
-Status: ready
+Status: closed
 
 Planning baseline: `ed17fe7` — M059 implementation head; M059 closure accepted in the following planning commit
 

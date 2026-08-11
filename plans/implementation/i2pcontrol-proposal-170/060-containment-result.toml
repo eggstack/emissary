@@ -1,6 +1,7 @@
 version = 1
 planning_baseline = "85677e7"
 upstream_baseline = "9b43484a21d5a1291c4881cdae62a36c527f8c0f"
+implementation_commit = "6085eca"
 no_new_core_paths = true
 routerinfo_matrix = "37/1/5"
 

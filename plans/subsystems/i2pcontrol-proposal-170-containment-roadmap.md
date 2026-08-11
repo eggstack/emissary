@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Containment Corrective Roadmap
 
-Status: active; M060 ready
+Status: active; M060 closed; M061 ready
 
 Planning baseline: `adb2f52543764b267b2bcb282d093111001ae4b2` — merged M057 closure head
 
@@ -148,13 +148,13 @@ M058 — non-i2pcontrol fork-delta inventory and containment ledger — closed
 M059 — original CLI/runtime adapter containment — closed; M058 closed
    |
    v
-M060 — core observation seam consolidation — ready; M059 closed
+M060 — core observation seam consolidation — closed; 6085eca
    |
    v
-M061 — independent containment reclosure and static-guard refresh — planned; hard-blocked on M060
+M061 — independent containment reclosure and static-guard refresh — ready; M060 closed
 ```
 
-M060 is dependency-ready in the active registry. M061 remains planned until M060 closes.
+M060 is closed and M061 is dependency-ready in the active registry.
 
 ## 7. Milestones
 
@@ -191,7 +191,7 @@ Objective: reduce and consolidate the modified `emissary-core` review surface wi
 
 Primary target groups: inspection/router plumbing, SAM/I2CP observations, transport peer/status/stat observations, and tunnel-pool/transit observations.
 
-Exit: obsolete/duplicate core hooks are removed, higher-level aggregation is used where semantically equivalent, and every retained protocol-owner hook has explicit necessity evidence. No new core path may be introduced without stopping for replanning.
+Exit: obsolete/duplicate core hooks are removed, higher-level aggregation is used where semantically equivalent, and every retained protocol-owner hook has explicit necessity evidence. No new core path was introduced; the accepted M060 closure records the final retained set.
 
 ### M061 — Independent containment reclosure and static-guard refresh
 
@@ -199,7 +199,7 @@ Class: invariant/closure.
 
 Objective: perform a production-free independent review of the final diff, install current static containment guards, and record the final retained non-`i2pcontrol` boundary.
 
-Exit: supported behavior passes focused regression, default/no-feature behavior remains unchanged, every retained path is documented, the current manifest is enforced, and no medium/high containment or behavior defect remains.
+Exit: supported behavior passes focused regression, default/no-feature behavior remains unchanged, every retained path is documented, the current manifest is enforced, and no medium/high containment or behavior defect remains. M061 is ready against M060 head `6085eca`.
 
 ## 8. Cross-cutting requirements
 
@@ -273,7 +273,7 @@ The completion criterion is **minimum justified delta**, not a predetermined num
 |---|---|---|---|---|
 | M058 | closed | `plans/implementation/i2pcontrol-proposal-170/058-non-i2pcontrol-delta-inventory.md` | `plans/closure/i2pcontrol-proposal-170/058-closure.md` | audit-only; 47 paths classified; no production changes |
 | M059 | closed | `plans/implementation/i2pcontrol-proposal-170/059-cli-runtime-containment.md` | `plans/closure/i2pcontrol-proposal-170/059-closure.md` | exact original-CLI budget implemented; no core changes |
-| M060 | ready | `plans/implementation/i2pcontrol-proposal-170/060-core-observation-containment.md` | to be created after implementation | M059 closure accepted; exact core budget frozen |
-| M061 | planned | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | to be created after implementation | hard: M060 closure |
+| M060 | closed | `plans/implementation/i2pcontrol-proposal-170/060-core-observation-containment.md` | `plans/closure/i2pcontrol-proposal-170/060-closure.md` | 23 retained core paths; 9 formatting-only paths reverted; no new core path |
+| M061 | ready | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | to be created after implementation | M060 closure accepted at `6085eca` |
 
 M051 from the source-completion roadmap remains independently blocked by absent substantive news/ban owners and is not a dependency of this containment sequence.

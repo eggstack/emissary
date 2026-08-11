@@ -1,17 +1,21 @@
 # I2PControl Proposal 170 RouterInfo Source-Completion Roadmap
 
-Status: partial Proposal 170 support; RouterInfo source-completion sequence closed with accepted semantic limitation
+Status: partial Proposal 170 support; corrective RouterInfo truthfulness sequence active
 
 Planning baseline: `b759038` — M044 finalized reviewed head
 
-Corrective baseline: `bf9c2eeb` — M045 blocked after stale startup-snapshot rollback
+Corrective baselines:
+
+- `bf9c2eeb` — M045 blocked after stale startup-snapshot rollback;
+- `970252c` — merged M053–M052 head reviewed after source-completion closure.
 
 Pinned external authority:
 
 - I2P Proposal 170, `I2PControl Expansion`;
 - status: `Open`;
 - revision created/updated `2026-05-20`;
-- existing I2PControl authentication and JSON-RPC contract.
+- existing I2PControl authentication and JSON-RPC contract;
+- read-only i2pd/reference implementation where Proposal 170 explicitly adopts or leaves semantics terse.
 
 Canonical internal references:
 
@@ -21,45 +25,55 @@ Canonical internal references:
 - `plans/closure/i2pcontrol-proposal-170/044-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/045-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/049-closure.md`;
+- `plans/closure/i2pcontrol-proposal-170/050-closure.md`;
+- `plans/closure/i2pcontrol-proposal-170/052-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/053-closure.md`;
 - `plans/implementation/i2pcontrol-proposal-170/README.md`;
-- `plans/implementation/i2pcontrol-proposal-170/045-052-routerinfo-source-boundary.toml`;
-- `plans/implementation/i2pcontrol-proposal-170/053-m045-live-profile-storage-corrective.md`.
+- `plans/implementation/i2pcontrol-proposal-170/045-052-routerinfo-source-boundary.toml`.
 
 ## 1. Purpose
 
-M044 truthfully closed the prior corrective sequence with 43 canonical Proposal 170 RouterInfo additions classified as 16 available, 1 protocol-permitted neutral, and 26 unavailable. M045 then attempted to implement three known-peer fields using a bounded `Router::inspection_snapshot()` captured at I2PControl startup. Closure rejected that source because it was safe but stale: peer churn after composition was not visible.
+M044 closed the prior corrective sequence with 43 canonical Proposal 170 RouterInfo additions classified as 16 available, 1 protocol-permitted neutral, and 26 unavailable. M045 then failed because its known-peer source retained a startup `CoreSnapshot`. M053 corrected that exact defect with a narrow live `ProfileStorage` inspection seam. M046–M048 subsequently added bounded live active-peer and tunnel observations. M049 added rolling/recent metrics and queue observations; M050 added v4/v6 network state; M051 retained news and banned peers unavailable; M052 accepted an integrated 40 available / 1 neutral / 2 unavailable matrix.
 
-M053 corrected that exact defect with the smallest neutral live core inspection seam required to expose the canonical `ProfileStorage` directory without making `ProfileStorage`, `Bucket`, NetDB authority, or mutable router state public. M045 is corrected/closed through the accepted M053 closure. M046 then added the neutral live transport inspection seam and completed active-peer inventory and finite-limit sources. M047 added bounded current active-session statistics; M048 added bounded live tunnel-pool sources; M049 added rolling transit/recent-success metrics and live queue depths; M050 added independent v4/v6 network state. The matrix is now 40 available, 1 protocol-permitted neutral, and 2 unavailable.
+Post-M052 review at `970252c` found two material semantic defects in that closure:
 
-The architecture remains asymmetric: core/runtime code may expose only the smallest neutral bounded read-only facts that only the canonical owner can know. I2PControl owns source composition, rolling windows, aggregation, deterministic ordering, response bounds, Proposal 170 source disposition, numeric/wire mapping, JSON serialization, and failure semantics.
+1. `i2p.router.net.bw.transit.15s` is currently sampled only when the RouterInfo getter is called, so the claimed 15-second router metric depends on API request history rather than router traffic history.
+2. `i2p.router.net.error` and `.error.v6` are marked available even though M050 itself records that Emissary has no canonical network-error owner; unset state is mapped to wire code `0` (`No error`), which fabricates a positive semantic claim from source absence.
 
-This roadmap does not reopen the ten unsupported tunnel data planes, `SetConfig`, base unsupported I2PControl methods, frontend work, or upstream integration.
+The review-corrected matrix before implementation of M054/M055 is therefore 37 available, 1 protocol-permitted neutral, and 5 unavailable: news, banned peers, transit 15s, and the two network-error rows. This is a review disposition, not yet the machine-readable contract state; M054/M055 must reconcile code, tests, docs, and source accounting.
 
-## 2. Target fields
+The architecture remains asymmetric: core/runtime code may expose only the smallest neutral bounded read-only facts that only a canonical owner can know. I2PControl owns field/source disposition, numeric/wire mapping, JSON serialization, compatibility semantics, aggregate bounds, and sanitized errors.
 
-The 2 remaining target rows are exactly the current unavailable rows in `router_info_keys::PROPOSAL_170_CONTRACT` and `docs/i2pcontrol/router-info-source-map.md`:
+This roadmap does not reopen unsupported tunnel data planes, `SetConfig`, unrelated base methods, frontend work, release/CI machinery, or upstream integration.
 
-1. `i2p.router.news`;
-2. `i2p.router.netdb.bannedpeers`.
+## 2. Corrective target fields
 
-No additional RouterInfo/base selector work is authorized unless a direct regression is discovered and separately planned.
+The active corrective sequence touches exactly three previously promoted rows:
+
+1. `i2p.router.net.bw.transit.15s`;
+2. `i2p.router.net.error`;
+3. `i2p.router.net.error.v6`.
+
+M051's two retained unavailable rows remain unchanged:
+
+4. `i2p.router.news`;
+5. `i2p.router.netdb.bannedpeers`.
+
+No other RouterInfo row is reopened unless a direct new defect is independently demonstrated.
 
 ## 3. Current-state evidence
 
-Existing code already provides the necessary ownership facts:
+Established owners and boundaries:
 
-- `EventHandle` owns cumulative transport/transit byte counters, connected-router count, transit-tunnel count, cumulative tunnel-build success/failure counts, and v4/v6 firewall status;
-- `RouterContext::profile_storage()` is the canonical known-router directory and provides public serialized RouterInfo inside core;
-- `ProfileStorage::get_router_ids(Bucket::Any, ...)`, `get_raw()`, and `reader()` provide the internal primitives needed for a live request-time peer-directory snapshot;
-- the obstacle is visibility, not missing data: `profile` is private to `emissary-core`, so `emissary-cli` cannot use `Bucket` directly;
-- `emissary-core/src/inspection.rs` already establishes the correct neutral DTO boundary and is public;
-- `Router::inspection_snapshot()` is intentionally one-shot and therefore cannot be reused as the M045 live source;
-- `TransportManager` owns current connected peers and already has a bounded peer-ID snapshot helper for later milestones;
-- tunnel pools/transit owners contain later lifecycle information but no suitable cloneable aggregate yet;
-- I2PControl already owns canonical serializers and `RouterInfoControl`, so wire policy need not move into core.
+- `EventHandle` owns cumulative transport/transit counters, connected-router count, tunnel-build counters, firewall status, testing observations, and recent tunnel-build success state;
+- `EventManager` already runs as part of `Router`, owns a periodic timer, and reads cumulative transit counters, but its `refresh_interval` is configurable and cannot be assumed to be exactly one second;
+- `ProfileStorage` remains the canonical known-router directory, exposed through the accepted M053 read-only inspection handle;
+- `TransportInspection` and tunnel inspection sources remain accepted M046–M048 neutral observations;
+- SSU2 peer-test activity is a real production owner for v4/v6 testing state;
+- no canonical production owner has been identified for the i2pd-style v4/v6 network-error reason state;
+- I2PControl already owns the direct Proposal 170 serializers and source inventory.
 
-Read-only i2pd reference inspection remains the semantic authority for adopted fields where Proposal 170 is terse: transit 15s is rolling, recent tunnel success is distinct from cumulative success, queue/TBM queue are instantaneous depths, and v4/v6 status/error/testing are independent state.
+Read-only reference evidence remains authoritative where adopted: transit 15s is a router-maintained recent bandwidth value, not a request-history measurement; i2pd network error code `0` means `No error` from explicit router state, not `source unavailable`.
 
 ## 4. Ownership architecture
 
@@ -68,43 +82,44 @@ Read-only i2pd reference inspection remains the semantic authority for adopted f
 The following remain under `emissary-cli/src/i2pcontrol/**`:
 
 - Proposal 170 key/type/source inventory;
-- request assembly and source grouping;
-- rolling-window policy and aggregation;
+- request grouping/assembly;
+- source disposition and unavailable behavior;
 - deterministic sorting/deduplication;
-- peer-directory joins and completeness policy;
 - collection/serialized-size bounds;
-- Base64 and numeric wire mappings;
-- sanitized error translation;
-- JSON-RPC and compatibility semantics;
-- source availability/disposition.
+- Base64/numeric wire mapping;
+- JSON-RPC compatibility and direct-presence semantics;
+- sanitized error translation.
+
+Rolling-window policy may remain in I2PControl only when the underlying observation is genuinely request-independent. A RouterInfo getter may not create the only history used to answer itself.
 
 ### 4.2 Core/runtime exception rule
 
-A change outside `i2pcontrol/**` is authorized only when the canonical owner is the only truthful place to observe a fact. Such changes must be neutral immutable DTOs, cloneable read-only inspection handles, passive bounded lifecycle/stat publication at existing transitions, or composition-only wiring in `main.rs`.
+A change outside I2PControl is authorized only when the canonical owner is the only truthful place to observe a fact. It must be neutral, bounded, passive, and unable to mutate router behavior.
 
-M053 is the first corrective exception and is deliberately narrower than the later generic budgets: only `emissary-core/src/inspection.rs` and `emissary-core/src/router/mod.rs` are authorized core production paths. `profile.rs`, `router/context.rs`, `lib.rs` re-export expansion, and NetDB are explicitly forbidden unless another corrective disposition is created.
+Machine-readable budgets are in `045-052-routerinfo-source-boundary.toml`:
 
-The exact budgets are machine-readable in `045-052-routerinfo-source-boundary.toml`.
+- M054 may touch only `emissary-core/src/events.rs` in core;
+- M055 may touch only `events.rs` and `inspection.rs` for removal of unowned error-only scaffolding;
+- M056 authorizes no production code.
 
 ### 4.3 No parallel authorities
 
-Do not build a second NetDB, peer, tunnel, reachability, or metrics cache when an existing owner can be inspected directly. A request-time inspection handle may retain a clone of the canonical owner privately inside core, but it must expose only owned bounded public snapshots and no mutation methods.
-
-The one-shot `CoreSnapshot` must not become a runtime authority or be retained by I2PControl as a supposedly live source.
+Do not create a second NetDB, transport owner, tunnel owner, reachability engine, news service, ban engine, or persistent metrics service for I2PControl. Do not retain stale one-shot snapshots as live authority. Do not add a dedicated polling daemon or background sampler task merely to raise RouterInfo source counts.
 
 ## 5. Cross-cutting invariants
 
-1. Exact Proposal 170 names, casing, types, and presence semantics remain unchanged.
-2. No fabricated zero, false, empty, null, or adjacent metric may replace unavailable state.
-3. Default/no-feature router execution performs no background I2PControl work.
-4. Core observation cannot change routing, peer selection, NetDB, transport, tunnel-building, congestion, retry, timing, cryptographic, or LeaseSet behavior.
-5. No private/session key, destination private material, socket, mutable session/tunnel/router object, command channel, or message payload crosses an inspection boundary.
-6. All collections and histories are bounded; handlers retain no unbounded time series.
-7. No lock is held across network I/O, sleep, cancellation, `.await`, or JSON serialization.
-8. Partial/incomplete observation fails closed rather than returning plausible partial data.
-9. Source availability changes only after production source plus exact regression/contract fixtures exist.
-10. Compatibility aliases/base nested selectors are not expanded or silently changed.
-11. No tunnel data plane, `SetConfig`, frontend, workflow/release, broad refactor, or upstream activity is authorized.
+1. Exact Proposal 170 names, casing, JSON types, and direct-presence semantics remain unchanged.
+2. No fabricated zero, false, empty, null, or adjacent metric replaces unavailable state.
+3. A serializer is not evidence of a production source owner.
+4. Request frequency must not determine a router-owned rolling metric.
+5. Missing network-error authority must not serialize as `No error`.
+6. Default/no-I2PControl router execution gains no I2PControl-specific task, poller, probe, or persistent state.
+7. Core observation cannot change routing, peer selection, NetDB, transport, tunnel building, congestion, retry, timing, cryptographic, or LeaseSet behavior.
+8. No private/session key, destination private material, socket, mutable session/tunnel/router object, command channel, or message payload crosses an inspection boundary.
+9. Collections/histories are bounded and locks do not cross `.await`, sleep, network I/O, or JSON serialization.
+10. Partial/incomplete observation fails closed.
+11. Compatibility aliases/base selectors are not expanded by these corrective passes.
+12. No tunnel data plane, AddressBook/`SetConfig`, frontend, workflow/release, or upstream activity is authorized.
 
 ## 6. Dependency graph
 
@@ -112,34 +127,40 @@ The one-shot `CoreSnapshot` must not become a runtime authority or be retained b
 M044 closed
    |
    v
-M053 M045 live ProfileStorage corrective — closed
+M053 / corrected M045 — closed
    |
    v
-M045 known peer directory (3) corrected/closed
+M046 — closed
    |
    v
-M046 active peers + limits (4) — closed
+M047 — closed
    |
    v
-M047 active peer stats (1) — closed
+M048 — closed
    |
    v
-M048 tunnel pool counts/details (7) — closed
+M049 — partially invalidated: transit 15s only
    |
    v
-M049 rolling metrics + queues (4)
+M050 — partially invalidated: error v4/v6 only
    |
    v
-M050 v4/v6 network state (5)
+M051 — blocked with accepted news/ban semantic limitation
    |
    v
-M051 news + banned-peer semantics (2)
+M052 — final source-accounting closure invalidated by post-closure review
    |
    v
-M052 integration/containment reclosure
+M054 — M049 transit-15s corrective — READY
+   |
+   v
+M055 — M050 network-error truthfulness corrective — blocked on M054
+   |
+   v
+M056 — corrective integration reclosure — blocked on M054 + M055
 ```
 
-The sequence remains serialized so every new audited-core observation seam receives independent closure before the next one is introduced. M050 is closed, M051 is blocked with an accepted semantic disposition, and M052 is now closed after validating the final integrated head. No dependency-ready successor remains because the two M051 fields require substantive owners absent from Emissary.
+The corrective sequence is serialized to keep one dependency-ready handoff in the registry and to preserve independent closure evidence for each semantic defect.
 
 ## 7. Milestones
 
@@ -147,135 +168,153 @@ The sequence remains serialized so every new audited-core observation seam recei
 
 Plan: `053-m045-live-profile-storage-corrective.md`.
 
-Corrective target: the three M045 known-peer fields.
+M053 remains accepted. It created the bounded live known-peer inspection seam and the required post-construction churn regression. No current corrective finding reopens it.
 
-Create a neutral cloneable request-time live inspection handle in `emissary-core::inspection`, expose it through one read-only `Router` method, compose it into I2PControl, and prove the same source instance observes canonical peer-directory mutation after construction. Core production budget is exactly `inspection.rs` + `router/mod.rs`; do not modify or publicly export `ProfileStorage`/`Bucket`.
+### M045 — Known-peer directory — corrected/closed through M053
 
-Exit: M045's stale-source defect is corrected, the three selectors are live/bounded/exact, source accounting becomes 19 available + 1 neutral + 23 unavailable, and an independent closure accepts the core path audit and post-construction churn regression.
+Fields: `netdb.peers`, `netdb.peers.list`, `netdb.peers.info`. Retained.
 
-### M045 — Known-peer directory sources — corrected/closed through M053
+### M046 — Active-peer inventory and finite limits — closed
 
-Plan: `045-routerinfo-known-peer-directory.md`.
-
-Fields: `netdb.peers`, `netdb.peers.list`, `netdb.peers.info`.
-
-The zero-core-change assumption was disproven by closure. M053 is the authorized corrective expansion, and its independent closure explicitly accepts the live source and closes M045.
-
-### M046 — Active-peer inventory and limits — closed
-
-Plan: `046-routerinfo-active-peer-inventory-and-limits.md`.
-
-Fields: active peer list/info and NTCP/SSU limits. M046 added the minimum neutral cloneable transport-inspection source, joined active IDs to the live public RouterInfo directory, and retained unlimited/disabled limits as unavailable rather than inventing a sentinel. Closure: `plans/closure/i2pcontrol-proposal-170/046-closure.md`.
+Fields: active peer list/info and finite NTCP/SSU limits. Retained.
 
 ### M047 — Active-peer statistics — closed
 
-Plan: `047-routerinfo-active-peer-stats.md`.
-
-Field: `netdb.activepeers.stats`. Audit each required object field to a canonical NTCP2/SSU2 owner and extend neutral observation only where passive capture is sufficient.
-
-M046 is closed; M047's field-owner audit was accepted through `plans/closure/i2pcontrol-proposal-170/047-closure.md`. Its source is the accepted neutral transport seam plus passive counters at existing NTCP2/SSU2 byte-accounting points.
+Field: `netdb.activepeers.stats`. Retained. Richer unstable reference-map schemas remain an interoperability observation, not a current formal Proposal 170 violation.
 
 ### M048 — Tunnel-pool counts/details — closed
 
-Plan: `048-routerinfo-tunnel-pool-sources.md`.
+Seven participating/exploratory/client count/detail fields remain accepted. Minimal map member shape remains an interoperability observation because the pinned proposal defines list-of-map types but not stable member names.
 
-Fields: participating detail; exploratory in/out/detail; client in/out/detail. Implemented through a neutral bounded lifecycle source shared by canonical pool/transit owners; I2PControl owns grouping, counts, deterministic row mapping, and response bounds. Closure: `plans/closure/i2pcontrol-proposal-170/048-closure.md`.
+### M049 — Rolling metrics and queues — corrective pass required for transit 15s only
 
-### M049 — Rolling metrics and queues — closed
+Original plan: `049-routerinfo-rolling-metrics-and-queues.md`.
 
-Plan: `049-routerinfo-rolling-metrics-and-queues.md`.
+Retained as accepted:
 
-Fields: transit 15s, recent tunnel success, queue, TBM queue. Compute rolling transit in I2PControl; match reference recent-success semantics; add only neutral core gauges that cannot be reconstructed truthfully.
+- recent tunnel success rate;
+- tunnel queue depth;
+- TBM queue depth.
 
-Closure: `plans/closure/i2pcontrol-proposal-170/049-closure.md`.
+Invalidated finding:
 
-### M050 — Network status/error/testing — closed
+- `i2p.router.net.bw.transit.15s` uses request-driven sampling and therefore lacks request-independent router history.
 
-Plan: `050-routerinfo-network-state-sources.md`.
+Corrective plan: `054-m049-transit-15s-corrective.md`.
 
-Fields: status.v6; error v4/v6; testing v4/v6. Track independent neutral state at existing reachability transitions and map to wire integers only in I2PControl. No new probes.
+### M050 — Network status/error/testing — corrective pass required for error rows only
 
-Closure: `plans/closure/i2pcontrol-proposal-170/050-closure.md`.
+Original plan: `050-routerinfo-network-state-sources.md`.
 
-### M051 — News and banned-peer semantics — blocked by accepted semantic limitation
+Retained as accepted:
+
+- `i2p.router.net.status.v6`;
+- `i2p.router.net.testing`;
+- `i2p.router.net.testing.v6`.
+
+Invalidated findings:
+
+- `i2p.router.net.error`;
+- `i2p.router.net.error.v6`.
+
+The current implementation has no canonical error owner and maps unset internal state to `0`/`No error`. Corrective plan: `055-m050-network-error-truthfulness-corrective.md`.
+
+### M051 — News and banned-peer semantics — blocked with accepted limitation
 
 Plan: `051-routerinfo-news-and-banned-peer-semantics.md`.
 
-Fields: router news and banned peers. The pinned proposal specifies the string
-and map-of-objects wire types but does not authorize capability-empty values.
-The read-only Java reference requires a NewsFeedHelper owner for news and a
-Banlist owner for bans; Emissary has neither. Both fields therefore remain
-unavailable. Do not add a news service or ban engine solely for telemetry.
+News and banned peers remain unavailable because Emissary has no authoritative news-feed or ban-list owner. Do not create either subsystem solely for telemetry.
 
-Closure: `plans/closure/i2pcontrol-proposal-170/051-closure.md`.
+### M052 — Integration/containment reclosure — corrective pass required for final source accounting
 
-### M052 — 26-source integration and reclosure — closed with accepted semantic limitation
+Original closure remains historical evidence, but its `40/1/2` final matrix is invalidated by the three post-closure source-truthfulness findings. No M052 production code is implicated.
 
-Plan: `052-routerinfo-source-integration-and-reclosure.md`.
+Corrective reclosure: `056-m049-m050-corrective-reclosure.md` after M054 and M055.
 
-No production changes. M052 reviewed all 26 target rows, retained rows, child-process behavior, bounds, failure semantics, no-feature behavior, and every core changed path. M051's two semantic limitations are accepted inputs, so the RouterInfo dimension remains incomplete. Closure evidence is in `plans/closure/i2pcontrol-proposal-170/052-closure.md`; a new defect requires another corrective plan.
+### M054 — M049 request-independent transit 15s corrective — ready
+
+Plan: `054-m049-transit-15s-corrective.md`.
+
+Replace the request-driven source with exact bounded request-independent observation maintained by an existing canonical owner, preferably within the existing event owner and only if real elapsed-time/window semantics are proven under configurable cadence. Otherwise demote the field to explicit unavailable. Do not add an I2PControl-specific sampler task or touch tunnel/transport data-plane paths.
+
+Exit is either an exact owner-backed source or truthful unavailability, with no-prior-query and long-query-gap regression evidence.
+
+### M055 — M050 network-error truthfulness corrective — blocked
+
+Plan: `055-m050-network-error-truthfulness-corrective.md`.
+
+Audit production writers, then demote both error selectors unless a real existing canonical owner is found. Remove dead error-only atomics/enums/setters where safe, while leaving status/testing observations untouched.
+
+Expected final disposition is unavailable for both error rows under current evidence.
+
+### M056 — Corrective integration reclosure — blocked
+
+Plan: `056-m049-m050-corrective-reclosure.md`.
+
+No production changes. Validate the accepted M054/M055 dispositions, rerun retained source/child-process evidence, reconcile all 43 rows, and supersede only the invalidated M049/M050/M052 findings.
 
 ## 8. Failure, cancellation, restart, and contention policy
 
-Read-only snapshots are request-scoped and owned. Passive observers use bounded state and must not block producers. Observation failure never changes router behavior; if it makes an API source incomplete, I2PControl fails the affected request until authoritative recovery.
+Read-only snapshots remain bounded and owned. Observation failure never changes router behavior. Peer/tunnel lifecycle semantics from M053/M046–M048 remain unchanged.
 
-M053 specifically requires live peer-directory snapshots from the same retained inspection source after canonical storage mutation. Peer churn between enumeration and raw-RouterInfo copy must be handled fail-closed when a complete join cannot be constructed. No lock escapes core or survives into async JSON-RPC work.
+For M054, request cancellation or request inactivity must not reset/advance the underlying rolling history. Restart resets process-local state according to pinned reference startup semantics. If exact startup behavior cannot be established, unavailable is preferred to fabricated zero.
 
-Rolling metrics are process-local and reset safely on counter rollback/restart. No new persisted state is required by this roadmap.
+For M055, unavailable network-error requests fail before source acquisition and produce no partial result. No new runtime state is required.
 
 ## 9. Verification policy
 
-Each implementation milestone runs focused regression/contract tests first, then affected core tests and the bounded CLI feature/no-feature matrix. M053 must include a failing-before/passing-after post-construction peer-churn regression. M052 reruns the broad matrix and live child-process test.
+Each corrective milestone runs its semantic regression first, then affected core and CLI feature/no-feature suites. M054 must include no-prior-query and >15-second query-gap tests. M055 must include zero-without-owner and combined-request no-partial-result tests. M056 reruns the broad matrix and existing live child-process path without constructing a new network certification harness.
 
 No new remote CI, coverage, fuzz, soak, network farm, release automation, or generated evidence bundle is required.
 
-Static guards should enforce no Proposal 170 terminology in core DTOs, no sensitive/mutable handles in inspection contracts, changed-path compliance, no background resource allocation in read-only handles, and no source promotion before production evidence.
-
 ## 10. Security and compatibility
 
-The work is read-only observability. Authentication, TLS, tokens, AddressBook authority, tunnel administrative persistence, server secrets, and compatibility aliases remain untouched. No schema migration is expected.
+Authentication, TLS, tokens, AddressBook authority, tunnel administrative persistence, secrets, and compatibility aliases remain untouched. No schema migration is expected.
 
-Because upstream Emissary is treated as heavily security-reviewed, a small purpose-specific neutral inspection seam is preferable to making `ProfileStorage`, `Bucket`, NetDB handles, or broad router internals public. Code reuse is not sufficient reason to alter audited data-plane logic.
+Because upstream Emissary is treated as heavily security-reviewed, corrective work should reduce or preserve the current core observation footprint. M055 should remove error-only core scaffolding if it has no production writer rather than leaving speculative telemetry infrastructure behind.
 
 ## 11. Risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Live inspection becomes a general core management API | M053 exposes only bounded owned snapshots; no mutable methods or public ProfileStorage |
-| Startup snapshot is accidentally retained again | required source-then-mutate-then-resnapshot regression |
-| Peer churn yields fabricated complete join | fail closed on missing required raw RouterInfo |
-| Core path budget expands | M053 exact two-file budget + explicit stop condition |
-| Recent success implemented as cumulative success | M049 reference fixture requires distinct recent semantics |
-| Tunnel placeholders become claimed values | M048 lifecycle evidence required |
-| Active peer stats leak session details | sanitized neutral DTO + static type review |
-| Unlimited transport limits get invented sentinel | M046 stop rule |
-| Network testing/error inferred from firewall status | M050 requires independent state |
-| Empty news/ban values used as fake completion | M051 semantic adjudication gate |
+| Transit metric silently remains API-history dependent | M054 no-prior-query and long-query-gap regressions |
+| Existing configurable event interval is assumed to be one second | require real elapsed-time/reference-window proof or demotion |
+| A new sampler task is added only for I2PControl | explicit M054 prohibition/path budget |
+| Missing error owner still maps to `0` | M055 unavailable disposition + zero-without-owner regression |
+| Dead error scaffolding expands audited core | remove it when production-writer audit proves it unused |
+| M050 valid status/testing behavior regresses | M055 explicit retained-field fixtures |
+| M052 history is rewritten instead of corrected | M056 supersedes only invalidated findings |
+| Empty news/ban values used as fake completion | M051 retained semantic gate |
+| Core path budget expands | machine-readable M054/M055/M056 budgets and stop conditions |
 
 ## 12. Explicit non-goals
 
-- the ten unsupported Proposal 170 tunnel data planes;
+- unsupported Proposal 170 tunnel data planes;
 - startup tunnel task adoption/control;
 - AddressBook or `SetConfig` changes;
 - base I2PControl unsupported methods;
 - router/transport/tunnel/NetDB algorithm redesign;
-- public export of `ProfileStorage`/`Bucket` merely for M045;
-- new reachability probes, news downloader, or ban engine solely for telemetry;
+- new reachability probes or error-detection subsystem;
+- news downloader/feed or ban engine solely for telemetry;
+- new background sampler/polling service solely for I2PControl;
 - UI/frontend work;
-- crate-wide extraction/refactor;
+- crate-wide refactor;
 - CI/release/publishing expansion;
 - upstream issues, PRs, reviews, submissions, adoption, merge requests, maintainer outreach, or contribution preparation.
 
 ## 13. Final status rule
 
-If M046–M051 make all remaining fields operational and M052 accepts the final head, the RouterInfo dimension may be recorded as 42 available + 1 protocol-permitted neutral + 0 unavailable and `RouterInfo source completion closed internally against pinned revision`. That condition was not met: the accepted M051 limitation leaves the final matrix at 40 available + 1 protocol-permitted neutral + 2 unavailable.
+The pre-review `40 available + 1 neutral + 2 unavailable` matrix is no longer accepted as truthful.
 
-That does not by itself make the entire Proposal 170 implementation complete. Unrelated accepted unsupported/runtime dimensions remain outside this roadmap.
+After M054/M055:
 
-M051 proved both remaining fields require absent substantive subsystems that this
-roadmap refuses to add; retain them unavailable rather than broadening scope or
-fabricating support.
+- if M054 restores exact request-independent transit-15s, the expected matrix is 38 available + 1 neutral + 4 unavailable;
+- if exact transit-15s cannot be provided within scope, the expected matrix is 37 available + 1 neutral + 5 unavailable.
+
+M056 must derive the final count directly from the machine-readable contract and production evidence; it must not force either outcome.
+
+Even after M056, RouterInfo source completion remains partial because news, banned peers, and both network-error rows are expected to remain unavailable under current owners. The broader Proposal 170 implementation also retains unrelated previously accepted unsupported dimensions.
 
 ## 14. Historical corrective sequence
 
-M040–M044 remain closed retained evidence. M039 remains historical-invalidated. The failed M045 startup-snapshot attempt and blocked closure remain retained evidence explaining M053. M053 supersedes only M045's disproven zero-core-change assumption; it does not rewrite earlier closure history.
+M040–M044 remain closed retained evidence. M039 remains historical-invalidated. The failed M045 startup-snapshot attempt remains retained evidence explaining M053. M053/M045 and M046–M048 remain accepted. M049 and M050 retain their unaffected field closures but are partially invalidated as described above. M052's final source-count claim is superseded only after M056 closure.

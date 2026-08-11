@@ -1,6 +1,6 @@
 # M055 — M050 Corrective Network-Error Truthfulness
 
-Status: blocked — M054 closure required first
+Status: ready
 
 Planning baseline: `970252c` — merged M053–M052 implementation/reclosure head
 

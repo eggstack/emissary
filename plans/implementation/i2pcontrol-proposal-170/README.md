@@ -20,9 +20,10 @@ All work is internal to `eggstack/emissary`. External specifications/reference i
 
 ## Current handoff
 
-M054 is the sole dependency-ready implementation plan:
+M055 is the sole dependency-ready implementation plan:
 
-- `054-m049-transit-15s-corrective.md` — ready; correct the request-driven `i2p.router.net.bw.transit.15s` source or demote it truthfully if exact request-independent semantics cannot be supplied within the bounded owner/path budget.
+- `054-m049-transit-15s-corrective.md` — closed; transit-15s is explicitly unavailable because no request-independent owner fits the bounded budget.
+- `055-m050-network-error-truthfulness-corrective.md` — ready; correct the unowned v4/v6 network-error rows.
 
 Blocked successors:
 
@@ -54,8 +55,8 @@ M054 may restore transit-15s to available only with a request-independent source
 | M050 — v4/v6 network state | corrective pass required for error rows only | status.v6 + testing v4/v6 retained; error v4/v6 invalidated | M055 |
 | M051 — router news + banned peers | blocked with accepted limitation | 2 fields remain unavailable | retained `051-closure.md` |
 | M052 — integration/containment reclosure | corrective pass required for final matrix | historical `40/1/2` count invalidated | M056 |
-| M054 — transit 15s corrective | ready | exact request-independent source or truthful unavailability | post-M052 review finding |
-| M055 — network-error truthfulness | blocked | demote unowned v4/v6 error rows; remove dead scaffold where safe | M054 closure |
+| M054 — transit 15s corrective | closed | truthful transit-15s unavailability; request-local sampler removed | `054` closure |
+| M055 — network-error truthfulness | ready | demote unowned v4/v6 error rows; remove dead scaffold where safe | M054 closure |
 | M056 — corrective integration reclosure | blocked | no production changes; reconcile all 43 rows | M054 + M055 closures |
 
 Plans:
@@ -122,7 +123,8 @@ Throughout the roadmap, do not:
 
 Every milestone must inspect its accepted dependency head, pin exact semantics before source-disposition changes, use focused source/wire regressions, preserve no-feature behavior, remain inside its path budget, and create an independent closure record. Material scope expansion is a blocker, not permission to improvise.
 
-Only the registry advances the next handoff to `ready`. M054 is currently the sole ready plan; M055/M056 remain blocked.
+Only the registry advances the next handoff to `ready`. M055 is now the sole
+ready plan; M056 remains blocked behind M055.
 
 ## Verification rule
 

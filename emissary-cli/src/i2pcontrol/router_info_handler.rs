@@ -1920,9 +1920,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn m049_wire_fixture_returns_rolling_metric_and_live_queues() {
+    async fn m049_wire_fixture_returns_recent_success_and_live_queues() {
         let ri = FakeRouterInfoControl::new();
-        ri.set_transit_bandwidth_15s(2048);
         ri.set_recent_tunnel_success_rate(73.0);
         ri.set_tunnel_details(TunnelDetails {
             queue_depth: 4,
@@ -1931,7 +1930,6 @@ mod tests {
         });
         let state = test_state(ri);
         let req = direct_request(serde_json::json!({
-            "i2p.router.net.bw.transit.15s": false,
             "i2p.router.net.tunnels.successrate": null,
             "i2p.router.net.tunnels.queue": true,
             "i2p.router.net.tunnels.tbmqueue": {},
@@ -1940,7 +1938,6 @@ mod tests {
         let result = resp["result"]
             .as_object()
             .unwrap_or_else(|| panic!("M049 fixture response: {resp}"));
-        assert_eq!(result["i2p.router.net.bw.transit.15s"], 2048);
         assert_eq!(result["i2p.router.net.tunnels.successrate"], 73.0);
         assert_eq!(result["i2p.router.net.tunnels.queue"], 4);
         assert_eq!(result["i2p.router.net.tunnels.tbmqueue"], 7);

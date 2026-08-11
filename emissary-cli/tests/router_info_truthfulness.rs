@@ -46,6 +46,15 @@ fn test_request(selectors: serde_json::Value) -> emissary_cli::i2pcontrol::rpc::
     }
 }
 
+fn direct_request(params: serde_json::Value) -> emissary_cli::i2pcontrol::rpc::JsonRpcRequest {
+    emissary_cli::i2pcontrol::rpc::JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        method: "RouterInfo".to_string(),
+        params: Some(params.as_object().cloned().unwrap()),
+        id: Some(rpc::RequestId::Number(1)),
+    }
+}
+
 fn test_state(ri: FakeRouterInfoControl) -> emissary_cli::i2pcontrol::server::I2pControlState {
     let mut state =
         emissary_cli::i2pcontrol::server::I2pControlState::new_for_test("test".to_string());
@@ -89,6 +98,47 @@ async fn tunnel_summary_available_zero_is_success() {
     let result = resp["result"].as_object().unwrap();
     assert_eq!(result["i2p.router.tunnels.participating"], 0);
     assert_eq!(result["i2p.router.tunnels.configured"], 0);
+}
+
+#[tokio::test]
+async fn transit_bandwidth_15s_is_unavailable_without_request_independent_owner() {
+    let ri = FakeRouterInfoControl::new();
+    ri.set_transit_bandwidth_15s(2048);
+    let state = test_state(ri);
+    let req = emissary_cli::i2pcontrol::rpc::JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        method: "RouterInfo".to_string(),
+        params: Some(
+            serde_json::json!({
+                "i2p.router.net.bw.transit.15s": false,
+            })
+            .as_object()
+            .cloned()
+            .unwrap(),
+        ),
+        id: Some(rpc::RequestId::Number(1)),
+    };
+    let response =
+        emissary_cli::i2pcontrol::router_info_handler::handle_router_info(&state, &req).await;
+
+    assert_eq!(response["error"]["code"], -32603);
+    assert!(response["result"].is_null());
+}
+
+#[tokio::test]
+async fn transit_bandwidth_15s_failure_does_not_return_partial_result() {
+    let ri = FakeRouterInfoControl::new();
+    ri.set_version("Emissary test".to_string());
+    let state = test_state(ri);
+    let req = direct_request(serde_json::json!({
+        "i2p.router.version": true,
+        "i2p.router.net.bw.transit.15s": true,
+    }));
+    let response =
+        emissary_cli::i2pcontrol::router_info_handler::handle_router_info(&state, &req).await;
+
+    assert_eq!(response["error"]["code"], -32603);
+    assert!(response["result"].is_null());
 }
 
 #[tokio::test]

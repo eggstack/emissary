@@ -33,7 +33,7 @@ Canonical internal references:
 
 ## 1. Purpose
 
-M044 closed the prior corrective sequence with 43 canonical Proposal 170 RouterInfo additions classified as 16 available, 1 protocol-permitted neutral, and 26 unavailable. M045 then failed because its known-peer source retained a startup `CoreSnapshot`. M053 corrected that exact defect with a narrow live `ProfileStorage` inspection seam. M046–M048 subsequently added bounded live active-peer and tunnel observations. M049 added rolling/recent metrics and queue observations; M050 added v4/v6 network state; M051 retained news and banned peers unavailable; M052 accepted an integrated 40 available / 1 neutral / 2 unavailable matrix.
+M044 closed the prior corrective sequence with 43 canonical Proposal 170 RouterInfo additions classified as 16 available, 1 protocol-permitted neutral, and 26 unavailable. M045 then failed because its known-peer source retained a startup `CoreSnapshot`. M053 corrected that exact defect with a narrow live `ProfileStorage` inspection seam. M046–M048 subsequently added bounded live active-peer and tunnel observations. M049 added rolling/recent metrics and queue observations; M050 added v4/v6 network state; M051 retained news and banned peers unavailable; M052 accepted an integrated 40 available / 1 neutral / 2 unavailable matrix, which is now historical only.
 
 Post-M052 review at `970252c` found two material semantic defects in that closure:
 
@@ -151,10 +151,10 @@ M051 — blocked with accepted news/ban semantic limitation
 M052 — final source-accounting closure invalidated by post-closure review
    |
    v
-M054 — M049 transit-15s corrective — READY
+M054 — M049 transit-15s corrective — CLOSED
    |
    v
-M055 — M050 network-error truthfulness corrective — blocked on M054
+M055 — M050 network-error truthfulness corrective — READY
    |
    v
 M056 — corrective integration reclosure — blocked on M054 + M055
@@ -186,7 +186,7 @@ Field: `netdb.activepeers.stats`. Retained. Richer unstable reference-map schema
 
 Seven participating/exploratory/client count/detail fields remain accepted. Minimal map member shape remains an interoperability observation because the pinned proposal defines list-of-map types but not stable member names.
 
-### M049 — Rolling metrics and queues — corrective pass required for transit 15s only
+### M049 — Rolling metrics and queues — corrected/closed through M054
 
 Original plan: `049-routerinfo-rolling-metrics-and-queues.md`.
 
@@ -200,7 +200,9 @@ Invalidated finding:
 
 - `i2p.router.net.bw.transit.15s` uses request-driven sampling and therefore lacks request-independent router history.
 
-Corrective plan: `054-m049-transit-15s-corrective.md`.
+Corrective plan: `054-m049-transit-15s-corrective.md`. M054 closed the transit
+row as explicitly unavailable because the existing configurable event cadence
+cannot provide the pinned request-independent semantics within scope.
 
 ### M050 — Network status/error/testing — corrective pass required for error rows only
 
@@ -231,21 +233,28 @@ Original closure remains historical evidence, but its `40/1/2` final matrix is i
 
 Corrective reclosure: `056-m049-m050-corrective-reclosure.md` after M054 and M055.
 
-### M054 — M049 request-independent transit 15s corrective — ready
+### M054 — M049 request-independent transit 15s corrective — closed
 
 Plan: `054-m049-transit-15s-corrective.md`.
 
-Replace the request-driven source with exact bounded request-independent observation maintained by an existing canonical owner, preferably within the existing event owner and only if real elapsed-time/window semantics are proven under configurable cadence. Otherwise demote the field to explicit unavailable. Do not add an I2PControl-specific sampler task or touch tunnel/transport data-plane paths.
+The feasibility audit found that the configurable existing event cadence cannot
+provide the pinned request-independent semantics without a new timer or
+data-plane instrumentation outside scope. The request-local sampler was
+removed and the field was demoted to explicit unavailable. No I2PControl-specific
+sampler task or tunnel/transport data-plane path was added.
 
-Exit is either an exact owner-backed source or truthful unavailability, with no-prior-query and long-query-gap regression evidence.
+Exit is truthful unavailability with a precise missing-owner reason, direct and
+combined no-partial-result regressions, and a static guard against restoring the
+request-local sampler.
 
-### M055 — M050 network-error truthfulness corrective — blocked
+### M055 — M050 network-error truthfulness corrective — ready
 
 Plan: `055-m050-network-error-truthfulness-corrective.md`.
 
 Audit production writers, then demote both error selectors unless a real existing canonical owner is found. Remove dead error-only atomics/enums/setters where safe, while leaving status/testing observations untouched.
 
-Expected final disposition is unavailable for both error rows under current evidence.
+M054's accepted closure unblocks this plan. Expected final disposition is
+unavailable for both error rows under current evidence.
 
 ### M056 — Corrective integration reclosure — blocked
 
@@ -304,12 +313,17 @@ Because upstream Emissary is treated as heavily security-reviewed, corrective wo
 
 ## 13. Final status rule
 
-The pre-review `40 available + 1 neutral + 2 unavailable` matrix is no longer accepted as truthful.
+The pre-review `40 available + 1 neutral + 2 unavailable` matrix is historical
+only and is no longer accepted as truthful. M054's accepted implementation
+currently leaves `39 available + 1 neutral + 3 unavailable`: transit 15s, news,
+and banned peers. M055 is ready to reconcile the two network-error rows, after
+which the expected integrated disposition is `37 available + 1 neutral + 5
+unavailable` if no owner is discovered.
 
 After M054/M055:
 
 - if M054 restores exact request-independent transit-15s, the expected matrix is 38 available + 1 neutral + 4 unavailable;
-- if exact transit-15s cannot be provided within scope, the expected matrix is 37 available + 1 neutral + 5 unavailable.
+- if exact transit-15s cannot be provided within scope, the expected matrix is 37 available + 1 neutral + 5 unavailable (the accepted M054 outcome).
 
 M056 must derive the final count directly from the machine-readable contract and production evidence; it must not force either outcome.
 

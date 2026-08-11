@@ -1,6 +1,6 @@
 # M054 — M049 Corrective Request-Independent Transit 15s Source
 
-Status: ready
+Status: closed
 
 Planning baseline: `970252c` — merged M053–M052 implementation/reclosure head
 
@@ -241,4 +241,5 @@ Stop and record a new blocker rather than:
 
 The closure record must include the defect reproduction, pinned reference-semantic notes, source-owner decision, failing-before/passing-after request-independence regression, exact changed-path audit, startup/reset/window evidence, source-count reconciliation, no-feature verification, security/containment review, and internal-only attestation.
 
-M055 must remain blocked until this corrective disposition is accepted.
+M055 is unblocked by this accepted corrective disposition and is the next
+dependency-ready plan. M056 remains blocked until M055 also closes.

@@ -26,8 +26,11 @@ M039 independently reviewed the complete M031–M038 final head and formally
 closed the authorized workstream as partial support.
 
 The expected bounded final status remains `partial Proposal 170 support` while
-26 RouterInfo selectors lack bounded authoritative sources and missing tunnel
-data planes remain explicit unsupported runtimes.
+27 RouterInfo selectors lack bounded authoritative sources and missing tunnel
+data planes remain explicit unsupported runtimes. The canonical 43-addition
+matrix currently contains 39 available selectors, one protocol-permitted
+neutral selector, and three unavailable selectors; the unavailable rows are
+router news, banned peers, and transit bandwidth over 15 seconds.
 
 ## Compile feature
 
@@ -205,9 +208,9 @@ backend stubs are not operational coverage.
 
 The retained matrix contains:
 
-- 40 available selectors;
+- 39 available selectors;
 - 1 protocol-permitted neutral selector;
-- 2 unavailable selectors.
+- 3 unavailable selectors.
 
 Unavailable selectors fail explicitly and are never substituted with zero,
 false, empty, or semantically adjacent values.

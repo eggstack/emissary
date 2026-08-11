@@ -89,7 +89,7 @@ implementation and regression evidence; M044 owns the accepted independent
 final-head review.
 
 Expected final disposition under the authorized scope remains
-`partial Proposal 170 support` because 2 of the 43 RouterInfo additions lack
+`partial Proposal 170 support` because 3 of the 43 RouterInfo additions lack
 bounded authoritative sources and missing tunnel data planes remain explicit
 unsupported runtimes.
 
@@ -275,11 +275,11 @@ M028 does not alter these sources. M029 revalidated them.
 
 ## RouterInfo
 
-Retained source matrix:
+Current source matrix:
 
-- 40 available;
+- 39 available;
 - 1 protocol-permitted neutral;
-- 2 unavailable.
+- 3 unavailable.
 
 Available selectors have bounded current owners. Clock skew uses `null` only
 when the protocol permits it. Unavailable selectors fail with sanitized errors

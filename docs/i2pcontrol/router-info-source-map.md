@@ -6,12 +6,12 @@ This is the reviewed source map for the pinned Proposal 170 revision created and
 last updated on `2026-08-11`. M027 independently revalidated the matrix against
 the external revision. The machine-readable authority is
 `router_info_keys::PROPOSAL_170_CONTRACT` in `emissary-cli/src/i2pcontrol/rpc.rs`.
-Summary: 43 total, 40 available, 1 protocol-permitted neutral, and 2 unavailable.
-M051 adjudicated the two unavailable rows against the pinned proposal and the
-read-only Java reference change: the proposal specifies their wire types, while
-the reference requires substantive news-feed and ban-list owners. Emissary has
-neither owner, so empty string/map values are not authoritative capability-empty
-states and are not emitted.
+Summary: 43 total, 39 available, 1 protocol-permitted neutral, and 3 unavailable.
+M051 adjudicated the news and ban rows, and M054 adjudicated transit-15s, against
+the pinned proposal and read-only reference evidence. The proposal specifies
+their wire types, but Emissary has no authoritative news-feed, ban-list, or
+request-independent rolling transit owner. Empty values and request-local
+sampling are not authoritative capability states and are not emitted.
 The table below is intentionally one row per canonical addition. Base selectors and
 the nested `Selector` compatibility form are not counted in those totals.
 
@@ -41,7 +41,7 @@ is read-only. Actual serialized response size is checked after assembly.
 | `i2p.router.net.total.received.bytes` | integer | available | event-metrics | `serialize_total_received_bytes` | `p170.total_received.integer` | — | — |
 | `i2p.router.net.total.sent.bytes` | integer | available | event-metrics | `serialize_total_sent_bytes` | `p170.total_sent.integer` | — | — |
 | `i2p.router.net.total.transit.bytes` | integer | available | event-metrics | `serialize_total_transit_bytes` | `p170.total_transit.integer` | — | — |
-| `i2p.router.net.bw.transit.15s` | integer | available | traffic-metrics: bounded rolling transit sampler | `serialize_transit_bandwidth_15s` | `p170.transit_15s.bytes_per_second` | 16 samples | — |
+| `i2p.router.net.bw.transit.15s` | integer | unavailable | transit-bandwidth: no request-independent rolling transit owner | `serialize_transit_bandwidth_15s` | `p170.transit_15s.bytes_per_second` | — | — |
 | `i2p.router.net.tunnels.shareratio` | number | available | retained-configuration | `serialize_tunnel_share_ratio` | `p170.share_ratio.number` | — | — |
 | `i2p.router.net.tunnels.participating.info` | array&lt;object&gt; | available | tunnel-inspection | `serialize_participating_tunnel_info` | `p170.participating_info.rows` | 10,000 / 4 MiB | — |
 | `i2p.router.net.tunnels.i2ptunnel` | array&lt;object&gt; | available | startup-tunnel-inventory | `serialize_i2ptunnel_quick_info` | `p170.i2ptunnel.quick_info` | 1,000 / 4 MiB | — |

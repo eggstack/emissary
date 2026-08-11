@@ -334,6 +334,15 @@ fn production_adapter_returns_unavailable_for_unimplemented_selectors() {
 }
 
 #[test]
+fn transit_bandwidth_15s_has_no_request_local_sampler() {
+    let source = read_source("src/i2pcontrol/production.rs");
+    let production = source.split("#[cfg(test)]").next().unwrap_or(&source);
+    assert!(!production.contains("TransitBandwidthSampler"));
+    assert!(!production.contains("transit_bandwidth_sampler"));
+    assert!(production.contains("no request-independent rolling transit owner"));
+}
+
+#[test]
 fn m053_composes_live_peer_directory_without_startup_snapshot() {
     let main = read_source("src/main.rs");
     assert!(main.contains("LivePeerDirectorySource::new"));

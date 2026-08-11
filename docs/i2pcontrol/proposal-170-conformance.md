@@ -53,9 +53,9 @@ It contains exactly 43 Proposal 170 additions and records, for each selector:
 
 Retained counts:
 
-- 40 available;
+- 39 available;
 - 1 protocol-permitted neutral;
-- 2 unavailable.
+- 3 unavailable.
 
 The separate existing-I2PControl and Emissary compatibility inventories are not
 counted in the 43 additions.

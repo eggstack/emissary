@@ -27,15 +27,13 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | partial Proposal 170 support; RouterInfo corrective truthfulness sequence closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | none | M051 remains blocked by absent news/ban owners; no current successor |
+| I2PControl Proposal 170 | partial Proposal 170 support; post-M056 planning-record consistency corrective ready | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M057 ready | production corrective sequence M054–M056 is closed; M057 is documentation/control-surface consistency only |
 
 ## Dependency-ready implementation plans
 
-None. The final M056 integrated reclosure is accepted and no future plan is
-newly dependency-ready.
-
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
+| I2PControl Proposal 170 | M057 — post-M056 planning-record consistency corrective | ready | `plans/implementation/i2pcontrol-proposal-170/057-post-m056-planning-record-consistency-corrective.md` | accepted M054, M055, and M056 closures |
 
 ## Blocked roadmap successors
 
@@ -57,27 +55,26 @@ Per `plans/003-planning-process.md`, these plans exist for deterministic handoff
 | M050 — v4/v6 network state | corrected/closed through M055 and M056 | status.v6 + testing v4/v6 retained; error rows unavailable with no canonical owner |
 | M051 — news/banned peers | blocked with accepted limitation | `051-closure.md`; both rows remain unavailable |
 | M052 — integration reclosure | corrected/closed through M056 | historical `052-closure.md` `40/1/2` matrix superseded by accepted `37/1/5` audit |
+| M057 — post-M056 planning-record consistency | ready | fixes stale roadmap status and historical-baseline wording only; no production changes authorized |
 
 ## Current review finding/work scope
 
-Repository implementation at review baseline `970252c` still declares:
+Historical implementation head `970252c` was the merged M053–M052 head and carried the now-invalidated source claim:
 
 - 43 canonical Proposal 170 RouterInfo additions;
-- 37 available;
+- 40 available;
 - 1 protocol-permitted neutral;
-- 5 unavailable.
+- 2 unavailable.
 
-Post-closure source-truthfulness review invalidated three of those `available` claims:
+Post-M052 source-truthfulness review invalidated three of those `available` claims:
 
-- `i2p.router.net.bw.transit.15s` — current history is created only by RouterInfo requests;
-- `i2p.router.net.error` — no canonical error owner; unset state maps to `0` / `No error`;
+- `i2p.router.net.bw.transit.15s` — the history was created only by RouterInfo requests;
+- `i2p.router.net.error` — no canonical error owner; unset state was mapped to `0` / `No error`;
 - `i2p.router.net.error.v6` — same defect.
 
-The accepted M054/M055 dispositions leave the machine-readable implementation matrix at **37 available / 1 neutral / 5 unavailable**: transit 15s, news, banned peers, and both network-error rows are unavailable. The M052 `40/1/2` count remains historical evidence only; M056 accepted the integrated reclosure at that final count.
+M054 and M055 corrected production truthfulness by demoting those three rows, and M056 accepted the integrated machine-readable matrix at **37 available / 1 neutral / 5 unavailable**: transit 15s, news, banned peers, and both network-error rows are unavailable. The historical M052 `40/1/2` count remains evidence of the invalidated pre-corrective state only.
 
-M054 demoted transit-15s because no request-independent owner fit its bounded
-budget. M055 demoted both error rows because no canonical error owner exists.
-M056 accepted the final integrated source accounting.
+M057 does not alter that production disposition. It exists only to remove stale current-state wording that survived the accepted M056 closure, including the roadmap dependency graph's stale M055 readiness label and any remaining conflation of the historical `970252c` state with the final M056 state.
 
 ## Corrective containment guard
 
@@ -115,6 +112,12 @@ Required regression: direct and combined v4/v6 error requests fail unavailable a
 
 Production changes: none. It is independent corrective reclosure only.
 
+### M057
+
+Production changes: none. Core production paths: none.
+
+Authorized work is planning/control-surface consistency only under the exact paths named in `057-post-m056-planning-record-consistency-corrective.md`. Broad Rust verification is not required; closure is based on changed-path and targeted planning-consistency evidence.
+
 ## Prohibited scope throughout the RouterInfo roadmap
 
 - new HTTP, HTTP server/bidirectional server, IRC, SOCKS-IRC, CONNECT, Streamr, or other unsupported tunnel data planes;
@@ -142,10 +145,11 @@ Production changes: none. It is independent corrective reclosure only.
 | M045 stale attempt | bounded startup peer snapshot | rejected historical evidence |
 | M053 / corrected M045 | live known-peer source | closed retained evidence |
 | M046–M048 | active-peer/tunnel source work | closed retained evidence |
-| M049 closure | four-field closure | partially invalidated for transit 15s only |
-| M050 closure | five-field closure | partially invalidated for error v4/v6 only |
+| M049 closure | four-field closure | partially invalidated for transit 15s only; corrected by M054/M056 |
+| M050 closure | five-field closure | partially invalidated for error v4/v6 only; corrected by M055/M056 |
 | M051 closure | news/ban semantic limitation | retained |
-| M052 closure | integrated `40/1/2` matrix | final source-count finding invalidated pending M056 |
+| M052 closure | integrated `40/1/2` matrix | source-count finding superseded by M056 `37/1/5` reclosure |
+| M054–M056 | transit/error truthfulness and integrated source reclosure | closed retained evidence |
 
 ## Pinned authority
 
@@ -153,13 +157,14 @@ Current work is pinned to Proposal 170 `I2PControl Expansion`, status Open, revi
 
 ## Registry maintenance rules
 
-1. M056 is closed; no current dependency-ready plan remains.
-2. M055 has an accepted closure disposition.
-3. M054, M055, and M056 are accepted; no successor is registered as ready.
+1. M057 is the sole dependency-ready plan and is planning-record-only.
+2. M054, M055, and M056 remain closed and must not be reopened by M057 absent a new production defect.
+3. After accepted M057 closure, no current dependency-ready plan should remain.
 4. Preserve M053/M045 and M046–M048 closure history unless a direct new defect is demonstrated.
-5. Preserve M049/M050 historical records but mark only their named invalidated findings as corrective.
-6. Keep all Proposal 170 policy under I2PControl; core exceptions are neutral observation only and milestone-budgeted.
+5. Preserve M049/M050/M052 historical records while retaining only their named superseded findings.
+6. Keep all Proposal 170 policy under I2PControl; M057 has zero production authority.
 7. Do not mark a source available before its production owner, exact fixture, bounds, live/request-independence behavior, and failure semantics are evidenced.
-8. Keep verification local/package-scoped; do not add CI/release infrastructure.
-9. Overall Proposal 170 remains partial after this sequence unless separately authorized work closes unrelated unsupported dimensions.
-10. No upstream interaction is authorized.
+8. Keep verification local/package-scoped; M057 specifically requires only planning-integrity checks unless its changed-file boundary is violated.
+9. Overall Proposal 170 remains partial unless separately authorized work closes unrelated unsupported dimensions.
+10. M051 remains blocked by absent substantive news/ban owners.
+11. No upstream interaction is authorized.

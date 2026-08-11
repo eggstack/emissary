@@ -2915,9 +2915,8 @@ mod tests {
         alice_relay.handle_relay_response(nonce, None, token, rejection, message, signature);
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie.router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie.router_id),
             _ => {}
         }
     }
@@ -3011,9 +3010,8 @@ mod tests {
         alice_relay.handle_relay_response(nonce, None, token, rejection, message, signature);
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie.router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie.router_id),
             _ => {}
         }
     }
@@ -3108,9 +3106,8 @@ mod tests {
         alice_relay.handle_relay_response(nonce, None, token, rejection, message, signature);
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie.router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie.router_id),
             _ => {}
         }
     }
@@ -3284,9 +3281,8 @@ mod tests {
         );
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie.router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie.router_id),
             _ => {}
         }
     }
@@ -3458,9 +3454,8 @@ mod tests {
         );
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie.router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie.router_id),
             _ => {}
         }
     }
@@ -3633,9 +3628,8 @@ mod tests {
         );
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie.router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie.router_id),
             _ => {}
         }
     }
@@ -3810,9 +3804,8 @@ mod tests {
         );
 
         match alice_relay.next().await.unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie.router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie.router_id),
             _ => {}
         }
     }
@@ -4044,9 +4037,8 @@ mod tests {
         );
 
         match timeout!(alice_relay.next()).await.unwrap().unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie_router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie_router_id),
             _ => panic!("unexpected event"),
         }
     }
@@ -4112,9 +4104,8 @@ mod tests {
         );
 
         match timeout!(alice_relay.next()).await.unwrap().unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie_router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie_router_id),
             _ => panic!("unexpected event"),
         }
     }
@@ -4179,9 +4170,8 @@ mod tests {
         );
 
         match timeout!(alice_relay.next()).await.unwrap().unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie_router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie_router_id),
             _ => panic!("unexpected event"),
         }
     }
@@ -4235,9 +4225,8 @@ mod tests {
         );
 
         match timeout!(alice_relay.next()).await.unwrap().unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie_router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie_router_id),
             _ => panic!("unexpected event"),
         }
     }
@@ -4576,9 +4565,8 @@ mod tests {
             alice_relay.send_relay_request(charlie.parsed(), false).unwrap();
 
         match timeout!(alice_relay.next(), Duration::from_secs(30)).await.unwrap().unwrap() {
-            RelayManagerEvent::RelayFailure { router_id } => {
-                assert_eq!(router_id, charlie.router_id)
-            }
+            RelayManagerEvent::RelayFailure { router_id } =>
+                assert_eq!(router_id, charlie.router_id),
             _ => panic!("unexpected event"),
         }
     }

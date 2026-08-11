@@ -1076,7 +1076,7 @@ impl<R: Runtime> InboundSsu2Session<R> {
 
                     self.state = PendingSessionState::AwaitingSessionRequest { token };
                 }
-                PendingSessionState::HandleSessionRequest { payload } => {
+                PendingSessionState::HandleSessionRequest { payload } =>
                     match self.on_session_request(payload) {
                         Ok(None) => {}
                         Ok(Some(status)) => return status,
@@ -1098,8 +1098,7 @@ impl<R: Runtime> InboundSsu2Session<R> {
                                 reason: error.into(),
                             };
                         }
-                    }
-                }
+                    },
                 _ => unreachable!(),
             }
         }

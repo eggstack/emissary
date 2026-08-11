@@ -109,9 +109,6 @@ pub struct SamSession<R: Runtime> {
     /// set is being queried are stored in the pending session state.
     pending_outbound: HashMap<DestinationId, PendingSession<R>>,
 
-    /// Observed stream socket IDs grouped by remote destination.
-    observed_stream_sockets: HashMap<DestinationId, Vec<u64>>,
-
     /// Public key context for the session.
     public_key_context: PublicKeyContext,
 
@@ -295,7 +292,6 @@ impl<R: Runtime> SamSession<R> {
             options,
             pending_host_lookups: HashMap::new(),
             pending_outbound: HashMap::new(),
-            observed_stream_sockets: HashMap::new(),
             receiver,
             session_id,
             session_kind: match session_kind {
@@ -322,9 +318,9 @@ impl<R: Runtime> SamSession<R> {
         }
     }
 
-    fn observe_socket(&mut self, socket: &SamSocket<R>, socket_type: u8) -> bool {
+    fn observe_socket(&self, socket: &SamSocket<R>, socket_type: u8) {
         let Some(hook) = &self.observation_hook else {
-            return true;
+            return;
         };
         let event = SamObservationEvent::SocketActivated {
             session_id: super::sanitized_text(&self.session_id, 256),
@@ -333,14 +329,13 @@ impl<R: Runtime> SamSession<R> {
             peer: super::sanitized_peer(socket.peer_addr()),
         };
         match hook.publish(event) {
-            Ok(()) => true,
+            Ok(()) => {}
             Err(_) => {
                 tracing::warn!(
                     target: LOG_TARGET,
                     session_id = %self.session_id,
                     "SAM observation hook rejected socket activation",
                 );
-                false
             }
         }
     }
@@ -361,16 +356,6 @@ impl<R: Runtime> SamSession<R> {
                     "SAM observation hook rejected socket removal",
                 );
             }
-        }
-    }
-
-    fn remove_tracked_stream_socket(&mut self, destination_id: &DestinationId, socket_id: u64) {
-        let Some(socket_ids) = self.observed_stream_sockets.get_mut(destination_id) else {
-            return;
-        };
-        socket_ids.retain(|tracked_socket_id| *tracked_socket_id != socket_id);
-        if socket_ids.is_empty() {
-            self.observed_stream_sockets.remove(destination_id);
         }
     }
 
@@ -467,22 +452,7 @@ impl<R: Runtime> SamSession<R> {
             return;
         }
 
-        let socket_id = socket.observation_id();
-        let observed = self.observe_socket(&socket, 2);
-        if self.observation_hook.is_some() {
-            self.observed_stream_sockets
-                .entry(destination_id.clone())
-                .or_default()
-                .push(socket_id);
-        }
-        if !observed {
-            tracing::debug!(
-                target: LOG_TARGET,
-                session_id = %self.session_id,
-                socket_id,
-                "retaining an unpublishable stream socket for bounded recovery",
-            );
-        }
+        self.observe_socket(&socket, 2);
 
         tracing::info!(
             target: LOG_TARGET,
@@ -1385,7 +1355,6 @@ impl<R: Runtime> Future for SamSession<R> {
                 })) => {
                     self.pending_outbound.remove(&destination_id);
                     self.remove_observed_socket(socket_id);
-                    self.remove_tracked_stream_socket(&destination_id, socket_id);
                 }
                 Poll::Ready(Some(StreamManagerEvent::StreamClosed {
                     destination_id,
@@ -1399,7 +1368,6 @@ impl<R: Runtime> Future for SamSession<R> {
                     );
                     if let Some(socket_id) = socket_id {
                         self.remove_observed_socket(socket_id);
-                        self.remove_tracked_stream_socket(&destination_id, socket_id);
                     }
                 }
                 Poll::Ready(Some(StreamManagerEvent::ShutDown)) => {

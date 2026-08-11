@@ -78,7 +78,7 @@ impl RouterId {
     /// Return the full Base64-encoded router identity string.
     ///
     /// Unlike [`Display`] which truncates to 8 characters, this returns
-    /// the complete Base64 representation required by Proposal 170 selectors.
+    /// the complete Base64 representation required by inspection consumers.
     pub fn to_base64(&self) -> &str {
         &self.0
     }

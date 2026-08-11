@@ -40,10 +40,15 @@ This document describes the read-only inspection architecture for I2PControl Pro
 ├─────────────────────────────────────────────┤
 │  Core (emissary-core)                       │
 │  ├── EventHandle (atomic counters)          │
-│  ├── Router (router identity, RI bytes)     │
+│  ├── Narrow neutral inspection handles      │
 │  └── Subsystem managers (tunnels, peers...) │
 └─────────────────────────────────────────────┘
 ```
+
+Core exposes purpose-specific, bounded owned snapshots and passive owner-local
+lifecycle facts. Aggregation, recovery, public bounds, and wire serialization
+remain in the application adapter; there is no aggregate core snapshot or
+control-plane policy in `emissary-core`.
 
 ## Key components
 

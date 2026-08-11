@@ -149,10 +149,10 @@ pub struct EventHandle<R: Runtime> {
     /// Cumulative outbound bandwidth used by all transit tunnels.
     transit_outbound_bandwidth: Arc<AtomicUsize>,
 
-    /// Latest IPv4 firewall status (cache for I2PControl read-only access).
+    /// Latest IPv4 firewall status (cache for read-only inspection access).
     ipv4_firewall_status: Arc<AtomicUsize>,
 
-    /// Latest IPv6 firewall status (cache for I2PControl read-only access).
+    /// Latest IPv6 firewall status (cache for read-only inspection access).
     ipv6_firewall_status: Arc<AtomicUsize>,
 
     /// Whether an existing IPv4 reachability test is active.
@@ -293,7 +293,7 @@ impl<R: Runtime> EventHandle<R> {
         }
     }
 
-    // --- Read-only snapshot accessors for I2PControl metrics ---
+    // --- Read-only snapshot accessors for metrics ---
 
     /// Cumulative inbound transport bytes (read-only snapshot).
     #[cfg(feature = "events")]

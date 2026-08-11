@@ -388,14 +388,6 @@ impl<R: Runtime> TransportManager<R> {
         &self.event_handle
     }
 
-    /// Get bounded list of currently connected peer IDs.
-    ///
-    /// Returns at most `limit` peer IDs. Used by inspection snapshots
-    /// without exposing the internal `routers` HashMap.
-    pub fn connected_peer_ids(&self, limit: usize) -> Vec<String> {
-        self.routers.keys().take(limit).map(|id| id.to_base64().to_owned()).collect()
-    }
-
     /// Get the cloneable, read-only transport inspection source.
     pub fn inspection(&self) -> TransportInspection {
         self.transport_inspection.clone()

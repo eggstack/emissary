@@ -310,15 +310,12 @@ impl fmt::Display for SamCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Hello { min, max } => write!(f, "SamCommand::Hello({min:?}, {max:?})"),
-            Self::CreateSession { session_id, .. } => {
-                write!(f, "SamCommand::CreateSession({session_id})")
-            }
-            Self::CreateSubSession { session_id, .. } => {
-                write!(f, "SamCommand::CreateSubSession({session_id})")
-            }
-            Self::Connect { session_id, .. } => {
-                write!(f, "SamCommand::StreamConnect({session_id})")
-            }
+            Self::CreateSession { session_id, .. } =>
+                write!(f, "SamCommand::CreateSession({session_id})"),
+            Self::CreateSubSession { session_id, .. } =>
+                write!(f, "SamCommand::CreateSubSession({session_id})"),
+            Self::Connect { session_id, .. } =>
+                write!(f, "SamCommand::StreamConnect({session_id})"),
             Self::Accept { session_id, .. } => write!(f, "SamCommand::StreamAccept({session_id})"),
             Self::Forward { session_id, .. } => write!(f, "SamCommand::Forward({session_id})"),
             Self::NamingLookup { name } => write!(f, "SamCommand::NamingLookup({name})"),
@@ -1123,9 +1120,8 @@ mod tests {
             };
 
             match SamCommand::try_from(invalid_cmd) {
-                Ok(_) => {
-                    panic!("Failed to reject the invalid inbound tunnel length {invalid_in_len:?}",)
-                }
+                Ok(_) =>
+                    panic!("Failed to reject the invalid inbound tunnel length {invalid_in_len:?}",),
                 Err(_) => {}
             }
         }

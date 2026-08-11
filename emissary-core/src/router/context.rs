@@ -150,7 +150,7 @@ impl<R: Runtime> RouterContext<R> {
 
     /// Get reference to [`EventHandle`].
     ///
-    /// Exposes read-only metric snapshots for I2PControl without
+    /// Exposes read-only metric snapshots without
     /// allowing mutation of router state.
     #[allow(private_interfaces)]
     pub fn event_handle(&self) -> &EventHandle<R> {

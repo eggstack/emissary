@@ -59,7 +59,8 @@ fn core_is_outside_the_m059_changed_path_budget() {
         .args([
             "diff",
             "--name-only",
-            "adb2f52543764b267b2bcb282d093111001ae4b2",
+            "adb2f52543764b267b2bcb282d093111001ae4b",
+            "ed17fe7",
             "--",
             "emissary-core",
         ])

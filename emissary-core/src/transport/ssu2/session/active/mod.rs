@@ -797,12 +797,7 @@ impl<R: Runtime> Future for Ssu2Session<R> {
                         break;
                     }
                     Poll::Ready(None) => return Poll::Ready(TerminationReason::RouterShutdown),
-                Poll::Ready(Some(nwritten)) => {
-                    self.transport_inspection.record_peer_bytes(
-                        self.router_id.to_base64(),
-                        0,
-                        nwritten as u64,
-                    );
+                    Poll::Ready(Some(nwritten)) => {
                         self.router_ctx
                             .metrics_handle()
                             .counter(OUTBOUND_BANDWIDTH)

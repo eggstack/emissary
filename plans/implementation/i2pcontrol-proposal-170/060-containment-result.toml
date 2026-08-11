@@ -1,0 +1,66 @@
+version = 1
+planning_baseline = "85677e7"
+upstream_baseline = "9b43484a21d5a1291c4881cdae62a36c527f8c0f"
+no_new_core_paths = true
+routerinfo_matrix = "37/1/5"
+
+reverted_to_upstream = [
+  "emissary-core/src/error/mod.rs",
+  "emissary-core/src/i2cp/socket.rs",
+  "emissary-core/src/runtime/mod.rs",
+  "emissary-core/src/sam/parser.rs",
+  "emissary-core/src/subsystem/mod.rs",
+  "emissary-core/src/transport/ssu2/message/data.rs",
+  "emissary-core/src/transport/ssu2/relay/mod.rs",
+  "emissary-core/src/transport/ssu2/session/pending/inbound.rs",
+  "emissary-core/src/transport/ssu2/session/terminating.rs",
+]
+
+[[reduced_hunk]]
+path = "emissary-core/src/inspection.rs"
+disposition = "removed dead aggregate CoreSnapshot DTOs and an unused peer-id replacement helper"
+necessity = "Only purpose-specific peer, transport, and tunnel handles have live consumers."
+
+[[reduced_hunk]]
+path = "emissary-core/src/router/mod.rs"
+disposition = "removed the unused aggregate inspection_snapshot accessor"
+necessity = "The CLI consumes canonical owner handles directly; no aggregate snapshot consumer exists."
+
+[[reduced_hunk]]
+path = "emissary-core/src/transport/mod.rs"
+disposition = "removed the connected_peer_ids accessor used only by the deleted aggregate snapshot"
+necessity = "TransportInspection is the retained bounded owner seam."
+
+[[reduced_hunk]]
+path = "emissary-core/src/sam/session.rs"
+disposition = "removed unconsumed rejected-publication stream tracking"
+necessity = "StreamManager close/reject events already carry the authoritative socket identity."
+
+[[reduced_hunk]]
+path = "emissary-core/src/transport/ssu2/session/active/mod.rs"
+disposition = "removed duplicate buffered-send byte publication"
+necessity = "Each accepted socket write must update the neutral counter exactly once."
+
+[[retained_owner_seam]]
+path = "emissary-core/src/sam/mod.rs"
+necessity = "SamServer observes authoritative session activation/removal order and emits only sanitized bounded facts."
+
+[[retained_owner_seam]]
+path = "emissary-core/src/sam/session.rs"
+necessity = "SamSession is the only owner that sees stream/listener activation and terminal close/reject transitions."
+
+[[retained_owner_seam]]
+path = "emissary-core/src/transport/ntcp2/session/active.rs"
+necessity = "Only the active NTCP2 I/O owner sees exact partial read/write byte counts."
+
+[[retained_owner_seam]]
+path = "emissary-core/src/transport/ssu2/session/active/mod.rs"
+necessity = "Only the active SSU2 I/O owner sees packet receive, retransmit, ACK, and send completion byte counts."
+
+[[retained_owner_seam]]
+path = "emissary-core/src/tunnel/pool/mod.rs"
+necessity = "TunnelPool owns exact directional lifecycle and pending queue transitions."
+
+[[retained_owner_seam]]
+path = "emissary-core/src/tunnel/transit/mod.rs"
+necessity = "TransitTunnelManager owns participating-tunnel admission, expiry, and TBM queue depth."

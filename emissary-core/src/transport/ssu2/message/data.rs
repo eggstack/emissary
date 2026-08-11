@@ -356,13 +356,12 @@ impl RelayBlock {
                 signature,
                 token,
                 rejection: _,
-            } => {
+            } =>
                 overhead
                     + 1 // code
                     + message.len()
                     + signature.len()
-                    + token.map_or(0, |_| TOKEN_LEN)
-            }
+                    + token.map_or(0, |_| TOKEN_LEN),
             Self::Intro {
                 message,
                 signature,

@@ -24,7 +24,7 @@
 //!
 //! # Invariants
 //!
-//! - No JSON-RPC, Proposal 170, or wire-format terminology appears in these types.
+//! - No control-plane protocol or wire-format terminology appears in these types.
 //! - No private key, session key, or lease-set private material can enter a snapshot.
 //! - All list fields are bounded at construction time.
 //! - Snapshots are immutable after construction.
@@ -160,7 +160,7 @@ pub struct TransportInspectionSnapshot {
 
 /// Bounded, owned facts about one established transport session.
 ///
-/// The boolean fields intentionally remain neutral core facts. I2PControl
+/// The boolean fields intentionally remain neutral core facts. The adapter
 /// owns their wire labels and any compatibility mapping.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransportPeerInspection {
@@ -211,24 +211,6 @@ impl TransportInspection {
             return Err(TransportInspectionError::ItemLimitExceeded { limit: max_items });
         }
         Ok(snapshot.clone())
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn update_connected_peer_ids(&self, connected_peer_ids: Vec<String>) {
-        let mut snapshot = self.snapshot.write();
-        snapshot.connected_peer_ids = connected_peer_ids.clone();
-        snapshot.peer_stats.retain(|peer| connected_peer_ids.contains(&peer.peer_id));
-        for peer_id in connected_peer_ids {
-            if !snapshot.peer_stats.iter().any(|peer| peer.peer_id == peer_id) {
-                snapshot.peer_stats.push(TransportPeerInspection {
-                    peer_id,
-                    inbound: false,
-                    connected: true,
-                    bytes_received: 0,
-                    bytes_sent: 0,
-                });
-            }
-        }
     }
 
     pub(crate) fn set_ntcp2_limit(&self, limit: Option<usize>) {
@@ -574,7 +556,9 @@ mod tests {
             Err(TransportInspectionError::ItemLimitExceeded { limit: 1 })
         ));
 
-        inspection.update_connected_peer_ids(vec!["peer-c".into()]);
+        inspection.peer_disconnected("peer-a");
+        inspection.peer_disconnected("peer-b");
+        inspection.peer_connected("peer-c".into(), false);
         assert_eq!(clone.snapshot(2).unwrap().connected_peer_ids, ["peer-c"]);
     }
 
@@ -667,99 +651,4 @@ mod tests {
         inspection.recover(Vec::new()).unwrap();
         assert!(inspection.snapshot(0).unwrap().entries.is_empty());
     }
-}
-
-/// Bounded transport connection snapshot.
-///
-/// Carries actual UDP/TCP transport state from canonical core owners
-/// to inspection adapters without exposing session or transport handles.
-#[derive(Debug, Clone)]
-pub struct TransportSnapshot {
-    /// Whether any transport is currently active (has connected peers).
-    pub udp_active: bool,
-    /// Whether UDP is firewalled.
-    pub udp_firewalled: bool,
-    /// Whether TCP is currently active.
-    pub tcp_active: bool,
-    /// Number of currently connected peers (across all transports).
-    pub connected_peer_count: usize,
-    /// Bounded list of connected peer IDs.
-    pub connected_peer_ids: Vec<String>,
-    /// IPv4 firewall status as a string code: "ok", "firewalled", "symmetric_nat", "unknown".
-    pub ipv4_firewall_status: String,
-    /// IPv6 firewall status as a string code.
-    pub ipv6_firewall_status: String,
-}
-
-/// Bounded tunnel pool snapshot.
-///
-/// Carries actual tunnel pool state from canonical core owners.
-/// Does not include configured definition counts — those remain
-/// in the shared administrative tunnel manager store.
-#[derive(Debug, Clone)]
-pub struct TunnelSnapshot {
-    /// Active participating (transit) tunnel count.
-    pub active_participating: usize,
-    /// Active exploratory inbound tunnel count.
-    pub exploratory_inbound: usize,
-    /// Active exploratory outbound tunnel count.
-    pub exploratory_outbound: usize,
-    /// Active client inbound tunnel count.
-    pub client_inbound: usize,
-    /// Active client outbound tunnel count.
-    pub client_outbound: usize,
-    /// Pending tunnel build queue depth.
-    pub queue_depth: usize,
-}
-
-/// Bounded NetDB and peer storage snapshot.
-///
-/// Carries actual NetDB state from canonical core owners.
-/// Profile classifications are only included where Emissary
-/// already maintains them canonically.
-#[derive(Debug, Clone)]
-pub struct NetDbSnapshot {
-    /// Whether the NetDB subsystem is active.
-    pub active: bool,
-    /// Number of stored router infos (floodfill only; zero on non-floodfill).
-    pub router_info_count: usize,
-    /// Number of stored lease sets (floodfill only; zero on non-floodfill).
-    pub lease_set_count: usize,
-    /// Bounded list of known router IDs.
-    pub known_router_ids: Vec<String>,
-    /// Total number of known peers in profile storage.
-    pub known_peer_count: usize,
-    /// Number of connected (active) peers.
-    pub active_peer_count: usize,
-    /// Bounded map of peer ID → serialized public RouterInfo bytes.
-    ///
-    /// Populated for bounded peer RouterInfo lookup. Keys are Base64 router IDs.
-    /// Values are the raw serialized RouterInfo (public only, no private material).
-    pub peer_router_infos: alloc::collections::BTreeMap<String, Vec<u8>>,
-}
-
-/// Pre-computed core inspection snapshot.
-///
-/// This struct is populated by `Router::inspection_snapshot()` and
-/// passed across crate boundaries to inspection adapters. It is non-generic
-/// and contains only owned, bounded, public data.
-///
-/// # Invariants
-///
-/// - All fields are populated from canonical core owners at construction time.
-/// - No private key, session key, or mutable handle is stored.
-/// - List fields are bounded at construction time.
-/// - The snapshot is immutable after construction.
-#[derive(Debug, Clone)]
-pub struct CoreSnapshot {
-    /// Router identity in Base64.
-    pub router_id_b64: String,
-    /// Serialized local RouterInfo bytes (public only).
-    pub router_info_bytes: Vec<u8>,
-    /// Transport connection state.
-    pub transport: TransportSnapshot,
-    /// Tunnel pool state.
-    pub tunnels: TunnelSnapshot,
-    /// NetDB and peer storage state.
-    pub netdb: NetDbSnapshot,
 }

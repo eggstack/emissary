@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; M057 post-M056 planning-record consistency corrective ready
+Status: partial Proposal 170 support; M057 post-M056 planning-record consistency corrective closed
 
 This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -20,9 +20,7 @@ All work is internal to `eggstack/emissary`. External specifications/reference i
 
 ## Current handoff
 
-M054, M055, and M056 are closed. M057 is now the sole dependency-ready handoff:
-
-- `057-post-m056-planning-record-consistency-corrective.md` — ready; documentation/control-surface consistency only, with zero production authority.
+M054, M055, M056, and M057 are closed. No dependency-ready handoff is currently registered. M051 remains blocked with its accepted semantic limitation because no substantive news/ban owner exists.
 
 The accepted production disposition remains unchanged:
 
@@ -30,7 +28,7 @@ The accepted production disposition remains unchanged:
 - `055-m050-network-error-truthfulness-corrective.md` — closed; both unowned v4/v6 network-error rows are unavailable and dead error scaffolding was removed.
 - `056-m049-m050-corrective-reclosure.md` — closed; final integrated matrix is 37 available / 1 neutral / 5 unavailable.
 
-M057 exists only because a small number of active planning sentences remained stale after M056: the roadmap dependency graph still labels M055 ready, and historical/current source-count wording must consistently distinguish the pre-corrective `970252c` 40/1/2 claim from the accepted post-M056 37/1/5 state. M057 must not change code, source disposition, runtime support, or the accepted closure records.
+M057 existed only because a small number of active planning sentences remained stale after M056: the roadmap dependency graph had carried a stale M055 lifecycle label, and historical/current source-count wording needed to distinguish the pre-corrective `970252c` 40/1/2 claim from the accepted post-M056 37/1/5 state. M057 did not change code, source disposition, runtime support, or the accepted closure records.
 
 ## Why the corrective source sequence was reopened
 
@@ -58,7 +56,7 @@ The pre-corrective `40 available / 1 neutral / 2 unavailable` matrix is historic
 | M054 — transit 15s corrective | closed | truthful transit-15s unavailability; request-local sampler removed | `054-closure.md` |
 | M055 — network-error truthfulness | closed | both error rows unavailable; dead error scaffold removed | `055-closure.md` |
 | M056 — corrective integration reclosure | closed | no production changes; final 43-row audit accepted | `056-closure.md` |
-| M057 — post-M056 planning-record consistency | ready | reconcile active planning statuses/baselines only; no production changes | M054–M056 accepted closures |
+| M057 — post-M056 planning-record consistency | closed | active planning statuses/baselines reconciled; no production changes | `057-closure.md` |
 
 Plans:
 
@@ -128,7 +126,7 @@ Throughout the roadmap, do not:
 
 Every milestone must inspect its accepted dependency head, preserve exact semantics and scope, remain inside its path budget, and create an independent closure record. Material scope expansion is a blocker, not permission to improvise.
 
-Only the registry advances the next handoff to `ready`. M057 is the sole current ready plan. After accepted M057 closure, no successor should be registered unless separately authorized; M051 remains blocked behind absent substantive news/ban owners.
+Only the registry advances a dependency-ready handoff. M057 is closed and no successor is registered; M051 remains blocked behind absent substantive news/ban owners.
 
 ## Verification rule
 
@@ -140,7 +138,7 @@ Do not add CI/release/coverage/fuzz/soak infrastructure.
 
 M056 independently derived and validated the final matrix as 37 available / 1 protocol-permitted neutral / 5 unavailable. RouterInfo source completion remains partial under current owners because news, banned peers, transit-15s, and both network-error rows are unavailable. Broader Proposal 170 support also retains unrelated previously accepted partial dimensions.
 
-M057 may close only planning-record consistency. It cannot change this final support disposition.
+M057 closed only planning-record consistency. It did not change this final support disposition.
 
 ## Historical evidence
 

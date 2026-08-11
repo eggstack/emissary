@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 RouterInfo Source-Completion Roadmap
 
-Status: partial Proposal 170 support; M057 post-M056 planning-record consistency corrective ready
+Status: partial Proposal 170 support; M057 post-M056 planning-record consistency corrective closed
 
 Planning baseline: `b759038` — M044 finalized reviewed head
 
@@ -70,7 +70,7 @@ M057 touches no RouterInfo field. Its target is active planning-record consisten
 
 - milestone lifecycle/status wording after accepted M054–M056 closure;
 - historical `970252c` 40/1/2 wording versus final post-M056 37/1/5 wording;
-- stale current-state references to M056 as pending/ready/blocked, if any remain.
+- stale current-state lifecycle references for M056, if any remain.
 
 No other RouterInfo row or runtime is reopened unless a direct new defect is independently demonstrated and separately planned.
 
@@ -174,16 +174,16 @@ M052 — final source-accounting closure invalidated by post-closure review
 M054 — M049 transit-15s corrective — CLOSED
    |
    v
-M055 — M050 network-error truthfulness corrective — READY
+M055 — M050 network-error truthfulness corrective — CLOSED
    |
    v
-M056 — corrective integration reclosure — CLOSED; no successor currently ready
+M056 — corrective integration reclosure — CLOSED
    |
    v
-M057 — post-M056 planning-record consistency corrective — READY
+M057 — post-M056 planning-record consistency corrective — CLOSED; no dependency-ready successor
 ```
 
-The M055/M056 current-state wording above is intentionally the planning-record inconsistency that M057 must correct; accepted closure records already establish both milestones as closed. M057 is the sole dependency-ready handoff in the registry and has zero production authority.
+M054, M055, and M056 are accepted closed milestones. M057 was the bounded planning-record corrective handoff and is now closed; no dependency-ready successor is registered. M051 remains blocked with its accepted semantic limitation and has no substantive owner-specific successor plan.
 
 ## 7. Milestones
 
@@ -261,7 +261,7 @@ Plan: `056-m049-m050-corrective-reclosure.md`.
 
 No production changes. M056 validated the accepted M054/M055 dispositions, reconciled all 43 rows, and superseded only the invalidated M049/M050/M052 findings. Final matrix: 37 available / 1 protocol-permitted neutral / 5 unavailable.
 
-### M057 — Post-M056 planning-record consistency corrective — ready
+### M057 — Post-M056 planning-record consistency corrective — closed
 
 Plan: `057-post-m056-planning-record-consistency-corrective.md`.
 
@@ -269,7 +269,7 @@ Correct only active planning/control-surface drift after accepted M056 closure. 
 
 M057 authorizes no production Rust, runtime, test-behavior, workflow, release, or source-disposition change. Closure is based on changed-path review, targeted planning-status/baseline searches, `git diff --check`, preservation of accepted closure records, and explicit internal-only attestation.
 
-Exit: active registry/roadmap/index agree that M054–M056 are closed, `970252c` is historical 40/1/2 evidence, the accepted current matrix is 37/1/5, M051 remains blocked, and no dependency-ready successor remains after M057 closure.
+Exit: active registry/roadmap/index agree that M054–M057 are closed, `970252c` is historical 40/1/2 evidence, the accepted current matrix is 37/1/5, M051 remains blocked, and no dependency-ready successor remains.
 
 ## 8. Failure, cancellation, restart, and contention policy
 
@@ -332,7 +332,7 @@ The pre-corrective `40 available + 1 neutral + 2 unavailable` matrix is historic
 
 M057 cannot change this source matrix. Its only allowed completion is a planning-record reclosure in which active documents consistently distinguish the historical `970252c` 40/1/2 claim from the accepted post-M056 37/1/5 state and consistently label M054–M056 closed.
 
-While M057 is ready, it is the sole dependency-ready plan. After M057 closes, no successor should be registered unless separately authorized. M051 remains blocked until separately authorized substantive news/ban owners exist.
+M057 is closed and no dependency-ready plan is registered. M051 remains blocked until separately authorized substantive news/ban owners exist.
 
 RouterInfo source completion and broader Proposal 170 support remain partial under the accepted scope.
 

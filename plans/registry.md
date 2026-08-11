@@ -27,13 +27,13 @@ Canonical direction:
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | partial Proposal 170 support; post-M056 planning-record consistency corrective ready | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | M057 ready | production corrective sequence M054–M056 is closed; M057 is documentation/control-surface consistency only |
+| I2PControl Proposal 170 | partial Proposal 170 support; post-M056 planning-record consistency corrective closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no dependency-ready handoff | M054–M057 are closed; M051 remains blocked by absent substantive news/ban owners |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 | M057 — post-M056 planning-record consistency corrective | ready | `plans/implementation/i2pcontrol-proposal-170/057-post-m056-planning-record-consistency-corrective.md` | accepted M054, M055, and M056 closures |
+| _None_ | — | — | — | M057 is closed; no dependency-ready successor exists |
 
 ## Blocked roadmap successors
 
@@ -55,7 +55,7 @@ Per `plans/003-planning-process.md`, these plans exist for deterministic handoff
 | M050 — v4/v6 network state | corrected/closed through M055 and M056 | status.v6 + testing v4/v6 retained; error rows unavailable with no canonical owner |
 | M051 — news/banned peers | blocked with accepted limitation | `051-closure.md`; both rows remain unavailable |
 | M052 — integration reclosure | corrected/closed through M056 | historical `052-closure.md` `40/1/2` matrix superseded by accepted `37/1/5` audit |
-| M057 — post-M056 planning-record consistency | ready | fixes stale roadmap status and historical-baseline wording only; no production changes authorized |
+| M057 — post-M056 planning-record consistency | closed | `057-closure.md`; active status/baseline wording reconciled; no production changes authorized |
 
 ## Current review finding/work scope
 
@@ -157,9 +157,9 @@ Current work is pinned to Proposal 170 `I2PControl Expansion`, status Open, revi
 
 ## Registry maintenance rules
 
-1. M057 is the sole dependency-ready plan and is planning-record-only.
+1. No dependency-ready implementation plan remains after M057 closure.
 2. M054, M055, and M056 remain closed and must not be reopened by M057 absent a new production defect.
-3. After accepted M057 closure, no current dependency-ready plan should remain.
+3. M057 is closed and must not be reopened absent a separately documented defect.
 4. Preserve M053/M045 and M046–M048 closure history unless a direct new defect is demonstrated.
 5. Preserve M049/M050/M052 historical records while retaining only their named superseded findings.
 6. Keep all Proposal 170 policy under I2PControl; M057 has zero production authority.

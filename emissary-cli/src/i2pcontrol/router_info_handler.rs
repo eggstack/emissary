@@ -86,18 +86,6 @@ fn network_status_code(status: NetworkStatus) -> i64 {
     }
 }
 
-/// Map a known neutral failure reason to the pinned i2pd error vocabulary.
-fn network_error_code(error: Option<emissary_core::inspection::NetworkErrorReason>) -> i64 {
-    match error {
-        None => 0,
-        Some(emissary_core::inspection::NetworkErrorReason::ClockSkew) => 1,
-        Some(emissary_core::inspection::NetworkErrorReason::Offline) => 2,
-        Some(emissary_core::inspection::NetworkErrorReason::SymmetricNat) => 3,
-        Some(emissary_core::inspection::NetworkErrorReason::FullConeNat) => 4,
-        Some(emissary_core::inspection::NetworkErrorReason::NoDescriptors) => 5,
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RouterInfoRequestMode {
     CanonicalDirect,
@@ -512,8 +500,6 @@ async fn assemble_response(
     let network_snapshot = if key_set.contains(rpc::router_info_keys::NET_BW_INBOUND)
         || key_set.contains(rpc::router_info_keys::NET_BW_OUTBOUND)
         || key_set.contains(rpc::router_info_keys::P170_NET_STATUS_V6)
-        || key_set.contains(rpc::router_info_keys::P170_NET_ERROR)
-        || key_set.contains(rpc::router_info_keys::P170_NET_ERROR_V6)
         || key_set.contains(rpc::router_info_keys::P170_NET_TESTING)
         || key_set.contains(rpc::router_info_keys::P170_NET_TESTING_V6)
     {
@@ -723,18 +709,6 @@ async fn assemble_response(
             result.insert(
                 rpc::router_info_keys::P170_NET_STATUS_V6.to_string(),
                 serde_json::json!(network_status_code(network.ipv6_status)),
-            );
-        }
-        if key_set.contains(rpc::router_info_keys::P170_NET_ERROR) {
-            result.insert(
-                rpc::router_info_keys::P170_NET_ERROR.to_string(),
-                serde_json::json!(network_error_code(network.ipv4_error)),
-            );
-        }
-        if key_set.contains(rpc::router_info_keys::P170_NET_ERROR_V6) {
-            result.insert(
-                rpc::router_info_keys::P170_NET_ERROR_V6.to_string(),
-                serde_json::json!(network_error_code(network.ipv6_error)),
             );
         }
         if key_set.contains(rpc::router_info_keys::P170_NET_TESTING) {
@@ -1920,9 +1894,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn m049_wire_fixture_returns_rolling_metric_and_live_queues() {
+    async fn m049_wire_fixture_returns_recent_success_and_live_queues() {
         let ri = FakeRouterInfoControl::new();
-        ri.set_transit_bandwidth_15s(2048);
         ri.set_recent_tunnel_success_rate(73.0);
         ri.set_tunnel_details(TunnelDetails {
             queue_depth: 4,
@@ -1931,7 +1904,6 @@ mod tests {
         });
         let state = test_state(ri);
         let req = direct_request(serde_json::json!({
-            "i2p.router.net.bw.transit.15s": false,
             "i2p.router.net.tunnels.successrate": null,
             "i2p.router.net.tunnels.queue": true,
             "i2p.router.net.tunnels.tbmqueue": {},
@@ -1940,7 +1912,6 @@ mod tests {
         let result = resp["result"]
             .as_object()
             .unwrap_or_else(|| panic!("M049 fixture response: {resp}"));
-        assert_eq!(result["i2p.router.net.bw.transit.15s"], 2048);
         assert_eq!(result["i2p.router.net.tunnels.successrate"], 73.0);
         assert_eq!(result["i2p.router.net.tunnels.queue"], 4);
         assert_eq!(result["i2p.router.net.tunnels.tbmqueue"], 7);
@@ -2579,8 +2550,6 @@ mod tests {
         ri.set_network(NetworkSnapshot {
             ipv4_status: NetworkStatus::Ok,
             ipv6_status: NetworkStatus::Firewalled,
-            ipv4_error: Some(emissary_core::inspection::NetworkErrorReason::ClockSkew),
-            ipv6_error: Some(emissary_core::inspection::NetworkErrorReason::SymmetricNat),
             ipv4_testing: true,
             ipv6_testing: false,
             ..Default::default()
@@ -2588,18 +2557,41 @@ mod tests {
         let state = test_state(ri);
         let req = direct_request(serde_json::json!({
             "i2p.router.net.status.v6": false,
-            "i2p.router.net.error": null,
-            "i2p.router.net.error.v6": "ignored",
             "i2p.router.net.testing": 0,
             "i2p.router.net.testing.v6": true,
         }));
         let resp = handle_router_info(&state, &req).await;
         let result = resp["result"].as_object().unwrap();
         assert_eq!(result["i2p.router.net.status.v6"], 1);
-        assert_eq!(result["i2p.router.net.error"], 1);
-        assert_eq!(result["i2p.router.net.error.v6"], 3);
         assert_eq!(result["i2p.router.net.testing"], 1);
         assert_eq!(result["i2p.router.net.testing.v6"], 0);
+    }
+
+    #[tokio::test]
+    async fn network_errors_are_unavailable_without_partial_results() {
+        for request in [
+            direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NET_ERROR: false,
+            })),
+            direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NET_ERROR_V6: false,
+            })),
+            direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NET_STATUS_V6: false,
+                rpc::router_info_keys::P170_NET_TESTING: false,
+                rpc::router_info_keys::P170_NET_TESTING_V6: false,
+                rpc::router_info_keys::P170_NET_ERROR: false,
+                rpc::router_info_keys::P170_NET_ERROR_V6: false,
+            })),
+        ] {
+            let response =
+                handle_router_info(&test_state(FakeRouterInfoControl::new()), &request).await;
+            assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
+            assert!(response["result"].is_null());
+            assert!(response["error"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("no canonical network-error owner")));
+        }
     }
 
     #[tokio::test]

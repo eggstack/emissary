@@ -605,6 +605,31 @@ async fn production_router_info_tcp_snapshot_returns_unavailable() {
     assert!(result.is_err());
 }
 
+#[tokio::test]
+async fn production_router_info_transit_bandwidth_15s_is_unavailable_without_owner() {
+    let metrics = make_metrics();
+    let tunnel_mgr = make_tunnel_manager();
+    let log_ring = Arc::new(LogRing::default());
+    let ri = ProductionRouterInfoControl::new(
+        String::new(),
+        "test".to_string(),
+        0.0,
+        0,
+        0,
+        metrics,
+        log_ring,
+        tunnel_mgr,
+    );
+
+    assert!(matches!(
+        ri.transit_bandwidth_15s().await,
+        Err(InspectionError::UnavailableReason {
+            group: InspectionGroup::TrafficMetrics,
+            reason: "no request-independent rolling transit owner"
+        })
+    ));
+}
+
 // --- Static guards ---
 
 #[test]

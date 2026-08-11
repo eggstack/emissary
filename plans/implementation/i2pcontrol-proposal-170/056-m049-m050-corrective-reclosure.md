@@ -1,6 +1,6 @@
 # M056 — M049/M050 Corrective Integration Reclosure
 
-Status: blocked — M054 and M055 accepted closures required
+Status: closed
 
 Planning baseline: `970252c` — merged M053–M052 implementation/reclosure head
 

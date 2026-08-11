@@ -1,6 +1,6 @@
 # M052 — RouterInfo 26-Source Integration, Containment Review, and Reclosure
 
-Status: corrective pass required for final source-accounting closure; historical closure retained
+Status: corrected/closed through M056; historical closure retained
 
 Planning baseline: `b759038`
 

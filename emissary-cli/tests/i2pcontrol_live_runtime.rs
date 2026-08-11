@@ -471,7 +471,7 @@ async fn live_runtime_interoperability() {
     .await;
     assert!(peers["result"]["i2p.router.netdb.peers"].is_array());
 
-    // Exercise every newly available M045-M050 RouterInfo source through the
+    // Exercise every currently available M045-M050 RouterInfo source through the
     // real TLS/authenticated child process. These selectors are deliberately
     // requested one at a time so a source-group composition regression cannot
     // be hidden by a successful neighboring field.
@@ -491,13 +491,10 @@ async fn live_runtime_interoperability() {
         "i2p.router.net.tunnels.client.inbound",
         "i2p.router.net.tunnels.client.outbound",
         "i2p.router.net.tunnels.client.info.list",
-        "i2p.router.net.bw.transit.15s",
         "i2p.router.net.tunnels.successrate",
         "i2p.router.net.tunnels.queue",
         "i2p.router.net.tunnels.tbmqueue",
         "i2p.router.net.status.v6",
-        "i2p.router.net.error",
-        "i2p.router.net.error.v6",
         "i2p.router.net.testing",
         "i2p.router.net.testing.v6",
     ];
@@ -517,6 +514,36 @@ async fn live_runtime_interoperability() {
         );
     }
 
+    for (index, selector) in ["i2p.router.net.error", "i2p.router.net.error.v6"].iter().enumerate()
+    {
+        let response = protected(
+            &client,
+            &endpoint,
+            63 + index as u64,
+            &token,
+            "RouterInfo",
+            serde_json::Map::from_iter([(selector.to_string(), json!(false))]),
+        )
+        .await;
+        assert_eq!(response["error"]["code"], -32603);
+        assert!(response["result"].is_null());
+        assert!(response["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("no canonical network-error owner")));
+    }
+
+    let transit_unavailable = protected(
+        &client,
+        &endpoint,
+        64,
+        &token,
+        "RouterInfo",
+        serde_json::Map::from_iter([("i2p.router.net.bw.transit.15s".into(), json!(false))]),
+    )
+    .await;
+    assert_eq!(transit_unavailable["error"]["code"], -32603);
+    assert!(transit_unavailable["result"].is_null());
+
     let combined = protected(
         &client,
         &endpoint,
@@ -527,7 +554,6 @@ async fn live_runtime_interoperability() {
             ("i2p.router.netdb.peers".into(), json!(false)),
             ("i2p.router.netdb.activepeers.stats".into(), json!(false)),
             ("i2p.router.net.tunnels.queue".into(), json!(false)),
-            ("i2p.router.net.bw.transit.15s".into(), json!(false)),
             ("i2p.router.net.status.v6".into(), json!(false)),
         ]),
     )
@@ -536,7 +562,6 @@ async fn live_runtime_interoperability() {
         "i2p.router.netdb.peers",
         "i2p.router.netdb.activepeers.stats",
         "i2p.router.net.tunnels.queue",
-        "i2p.router.net.bw.transit.15s",
         "i2p.router.net.status.v6",
     ] {
         assert!(
@@ -545,7 +570,7 @@ async fn live_runtime_interoperability() {
         );
     }
     eprintln!(
-        "M052 phase D: all {} newly available RouterInfo selectors and multi-group composition passed",
+        "M054 phase D: all {} available RouterInfo selectors and multi-group composition passed",
         newly_available.len()
     );
 

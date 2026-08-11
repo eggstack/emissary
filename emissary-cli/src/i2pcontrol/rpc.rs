@@ -1010,8 +1010,9 @@ pub mod router_info_keys {
         field!(
             P170_NET_BW_TRANSIT_15S,
             JsonType::Integer,
-            SourceDisposition::Available {
-                owner: "traffic-metrics"
+            SourceDisposition::Unavailable {
+                owner: "transit-bandwidth",
+                reason: "no request-independent rolling transit owner"
             },
             "serialize_transit_bandwidth_15s",
             "p170.transit_15s.bytes_per_second",
@@ -1154,10 +1155,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_ERROR,
             JsonType::Integer,
-            SourceDisposition::Available {
-                owner: "network-state",
+            SourceDisposition::Unavailable {
+                owner: "network-error",
+                reason: "no canonical network-error owner",
             },
-            "serialize_network_error",
+            "unavailable",
             "p170.error_v4.integer",
             Mutation::ReadOnly,
             Bound::None,
@@ -1166,10 +1168,11 @@ pub mod router_info_keys {
         field!(
             P170_NET_ERROR_V6,
             JsonType::Integer,
-            SourceDisposition::Available {
-                owner: "network-state",
+            SourceDisposition::Unavailable {
+                owner: "network-error",
+                reason: "no canonical network-error owner",
             },
-            "serialize_network_error_v6",
+            "unavailable",
             "p170.error_v6.integer",
             Mutation::ReadOnly,
             Bound::None,
@@ -2060,7 +2063,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (40, 1, 2));
+        assert_eq!((available, neutral, unavailable), (37, 1, 5));
     }
 
     #[test]

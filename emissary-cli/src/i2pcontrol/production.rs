@@ -26,9 +26,9 @@
 //! subscriber consumption, and no private key exposure.
 
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::BTreeMap,
     path::PathBuf,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, RwLock},
 };
 
 use async_trait::async_trait;
@@ -491,53 +491,6 @@ impl<R: Runtime> EventMetrics for EventHandleMetrics<R> {
 
     fn ipv6_network_state(&self) -> NetworkState {
         self.handle.ipv6_network_state()
-    }
-}
-
-const TRANSIT_BANDWIDTH_WINDOW_MS: u64 = 15_000;
-const MAX_TRANSIT_BANDWIDTH_SAMPLES: usize = 16;
-
-#[derive(Debug, Default)]
-struct TransitBandwidthSampler {
-    samples: VecDeque<(u64, u64)>,
-}
-
-impl TransitBandwidthSampler {
-    fn sample(&mut self, now_ms: u64, total_transit_bytes: u64) -> u64 {
-        if self
-            .samples
-            .back()
-            .is_some_and(|(_, previous_bytes)| total_transit_bytes < *previous_bytes)
-        {
-            self.samples.clear();
-        }
-
-        if self.samples.back().is_some_and(|(last_ms, _)| *last_ms == now_ms) {
-            *self.samples.back_mut().expect("sample exists") = (now_ms, total_transit_bytes);
-        } else {
-            self.samples.push_back((now_ms, total_transit_bytes));
-        }
-
-        while self.samples.front().is_some_and(|(timestamp, _)| {
-            now_ms.saturating_sub(*timestamp) > TRANSIT_BANDWIDTH_WINDOW_MS
-        }) {
-            self.samples.pop_front();
-        }
-        while self.samples.len() > MAX_TRANSIT_BANDWIDTH_SAMPLES {
-            self.samples.pop_front();
-        }
-
-        let Some((oldest_ms, oldest_bytes)) = self.samples.front().copied() else {
-            return 0;
-        };
-        let elapsed_ms = now_ms.saturating_sub(oldest_ms);
-        if elapsed_ms < TRANSIT_BANDWIDTH_WINDOW_MS {
-            return 0;
-        }
-        let Some(delta_bytes) = total_transit_bytes.checked_sub(oldest_bytes) else {
-            return 0;
-        };
-        ((u128::from(delta_bytes) * 1000) / u128::from(elapsed_ms)).min(u128::from(u64::MAX)) as u64
     }
 }
 
@@ -1335,7 +1288,6 @@ pub struct ProductionRouterInfoControl {
     configured_bandwidth_in: u64,
     configured_bandwidth_out: u64,
     metrics: Arc<dyn EventMetrics>,
-    transit_bandwidth_sampler: Mutex<TransitBandwidthSampler>,
     log_ring: Arc<LogRing>,
     tunnel_manager: Arc<dyn TunnelManagerControl>,
     peer_directory: Option<Arc<dyn PeerDirectorySource>>,
@@ -1364,7 +1316,6 @@ impl ProductionRouterInfoControl {
             configured_bandwidth_in,
             configured_bandwidth_out,
             metrics,
-            transit_bandwidth_sampler: Mutex::new(TransitBandwidthSampler::default()),
             log_ring,
             tunnel_manager,
             peer_directory: None,
@@ -1425,8 +1376,6 @@ impl RouterInfoControl for ProductionRouterInfoControl {
         Ok(NetworkSnapshot {
             ipv4_status: ipv4,
             ipv6_status: ipv6,
-            ipv4_error: ipv4_state.error,
-            ipv6_error: ipv6_state.error,
             ipv4_testing: ipv4_state.testing,
             ipv6_testing: ipv6_state.testing,
             firewalled,
@@ -1453,14 +1402,10 @@ impl RouterInfoControl for ProductionRouterInfoControl {
     }
 
     async fn transit_bandwidth_15s(&self) -> Result<u64, InspectionError> {
-        let mut sampler = self
-            .transit_bandwidth_sampler
-            .lock()
-            .map_err(|_| InspectionError::InternalInvariant)?;
-        Ok(sampler.sample(
-            self.startup.elapsed().as_millis().min(u128::from(u64::MAX)) as u64,
-            self.metrics.transit_outbound_bytes(),
-        ))
+        Err(InspectionError::UnavailableReason {
+            group: InspectionGroup::TrafficMetrics,
+            reason: "no request-independent rolling transit owner",
+        })
     }
 
     async fn transit_bytes(&self) -> Result<TransitBytes, InspectionError> {
@@ -1683,24 +1628,6 @@ mod tests {
         base64_encode(
             emissary_core::primitives::Destination::new::<TokioRuntime>(key.public()).serialize(),
         )
-    }
-
-    #[test]
-    fn transit_sampler_is_zero_until_a_full_window_then_uses_bytes_per_second() {
-        let mut sampler = TransitBandwidthSampler::default();
-        assert_eq!(sampler.sample(0, 0), 0);
-        assert_eq!(sampler.sample(7_500, 7_500), 0);
-        assert_eq!(sampler.sample(15_000, 30_000), 2_000);
-        assert_eq!(sampler.sample(30_000, 30_000), 0);
-    }
-
-    #[test]
-    fn transit_sampler_handles_zero_traffic_and_counter_reset() {
-        let mut sampler = TransitBandwidthSampler::default();
-        assert_eq!(sampler.sample(0, 100), 0);
-        assert_eq!(sampler.sample(15_000, 100), 0);
-        assert_eq!(sampler.sample(16_000, 10), 0);
-        assert_eq!(sampler.sample(31_000, 10), 0);
     }
 
     #[tokio::test]

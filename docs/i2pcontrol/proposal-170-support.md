@@ -86,12 +86,16 @@ truthful configuration rejection. M035 owns the base method inventory and the
 mode-specific RouterInfo compatibility boundary. M038 owns production-composition
 and live child-process interoperability evidence. M040–M043 own the corrective
 implementation and regression evidence; M044 owns the accepted independent
-final-head review.
+final-head review. M053 owns the live ProfileStorage correction for M045
+known-peer sources. M054 owns the transit-15s truthfulness correction for M049.
+M055 owns the network-error truthfulness correction for M050. M056 owns the
+accepted integrated reclosure and final 43-row source audit.
 
 Expected final disposition under the authorized scope remains
-`partial Proposal 170 support` because 2 of the 43 RouterInfo additions lack
+`partial Proposal 170 support` because five of the 43 RouterInfo additions lack
 bounded authoritative sources and missing tunnel data planes remain explicit
-unsupported runtimes.
+unsupported runtimes. The unavailable rows are router news, banned peers,
+transit-15s, and v4/v6 network-error.
 
 ## M038 live-runtime evidence
 
@@ -275,16 +279,17 @@ M028 does not alter these sources. M029 revalidated them.
 
 ## RouterInfo
 
-Retained source matrix:
+Current source matrix:
 
-- 40 available;
+- 37 available;
 - 1 protocol-permitted neutral;
-- 2 unavailable.
+- 5 unavailable.
 
 Available selectors have bounded current owners. Clock skew uses `null` only
-when the protocol permits it. Unavailable selectors fail with sanitized errors
-before assembly and never return fabricated zero, false, empty, partial, or
-semantically adjacent values.
+when the protocol permits it. Unavailable selectors—including both network-error
+selectors, for which Emissary has no canonical error owner—fail with sanitized
+errors before assembly and never return fabricated zero, false, empty, partial,
+or semantically adjacent values.
 
 M026 found no additional in-scope authoritative source. M028/M029 do not repeat
 that audit or authorize new telemetry/core inspection.
@@ -320,6 +325,10 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M042 | closed | AddressBook post-commit refresh boundary |
 | M043 | closed | corrective runtime regression validation |
 | M044 | closed; partial Proposal 170 support | corrected final-head independent reclosure |
+| M053 | closed | live ProfileStorage correction for M045 known-peer sources |
+| M054 | closed | transit-15s truthfulness correction; explicit unavailable disposition |
+| M055 | closed | network-error truthfulness correction; explicit unavailable dispositions |
+| M056 | closed | integrated reclosure; final 37 available / 1 neutral / 5 unavailable audit |
 
 ## Final-status rule
 

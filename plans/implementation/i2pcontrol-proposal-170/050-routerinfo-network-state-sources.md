@@ -1,6 +1,6 @@
 # M050 — RouterInfo IPv4/IPv6 Network State Sources
 
-Status: corrective pass required for `i2p.router.net.error` and `.error.v6`; status/testing fields retain accepted closure
+Status: corrected/closed through M055 and M056; error rows are unavailable and status/testing fields retain accepted closure
 
 Planning baseline: `b759038`
 

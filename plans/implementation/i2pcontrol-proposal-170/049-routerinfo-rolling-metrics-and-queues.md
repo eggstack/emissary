@@ -1,6 +1,6 @@
 # M049 — RouterInfo Rolling Transit, Tunnel Success, and Queue Sources
 
-Status: corrected/closed through M054 for `i2p.router.net.bw.transit.15s`; other three fields retain accepted closure
+Status: corrected/closed through M054 and M056; transit-15s is unavailable and the other three fields retain accepted closure
 
 Planning baseline: `b759038`
 

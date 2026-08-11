@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; RouterInfo corrective truthfulness sequence active
+Status: partial Proposal 170 support; RouterInfo corrective truthfulness sequence closed
 
 This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -20,14 +20,15 @@ All work is internal to `eggstack/emissary`. External specifications/reference i
 
 ## Current handoff
 
-M055 is closed and M056 is the sole dependency-ready implementation plan:
+M056 is closed. The corrective RouterInfo truthfulness sequence has no current
+dependency-ready successor:
 
 - `054-m049-transit-15s-corrective.md` — closed; transit-15s is explicitly unavailable because no request-independent owner fits the bounded budget.
 - `055-m050-network-error-truthfulness-corrective.md` — closed; both unowned v4/v6 network-error rows are unavailable and dead error scaffolding was removed.
 
-Blocked successors:
+Completed corrective successor:
 
-- `056-m049-m050-corrective-reclosure.md` — ready after accepted M054 and M055 closures.
+- `056-m049-m050-corrective-reclosure.md` — closed; final integrated matrix is 37 available / 1 neutral / 5 unavailable.
 
 ## Why the corrective sequence was reopened
 
@@ -50,13 +51,13 @@ M054 may restore transit-15s to available only with a request-independent source
 | M046 — active-peer inventory + finite limits | closed | 4 fields | accepted `046-closure.md` |
 | M047 — active-peer statistics | closed | 1 field | accepted `047-closure.md` |
 | M048 — tunnel-pool counts/details | closed | 7 fields | accepted `048-closure.md` |
-| M049 — rolling transit/build metrics + queues | corrective pass required for transit 15s only | recent success + queue/TBM retained; transit 15s invalidated | M054 |
-| M050 — v4/v6 network state | corrective pass required for error rows only | status.v6 + testing v4/v6 retained; error v4/v6 invalidated | M055 |
+| M049 — rolling transit/build metrics + queues | corrected/closed through M054 and M056 | recent success + queue/TBM retained; transit 15s unavailable | accepted corrective closures |
+| M050 — v4/v6 network state | corrected/closed through M055 and M056 | status.v6 + testing v4/v6 retained; error v4/v6 unavailable | accepted corrective closures |
 | M051 — router news + banned peers | blocked with accepted limitation | 2 fields remain unavailable | retained `051-closure.md` |
-| M052 — integration/containment reclosure | corrective pass required for final matrix | historical `40/1/2` count invalidated | M056 |
+| M052 — integration/containment reclosure | corrected/closed through M056 | historical `40/1/2` count superseded by final `37/1/5` audit | `056-closure.md` |
 | M054 — transit 15s corrective | closed | truthful transit-15s unavailability; request-local sampler removed | `054` closure |
 | M055 — network-error truthfulness | closed | both error rows unavailable; dead error scaffold removed | `055` closure |
-| M056 — corrective integration reclosure | ready | no production changes; reconcile all 43 rows | M054 + M055 closures |
+| M056 — corrective integration reclosure | closed | no production changes; final 43-row audit accepted | `056-closure.md` |
 
 Plans:
 
@@ -122,8 +123,9 @@ Throughout the roadmap, do not:
 
 Every milestone must inspect its accepted dependency head, pin exact semantics before source-disposition changes, use focused source/wire regressions, preserve no-feature behavior, remain inside its path budget, and create an independent closure record. Material scope expansion is a blocker, not permission to improvise.
 
-Only the registry advances the next handoff to `ready`. M056 is now the sole
-ready plan; M051 remains blocked behind its absent substantive owners.
+Only the registry advances the next handoff to `ready`. No current plan is
+dependency-ready after M056; M051 remains blocked behind its absent substantive
+owners.
 
 ## Verification rule
 
@@ -145,13 +147,17 @@ Use targeted formatting because the repository's stable/nightly formatter qualif
 
 ## Final status rule
 
-After M054/M055:
-
-- if M054 restores exact transit-15s: expected matrix is 38 available / 1 neutral / 4 unavailable;
-- if M054 must demote transit-15s: expected matrix is 37 available / 1 neutral / 5 unavailable.
-
-M056 must derive and independently validate the actual final count. RouterInfo source completion remains partial under current owners because news, banned peers, and both network-error rows are expected to remain unavailable. Broader Proposal 170 support also retains unrelated previously accepted partial dimensions.
+M056 independently derived and validated the final matrix as 37 available / 1
+protocol-permitted neutral / 5 unavailable. RouterInfo source completion remains
+partial under current owners because news, banned peers, transit-15s, and both
+network-error rows are unavailable. Broader Proposal 170 support also retains
+unrelated previously accepted partial dimensions.
 
 ## Historical evidence
 
-M040–M044 remain closed retained evidence. M039 remains historical-invalidated. The M045 stale-snapshot attempt and blocked closure remain corrective history; M053/M045 and M046–M048 remain accepted. M049/M050 closures remain historical evidence but are partially superseded by M054/M055. M052's final matrix remains historical-invalidated pending M056.
+M040–M044 remain closed retained evidence. M039 remains historical-invalidated.
+The M045 stale-snapshot attempt and blocked closure remain corrective history;
+M053/M045 and M046–M048 remain accepted. M049/M050 historical closures are
+partially superseded by M054/M055 and this M056 reclosure. M052's `40/1/2`
+matrix is historical-invalidated and superseded by the accepted M056 `37/1/5`
+audit.

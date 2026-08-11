@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 RouterInfo Source-Completion Roadmap
 
-Status: partial Proposal 170 support; corrective RouterInfo truthfulness sequence active
+Status: partial Proposal 170 support; corrective RouterInfo truthfulness sequence closed
 
 Planning baseline: `b759038` — M044 finalized reviewed head
 
@@ -157,7 +157,7 @@ M054 — M049 transit-15s corrective — CLOSED
 M055 — M050 network-error truthfulness corrective — READY
    |
    v
-M056 — corrective integration reclosure — ready after M054 + M055
+M056 — corrective integration reclosure — CLOSED; no successor currently ready
 ```
 
 The corrective sequence is serialized to keep one dependency-ready handoff in the registry and to preserve independent closure evidence for each semantic defect.
@@ -186,7 +186,7 @@ Field: `netdb.activepeers.stats`. Retained. Richer unstable reference-map schema
 
 Seven participating/exploratory/client count/detail fields remain accepted. Minimal map member shape remains an interoperability observation because the pinned proposal defines list-of-map types but not stable member names.
 
-### M049 — Rolling metrics and queues — corrected/closed through M054
+### M049 — Rolling metrics and queues — corrected/closed through M054 and M056
 
 Original plan: `049-routerinfo-rolling-metrics-and-queues.md`.
 
@@ -204,7 +204,7 @@ Corrective plan: `054-m049-transit-15s-corrective.md`. M054 closed the transit
 row as explicitly unavailable because the existing configurable event cadence
 cannot provide the pinned request-independent semantics within scope.
 
-### M050 — Network status/error/testing — corrective pass required for error rows only
+### M050 — Network status/error/testing — corrected/closed through M055 and M056
 
 Original plan: `050-routerinfo-network-state-sources.md`.
 
@@ -227,7 +227,7 @@ Plan: `051-routerinfo-news-and-banned-peer-semantics.md`.
 
 News and banned peers remain unavailable because Emissary has no authoritative news-feed or ban-list owner. Do not create either subsystem solely for telemetry.
 
-### M052 — Integration/containment reclosure — corrective pass required for final source accounting
+### M052 — Integration/containment reclosure — corrected/closed through M056
 
 Original closure remains historical evidence, but its `40/1/2` final matrix is invalidated by the three post-closure source-truthfulness findings. No M052 production code is implicated.
 
@@ -258,11 +258,14 @@ production-writer audit found no canonical owner. It also removed the neutral
 core error enum, fields, setters, and mapper scaffolding that had no retained
 production consumer. Status.v6 and testing v4/v6 remain accepted unchanged.
 
-### M056 — Corrective integration reclosure — ready
+### M056 — Corrective integration reclosure — closed
 
 Plan: `056-m049-m050-corrective-reclosure.md`.
 
-No production changes. Validate the accepted M054/M055 dispositions, rerun retained source/child-process evidence, reconcile all 43 rows, and supersede only the invalidated M049/M050/M052 findings. M054 and M055 are both accepted, so M056 is now dependency-ready.
+No production changes. M056 validated the accepted M054/M055 dispositions,
+reran retained source/child-process evidence, reconciled all 43 rows, and
+superseded only the invalidated M049/M050/M052 findings. The final matrix is 37
+available / 1 protocol-permitted neutral / 5 unavailable.
 
 ## 8. Failure, cancellation, restart, and contention policy
 
@@ -316,20 +319,25 @@ Because upstream Emissary is treated as heavily security-reviewed, corrective wo
 ## 13. Final status rule
 
 The pre-review `40 available + 1 neutral + 2 unavailable` matrix is historical
-only and is no longer accepted as truthful. M054's accepted implementation
-currently leaves `37 available + 1 neutral + 5 unavailable`: transit 15s, news,
-banned peers, and both network-error rows. M056 is ready to reconcile the
-integrated disposition.
+only and is no longer accepted as truthful. M054 and M055 are accepted, and
+M056 independently reclosed the integrated disposition as `37 available + 1
+neutral + 5 unavailable`: transit 15s, news, banned peers, and both
+network-error rows.
 
-After M054/M055:
+M056 derived the final count directly from the machine-readable contract and
+production evidence; it did not force either target outcome.
 
-- if M054 restores exact request-independent transit-15s, the expected matrix is 38 available + 1 neutral + 4 unavailable;
-- if exact transit-15s cannot be provided within scope, the expected matrix is 37 available + 1 neutral + 5 unavailable (the accepted M054 outcome).
-
-M056 must derive the final count directly from the machine-readable contract and production evidence; it must not force either outcome.
-
-Even after M056, RouterInfo source completion remains partial because news, banned peers, and both network-error rows are expected to remain unavailable under current owners. The broader Proposal 170 implementation also retains unrelated previously accepted unsupported dimensions.
+After M056, RouterInfo source completion remains partial because news, banned
+peers, transit-15s, and both network-error rows remain unavailable under current
+owners. The broader Proposal 170 implementation also retains unrelated
+previously accepted unsupported dimensions. No future plan is newly unblocked:
+M051 remains blocked until separately authorized substantive news/ban owners
+exist.
 
 ## 14. Historical corrective sequence
 
-M040–M044 remain closed retained evidence. M039 remains historical-invalidated. The failed M045 startup-snapshot attempt remains retained evidence explaining M053. M053/M045 and M046–M048 remain accepted. M049 and M050 retain their unaffected field closures but are partially invalidated as described above. M052's final source-count claim is superseded only after M056 closure.
+M040–M044 remain closed retained evidence. M039 remains historical-invalidated.
+The failed M045 startup-snapshot attempt remains retained evidence explaining
+M053. M053/M045 and M046–M048 remain accepted. M049 and M050 retain their
+unaffected field closures but are partially superseded as described above.
+M052's final source-count claim is superseded by the accepted M056 closure.

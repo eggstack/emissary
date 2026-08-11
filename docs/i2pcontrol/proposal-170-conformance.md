@@ -1,6 +1,6 @@
 # Proposal 170 Conformance Matrix
 
-Status: partial Proposal 170 support; M039 final-head closure accepted
+Status: partial Proposal 170 support; M056 final integrated reclosure accepted
 
 Proposal 170 remains Open. This workstream is pinned to the revision created
 and last updated on `2026-05-20`.
@@ -18,7 +18,7 @@ Completed implementation correction:
 - M035, `plans/implementation/i2pcontrol-proposal-170/035-base-compatibility-and-selector-overlap.md`
 - M038, `plans/implementation/i2pcontrol-proposal-170/038-live-runtime-interoperability.md`
 
-Controlling final closure:
+Historical final closure:
 
 - M039, `plans/implementation/i2pcontrol-proposal-170/039-operational-reclosure.md`; closure:
   `plans/closure/i2pcontrol-proposal-170/039-closure.md`
@@ -29,8 +29,9 @@ M028 is implemented and closed with the required boundary evidence. M030
 reviewed the actual AddressBook final head and accepted partial Proposal 170
 support. M031 and M032 made only the generic control-plane `client` and `server`
 backends operational; the ten other tunnel families remain explicitly
-unsupported. M039 independently revalidated the final source/runtime/evidence
-boundary and accepted the partial-support disposition.
+unsupported. M039 independently revalidated the earlier source/runtime/evidence
+boundary. The current controlling RouterInfo source disposition is accepted by
+M056 after the M054/M055 corrective heads.
 
 ## Retained machine-readable matrix
 
@@ -51,7 +52,7 @@ It contains exactly 43 Proposal 170 additions and records, for each selector:
 - compatibility/base separation;
 - residual limitation.
 
-Retained counts:
+Current counts:
 
 - 37 available;
 - 1 protocol-permitted neutral;
@@ -179,8 +180,10 @@ Retained M025/M026 evidence covers:
 - no fabricated zero/false/empty/adjacent values;
 - no partial result on source or response-bound failure.
 
-M028 does not alter this matrix. M029 revalidated the counts and focused
-fixtures after the AddressBook feature-boundary correction.
+M028 does not alter this matrix. M029 revalidated the earlier counts and focused
+fixtures after the AddressBook feature-boundary correction. M054/M055 corrected
+three previously overclaimed rows, and M056 independently accepted the final
+37/1/5 integrated matrix.
 
 M035 additionally proves that direct and nested request modes are distinct:
 the nested base inventories use legacy serializers, while direct Proposal 170
@@ -231,7 +234,7 @@ M030 selected:
 - `blocked` when the external revision changed or required evidence cannot be
   obtained.
 
-Under the current scope and retained 16/1/26 matrix, the expected honest status
+Under the current scope and accepted 37/1/5 matrix, the expected honest status
 is `partial Proposal 170 support`.
 
 No status implies upstream review, acceptance, certification, adoption,

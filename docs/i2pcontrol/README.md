@@ -26,12 +26,12 @@ M039 independently reviewed the complete M031–M038 final head and formally
 closed the authorized workstream as partial support.
 
 The expected bounded final status remains `partial Proposal 170 support` while
-27 RouterInfo selectors lack bounded authoritative sources and missing tunnel
-data planes remain explicit unsupported runtimes. The canonical 43-addition
-matrix currently contains 37 available selectors, one protocol-permitted
-neutral selector, and five unavailable selectors; the unavailable rows are
-router news, banned peers, transit bandwidth over 15 seconds, and both
-network-error selectors.
+missing tunnel data planes remain explicit unsupported runtimes. The canonical
+43-addition matrix currently contains 37 available selectors, one
+protocol-permitted neutral selector, and five unavailable selectors; the
+unavailable rows are router news, banned peers, transit bandwidth over 15
+seconds, and both network-error selectors. The M056 corrective integration
+reclosure accepted this final source accounting without adding production code.
 
 ## Compile feature
 
@@ -188,6 +188,10 @@ M028 does not reopen these areas except for the AddressBook activation boundary.
 | M028 | closed for implementation | status chronology and AddressBook control-state isolation |
 | M029 | historical invalidated closure | retained non-AddressBook evidence |
 | M030 | closed; partial Proposal 170 support | AddressBook destination/lookup coherence and final-head review accepted |
+| M053 | closed | corrected M045 with live ProfileStorage source |
+| M054 | closed | corrected M049 transit-15s truthfulness; explicit unavailable disposition |
+| M055 | closed | corrected M050 network-error truthfulness; explicit unavailable dispositions |
+| M056 | closed | integrated M049/M050/M052 reclosure; final 37/1/5 source matrix |
 
 ## Support dimensions
 

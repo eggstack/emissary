@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; containment corrective sequence active with M060 closed and M061 ready
+Status: partial Proposal 170 support; containment corrective sequence closed through M061
 
 This directory contains bounded internal implementation/closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -21,17 +21,17 @@ All work is internal to `eggstack/emissary`. External specifications/reference i
 
 ## Current handoff
 
-M061 is the sole dependency-ready handoff:
+The containment corrective sequence is closed through M061. There is no
+dependency-ready containment successor:
 
 - `058-non-i2pcontrol-delta-inventory.md` — **closed**; audit-only complete upstream/fork non-`i2pcontrol` production delta and create a machine-readable containment ledger. Production changes were forbidden.
 - `059-cli-runtime-containment.md` — **closed**; original CLI/runtime containment accepted with no core changes.
 - `060-core-observation-containment.md` — **closed**; core observation containment accepted at `6085eca` with the final retained-path disposition in `060-closure.md`.
 
-The remaining containment handoff is now registered ready because its predecessor is closed:
+- `061-containment-reclosure.md` — **closed**; the current exact-path boundary is
+  enforced by `061-containment-boundary.toml` and `emissary-cli/tests/m061_containment.rs`.
 
-- `061-containment-reclosure.md` — ready; production-free current-boundary reclosure is next.
-
-Per planning governance, only M061 is executable now.
+Per planning governance, no containment implementation plan is executable now.
 
 ## Accepted Proposal 170 production disposition
 
@@ -69,7 +69,7 @@ This is primarily a security-review surface reduction.
 | M058 — non-I2PControl delta inventory | closed | 47-path ledger accepted; exact M059/M060 budgets frozen; no production changes | `058-closure.md` |
 | M059 — original CLI/runtime containment | closed | original CLI/runtime policy contained; exact M059 closure accepted with no core changes | `059-closure.md` |
 | M060 — core observation containment | closed | reduce audited-core inspection/SAM/I2CP/transport/tunnel delta to minimum neutral owner seams | `060-closure.md` |
-| M061 — independent containment reclosure | ready | production-free recompute/review; create current exact-path manifest and static guard | M060 closure accepted |
+| M061 — independent containment reclosure | closed | current exact-path manifest and static guard accepted; no production changes | M060 closure accepted |
 
 Plans:
 
@@ -129,6 +129,8 @@ M061 changes no production code. It independently recomputes the final productio
 - `061-closure.md`.
 
 The M061 manifest becomes the current containment authority while M037 remains historical evidence of the earlier boundary. High-sensitivity core allowances must be exact paths, not broad transport/tunnel directory prefixes.
+
+M061 is closed by `plans/closure/i2pcontrol-proposal-170/061-closure.md`.
 
 ## Historical RouterInfo source-completion sequence
 

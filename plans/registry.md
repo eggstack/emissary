@@ -28,15 +28,21 @@ Canonical direction:
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
-| I2PControl Proposal 170 containment | active | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061 — independent containment reclosure | M060 closed at `6085eca`; M061 ready |
+| I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no dependency-ready handoff | M061 closed; current boundary is enforced by the M061 manifest and guard |
 
 ## Dependency-ready implementation plans
 
 | Subsystem | Handoff | Status | Implementation plan | Dependencies |
 |---|---|---|---|---|
-| I2PControl Proposal 170 containment | M061 — independent containment reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | M060 closure accepted at `6085eca` |
+| I2PControl Proposal 170 containment | — | — | — | no dependency-ready containment plan |
 
-M061 is now registered as dependency-ready because M060 is closed, per `plans/003-planning-process.md`.
+M061 is closed and is no longer registered as dependency-ready, per `plans/003-planning-process.md`.
+
+## Recently closed milestones
+
+| Subsystem | Handoff | Status | Implementation plan | Closure record |
+|---|---|---|---|---|
+| I2PControl Proposal 170 containment | M061 — independent containment reclosure | closed | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | `plans/closure/i2pcontrol-proposal-170/061-closure.md` |
 
 ## Blocked roadmap successors
 
@@ -44,7 +50,7 @@ M061 is now registered as dependency-ready because M060 is closed, per `plans/00
 |---|---|---|---|
 | M051 — router news and banned peers | blocked with accepted semantic limitation | `plans/implementation/i2pcontrol-proposal-170/051-routerinfo-news-and-banned-peer-semantics.md` | substantive news/ban owners absent; no current owner-specific plan authorized |
 
-M061 is the remaining dependency-ordered containment milestone and is now the sole dependency-ready successor. M051 remains independently blocked by absent substantive news/ban owners.
+The containment sequence is complete. M051 remains independently blocked by absent substantive news/ban owners.
 
 ## Current containment corrective scope
 
@@ -59,9 +65,9 @@ The containment sequence is:
 1. M058 — audit-only complete non-`i2pcontrol` fork-delta ledger; zero production changes.
 2. M059 — original CLI/runtime adapter containment; closed with accepted M059 closure.
 3. M060 — audited-core observation seam consolidation; closed with accepted core disposition.
-4. M061 — production-free independent reclosure and current static containment guard; ready after M060 closure.
+4. M061 — production-free independent reclosure and current static containment guard; closed.
 
-Only M061 is currently executable in the containment sequence.
+No containment implementation plan is currently executable.
 
 ### Containment ownership rule
 
@@ -97,7 +103,7 @@ M058 closure must prove the inventory is complete and freeze the exact M059 path
 | M058 | closed | `058-closure.md` accepted; 47-path ledger and M059/M060 budgets frozen |
 | M059 | closed | `059-closure.md`; exact original-CLI budget implemented with no core changes |
 | M060 | closed | `060-closure.md`; 23 retained core paths, 9 formatting-only paths reverted, no new core path |
-| M061 | ready | M060 closure accepted at `6085eca`; final current-boundary reclosure is next |
+| M061 | closed | `061-closure.md`; exact current boundary accepted and enforced; no production changes |
 
 ## Accepted Proposal 170 support state
 
@@ -134,8 +140,8 @@ Upstream `eepnet/emissary` is accessed read-only for containment comparison. The
 
 ## Registry maintenance rules
 
-1. M061 is the sole dependency-ready containment handoff; M060 and M059 are closed.
-2. Register M061 only after M060 closure; this condition is now satisfied.
+1. M061 is closed; no dependency-ready containment successor remains.
+2. The current authority is `061-containment-boundary.toml` plus `m061_containment.rs`.
 3. Preserve M037 as historical evidence rather than rewriting its boundary to include later RouterInfo work.
 4. Preserve M053/M045 and M046–M048 closure history unless a direct new defect is demonstrated.
 5. Preserve M049/M050/M052 historical records while retaining only their named superseded findings.

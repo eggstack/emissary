@@ -1,0 +1,391 @@
+version = 1
+fork_baseline = "c958c4d998b1abde9ace730b4bdadcf5a838afc6"
+upstream_baseline = "9b43484a21d5a1291c4881cdae62a36c527f8c0f"
+policy_root = "emissary-cli/src/i2pcontrol/"
+routerinfo_matrix = "43 total / 37 available / 1 neutral / 5 unavailable"
+source_authority = "M058 ledger, M059 closure, M060 closure, and this independent reclosure"
+
+[allowed]
+composition = [
+  "emissary-cli/src/lib.rs",
+  "emissary-cli/src/logger.rs",
+  "emissary-cli/src/main.rs",
+]
+original_runtime_adapters = [
+  "emissary-cli/src/address_book.rs",
+  "emissary-cli/src/proxy/http/mod.rs",
+  "emissary-cli/src/proxy/socks.rs",
+  "emissary-cli/src/tunnel/client.rs",
+  "emissary-cli/src/tunnel/server.rs",
+]
+core_inspection = [
+  "emissary-core/src/events.rs",
+  "emissary-core/src/inspection.rs",
+  "emissary-core/src/lib.rs",
+  "emissary-core/src/primitives/router_identity.rs",
+  "emissary-core/src/router/context.rs",
+  "emissary-core/src/router/mod.rs",
+  "emissary-core/src/sam/pending/connection.rs",
+  "emissary-core/src/sam/protocol/streaming/listener.rs",
+  "emissary-core/src/sam/protocol/streaming/mod.rs",
+  "emissary-core/src/sam/session.rs",
+  "emissary-core/src/sam/socket.rs",
+  "emissary-core/src/transport/mod.rs",
+  "emissary-core/src/tunnel/mod.rs",
+]
+core_owner_hooks = [
+  "emissary-core/src/sam/mod.rs",
+  "emissary-core/src/transport/ntcp2/mod.rs",
+  "emissary-core/src/transport/ntcp2/session/active.rs",
+  "emissary-core/src/transport/ntcp2/session/mod.rs",
+  "emissary-core/src/transport/ssu2/mod.rs",
+  "emissary-core/src/transport/ssu2/peer_test/mod.rs",
+  "emissary-core/src/transport/ssu2/session/active/mod.rs",
+  "emissary-core/src/transport/ssu2/socket.rs",
+  "emissary-core/src/tunnel/pool/mod.rs",
+  "emissary-core/src/tunnel/transit/mod.rs",
+]
+build_feature_paths = ["emissary-cli/src/config.rs"]
+
+[prohibited]
+production_prefixes = [
+  "emissary-core/src/crypto/",
+  "emissary-core/src/i2np/",
+  "emissary-core/src/lease_set/",
+  "emissary-core/src/netdb/",
+]
+forbidden_terms_outside_policy_root = [
+  "Proposal 170",
+  "JsonRpc",
+  "jsonrpc",
+  "TunnelManagerControl",
+  "control-state.json",
+]
+forbidden_terms_in_core_declarations = [
+  "SamSocket",
+  "TcpStream",
+  "SigningPrivateKey",
+  "StaticPrivateKey",
+  "Sender<",
+  "Receiver<",
+]
+
+[[evidence]]
+path = "emissary-cli/src/config.rs"
+owner = "CLI configuration parser"
+purpose = "Feature-gated configuration values for enabling and binding the optional service."
+consumer = "I2PControl composition only."
+why_upstream_insufficient = "Upstream has no optional service configuration to compose."
+sensitivity = "configuration"
+seam = "feature/composition"
+reference = "M058 ledger path; M059 closure configuration review"
+
+[[evidence]]
+path = "emissary-cli/src/lib.rs"
+owner = "emissary-cli library/composition surface"
+purpose = "Exports the runtime modules used by feature-gated production and integration composition."
+consumer = "CLI composition and focused integration tests."
+why_upstream_insufficient = "The upstream binary has no library boundary for this optional composition."
+sensitivity = "composition"
+seam = "feature/composition"
+reference = "M058 ledger path; M059 closure export review"
+
+[[evidence]]
+path = "emissary-cli/src/logger.rs"
+owner = "CLI tracing subscriber composition"
+purpose = "Attaches the bounded passive log sink when the optional service is enabled."
+consumer = "I2PControl-owned log observation layer."
+why_upstream_insufficient = "The upstream logger has no optional passive sink composition point."
+sensitivity = "passive observation"
+seam = "feature/composition"
+reference = "M058 ledger path; M059 closure logger review"
+
+[[evidence]]
+path = "emissary-cli/src/main.rs"
+owner = "CLI startup/shutdown composition root"
+purpose = "Wires existing owner-local handles and the optional service lifecycle."
+consumer = "I2PControl production composition."
+why_upstream_insufficient = "Only the CLI composition root can connect existing runtime owners without changing their ownership."
+sensitivity = "lifecycle composition"
+seam = "feature/composition"
+reference = "M058 ledger path; M059 closure composition review"
+
+[[evidence]]
+path = "emissary-cli/src/address_book.rs"
+owner = "legacy AddressBook runtime and download owner"
+purpose = "Retains ordinary address download, parse, resolve, and one neutral runtime hook."
+consumer = "Normal address resolution and the I2PControl address-book adapter."
+why_upstream_insufficient = "The control owner needs authoritative legacy lookup/download transitions while administrative policy stays in policy_root."
+sensitivity = "runtime owner adapter"
+seam = "passive lifecycle hook"
+reference = "M058 ledger path; M059 closure AddressBook ownership review"
+
+[[evidence]]
+path = "emissary-cli/src/proxy/http/mod.rs"
+owner = "HTTP proxy listener"
+purpose = "Reads the authoritative local listener address after bind."
+consumer = "Passive ClientServicesInfo observation."
+why_upstream_insufficient = "Only the listener owner knows the actual bound address and failed-bind transition."
+sensitivity = "listener observation"
+seam = "passive lifecycle hook"
+reference = "M058 ledger path; M059 closure proxy review"
+
+[[evidence]]
+path = "emissary-cli/src/proxy/socks.rs"
+owner = "SOCKS proxy listener"
+purpose = "Reads the authoritative local listener address after bind."
+consumer = "Passive ClientServicesInfo observation."
+why_upstream_insufficient = "Only the listener owner knows the actual bound address and failed-bind transition."
+sensitivity = "listener observation"
+seam = "passive lifecycle hook"
+reference = "M058 ledger path; M059 closure proxy review"
+
+[[evidence]]
+path = "emissary-cli/src/tunnel/client.rs"
+owner = "existing client tunnel runtime"
+purpose = "Retains supported client lifecycle composition and neutral lifecycle callbacks."
+consumer = "Supported client backend and passive ClientServicesInfo inventory."
+why_upstream_insufficient = "The runtime owner alone observes start, ready, retry, and cancellation transitions."
+sensitivity = "tunnel lifecycle"
+seam = "passive lifecycle hook"
+reference = "M058 ledger path; M059 closure client lifecycle review"
+
+[[evidence]]
+path = "emissary-cli/src/tunnel/server.rs"
+owner = "existing server tunnel runtime"
+purpose = "Retains supported server lifecycle composition and public destination publication callback."
+consumer = "Supported server backend and passive ClientServicesInfo inventory."
+why_upstream_insufficient = "The runtime owner alone observes destination publication and forward/retry/cancel ordering."
+sensitivity = "tunnel lifecycle"
+seam = "passive lifecycle hook"
+reference = "M058 ledger path; M059 closure server lifecycle review"
+
+[[evidence]]
+path = "emissary-core/src/events.rs"
+owner = "core event counters and firewall-status owner"
+purpose = "Retains neutral bounded counters and status observations."
+consumer = "I2PControl RouterInfo and metrics adapters through existing handles."
+why_upstream_insufficient = "These facts are maintained by the core owners and are not truthfully reconstructed at the CLI boundary."
+sensitivity = "bounded snapshot"
+seam = "snapshot"
+reference = "M058 ledger path; M060 retained-path audit"
+
+[[evidence]]
+path = "emissary-core/src/inspection.rs"
+owner = "neutral core inspection DTO and handle boundary"
+purpose = "Defines bounded owned public snapshots for peer, transport, tunnel, and identity facts."
+consumer = "I2PControl production adapters."
+why_upstream_insufficient = "The upstream core has no bounded neutral inspection boundary for these canonical owner facts."
+sensitivity = "public read-only DTO"
+seam = "snapshot"
+reference = "M058 ledger path; M060 closure inspection review"
+
+[[evidence]]
+path = "emissary-core/src/lib.rs"
+owner = "core public module/export boundary"
+purpose = "Exports neutral inspection and sanitized observation types."
+consumer = "CLI composition imports."
+why_upstream_insufficient = "The optional control service needs a stable neutral export boundary absent upstream."
+sensitivity = "public API seam"
+seam = "feature/composition"
+reference = "M058 ledger path; M060 closure export review"
+
+[[evidence]]
+path = "emissary-core/src/primitives/router_identity.rs"
+owner = "router identity primitive owner"
+purpose = "Provides the bounded public identity representation used by inspection."
+consumer = "Public RouterInfo/peer directory adapters."
+why_upstream_insufficient = "The inspection boundary needs a copyable public identity without exposing router authority."
+sensitivity = "public identity"
+seam = "snapshot"
+reference = "M058 ledger path; M060 retained-path audit"
+
+[[evidence]]
+path = "emissary-core/src/router/context.rs"
+owner = "router context owner"
+purpose = "Provides neutral access to the local public RouterInfo snapshot."
+consumer = "RouterInfo adapter."
+why_upstream_insufficient = "The router context owns the authoritative current local RouterInfo."
+sensitivity = "public snapshot"
+seam = "snapshot"
+reference = "M058 ledger path; M060 retained-path audit"
+
+[[evidence]]
+path = "emissary-core/src/router/mod.rs"
+owner = "router composition owner"
+purpose = "Composes neutral inspection handles and the optional sanitized SAM observer."
+consumer = "CLI production composition."
+why_upstream_insufficient = "Only router construction can attach owner-local handles without changing router behavior."
+sensitivity = "composition"
+seam = "feature/composition"
+reference = "M058 ledger path; M060 closure router review"
+
+[[evidence]]
+path = "emissary-core/src/sam/pending/connection.rs"
+owner = "pending SAM connection owner"
+purpose = "Carries the neutral observation hook through pending session construction."
+consumer = "Sanitized SAM lifecycle observation."
+why_upstream_insufficient = "Pending connection construction owns the ordering needed to preserve activation truth."
+sensitivity = "lifecycle hook"
+seam = "passive lifecycle hook"
+reference = "M058 ledger path; M060 SAM review"
+
+[[evidence]]
+path = "emissary-core/src/sam/protocol/streaming/listener.rs"
+owner = "SAM streaming listener owner"
+purpose = "Carries the neutral observation hook through listener activation."
+consumer = "Sanitized listener lifecycle observation."
+why_upstream_insufficient = "The listener owner alone observes authoritative listener activation and rejection."
+sensitivity = "lifecycle hook"
+seam = "passive lifecycle hook"
+reference = "M058 ledger path; M060 SAM review"
+
+[[evidence]]
+path = "emissary-core/src/sam/protocol/streaming/mod.rs"
+owner = "SAM streaming manager owner"
+purpose = "Publishes neutral stream lifecycle transitions at their authoritative owner."
+consumer = "Sanitized SAM lifecycle observation."
+why_upstream_insufficient = "Moving stream close/reject ordering upward would require inference from lower-level state."
+sensitivity = "lifecycle hook"
+seam = "passive lifecycle hook"
+reference = "M058 ledger path; M060 SAM review"
+
+[[evidence]]
+path = "emissary-core/src/sam/session.rs"
+owner = "SamSession"
+purpose = "Publishes session, stream, and listener lifecycle transitions."
+consumer = "I2PControl SAM observer."
+why_upstream_insufficient = "SamSession alone observes authoritative activation and terminal close/reject ordering."
+sensitivity = "sanitized lifecycle hook"
+seam = "passive lifecycle hook"
+reference = "M060 closure retained-owner seam"
+
+[[evidence]]
+path = "emissary-core/src/sam/socket.rs"
+owner = "SAM socket owner"
+purpose = "Carries the neutral observation context through socket creation and teardown."
+consumer = "Sanitized SAM lifecycle observation."
+why_upstream_insufficient = "Socket ownership is required to preserve the observed public socket identity without crossing live handles."
+sensitivity = "lifecycle hook"
+seam = "passive lifecycle hook"
+reference = "M058 ledger path; M060 SAM review"
+
+[[evidence]]
+path = "emissary-core/src/transport/mod.rs"
+owner = "TransportManager"
+purpose = "Composes the bounded transport inspection source."
+consumer = "RouterInfo transport statistics adapter."
+why_upstream_insufficient = "TransportManager owns the canonical set of transport owners and their bounded inspection source."
+sensitivity = "snapshot composition"
+seam = "snapshot"
+reference = "M058 ledger path; M060 closure transport review"
+
+[[evidence]]
+path = "emissary-core/src/tunnel/mod.rs"
+owner = "TunnelManager"
+purpose = "Composes bounded pool and transit inspection sources."
+consumer = "RouterInfo and TunnelManager adapters."
+why_upstream_insufficient = "TunnelManager is the canonical owner for combining pool/transit handles without adding a sampler."
+sensitivity = "snapshot composition"
+seam = "snapshot"
+reference = "M058 ledger path; M060 closure tunnel review"
+
+[[evidence]]
+path = "emissary-core/src/sam/mod.rs"
+owner = "SamServer"
+purpose = "Defines and publishes sanitized bounded SAM observation events."
+consumer = "I2PControl SAM observer."
+why_upstream_insufficient = "SamServer owns authoritative session activation/removal order."
+sensitivity = "sanitized lifecycle hook"
+seam = "passive lifecycle hook"
+reference = "M060 closure retained-owner seam"
+
+[[evidence]]
+path = "emissary-core/src/transport/ntcp2/mod.rs"
+owner = "NTCP2 transport owner"
+purpose = "Passes the neutral byte-observation source into NTCP2 sessions."
+consumer = "Transport inspection adapter."
+why_upstream_insufficient = "The transport owner is the only canonical composition point for active NTCP2 I/O observations."
+sensitivity = "transport observation"
+seam = "snapshot"
+reference = "M060 closure retained-path audit"
+
+[[evidence]]
+path = "emissary-core/src/transport/ntcp2/session/active.rs"
+owner = "active NTCP2 session"
+purpose = "Records exact partial read/write byte counts."
+consumer = "Transport inspection adapter."
+why_upstream_insufficient = "Only active I/O sees exact partial read/write completion; higher owners would infer counts."
+sensitivity = "transport I/O observation"
+seam = "passive lifecycle hook"
+reference = "M060 closure retained-owner seam"
+
+[[evidence]]
+path = "emissary-core/src/transport/ntcp2/session/mod.rs"
+owner = "NTCP2 session manager"
+purpose = "Carries the neutral inspection source into active sessions."
+consumer = "Transport inspection adapter."
+why_upstream_insufficient = "The session manager is the canonical handoff between transport composition and active I/O owners."
+sensitivity = "transport observation"
+seam = "snapshot"
+reference = "M060 closure retained-path audit"
+
+[[evidence]]
+path = "emissary-core/src/transport/ssu2/mod.rs"
+owner = "SSU2 transport owner"
+purpose = "Passes the neutral byte/packet observation source into SSU2 sessions."
+consumer = "Transport inspection adapter."
+why_upstream_insufficient = "The transport owner is the canonical composition point for active SSU2 observations."
+sensitivity = "transport observation"
+seam = "snapshot"
+reference = "M060 closure retained-path audit"
+
+[[evidence]]
+path = "emissary-core/src/transport/ssu2/peer_test/mod.rs"
+owner = "SSU2 peer-test session owner"
+purpose = "Carries the neutral inspection source through peer-test sessions."
+consumer = "Transport inspection adapter and focused regression coverage."
+why_upstream_insufficient = "Peer-test sessions participate in the same canonical SSU2 observation path."
+sensitivity = "transport observation"
+seam = "passive lifecycle hook"
+reference = "M058 ledger path; M060 closure SSU2 review"
+
+[[evidence]]
+path = "emissary-core/src/transport/ssu2/session/active/mod.rs"
+owner = "active SSU2 session"
+purpose = "Records packet receive, retransmit, ACK, and send completion bytes."
+consumer = "Transport inspection adapter."
+why_upstream_insufficient = "Only active SSU2 I/O sees packet completion and retransmission facts without inference."
+sensitivity = "transport I/O observation"
+seam = "passive lifecycle hook"
+reference = "M060 closure retained-owner seam"
+
+[[evidence]]
+path = "emissary-core/src/transport/ssu2/socket.rs"
+owner = "SSU2 socket owner"
+purpose = "Carries the neutral inspection source through socket/session creation."
+consumer = "Transport inspection adapter."
+why_upstream_insufficient = "Socket construction owns the handoff required to preserve active-session observation ownership."
+sensitivity = "transport observation"
+seam = "snapshot"
+reference = "M058 ledger path; M060 closure SSU2 review"
+
+[[evidence]]
+path = "emissary-core/src/tunnel/pool/mod.rs"
+owner = "TunnelPool"
+purpose = "Publishes directional live tunnel entries and pending queue depth."
+consumer = "TunnelManager and RouterInfo inspection adapters."
+why_upstream_insufficient = "TunnelPool owns exact build/expiry transitions and both directional pending collections."
+sensitivity = "bounded tunnel snapshot"
+seam = "passive lifecycle hook"
+reference = "M060 closure retained-owner seam"
+
+[[evidence]]
+path = "emissary-core/src/tunnel/transit/mod.rs"
+owner = "TransitTunnelManager"
+purpose = "Publishes participating tunnel entries and TBM queue depth."
+consumer = "TunnelManager inspection adapter."
+why_upstream_insufficient = "TransitTunnelManager alone observes admission/expiry and its message receiver queue; no 15-second sampler is added."
+sensitivity = "bounded tunnel snapshot"
+seam = "passive lifecycle hook"
+reference = "M060 closure retained-owner seam"

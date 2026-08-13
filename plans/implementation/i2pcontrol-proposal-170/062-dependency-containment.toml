@@ -1,0 +1,56 @@
+version = 1
+fork_baseline = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
+upstream_baseline = "9b43484a21d5a1291c4881cdae62a36c527f8c0f"
+source_authority = "M061 retained source boundary; M058-M061 closure chain"
+routerinfo_matrix = "43 total / 37 available / 1 neutral / 5 unavailable"
+
+[direct_dependencies]
+"subtle" = { owner = "emissary-cli", owning_feature = "i2pcontrol", version = "2.6.1", default_features = false, optional = true }
+
+[forbidden_activations]
+default = []
+ui = []
+metrics = []
+
+[workspace_dependencies]
+"subtle" = "absent"
+
+[lockfile]
+expected = "byte-identical to baseline"
+baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
+
+[allowed_production_paths]
+root_manifests = [
+  "Cargo.toml",
+  "emissary-cli/Cargo.toml",
+]
+
+[prohibited_production_paths]
+patterns = [
+  "emissary-cli/src/**",
+  "emissary-core/**",
+  "emissary-util/**",
+  "examples/**",
+  ".github/**",
+]
+
+[dependency_rule]
+direct_ownership = "A direct dependency whose only direct consumer is code gated by feature = \"i2pcontrol\" must itself be optional and activated by the i2pcontrol feature. It must not be an unconditional dependency of the default Emissary CLI or a workspace-level dependency unless an independently justified non-I2PControl workspace consumer exists."
+transitive_permitted = true
+crate_name_absence_not_required = true
+
+[[evidence]]
+crate = "subtle"
+direct_consumer = "emissary-cli/src/i2pcontrol/auth.rs"
+feature_gated_consumer = true
+feature = "i2pcontrol"
+constant_time_primitive = "subtle::ConstantTimeEq / subtle::Choice"
+rationale = "Reviewed constant-time password comparison is required by the accepted I2PControl authentication contract; ownership is corrected to make the dependency optional and feature-owned without altering the reviewed primitive."
+reference = "M062 plan §4.2 and §11"
+
+[[evidence]]
+crate = "subtle"
+non_i2pcontrol_workspace_consumer = false
+non_i2pcontrol_literal_consumer = "emissary-core (literal version, NOT a workspace reference)"
+rationale = "emissary-core declares subtle = { version = \"2.6.1\", default-features = false } with a literal version in emissary-core/Cargo.toml and uses it directly in emissary-core/src/crypto/dsa.rs. That declaration does not require a [workspace.dependencies] entry and is unchanged by M062."
+reference = "M062 plan §4.1 and §7 Step A"

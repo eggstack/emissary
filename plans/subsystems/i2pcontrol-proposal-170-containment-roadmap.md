@@ -1,10 +1,12 @@
 # I2PControl Proposal 170 Containment Corrective Roadmap
 
-Status: active; M062 dependency-surface containment ready
+Status: closed; source containment closed by M061; dependency-surface containment closed by M062
 
 Original planning baseline: `adb2f52543764b267b2bcb282d093111001ae4b2` — merged M057 closure head
 
 M062 planning baseline: `a70dd3ac82f12fbea1f8fba51e30a9e2e516650a` — merged M061 containment reclosure head
+
+M062 closure commit: `a0d9f2dcc15fdeb5fcbe6658c0399ff9c8c9575b` — accepted dependency-surface closure head
 
 Upstream comparison baseline: `eepnet/emissary@9b43484a21d5a1291c4881cdae62a36c527f8c0f` — pinned fork merge base/read-only comparison authority
 
@@ -27,7 +29,8 @@ Canonical and governance references:
 - `plans/closure/i2pcontrol-proposal-170/058-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/059-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/060-closure.md`;
-- `plans/closure/i2pcontrol-proposal-170/061-closure.md`.
+- `plans/closure/i2pcontrol-proposal-170/061-closure.md`;
+- `plans/closure/i2pcontrol-proposal-170/062-closure.md`.
 
 Pinned external contract:
 
@@ -38,16 +41,16 @@ Pinned external contract:
 
 The Proposal 170 implementation is operational for its supported surface and keeps control-plane policy under `emissary-cli/src/i2pcontrol/**`. M058–M061 closed the main physical source-containment problem by reducing and then statically enforcing the minimum justified non-`i2pcontrol` source delta.
 
-A post-M061 review found one residual containment class that M061 intentionally did not govern: direct Cargo dependency ownership. `subtle`, used by I2PControl authentication for constant-time comparison, is currently declared at workspace scope and consumed by `emissary-cli` unconditionally even when the `i2pcontrol` feature is disabled.
+A post-M061 review found one residual containment class that M061 intentionally did not govern: direct Cargo dependency ownership. `subtle`, used by I2PControl authentication for constant-time comparison, was declared at workspace scope and consumed by `emissary-cli` unconditionally even when the `i2pcontrol` feature was disabled. M062 closed that dependency-surface gap.
 
-M062 is a bounded follow-up that closes only that dependency-surface gap. It does **not** reopen the accepted source boundary, RouterInfo source completeness, unsupported tunnel types, authentication behavior, or runtime/core architecture.
+M062 did **not** reopen the accepted source boundary, RouterInfo source completeness, unsupported tunnel types, authentication behavior, or runtime/core architecture.
 
 The governing ownership model is now two-layered:
 
-- **source containment:** M061 remains authoritative for changed source paths outside `emissary-cli/src/i2pcontrol/**`;
-- **dependency containment:** M062 must ensure direct dependencies used solely by I2PControl are optional and feature-owned, and must install a complementary manifest/lockfile guard.
+- **source containment:** M061 is authoritative for changed source paths outside `emissary-cli/src/i2pcontrol/**`;
+- **dependency containment:** M062 ensures direct dependencies used solely by I2PControl are optional and feature-owned, and installs a complementary manifest/lockfile guard.
 
-The target remains **minimum justified delta**, now including both source and direct dependency surfaces.
+The target is **minimum justified delta**, now including both source and direct dependency surfaces.
 
 ## 2. Work classification
 
@@ -106,17 +109,23 @@ M058 inventoried 47 non-I2PControl production/example paths. M059 moved AddressB
 
 That source disposition remains accepted and is not reopened by M062.
 
-### 4.2 Residual dependency gap
+### 4.2 Residual dependency gap (closed)
 
 At M062 baseline `a70dd3ac`:
 
-- root `Cargo.toml` has an added workspace dependency `subtle = { version = "2.6.1", default-features = false }` relative to the pinned upstream manifest;
-- `emissary-cli/Cargo.toml` declares `subtle = { workspace = true }` without `optional = true`;
-- `emissary-cli/src/i2pcontrol/auth.rs` is the identified direct consumer and uses `subtle::ConstantTimeEq` for password comparison;
-- `i2pcontrol` activates the other optional service dependencies but does not explicitly activate `subtle` because the direct dependency is unconditional;
-- M061's path guard intentionally scopes its git-diff check to `emissary-cli/src` and `emissary-core/src`, so Cargo manifests are not part of the exact source path authority.
+- root `Cargo.toml` had an added workspace dependency `subtle = { version = "2.6.1", default-features = false }` relative to the pinned upstream manifest;
+- `emissary-cli/Cargo.toml` declared `subtle = { workspace = true }` without `optional = true`;
+- `emissary-cli/src/i2pcontrol/auth.rs` was the identified direct consumer and uses `subtle::ConstantTimeEq` for password comparison;
+- `i2pcontrol` activated the other optional service dependencies but did not explicitly activate `subtle` because the direct dependency was unconditional;
+- M061's path guard intentionally scoped its git-diff check to `emissary-cli/src` and `emissary-core/src`, so Cargo manifests were not part of the exact source path authority.
 
-This is a dependency ownership defect, not an authentication or runtime defect.
+This was a dependency ownership defect, not an authentication or runtime defect. M062 corrected it without altering any source file. The current state at `a0d9f2d`:
+
+- root `Cargo.toml` no longer declares `subtle`;
+- `emissary-cli/Cargo.toml` declares `subtle = { version = "2.6.1", default-features = false, optional = true }`;
+- `i2pcontrol = [..., "dep:subtle"]` explicitly activates the optional dependency;
+- `emissary-core` continues to declare `subtle` with a literal version (independent non-I2PControl direct consumer in `emissary-core/src/crypto/dsa.rs`; not a workspace reference);
+- `Cargo.lock` is byte-identical to the M062 planning baseline.
 
 ## 5. Target architecture
 
@@ -168,10 +177,13 @@ M060 — core observation containment — CLOSED
 M061 — source containment reclosure/static guard — CLOSED
    |
    v
-M062 — dependency-surface containment corrective — READY
+M062 — dependency-surface containment corrective — CLOSED
 ```
 
-M062 is the sole dependency-ready containment handoff. M051 remains independently blocked in the source-completion roadmap.
+M062 is closed. The containment roadmap returns to closed with M061 governing
+source paths and M062 governing direct dependency ownership. M051 remains
+independently blocked in the source-completion roadmap. No future
+implementation plan becomes ready as a result of M062.
 
 ## 7. Milestones
 
@@ -199,11 +211,16 @@ Class: invariant/closure.
 
 Result: exact current source boundary accepted and enforced with no production changes.
 
-### M062 — I2PControl dependency-surface containment corrective — ready
+### M062 — I2PControl dependency-surface containment corrective — closed
 
 Class: corrective manifest/security containment.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md`.
+
+Closure: `plans/closure/i2pcontrol-proposal-170/062-closure.md`.
+
+Authority: `plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml`
+plus `emissary-cli/tests/m062_dependency_containment.rs`.
 
 Objective: remove the unconditional I2PControl-only direct dependency edge from feature-disabled `emissary-cli` and extend containment governance to Cargo dependency ownership.
 
@@ -212,23 +229,23 @@ Authorized production paths:
 - `Cargo.toml`;
 - `emissary-cli/Cargo.toml`.
 
-Expected changes:
+Closed changes:
 
-- remove root workspace `subtle` declaration after confirming no independent direct consumer;
-- declare `subtle` locally as optional with default features disabled;
-- add explicit `dep:subtle` activation to `i2pcontrol`;
-- leave `Cargo.lock` unchanged if the existing version resolution remains stable;
-- add M062 dependency manifest/test under non-production planning/test paths.
+- removed root workspace `subtle` declaration after confirming no independent non-I2PControl workspace consumer exists (`emissary-core` declares a literal version, not a workspace reference);
+- declared `subtle` locally in `emissary-cli` as optional with `default-features = false`;
+- added explicit `dep:subtle` activation to the `i2pcontrol` feature;
+- `Cargo.lock` is byte-identical to the M062 planning baseline `a70dd3ac`;
+- added the M062 dependency manifest, focused semantic test, and supporting planning artifacts.
 
-Exit conditions:
+Exit conditions (all met):
 
 - direct dependency ownership is feature-correct;
 - no source/runtime/core production file changed;
 - M061 source guard still passes unchanged;
-- M062 semantic dependency guard passes;
+- M062 semantic dependency guard passes (8 tests);
 - no unrelated dependency/version/lockfile churn;
 - feature-off and feature-on checks pass;
-- focused authentication regression passes;
+- focused authentication regression passes (20 tests);
 - accepted Proposal 170 state remains unchanged.
 
 ## 8. Cross-cutting requirements
@@ -295,7 +312,7 @@ No hosted CI, coverage, fuzz, soak, release, or platform expansion is required.
 
 ## 11. Completion definition
 
-This containment roadmap returns to closed after M062 only when:
+This containment roadmap returned to closed after M062 when all of the following held at the closure commit:
 
 - M058–M061 remain accepted closed;
 - root workspace no longer owns an I2PControl-only direct `subtle` dependency absent an independent direct consumer;
@@ -308,7 +325,7 @@ This containment roadmap returns to closed after M062 only when:
 - accepted Proposal 170 behavior and 37/1/5 RouterInfo disposition remain unchanged;
 - no new unsupported capability, CI/release machinery, or upstream interaction is introduced.
 
-The completion criterion remains **minimum justified source and dependency delta**, not a predetermined changed-file count.
+The completion criterion is **minimum justified source and dependency delta**, not a predetermined changed-file count. All items above were independently verified before M062 closure was accepted.
 
 ## 12. Milestone status
 
@@ -318,6 +335,6 @@ The completion criterion remains **minimum justified source and dependency delta
 | M059 | closed | `plans/implementation/i2pcontrol-proposal-170/059-cli-runtime-containment.md` | `plans/closure/i2pcontrol-proposal-170/059-closure.md` | exact original-CLI budget implemented; no core changes |
 | M060 | closed | `plans/implementation/i2pcontrol-proposal-170/060-core-observation-containment.md` | `plans/closure/i2pcontrol-proposal-170/060-closure.md` | 23 retained core paths; 9 restored; no new core path |
 | M061 | closed | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | `plans/closure/i2pcontrol-proposal-170/061-closure.md` | exact source boundary accepted and enforced |
-| M062 | ready | `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md` | pending | no remaining hard dependency; manifest-only production budget |
+| M062 | closed | `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md` | `plans/closure/i2pcontrol-proposal-170/062-closure.md` | dependency-surface containment corrective complete; manifest-only production budget executed; no source/runtime/core change |
 
 M051 from the source-completion roadmap remains independently blocked by absent substantive news/ban owners and is not a dependency of M062.

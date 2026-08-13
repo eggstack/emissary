@@ -1,12 +1,12 @@
 # I2PControl Proposal 170 Containment Corrective Roadmap
 
-Status: closed; source containment closed by M061; dependency-surface containment closed by M062
+Status: active; M063 ready; M061 source containment closed; M062 production dependency correction accepted with closure/evidence corrective required
 
 Original planning baseline: `adb2f52543764b267b2bcb282d093111001ae4b2` — merged M057 closure head
 
-M062 planning baseline: `a70dd3ac82f12fbea1f8fba51e30a9e2e516650a` — merged M061 containment reclosure head
+M062 planning head: `a0d9f2dcc15fdeb5fcbe6658c0399ff9c8c9575b`
 
-M062 closure commit: `a0d9f2dcc15fdeb5fcbe6658c0399ff9c8c9575b` — accepted dependency-surface closure head
+M062 implementation/closure commit and M063 planning baseline: `fac2a0cdf75e3aa805acaf976f5a1ca69da6cf2c`
 
 Upstream comparison baseline: `eepnet/emissary@9b43484a21d5a1291c4881cdae62a36c527f8c0f` — pinned fork merge base/read-only comparison authority
 
@@ -30,7 +30,8 @@ Canonical and governance references:
 - `plans/closure/i2pcontrol-proposal-170/059-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/060-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/061-closure.md`;
-- `plans/closure/i2pcontrol-proposal-170/062-closure.md`.
+- `plans/closure/i2pcontrol-proposal-170/062-closure.md`;
+- `plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md`.
 
 Pinned external contract:
 
@@ -41,16 +42,23 @@ Pinned external contract:
 
 The Proposal 170 implementation is operational for its supported surface and keeps control-plane policy under `emissary-cli/src/i2pcontrol/**`. M058–M061 closed the main physical source-containment problem by reducing and then statically enforcing the minimum justified non-`i2pcontrol` source delta.
 
-A post-M061 review found one residual containment class that M061 intentionally did not govern: direct Cargo dependency ownership. `subtle`, used by I2PControl authentication for constant-time comparison, was declared at workspace scope and consumed by `emissary-cli` unconditionally even when the `i2pcontrol` feature was disabled. M062 closed that dependency-surface gap.
+M062 correctly closed one residual production containment class: direct Cargo dependency ownership. `subtle`, used by I2PControl authentication for constant-time comparison, is now a local optional `emissary-cli` dependency activated explicitly by `i2pcontrol`; the root workspace declaration is gone; no production Rust source or lockfile changed.
 
-M062 did **not** reopen the accepted source boundary, RouterInfo source completeness, unsupported tunnel types, authentication behavior, or runtime/core architecture.
+A post-M062 review found bounded closure/evidence defects rather than a production dependency regression:
 
-The governing ownership model is now two-layered:
+- the M062 implementation plan retained `Status: ready`;
+- roadmap/registry text mislabeled the M062 planning head `a0d9f2d` as the closure/current head;
+- lifecycle status text disagreed between planning control surfaces;
+- the durable M062 guard rejects direct forbidden activation of `subtle` but does not compute transitive local Cargo feature reachability, so `ui -> i2pcontrol -> dep:subtle` is not currently rejected by the persistent test.
+
+M063 is the sole corrective for those items. It may modify planning records and the existing dependency-containment test only. It does **not** reopen the accepted source boundary, dependency manifests, RouterInfo source completeness, unsupported tunnel types, authentication behavior, or runtime/core architecture.
+
+The governing containment model remains two-layered:
 
 - **source containment:** M061 is authoritative for changed source paths outside `emissary-cli/src/i2pcontrol/**`;
-- **dependency containment:** M062 ensures direct dependencies used solely by I2PControl are optional and feature-owned, and installs a complementary manifest/lockfile guard.
+- **dependency containment:** M062 defines direct dependency ownership, with M063 strengthening the durable guard to enforce that ownership across transitive local-feature composition.
 
-The target is **minimum justified delta**, now including both source and direct dependency surfaces.
+The target remains **minimum justified delta**, including both source and direct dependency surfaces.
 
 ## 2. Work classification
 
@@ -59,8 +67,9 @@ The target is **minimum justified delta**, now including both source and direct 
 - Supported Proposal 170 behavior, exact wire spelling/types, authentication/TLS behavior, persistence semantics, AddressBook owner coherence, ClientServicesInfo truthfulness, and supported client/server tunnel lifecycle remain unchanged.
 - The accepted RouterInfo matrix remains 37 available / 1 neutral / 5 unavailable.
 - Unsupported tunnel data planes remain unsupported and resource-free.
-- M061 source-boundary files and accepted source-path disposition remain unchanged by M062 implementation.
-- Default/no-I2PControl execution must not carry an unconditional direct dependency solely for I2PControl code.
+- M061 source-boundary files and accepted source-path disposition remain unchanged.
+- Root/package Cargo manifests and `Cargo.lock` remain unchanged by M063.
+- Default/no-I2PControl execution must not activate an I2PControl-only direct dependency, including indirectly through another local feature.
 - No router, peer-selection, NetDB, tunnel construction/routing, transport handshake/retransmission/congestion, cryptographic, LeaseSet, or I2NP algorithm change is authorized.
 - No upstream write/review/submission activity is authorized.
 
@@ -73,15 +82,20 @@ Completed through M061:
 - consolidated neutral core observation boundary;
 - exact current source manifest and static guard.
 
-M062 adds:
+M062 production result:
 
 - machine-readable Cargo dependency ownership authority;
-- focused semantic manifest guard for I2PControl-only direct dependencies;
+- optional/local ownership of the I2PControl-only `subtle` CLI dependency;
 - lockfile/no-resolution-churn evidence.
+
+M063 adds only:
+
+- transitive local-feature reachability enforcement in the existing M062 test;
+- corrected lifecycle/head records for M062/M063.
 
 ### Polish
 
-M062 may restore root workspace dependency scope and package feature ownership only. It is not a general dependency-slimming pass.
+M063 corrects stale status/SHA text only. It is not a general planning cleanup.
 
 ### Capabilities
 
@@ -89,15 +103,16 @@ No new external capability is created. Authentication continues to use the revie
 
 ## 3. Explicit non-goals
 
-This work must not:
+M063 must not:
 
 - implement news, banned-peer ownership, transit 15-second sampling, v4/v6 network-error ownership, or any other currently unavailable RouterInfo source;
 - implement HTTP server/bidirectional server, IRC, SOCKS-IRC, CONNECT, Streamr, or any other missing tunnel data plane;
 - add new I2PControl methods, aliases, selectors, statuses, fields, or compatibility extensions;
-- change `emissary-cli/src/**`, `emissary-core/**`, `emissary-util/**`, examples, runtime configuration, or persistence code;
+- change `Cargo.toml`, `emissary-cli/Cargo.toml`, `Cargo.lock`, `emissary-cli/src/**`, `emissary-core/**`, `emissary-util/**`, examples, runtime configuration, or persistence code;
 - replace the `subtle` primitive with hand-written constant-time logic;
 - perform a repository-wide dependency cleanup or version refresh;
 - extract the implementation into a new Cargo crate merely for aesthetic isolation;
+- add a generalized feature-analysis framework or production/build-time dependency;
 - add CI, release automation, coverage, fuzz, soak, platform matrices, or generated evidence bundles;
 - prepare or seek an upstream merge, review, issue, pull request, proposal update, or maintainer contact.
 
@@ -107,62 +122,69 @@ This work must not:
 
 M058 inventoried 47 non-I2PControl production/example paths. M059 moved AddressBook administrative policy into `emissary-cli/src/i2pcontrol/**` and restored unnecessary original-CLI differences without touching core. M060 reduced the accepted 32-path core budget to 23 retained neutral owner/inspection paths and restored nine paths to upstream. M061 independently accepted nine original CLI/runtime source paths plus those 23 core paths and installed an exact-path static guard.
 
-That source disposition remains accepted and is not reopened by M062.
+That source disposition remains accepted and is not reopened by M063.
 
-### 4.2 Residual dependency gap (closed)
+### 4.2 Accepted M062 production dependency correction
 
-At M062 baseline `a70dd3ac`:
-
-- root `Cargo.toml` had an added workspace dependency `subtle = { version = "2.6.1", default-features = false }` relative to the pinned upstream manifest;
-- `emissary-cli/Cargo.toml` declared `subtle = { workspace = true }` without `optional = true`;
-- `emissary-cli/src/i2pcontrol/auth.rs` was the identified direct consumer and uses `subtle::ConstantTimeEq` for password comparison;
-- `i2pcontrol` activated the other optional service dependencies but did not explicitly activate `subtle` because the direct dependency was unconditional;
-- M061's path guard intentionally scoped its git-diff check to `emissary-cli/src` and `emissary-core/src`, so Cargo manifests were not part of the exact source path authority.
-
-This was a dependency ownership defect, not an authentication or runtime defect. M062 corrected it without altering any source file. The current state at `a0d9f2d`:
+At M062 baseline `a70dd3ac`, root `Cargo.toml` carried a workspace `subtle` declaration and `emissary-cli/Cargo.toml` consumed it unconditionally. M062 corrected that state at `fac2a0c`:
 
 - root `Cargo.toml` no longer declares `subtle`;
 - `emissary-cli/Cargo.toml` declares `subtle = { version = "2.6.1", default-features = false, optional = true }`;
 - `i2pcontrol = [..., "dep:subtle"]` explicitly activates the optional dependency;
-- `emissary-core` continues to declare `subtle` with a literal version (independent non-I2PControl direct consumer in `emissary-core/src/crypto/dsa.rs`; not a workspace reference);
-- `Cargo.lock` is byte-identical to the M062 planning baseline.
+- `emissary-core` continues to declare `subtle` with a literal version for its independent DSA consumer;
+- `Cargo.lock` remained byte-identical to the M062 planning baseline;
+- no production Rust source changed.
 
-## 5. Target architecture
+This production disposition is frozen under M063.
 
-### 5.1 I2PControl source owner
+### 4.3 M062 closure/evidence defects
 
-All Proposal 170 and I2PControl administrative/wire/security policy remains under `emissary-cli/src/i2pcontrol/**`, as accepted by M061.
+The post-M062 review found:
 
-### 5.2 Original CLI/core source boundary
+1. stale `Status: ready` in the M062 implementation plan;
+2. stale/mislabeled `a0d9f2d` closure-head text in roadmap/registry;
+3. lifecycle status disagreement between planning records;
+4. incomplete durable feature-activation guard: direct forbidden activation is checked, but transitive local-feature reachability is not.
 
-The M061 source boundary remains unchanged. M062 is prohibited from changing production Rust source.
+M063 exists only to close these four defects.
+
+## 5. Target architecture and durable boundary
+
+### 5.1 Source owner
+
+All Proposal 170/I2PControl administrative, wire, validation, persistence, security, support, and aggregation policy remains under `emissary-cli/src/i2pcontrol/**`, as accepted by M061.
+
+### 5.2 Source boundary
+
+The M061 source boundary remains unchanged. M063 may not change production Rust source.
 
 ### 5.3 Dependency boundary
 
 A direct dependency whose only direct consumer is I2PControl feature-gated code must:
 
-1. be declared optional at the package that owns the feature;
-2. be activated explicitly by the `i2pcontrol` feature;
-3. not be activated by `default`, `ui`, `metrics`, or another unrelated feature;
+1. be optional at the package that owns the feature;
+2. be activated explicitly by `i2pcontrol`;
+3. not be directly or indirectly activated by `default`, `ui`, `metrics`, or another unrelated local feature;
 4. not be promoted to workspace scope solely for I2PControl convenience unless another independently justified direct workspace consumer exists.
 
-For `subtle`, the expected target is local optional ownership in `emissary-cli/Cargo.toml`, with `dep:subtle` in `i2pcontrol`, and no direct root workspace declaration.
+The persistent guard must compute local Cargo feature reachability rather than checking only literal membership in each root feature list.
 
-This rule concerns **direct dependency ownership**, not transitive crate-name presence. `subtle` may legitimately appear transitively through unrelated cryptographic dependencies; that does not violate M062.
+For an optional dependency target such as `subtle`, the guard must recognize independent activation through `dep:subtle` and dependency-feature syntax such as `subtle/feature`; weak `subtle?/feature` alone does not independently activate the dependency. Local feature cycles must terminate through a visited set.
+
+This rule concerns **direct dependency activation**, not transitive crate-name presence in the resolved dependency graph.
 
 ### 5.4 Combined containment authority
 
-After M062 closure:
+After M063 closure:
 
 - source-path authority remains `061-containment-boundary.toml` plus `m061_containment.rs`;
-- dependency authority is `062-dependency-containment.toml` plus `m062_dependency_containment.rs`.
-
-Do not rewrite M061 historical accepted evidence merely to combine these into one file.
+- dependency authority remains `062-dependency-containment.toml` plus the strengthened `m062_dependency_containment.rs`;
+- M063 closure records the correction without rewriting M062 historical closure evidence.
 
 ## 6. Dependency graph
 
 ```text
-M057 closed source/truthfulness planning state
+M057 — source/truthfulness planning closure
    |
    v
 M058 — non-i2pcontrol delta inventory — CLOSED
@@ -177,76 +199,65 @@ M060 — core observation containment — CLOSED
 M061 — source containment reclosure/static guard — CLOSED
    |
    v
-M062 — dependency-surface containment corrective — CLOSED
+M062 — dependency-surface production corrective — PRODUCTION ACCEPTED; CLOSURE/EVIDENCE CORRECTIVE REQUIRED
+   |
+   v
+M063 — closure consistency + indirect feature-activation guard — READY
 ```
 
-M062 is closed. The containment roadmap returns to closed with M061 governing
-source paths and M062 governing direct dependency ownership. M051 remains
-independently blocked in the source-completion roadmap. No future
-implementation plan becomes ready as a result of M062.
+M051 remains independently blocked in the source-completion roadmap and is not a dependency of M063.
 
 ## 7. Milestones
 
 ### M058 — Non-I2PControl fork-delta inventory and containment ledger — closed
 
-Class: infrastructure/corrective audit.
-
 Result: complete 47-path inventory, exact M059/M060 budgets, zero production behavior changes.
 
 ### M059 — Original CLI/runtime adapter containment — closed
-
-Class: corrective implementation.
 
 Result: AddressBook administrative policy contained under I2PControl; original CLI/runtime reduced to composition/neutral adapters; no core changes.
 
 ### M060 — Core observation seam consolidation — closed
 
-Class: corrective implementation/security containment.
-
 Result: core budget reduced from 32 to 23 retained paths; nine paths restored to upstream; only bounded neutral owner-local observations retained.
 
 ### M061 — Independent source containment reclosure — closed
 
-Class: invariant/closure.
-
 Result: exact current source boundary accepted and enforced with no production changes.
 
-### M062 — I2PControl dependency-surface containment corrective — closed
-
-Class: corrective manifest/security containment.
+### M062 — I2PControl dependency-surface containment corrective — production accepted; closure/evidence corrective required
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md`.
 
-Closure: `plans/closure/i2pcontrol-proposal-170/062-closure.md`.
+Historical closure: `plans/closure/i2pcontrol-proposal-170/062-closure.md`.
 
-Authority: `plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml`
-plus `emissary-cli/tests/m062_dependency_containment.rs`.
+Production result at `fac2a0c`: dependency ownership corrected exactly as intended, with no production source or lockfile changes.
 
-Objective: remove the unconditional I2PControl-only direct dependency edge from feature-disabled `emissary-cli` and extend containment governance to Cargo dependency ownership.
+Remaining closure defects are delegated exclusively to M063.
 
-Authorized production paths:
+### M063 — M062 closure consistency and indirect feature-activation guard corrective — ready
 
-- `Cargo.toml`;
-- `emissary-cli/Cargo.toml`.
+Class: invariant/corrective closure.
 
-Closed changes:
+Plan: `plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md`.
 
-- removed root workspace `subtle` declaration after confirming no independent non-I2PControl workspace consumer exists (`emissary-core` declares a literal version, not a workspace reference);
-- declared `subtle` locally in `emissary-cli` as optional with `default-features = false`;
-- added explicit `dep:subtle` activation to the `i2pcontrol` feature;
-- `Cargo.lock` is byte-identical to the M062 planning baseline `a70dd3ac`;
-- added the M062 dependency manifest, focused semantic test, and supporting planning artifacts.
+Objective:
 
-Exit conditions (all met):
+- reconcile M062 status/head records with the actual landed commit;
+- strengthen `m062_dependency_containment.rs` so forbidden root features cannot transitively reach the I2PControl-only direct `subtle` activation;
+- preserve all Cargo manifests, lockfile, production source, runtime/core behavior, and Proposal 170 capability state.
 
-- direct dependency ownership is feature-correct;
-- no source/runtime/core production file changed;
-- M061 source guard still passes unchanged;
-- M062 semantic dependency guard passes (8 tests);
-- no unrelated dependency/version/lockfile churn;
-- feature-off and feature-on checks pass;
-- focused authentication regression passes (20 tests);
-- accepted Proposal 170 state remains unchanged.
+Authorized implementation paths are limited to the existing M062 test and planning/closure records named by the M063 plan.
+
+Exit conditions:
+
+- direct and indirect forbidden activation regressions fail the guard;
+- cycle/weak-feature semantics are covered without false positives;
+- M061 guard still passes unchanged;
+- Cargo manifests, lockfile, and production source are untouched;
+- M062/M063 planning records agree on exact status/head identities;
+- registry and roadmap return to closed with no ready containment successor;
+- 37/1/5, M051 blocker, unsupported tunnel scope, CI/release scope, and internal-only boundary remain unchanged.
 
 ## 8. Cross-cutting requirements
 
@@ -256,76 +267,70 @@ No persistence schema or storage change is authorized.
 
 ### Protocol and compatibility
 
-No wire contract change. Exact Proposal 170/base compatibility semantics remain those accepted before M062.
+No wire contract change. Exact Proposal 170/base compatibility semantics remain those accepted before M063.
 
 ### Security and authorization
 
-The reviewed constant-time password comparison primitive remains in place for enabled I2PControl. M062 reduces direct dependency exposure; it must not weaken authentication or move security policy outside I2PControl.
+The reviewed constant-time password comparison primitive remains unchanged. M063 strengthens only the evidence that unrelated Cargo features cannot activate its I2PControl-only direct dependency edge.
 
 ### Concurrency, cancellation, restart, and recovery
 
-No runtime task/lock/channel/lifecycle change is authorized. Any such change means M062 exceeded scope.
+No runtime task/lock/channel/lifecycle change is authorized. The test's feature graph traversal must be finite and cycle-safe.
 
 ### Observability and audit
 
-M061 remains source-audit authority. M062 must provide semantic manifest evidence for direct dependency ownership and exact allowed production paths.
+M061 remains source-audit authority. M062 remains dependency-policy authority. M063 adds regression completeness and record consistency only.
 
 ### Performance and resource use
 
-No runtime performance behavior is changed. The intended improvement is feature-disabled dependency-surface containment, not a runtime optimization claim.
+No runtime performance behavior changes. The new test helper must remain local, bounded, and deterministic.
 
 ### Documentation and operations
 
-No deployment/release-process change. Planning records should make clear that source containment was closed by M061 and dependency containment by M062.
+No deployment/release-process change. Planning records must distinguish the M062 planning head `a0d9f2d` from the actual M062 implementation/closure commit `fac2a0c`.
 
 ## 9. Verification strategy
 
-M062 verification is local and proportional:
+M063 verification is local and proportional:
 
-- inspect workspace/package manifest ownership and direct source consumers;
-- `cargo metadata --format-version 1 --no-deps` to inspect optional/direct feature metadata;
+- focused `m062_dependency_containment` tests including direct/indirect/cycle/weak-edge fixtures;
+- retained `m061_containment` source guard;
 - `cargo check -p emissary-cli --no-default-features`;
 - `cargo check -p emissary-cli --no-default-features --features i2pcontrol`;
-- focused `m062_dependency_containment` test;
-- focused I2PControl auth tests;
-- retained `m061_containment` source guard;
-- exact baseline changed-path and lockfile diff review;
+- exact changed-path review from `fac2a0c`;
+- exact proof that Cargo manifests, lockfile, M061 authority, and production source did not change;
 - `git diff --check`.
 
-`cargo tree` may be used diagnostically to inspect feature edges, but crate-name absence is not an acceptance gate because `subtle` may exist transitively.
-
-No hosted CI, coverage, fuzz, soak, release, or platform expansion is required.
+No full workspace matrix, hosted CI, coverage, fuzz, soak, release, or platform expansion is required.
 
 ## 10. Risks and decision points
 
 | Risk | Decision/mitigation |
 |---|---|
-| A non-I2PControl direct consumer actually needs workspace `subtle` | stop M062 and replan; do not fabricate dependency isolation |
-| Making dependency optional unexpectedly requires source changes | stop; production Rust is outside M062 authority |
-| Cargo rewrites unrelated lock entries | reject churn; no dependency update campaign |
-| Removing workspace declaration encourages hand-written crypto | explicitly retain reviewed `subtle`; only ownership changes |
-| Guard incorrectly treats transitive `subtle` as failure | guard direct manifest/feature ownership semantically, not crate-name absence |
-| M062 accidentally reopens M061 source boundary | M061 manifest/test must remain unchanged and continue to pass |
-| Work drifts into other dependencies | only same-class trivial manifest finding may be recorded; broader cleanup requires separate authorization |
+| Guard remains literal-only and misses feature composition | compute transitive local-feature closure with cycle protection |
+| Weak dependency-feature syntax is misclassified | treat `dep?/feature` as non-activating unless another reachable edge activates the dependency |
+| Test becomes a generalized Cargo implementation | keep a small local helper scoped to the feature forms required by this invariant |
+| Current manifests unexpectedly violate indirect activation rule | stop and separately plan a manifest corrective; M063 cannot edit manifests |
+| Closure cleanup rewrites historical evidence | preserve `062-closure.md`; record correction in M063 closure |
+| Work drifts into production dependency cleanup | Cargo manifests/lockfile are prohibited paths |
+| M063 accidentally reopens M061 source boundary | M061 manifest/test remain unchanged and must pass |
 | Work drifts into unavailable Prop 170 rows | 37/1/5 matrix is invariant |
 | Upstream interaction is inferred from comparison | upstream access remains read-only only |
 
 ## 11. Completion definition
 
-This containment roadmap returned to closed after M062 when all of the following held at the closure commit:
+This containment roadmap returns to closed only after M063 demonstrates:
 
 - M058–M061 remain accepted closed;
-- root workspace no longer owns an I2PControl-only direct `subtle` dependency absent an independent direct consumer;
-- `emissary-cli` owns `subtle` as an optional direct dependency;
-- `i2pcontrol` explicitly activates it and unrelated features do not;
-- no source/runtime/core production file changes;
-- no unrelated dependency/version/lockfile churn;
-- M061 source containment remains valid;
-- M062 dependency containment is machine-readable and statically guarded;
+- M062 production dependency correction remains unchanged and accepted;
+- direct and transitive local-feature activation of the I2PControl-only direct dependency is correctly guarded;
+- M062 plan status and planning/closure head labels are factually reconciled;
+- M062 historical closure record is preserved and M063 records the corrective evidence;
+- no Cargo manifest, lockfile, production source, runtime/core, unsupported capability, CI/release, or upstream-interaction change occurred;
 - accepted Proposal 170 behavior and 37/1/5 RouterInfo disposition remain unchanged;
-- no new unsupported capability, CI/release machinery, or upstream interaction is introduced.
+- no containment successor is dependency-ready.
 
-The completion criterion is **minimum justified source and dependency delta**, not a predetermined changed-file count. All items above were independently verified before M062 closure was accepted.
+The completion criterion remains **minimum justified source and dependency delta with durable evidence**, not a predetermined changed-file count.
 
 ## 12. Milestone status
 
@@ -335,6 +340,7 @@ The completion criterion is **minimum justified source and dependency delta**, n
 | M059 | closed | `plans/implementation/i2pcontrol-proposal-170/059-cli-runtime-containment.md` | `plans/closure/i2pcontrol-proposal-170/059-closure.md` | exact original-CLI budget implemented; no core changes |
 | M060 | closed | `plans/implementation/i2pcontrol-proposal-170/060-core-observation-containment.md` | `plans/closure/i2pcontrol-proposal-170/060-closure.md` | 23 retained core paths; 9 restored; no new core path |
 | M061 | closed | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | `plans/closure/i2pcontrol-proposal-170/061-closure.md` | exact source boundary accepted and enforced |
-| M062 | closed | `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md` | `plans/closure/i2pcontrol-proposal-170/062-closure.md` | dependency-surface containment corrective complete; manifest-only production budget executed; no source/runtime/core change |
+| M062 | corrective pass required for closure/evidence only; production fix accepted | `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md` | `plans/closure/i2pcontrol-proposal-170/062-closure.md` | M063 corrects stale records and incomplete indirect feature-activation guard |
+| M063 | ready | `plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md` | pending | M062 production implementation landed at `fac2a0c`; no other hard dependency |
 
-M051 from the source-completion roadmap remains independently blocked by absent substantive news/ban owners and is not a dependency of M062.
+M051 from the source-completion roadmap remains independently blocked by absent substantive news/ban owners and is not a dependency of M063.

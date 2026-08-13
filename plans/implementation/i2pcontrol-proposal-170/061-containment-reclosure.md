@@ -1,6 +1,6 @@
 # M061 — Independent Containment Reclosure and Static-Guard Refresh
 
-Status: ready
+Status: closed
 
 Planning baseline: `6085eca` — accepted M060 implementation head
 

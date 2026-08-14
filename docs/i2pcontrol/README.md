@@ -26,7 +26,9 @@ M039 independently reviewed the complete M031–M038 final head and formally
 closed the authorized workstream as partial support.
 
 The expected bounded final status remains `partial Proposal 170 support` while
-missing tunnel data planes remain explicit unsupported runtimes. The canonical
+missing tunnel data planes remain explicit unsupported runtimes. M065 closes the
+common runtime/option foundation only; it does not claim any newly operational
+tunnel type. The canonical
 43-addition matrix currently contains 37 available selectors, one
 protocol-permitted neutral selector, and five unavailable selectors; the
 unavailable rows are router news, banned peers, transit bandwidth over 15
@@ -171,6 +173,9 @@ Retained implementation includes:
 - exact Proposal 170 method/selector/action/type parsers and literal fixtures;
 - durable generation stores and atomic TunnelManager mutation;
 - explicit unsupported backends for missing tunnel data planes;
+- M065 bounded I2PControl-owned client-listener and accepted-server runtime primitives;
+- M065 backend-local option capability validation that rejects unsupported runtime options before
+  listener/session allocation and redacts option values;
 - startup-managed tunnel inventory and service lifecycle observation;
 - bounded recoverable SAM observation;
 - RouterInfo source classification and no-fabrication behavior;
@@ -224,8 +229,10 @@ false, empty, or semantically adjacent values.
 
 This workstream does not implement missing HTTP, IRC, SOCKS-IRC, CONNECT,
 Streamr, bidirectional, or other listener/destination/LeaseSet/traffic paths.
-Their definitions may parse and persist, but start/restart must fail explicitly,
-stop must remain safe, and no unsupported type may report running or allocate a
+The M065 primitives are lifecycle/filter seams for those future backends, not
+standalone protocol implementations. Their definitions may parse and persist,
+but start/restart must fail explicitly until each family closes its own plan.
+Stop must remain safe, and no unsupported type may report running or allocate a
 runtime resource.
 
 ## AddressBook enabled/disabled boundary

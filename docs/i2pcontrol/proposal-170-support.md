@@ -93,9 +93,10 @@ accepted integrated reclosure and final 43-row source audit.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because five of the 43 RouterInfo additions lack
-bounded authoritative sources and missing tunnel data planes remain explicit
-unsupported runtimes. The unavailable rows are router news, banned peers,
-transit-15s, and v4/v6 network-error.
+bounded authoritative sources and ten specialized tunnel data planes remain
+explicit unsupported runtimes. M065 closes shared runtime lifecycle and option
+validation primitives without claiming a new real tunnel type. The unavailable
+rows are router news, banned peers, transit-15s, and v4/v6 network-error.
 
 ## M038 live-runtime evidence
 
@@ -157,6 +158,8 @@ Retained candidate evidence includes:
 - bounded recoverable SAM observation;
 - exact 43-key RouterInfo matrix and explicit unavailable behavior;
 - enabled-mode runtime AddressBook authority.
+- M065 bounded I2PControl-owned client-listener and accepted-server runtime seams;
+- M065 deterministic backend option-capability validation with secret-safe errors.
 
 M028 must not reimplement or broaden these areas.
 
@@ -215,7 +218,8 @@ The following other tunnel families remain intentionally out of scope:
 
 Their definitions may parse and persist. Start/restart must return explicit
 not-implemented operation status; stop remains safe and inactive. They must not
-report running or open resources.
+report running or open resources. M065's lifecycle seams are not registered as
+those tunnel types and do not change this status.
 
 ## AddressBook
 

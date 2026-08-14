@@ -1,6 +1,8 @@
 # M065 — I2PControl Tunnel Runtime and Option-Capability Primitives
 
-Status: ready
+Status: closed
+
+Closure: `plans/closure/i2pcontrol-proposal-170/065-closure.md`.
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 

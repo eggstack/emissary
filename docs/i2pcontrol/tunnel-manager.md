@@ -1,7 +1,7 @@
 # I2PControl TunnelManager
 
-Status: M039 final-head review accepted; lifecycle reconciliation remains closed
-against the pinned Proposal 170 revision
+Status: M065 runtime-foundation closure accepted; lifecycle reconciliation remains
+closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
 Wire/CRUD/persistence evidence is distinct from runtime data-plane support.
@@ -36,6 +36,14 @@ root. The key is never accepted as `PrivKeyFile`, copied into `rawConfig`, or
 returned by `get`. The actual public destination is available to
 `ClientServicesInfo` only after the backend has established the session.
 Startup-managed server definitions remain externally owned.
+
+M065 also provides internal-only runtime seams for future specialized backends:
+the client seam owns one outbound Yosemite session, a validated local listener,
+and bounded per-connection tasks; the accepted-server seam owns one persistent
+session and passes the SAM-derived public peer identity plus stream to a
+protocol handler before any local target connection. These seams do not change
+the production registry: the ten specialized tunnel families remain explicit
+unsupported backends until their own security/filter milestones close.
 
 After the durable definition and server-identity stores load, `StartOnLoad` is
 reconciled only for control-plane-owned generic `client` and `server`

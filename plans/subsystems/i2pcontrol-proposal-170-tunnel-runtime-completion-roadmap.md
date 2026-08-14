@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Runtime Completion Roadmap
 
-Status: active; M064 closed; M065 ready
+Status: active; M064 and M065 closed; M066 is the next registered handoff
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6` — current production head reviewed before this planning series
 
@@ -300,11 +300,12 @@ Exit: clean baseline and exact single-defect correction.
 
 Plan: `065-i2pcontrol-tunnel-runtime-primitives.md`.
 
-Status: ready; hard dependency M064 is closed.
+Status: closed; hard dependency M064 is closed. Closure:
+`plans/closure/i2pcontrol-proposal-170/065-closure.md`.
 
 Add bounded reusable control-plane primitives for local listener ownership, accepted-stream server ownership, per-name task generation/cancellation where not already reusable, peer identity delivery to filters, and deterministic per-backend option-capability validation. Keep all production work under `i2pcontrol`.
 
-Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type yet.
+Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type. M066, M067, M068, and M071 are dependency-ready successors; only M066 is registered as the next handoff.
 
 ### M066 — IRC client/server family
 

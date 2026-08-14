@@ -16,7 +16,7 @@ This document describes the read-only inspection architecture for I2PControl Pro
 
 ## Architecture layers
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │  I2PControl HTTPS Server (axum)             │
 │  ├── Authentication (token service)         │
@@ -44,6 +44,36 @@ This document describes the read-only inspection architecture for I2PControl Pro
 │  └── Subsystem managers (tunnels, peers...) │
 └─────────────────────────────────────────────┘
 ```
+
+## Tunnel runtime ownership boundary
+
+Inspection and tunnel administration share the I2PControl feature boundary,
+but runtime protocol ownership remains separate from RouterInfo inspection.
+M065 adds two small internal seams under `backends/runtime`:
+
+```text
+control-plane backend
+  ├── client listener
+  │     ├── validated local bind
+  │     ├── one outbound Yosemite session
+  │     └── bounded connection handlers
+  └── accepted-stream server
+        ├── persistent destination/session
+        ├── SAM-derived TrustedPeerIdentity
+        └── handler decides before local-target connect
+```
+
+The accepted-server seam uses Yosemite's application-visible `accept()` path,
+not `STREAM FORWARD`, so future HTTP/IRC filters can inspect bounded initial
+bytes and trusted peer identity before forwarding. Runtime tasks stop on the
+exact instance cancellation path and are drained within a bounded timeout;
+handler panics are isolated to their connection. A narrow option-capability
+validator runs before listener/session allocation and reports only option names,
+never stored values.
+
+These helpers are lifecycle infrastructure only. M065 does not register
+`httpclient`, `httpserver`, IRC, SOCKS, CONNECT, Streamr, or bidirectional HTTP
+as real backends, and it does not alter startup-managed tunnel ownership.
 
 Core exposes purpose-specific, bounded owned snapshots and passive owner-local
 lifecycle facts. Aggregation, recovery, public bounds, and wire serialization

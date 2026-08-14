@@ -18,7 +18,9 @@
 
 pub mod client;
 pub mod fake;
+pub mod options;
 pub mod registry;
+pub mod runtime;
 pub mod server;
 pub mod unsupported;
 
@@ -32,6 +34,15 @@ use super::domain::tunnel::{TunnelDefinition, TunnelRuntimeState, TunnelType};
 pub enum BackendError {
     /// The tunnel type is not supported by this backend.
     NotImplemented { tunnel_type: TunnelType },
+    /// A runtime-relevant option is missing or unsupported by this backend.
+    MissingOption {
+        tunnel_type: TunnelType,
+        option: String,
+    },
+    UnsupportedOption {
+        tunnel_type: TunnelType,
+        option: String,
+    },
     /// The tunnel is not in a state where the operation can be performed.
     InvalidState {
         tunnel_type: TunnelType,
@@ -47,6 +58,26 @@ impl fmt::Display for BackendError {
         match self {
             Self::NotImplemented { tunnel_type } => {
                 write!(f, "error - {} not implemented", tunnel_type.as_str())
+            }
+            Self::MissingOption {
+                tunnel_type,
+                option,
+            } => {
+                write!(
+                    f,
+                    "error - {} requires option {option}",
+                    tunnel_type.as_str()
+                )
+            }
+            Self::UnsupportedOption {
+                tunnel_type,
+                option,
+            } => {
+                write!(
+                    f,
+                    "error - {} does not support option {option}",
+                    tunnel_type.as_str()
+                )
             }
             Self::InvalidState {
                 tunnel_type,

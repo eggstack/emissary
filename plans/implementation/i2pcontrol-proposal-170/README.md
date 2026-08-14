@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel-runtime completion phase active; M064 closed; M065 ready
+Status: partial Proposal 170 support; tunnel-runtime completion phase active; M064/M065 closed; M066 next
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -42,9 +42,11 @@ The implementation target is:
 
 ## Current handoff
 
-M065 is the only dependency-ready implementation plan:
+M065 is closed. M066 is the next registered dependency-ready implementation plan:
 
-- `065-i2pcontrol-tunnel-runtime-primitives.md` — **ready**.
+- `065-i2pcontrol-tunnel-runtime-primitives.md` — **closed**; closure:
+  `plans/closure/i2pcontrol-proposal-170/065-closure.md`.
+- `066-irc-client-server-tunnel-family.md` — **ready**.
 
 M064 repairs the existing feature-disabled/no-events unused-parameter regression in `emissary-core/src/events.rs` and establishes a clean baseline before new tunnel runtime work. It adds no capability.
 
@@ -57,16 +59,16 @@ Per `plans/003-planning-process.md`, future plans are prewritten for continuity 
 | Handoff | Status | Scope | Dependencies |
 |---|---|---|---|
 | M064 | closed | narrow current-head no-events/core-feature corrective | M063 closed |
-| M065 | ready | I2PControl-owned client/accepted-server runtime primitives + option-capability validation | M064 closed |
-| M066 | blocked | common IRC filter + real `ircclient` and `ircserver` | M065 |
-| M067 | blocked | secure filtered `httpserver` | M065 |
-| M068 | blocked | real `httpclient` + strict `connectclient` | M065 |
+| M065 | closed | I2PControl-owned client/accepted-server runtime primitives + option-capability validation | M064 closed |
+| M066 | ready | common IRC filter + real `ircclient` and `ircserver` | M065 |
+| M067 | blocked — dependency-ready but not next registered handoff | secure filtered `httpserver` | M065 |
+| M068 | blocked — dependency-ready but not next registered handoff | real `httpclient` + strict `connectclient` | M065 |
 | M069 | blocked | SOCKS4a/5 CONNECT + `socksirc` composed with M066 filter | M065, M066 |
 | M070 | blocked | `httpbidirserver` composition of M067/M068 | M067, M068 |
-| M071 | blocked | bounded Streamr client/server datagram family | M065 |
+| M071 | blocked — dependency-ready but not next registered handoff | bounded Streamr client/server datagram family | M065 |
 | M072 | blocked | integrated twelve-type runtime/security/containment reclosure | M066-M071 |
 
-After M065 closes, M066, M067, M068, and M071 are intended to be independently executable/parallelizable. M069 waits for the common IRC filter. M070 waits for both HTTP halves. M072 waits for all families.
+After M065 closes, M066, M067, M068, and M071 are dependency-ready successors. Project convention registers only M066 as the next handoff; M069 waits for the common IRC filter, M070 waits for both HTTP halves, and M072 waits for all families.
 
 ## Security-critical family rules
 

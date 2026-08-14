@@ -389,18 +389,41 @@ fn allowed_production_paths_match_the_m062_budget() {
             .iter()
             .any(|allowed| allowed == path);
         let authorized_m064 = path == "emissary-core/src/events.rs";
+        let authorized_m065 = is_authorized_m065_path(path);
         assert!(
-            permitted || authorized_m064 || is_authorized_planning_path(path),
+            permitted || authorized_m064 || authorized_m065 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
         );
 
         for pattern in &manifest.prohibited_production_paths.patterns {
             assert!(
-                authorized_m064 || !glob_matches(pattern, path),
+                authorized_m064 || authorized_m065 || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
             );
         }
     }
+}
+
+fn is_authorized_m065_path(path: &str) -> bool {
+    matches!(
+        path,
+        "AGENTS.md"
+            | "README.md"
+            | "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/inspection-architecture.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/tunnel-manager.md"
+            | "plans/closure/i2pcontrol-proposal-170/064-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/065-closure.md"
+            | "emissary-cli/src/i2pcontrol/backends/mod.rs"
+            | "emissary-cli/src/i2pcontrol/backends/client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/options.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/mod.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/task_group.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/accepted_server.rs"
+    )
 }
 
 fn is_authorized_planning_path(path: &str) -> bool {

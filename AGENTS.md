@@ -31,10 +31,13 @@ cargo test -p emissary-cli --no-default-features --features i2pcontrol
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 ```
 
-I2PControl supports the Proposal 170 contract, but runtime tunnel data-plane backends and
-inspection sources without a canonical Emissary owner remain explicit unsupported/unavailable
-responses. Keep changes within `emissary-cli/src/i2pcontrol/` and its composition seams; do not
-turn the administrative API into a router lifecycle or protocol implementation.
+I2PControl supports the Proposal 170 contract. Its I2PControl-owned runtime primitives now
+provide bounded local-listener and accepted-stream lifecycle ownership plus fail-before-allocation
+option validation, but they do not themselves make specialized tunnel families operational.
+Tunnel data-plane backends and inspection sources without a canonical Emissary owner remain
+explicit unsupported/unavailable responses. Keep changes within
+`emissary-cli/src/i2pcontrol/` and its composition seams; do not turn the administrative API into
+a router lifecycle or protocol implementation.
 
 Fuzz targets (requires nightly):
 ```bash

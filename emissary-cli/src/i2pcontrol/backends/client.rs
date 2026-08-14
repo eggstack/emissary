@@ -24,7 +24,10 @@ use futures::FutureExt;
 use parking_lot::Mutex;
 use tokio::task::JoinHandle;
 
-use super::{BackendError, BackendResult, BackendStatus, TunnelBackend};
+use super::{
+    options::{validate_options, OptionValidationError, CLIENT_OPTIONS},
+    BackendError, BackendResult, BackendStatus, TunnelBackend,
+};
 use crate::{
     i2pcontrol::domain::tunnel::{
         TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType,
@@ -115,9 +118,13 @@ impl ClientRuntimeSupervisor {
     fn set_task(&self, name: &str, generation: u64, task: JoinHandle<()>) {
         let mut runtime = self.inner.lock();
         if let Some(entry) = runtime.entries.get_mut(name) {
-            if entry.generation == generation {
+            if entry.generation == generation && entry.state == TunnelRuntimeState::Starting {
                 entry.task = Some(task);
+            } else {
+                task.abort();
             }
+        } else {
+            task.abort();
         }
     }
 
@@ -300,6 +307,8 @@ impl ClientTunnelBackend {
                 attempted_action: "start",
             });
         }
+        validate_options(TunnelType::Client, &definition.options, CLIENT_OPTIONS)
+            .map_err(option_error)?;
         let destination = definition
             .options
             .target_destination
@@ -328,6 +337,25 @@ impl ClientTunnelBackend {
             destination_port: definition.options.target_port,
             sam_tcp_port: self.supervisor.sam_tcp_port,
         })
+    }
+}
+
+fn option_error(error: OptionValidationError) -> BackendError {
+    match error {
+        OptionValidationError::Missing {
+            tunnel_type,
+            option,
+        } => BackendError::MissingOption {
+            tunnel_type,
+            option: option.to_owned(),
+        },
+        OptionValidationError::Unsupported {
+            tunnel_type,
+            option,
+        } => BackendError::UnsupportedOption {
+            tunnel_type,
+            option,
+        },
     }
 }
 
@@ -421,7 +449,13 @@ mod tests {
         def.options.target_destination = None;
 
         let result = backend.start(&def).await;
-        assert!(matches!(result, Err(BackendError::Internal { .. })));
+        assert!(matches!(
+            result,
+            Err(BackendError::MissingOption {
+                tunnel_type: TunnelType::Client,
+                option
+            }) if option == "TargetDestination"
+        ));
         assert_eq!(
             backend.inspect(&def).runtime_state,
             TunnelRuntimeState::Stopped

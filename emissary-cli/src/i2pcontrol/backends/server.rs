@@ -6,14 +6,17 @@ use futures::FutureExt;
 use parking_lot::Mutex;
 use tokio::task::JoinHandle;
 
-use super::{BackendError, BackendResult, BackendStatus, TunnelBackend};
+use super::{
+    options::{validate_options, OptionValidationError, SERVER_OPTIONS},
+    BackendError, BackendResult, BackendStatus, TunnelBackend,
+};
 use crate::{
     i2pcontrol::{
         domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
         server_secret_store::ServerDestinationStore,
     },
     tunnel_server::{
-        run_single_server, ServerRuntimeError, ServerTunnelRuntimeConfig, DestinationObserver,
+        run_single_server, DestinationObserver, ServerRuntimeError, ServerTunnelRuntimeConfig,
     },
 };
 
@@ -99,9 +102,13 @@ impl ServerRuntimeSupervisor {
     fn set_task(&self, name: &str, generation: u64, task: JoinHandle<()>) {
         let mut runtime = self.inner.lock();
         if let Some(entry) = runtime.entries.get_mut(name) {
-            if entry.generation == generation {
+            if entry.generation == generation && entry.state == TunnelRuntimeState::Starting {
                 entry.task = Some(task);
+            } else {
+                task.abort();
             }
+        } else {
+            task.abort();
         }
     }
 
@@ -254,8 +261,16 @@ impl ServerRuntimeSupervisor {
     pub fn inspect(&self, name: &str) -> (TunnelRuntimeState, &'static str, Option<String>) {
         let runtime = self.inner.lock();
         match runtime.entries.get(name) {
-            Some(entry) => (entry.state, entry.failure.unwrap_or("server tunnel runtime is active"), entry.destination.clone()),
-            None => (TunnelRuntimeState::Stopped, "server tunnel runtime is stopped", None),
+            Some(entry) => (
+                entry.state,
+                entry.failure.unwrap_or("server tunnel runtime is active"),
+                entry.destination.clone(),
+            ),
+            None => (
+                TunnelRuntimeState::Stopped,
+                "server tunnel runtime is stopped",
+                None,
+            ),
         }
     }
 }
@@ -307,11 +322,14 @@ impl ServerTunnelBackend {
                 attempted_action: "start",
             });
         }
-        let port = definition.options.target_port.or(definition.options.listen_port).ok_or_else(|| {
-            BackendError::Internal {
-                message: "server target port is required".to_string(),
-            }
-        })?;
+        let port =
+            definition
+                .options
+                .target_port
+                .or(definition.options.listen_port)
+                .ok_or_else(|| BackendError::Internal {
+                    message: "server target port is required".to_string(),
+                })?;
         if let Some(host) = definition
             .raw_config
             .get("TargetHost")
@@ -320,7 +338,8 @@ impl ServerTunnelBackend {
         {
             if !matches!(host, "127.0.0.1" | "localhost") {
                 return Err(BackendError::Internal {
-                    message: "server target host is not supported by the existing data plane".to_string(),
+                    message: "server target host is not supported by the existing data plane"
+                        .to_string(),
                 });
             }
         }
@@ -348,6 +367,8 @@ impl TunnelBackend for ServerTunnelBackend {
                 attempted_action: "start",
             });
         }
+        validate_options(TunnelType::Server, &definition.options, SERVER_OPTIONS)
+            .map_err(option_error)?;
         let store = self.destinations.as_ref().ok_or_else(|| BackendError::Internal {
             message: "server destination store is not composed".to_string(),
         })?;
@@ -371,13 +392,33 @@ impl TunnelBackend for ServerTunnelBackend {
     }
 
     fn inspect(&self, definition: &TunnelDefinition) -> BackendStatus {
-        let (runtime_state, message, destination) = self.supervisor.inspect(definition.name.as_str());
+        let (runtime_state, message, destination) =
+            self.supervisor.inspect(definition.name.as_str());
         BackendStatus {
             tunnel_type: TunnelType::Server,
             runtime_state,
             message: message.to_string(),
             destination,
         }
+    }
+}
+
+fn option_error(error: OptionValidationError) -> BackendError {
+    match error {
+        OptionValidationError::Missing {
+            tunnel_type,
+            option,
+        } => BackendError::MissingOption {
+            tunnel_type,
+            option: option.to_owned(),
+        },
+        OptionValidationError::Unsupported {
+            tunnel_type,
+            option,
+        } => BackendError::UnsupportedOption {
+            tunnel_type,
+            option,
+        },
     }
 }
 
@@ -450,7 +491,10 @@ mod tests {
         store.load().await.unwrap();
         let identity = ServerDestinationStore::new_identity();
         store
-            .put(&identity, StoredDestination::from_private(base64_encode([9u8; 128])))
+            .put(
+                &identity,
+                StoredDestination::from_private(base64_encode([9u8; 128])),
+            )
             .await
             .unwrap();
         let (sam_port, sam_task) = fake_sam().await;
@@ -477,7 +521,10 @@ mod tests {
             backend.inspect(&first).runtime_state,
             TunnelRuntimeState::Stopped
         );
-        assert_eq!(backend.inspect(&second).runtime_state, TunnelRuntimeState::Stopped);
+        assert_eq!(
+            backend.inspect(&second).runtime_state,
+            TunnelRuntimeState::Stopped
+        );
         sam_task.abort();
     }
 

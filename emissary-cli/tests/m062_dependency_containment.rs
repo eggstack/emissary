@@ -7,14 +7,19 @@
 //!   declaration;
 //! * `emissary-cli` declares `subtle` as `optional = true` with default features disabled;
 //! * only the `i2pcontrol` feature activates the optional `subtle` dependency;
+//! * the forbidden root features (`default`, `ui`, `metrics`) cannot transitively activate the
+//!   optional `subtle` dependency through local feature composition;
 //! * `Cargo.lock` is unchanged relative to the M062 fork baseline.
 //!
 //! The guard is intentionally semantic rather than comment-text based so that a
-//! future regression in dependency ownership fails closed.
+//! future regression in dependency ownership fails closed. The transitive helper
+//! tracks visited local features to bound traversal across cycles and treats weak
+//! dependency-feature syntax (`subtle?/feature`) as non-activating.
 
 #![cfg(feature = "i2pcontrol")]
 
 use std::{
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -247,12 +252,13 @@ fn only_i2pcontrol_activates_subtle() {
     let raw = std::fs::read_to_string(workspace_root().join("emissary-cli/Cargo.toml"))
         .expect("emissary-cli manifest");
     let parsed: toml::Value = toml::from_str(&raw).expect("valid emissary-cli manifest");
-    let features = parsed
+    let features_table = parsed
         .get("features")
         .and_then(|features| features.as_table())
         .expect("features table");
+    let graph = LocalFeatureGraph::from_features_value(&toml::Value::Table(features_table.clone()));
 
-    let i2pcontrol = features
+    let i2pcontrol = features_table
         .get("i2pcontrol")
         .and_then(|value| value.as_array())
         .expect("i2pcontrol feature must exist");
@@ -275,18 +281,29 @@ fn only_i2pcontrol_activates_subtle() {
             "{forbidden_feature} must not activate subtle"
         );
 
-        if let Some(value) = features.get(forbidden_feature) {
+        if let Some(value) = features_table.get(forbidden_feature) {
             if let Some(list) = value.as_array() {
                 for entry in list {
                     let entry = entry.as_str().unwrap_or_default();
                     assert!(
                         entry != "dep:subtle" && entry != "subtle",
-                        "{forbidden_feature} must not activate subtle"
+                        "{forbidden_feature} must not activate subtle directly"
                     );
                 }
             }
         }
+
+        assert!(
+            !graph.transitively_activates(forbidden_feature, "subtle"),
+            "{forbidden_feature} must not reach an activation of the subtle dependency through \
+             local feature composition"
+        );
     }
+
+    assert!(
+        graph.transitively_activates("i2pcontrol", "subtle"),
+        "i2pcontrol must reach an activation of the subtle dependency"
+    );
 }
 
 #[test]
@@ -390,10 +407,12 @@ fn is_authorized_planning_path(path: &str) -> bool {
         path,
         "plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md"
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md"
             | "plans/closure/i2pcontrol-proposal-170/062-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/063-closure.md"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }
@@ -416,4 +435,284 @@ fn dependency_evidence_describes_subtle_ownership() {
             && entry.feature.as_deref() == Some("i2pcontrol")),
         "manifest must record the i2pcontrol auth consumer of subtle"
     );
+}
+
+/// Semantic local-feature reachability helper for indirect Cargo feature activation.
+///
+/// Parses the `[features]` table of a Cargo manifest and computes whether a
+/// root feature reaches an activation of a target dependency through local
+/// feature composition. The helper is intentionally scoped to this guard and
+/// does not attempt a full Cargo resolver/fingerprint model.
+///
+/// Activation rules:
+/// - `dep:NAME` — explicit dependency activation;
+/// - `NAME/feature` — strong dependency feature, activates `NAME`;
+/// - `NAME?/feature` — weak dependency feature, does NOT activate `NAME`;
+/// - `?/NAME` — weak feature reference, does NOT activate `NAME`;
+/// - `NAME` — local feature reference (recurses) OR bare dependency activation when `NAME` is not a
+///   declared local feature.
+///
+/// Traversal uses a visited set so cycle-bearing feature maps terminate.
+#[derive(Debug, Clone)]
+struct LocalFeatureGraph {
+    features: BTreeMap<String, Vec<String>>,
+}
+
+impl LocalFeatureGraph {
+    fn from_features_value(value: &toml::Value) -> Self {
+        let mut features: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        if let Some(table) = value.as_table() {
+            for (name, entries) in table {
+                let mut edge_list: Vec<String> = Vec::new();
+                if let Some(arr) = entries.as_array() {
+                    for entry in arr {
+                        if let Some(s) = entry.as_str() {
+                            edge_list.push(s.to_owned());
+                        }
+                    }
+                }
+                features.insert(name.clone(), edge_list);
+            }
+        }
+        Self { features }
+    }
+
+    fn from_toml_str(raw: &str) -> Self {
+        let value: toml::Value = toml::from_str(raw).expect("valid feature-only TOML");
+        let features = value
+            .get("features")
+            .unwrap_or_else(|| panic!("features table missing in fixture: {raw}"));
+        Self::from_features_value(features)
+    }
+
+    fn edges(&self, feature: &str) -> &[String] {
+        self.features.get(feature).map(Vec::as_slice).unwrap_or(&[])
+    }
+
+    fn transitively_activates(&self, root_feature: &str, dependency: &str) -> bool {
+        let mut visited: BTreeSet<String> = BTreeSet::new();
+        self.visit(root_feature, dependency, &mut visited)
+    }
+
+    fn visit(&self, feature: &str, dependency: &str, visited: &mut BTreeSet<String>) -> bool {
+        if !visited.insert(feature.to_owned()) {
+            return false;
+        }
+        for edge in self.edges(feature) {
+            if edge_activates_dependency(edge, dependency) {
+                return true;
+            }
+            if is_local_feature(edge, &self.features) && self.visit(edge, dependency, visited) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+fn edge_activates_dependency(edge: &str, dependency: &str) -> bool {
+    if edge.starts_with("?/") {
+        return false;
+    }
+    if let Some(name) = edge.strip_prefix("dep:") {
+        return name == dependency;
+    }
+    if let Some((dep_part, _feat)) = edge.split_once('/') {
+        if dep_part == dependency {
+            return !dep_part.ends_with('?');
+        }
+        return false;
+    }
+    edge == dependency
+}
+
+fn is_local_feature(edge: &str, features: &BTreeMap<String, Vec<String>>) -> bool {
+    !edge.starts_with("?/")
+        && !edge.starts_with("dep:")
+        && !edge.contains('/')
+        && features.contains_key(edge)
+}
+
+#[test]
+fn current_manifest_forbidden_features_cannot_reach_subtle() {
+    let raw = std::fs::read_to_string(workspace_root().join("emissary-cli/Cargo.toml"))
+        .expect("emissary-cli manifest");
+    let parsed: toml::Value = toml::from_str(&raw).expect("valid emissary-cli manifest");
+    let graph =
+        LocalFeatureGraph::from_features_value(parsed.get("features").expect("features table"));
+
+    for forbidden_feature in ["default", "ui", "metrics"] {
+        assert!(
+            !graph.transitively_activates(forbidden_feature, "subtle"),
+            "{forbidden_feature} must not reach an activation of the subtle dependency through \
+             local feature composition"
+        );
+    }
+
+    assert!(
+        graph.transitively_activates("i2pcontrol", "subtle"),
+        "i2pcontrol must reach an activation of the subtle dependency"
+    );
+}
+
+#[test]
+fn direct_forbidden_feature_activation_is_rejected() {
+    let graph = LocalFeatureGraph::from_toml_str(
+        r#"
+        [features]
+        default = ["dep:subtle"]
+        "#,
+    );
+    assert!(graph.transitively_activates("default", "subtle"));
+}
+
+#[test]
+fn indirect_forbidden_feature_chain_is_rejected() {
+    let graph = LocalFeatureGraph::from_toml_str(
+        r#"
+        [features]
+        ui = ["i2pcontrol"]
+        i2pcontrol = ["dep:subtle"]
+        "#,
+    );
+    assert!(graph.transitively_activates("ui", "subtle"));
+    assert!(graph.transitively_activates("i2pcontrol", "subtle"));
+}
+
+#[test]
+fn indirect_forbidden_feature_chain_via_strong_dep_feature_is_rejected() {
+    let graph = LocalFeatureGraph::from_toml_str(
+        r#"
+        [features]
+        metrics = ["ui"]
+        ui = ["i2pcontrol"]
+        i2pcontrol = ["subtle/ct"]
+        "#,
+    );
+    assert!(graph.transitively_activates("metrics", "subtle"));
+    assert!(graph.transitively_activates("ui", "subtle"));
+}
+
+#[test]
+fn unrelated_local_feature_chain_that_does_not_reach_subtle_passes() {
+    let graph = LocalFeatureGraph::from_toml_str(
+        r#"
+        [features]
+        default = ["ui"]
+        ui = ["alpha"]
+        alpha = ["beta"]
+        beta = ["dep:other"]
+        "#,
+    );
+    assert!(!graph.transitively_activates("default", "subtle"));
+    assert!(!graph.transitively_activates("ui", "subtle"));
+    assert!(!graph.transitively_activates("alpha", "subtle"));
+    assert!(!graph.transitively_activates("beta", "subtle"));
+}
+
+#[test]
+fn feature_cycle_terminates_and_still_detects_activation() {
+    let graph = LocalFeatureGraph::from_toml_str(
+        r#"
+        [features]
+        ui = ["alpha"]
+        alpha = ["beta"]
+        beta = ["alpha", "i2pcontrol"]
+        i2pcontrol = ["dep:subtle"]
+        "#,
+    );
+    assert!(
+        graph.transitively_activates("ui", "subtle"),
+        "cycle must not prevent activation detection"
+    );
+    assert!(
+        graph.transitively_activates("alpha", "subtle"),
+        "cycle must not prevent activation detection"
+    );
+    assert!(
+        graph.transitively_activates("beta", "subtle"),
+        "cycle must not prevent activation detection"
+    );
+}
+
+#[test]
+fn weak_dependency_feature_alone_is_not_independent_activation() {
+    let graph = LocalFeatureGraph::from_toml_str(
+        r#"
+        [features]
+        default = ["subtle?/ct"]
+        ui = ["?/i2pcontrol"]
+        "#,
+    );
+    assert!(
+        !graph.transitively_activates("default", "subtle"),
+        "weak subtle?/feature must not independently activate subtle"
+    );
+    assert!(
+        !graph.transitively_activates("ui", "subtle"),
+        "weak ?/feature must not independently activate the referenced feature"
+    );
+}
+
+#[test]
+fn weak_dependency_feature_alongside_strong_still_activates() {
+    let graph = LocalFeatureGraph::from_toml_str(
+        r#"
+        [features]
+        default = ["subtle?/ct", "dep:subtle"]
+        "#,
+    );
+    assert!(
+        graph.transitively_activates("default", "subtle"),
+        "weak subtle?/feature must not block a sibling strong activation"
+    );
+}
+
+#[test]
+fn direct_bare_dependency_activation_is_detected() {
+    let graph = LocalFeatureGraph::from_toml_str(
+        r#"
+        [features]
+        default = ["subtle"]
+        "#,
+    );
+    assert!(graph.transitively_activates("default", "subtle"));
+}
+
+#[test]
+fn local_feature_with_no_entry_terminates_safely() {
+    let graph = LocalFeatureGraph::from_toml_str(
+        r#"
+        [features]
+        default = ["ui"]
+        ui = []
+        "#,
+    );
+    assert!(!graph.transitively_activates("default", "subtle"));
+}
+
+#[test]
+fn forbidden_activations_manifest_is_self_consistent_with_graph() {
+    let manifest = load_manifest();
+    let raw = std::fs::read_to_string(workspace_root().join("emissary-cli/Cargo.toml"))
+        .expect("emissary-cli manifest");
+    let parsed: toml::Value = toml::from_str(&raw).expect("valid emissary-cli manifest");
+    let graph =
+        LocalFeatureGraph::from_features_value(parsed.get("features").expect("features table"));
+
+    for forbidden_feature in ["default", "ui", "metrics"] {
+        let forbidden_activations = manifest
+            .forbidden_activations
+            .get(forbidden_feature)
+            .and_then(|value| value.as_array())
+            .unwrap_or_else(|| panic!("forbidden_activations must list {forbidden_feature}"));
+        assert!(
+            forbidden_activations.is_empty(),
+            "{forbidden_feature} must list no forbidden activations"
+        );
+        assert!(
+            !graph.transitively_activates(forbidden_feature, "subtle"),
+            "{forbidden_feature} must not reach subtle even via local feature composition"
+        );
+    }
 }

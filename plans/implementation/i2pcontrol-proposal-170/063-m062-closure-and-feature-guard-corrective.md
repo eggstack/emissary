@@ -1,6 +1,6 @@
 # M063 — M062 Closure Consistency and Indirect Feature-Activation Guard Corrective
 
-Status: ready
+Status: closed
 
 Planning baseline: `fac2a0cdf75e3aa805acaf976f5a1ca69da6cf2c` — current `master`, containing the M062 dependency-surface implementation and closure record
 
@@ -11,6 +11,8 @@ Predecessors:
 - M061 source containment closed: `plans/closure/i2pcontrol-proposal-170/061-closure.md`;
 - M062 dependency-surface implementation landed at `fac2a0cdf75e3aa805acaf976f5a1ca69da6cf2c` and its production dependency correction is accepted;
 - M062 closure record: `plans/closure/i2pcontrol-proposal-170/062-closure.md`.
+
+Closure record: `plans/closure/i2pcontrol-proposal-170/063-closure.md`.
 
 Source roadmap:
 

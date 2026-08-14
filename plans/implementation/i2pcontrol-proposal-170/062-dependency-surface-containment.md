@@ -1,8 +1,14 @@
 # M062 — I2PControl Dependency-Surface Containment Corrective
 
-Status: ready
+Status: closed
 
 Planning baseline: `a70dd3ac82f12fbea1f8fba51e30a9e2e516650a` — merged M061 containment reclosure head
+
+M062 implementation/closure commit: `fac2a0cdf75e3aa805acaf976f5a1ca69da6cf2c`
+
+Closure record: `plans/closure/i2pcontrol-proposal-170/062-closure.md`
+
+Closure correctness corrective: M063 (`plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md`) corrected the M062 plan's stale `ready` status, the mislabeled `a0d9f2d` planning head text, and the indirect feature-activation guard weakness that the M062 closure record did not durably enforce.
 
 Pinned upstream comparison baseline: `eepnet/emissary@9b43484a21d5a1291c4881cdae62a36c527f8c0f`
 

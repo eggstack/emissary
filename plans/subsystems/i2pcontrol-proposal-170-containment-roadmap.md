@@ -1,12 +1,16 @@
 # I2PControl Proposal 170 Containment Corrective Roadmap
 
-Status: active; M063 ready; M061 source containment closed; M062 production dependency correction accepted with closure/evidence corrective required
+Status: closed; M058–M063 closed; no dependency-ready containment successor
 
 Original planning baseline: `adb2f52543764b267b2bcb282d093111001ae4b2` — merged M057 closure head
 
 M062 planning head: `a0d9f2dcc15fdeb5fcbe6658c0399ff9c8c9575b`
 
-M062 implementation/closure commit and M063 planning baseline: `fac2a0cdf75e3aa805acaf976f5a1ca69da6cf2c`
+M062 implementation/closure commit: `fac2a0cdf75e3aa805acaf976f5a1ca69da6cf2c`
+
+M063 planning baseline: `fac2a0cdf75e3aa805acaf976f5a1ca69da6cf2c`
+
+M063 implementation commit: see `plans/closure/i2pcontrol-proposal-170/063-closure.md` (`Implementation commit` section).
 
 Upstream comparison baseline: `eepnet/emissary@9b43484a21d5a1291c4881cdae62a36c527f8c0f` — pinned fork merge base/read-only comparison authority
 
@@ -31,6 +35,7 @@ Canonical and governance references:
 - `plans/closure/i2pcontrol-proposal-170/060-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/061-closure.md`;
 - `plans/closure/i2pcontrol-proposal-170/062-closure.md`;
+- `plans/closure/i2pcontrol-proposal-170/063-closure.md`;
 - `plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md`.
 
 Pinned external contract:
@@ -49,14 +54,14 @@ A post-M062 review found bounded closure/evidence defects rather than a producti
 - the M062 implementation plan retained `Status: ready`;
 - roadmap/registry text mislabeled the M062 planning head `a0d9f2d` as the closure/current head;
 - lifecycle status text disagreed between planning control surfaces;
-- the durable M062 guard rejects direct forbidden activation of `subtle` but does not compute transitive local Cargo feature reachability, so `ui -> i2pcontrol -> dep:subtle` is not currently rejected by the persistent test.
+- the durable M062 guard rejected direct forbidden activation of `subtle` but did not compute transitive local Cargo feature reachability, so `ui -> i2pcontrol -> dep:subtle` was not rejected by the persistent test.
 
-M063 is the sole corrective for those items. It may modify planning records and the existing dependency-containment test only. It does **not** reopen the accepted source boundary, dependency manifests, RouterInfo source completeness, unsupported tunnel types, authentication behavior, or runtime/core architecture.
+M063 was the sole corrective for those items. It modified planning records and the existing dependency-containment test only. It did **not** reopen the accepted source boundary, dependency manifests, RouterInfo source completeness, unsupported tunnel types, authentication behavior, or runtime/core architecture.
 
 The governing containment model remains two-layered:
 
 - **source containment:** M061 is authoritative for changed source paths outside `emissary-cli/src/i2pcontrol/**`;
-- **dependency containment:** M062 defines direct dependency ownership, with M063 strengthening the durable guard to enforce that ownership across transitive local-feature composition.
+- **dependency containment:** M062 defines direct dependency ownership, with M063 having strengthened the durable guard to enforce that ownership across transitive local-feature composition.
 
 The target remains **minimum justified delta**, including both source and direct dependency surfaces.
 
@@ -199,13 +204,13 @@ M060 — core observation containment — CLOSED
 M061 — source containment reclosure/static guard — CLOSED
    |
    v
-M062 — dependency-surface production corrective — PRODUCTION ACCEPTED; CLOSURE/EVIDENCE CORRECTIVE REQUIRED
+M062 — dependency-surface production corrective — CLOSED (closure/evidence corrected by M063)
    |
    v
-M063 — closure consistency + indirect feature-activation guard — READY
+M063 — closure consistency + indirect feature-activation guard — CLOSED
 ```
 
-M051 remains independently blocked in the source-completion roadmap and is not a dependency of M063.
+M051 remains independently blocked in the source-completion roadmap and is not a dependency of this containment workstream.
 
 ## 7. Milestones
 
@@ -225,7 +230,7 @@ Result: core budget reduced from 32 to 23 retained paths; nine paths restored to
 
 Result: exact current source boundary accepted and enforced with no production changes.
 
-### M062 — I2PControl dependency-surface containment corrective — production accepted; closure/evidence corrective required
+### M062 — I2PControl dependency-surface containment corrective — closed (closure/evidence corrected by M063)
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md`.
 
@@ -233,13 +238,15 @@ Historical closure: `plans/closure/i2pcontrol-proposal-170/062-closure.md`.
 
 Production result at `fac2a0c`: dependency ownership corrected exactly as intended, with no production source or lockfile changes.
 
-Remaining closure defects are delegated exclusively to M063.
+Remaining closure defects were delegated exclusively to M063 and were corrected in this closure.
 
-### M063 — M062 closure consistency and indirect feature-activation guard corrective — ready
+### M063 — M062 closure consistency and indirect feature-activation guard corrective — closed
 
 Class: invariant/corrective closure.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md`.
+
+Closure record: `plans/closure/i2pcontrol-proposal-170/063-closure.md`.
 
 Objective:
 
@@ -247,9 +254,9 @@ Objective:
 - strengthen `m062_dependency_containment.rs` so forbidden root features cannot transitively reach the I2PControl-only direct `subtle` activation;
 - preserve all Cargo manifests, lockfile, production source, runtime/core behavior, and Proposal 170 capability state.
 
-Authorized implementation paths are limited to the existing M062 test and planning/closure records named by the M063 plan.
+Authorized implementation paths were limited to the existing M062 test and planning/closure records named by the M063 plan.
 
-Exit conditions:
+Closed exit conditions:
 
 - direct and indirect forbidden activation regressions fail the guard;
 - cycle/weak-feature semantics are covered without false positives;
@@ -340,7 +347,7 @@ The completion criterion remains **minimum justified source and dependency delta
 | M059 | closed | `plans/implementation/i2pcontrol-proposal-170/059-cli-runtime-containment.md` | `plans/closure/i2pcontrol-proposal-170/059-closure.md` | exact original-CLI budget implemented; no core changes |
 | M060 | closed | `plans/implementation/i2pcontrol-proposal-170/060-core-observation-containment.md` | `plans/closure/i2pcontrol-proposal-170/060-closure.md` | 23 retained core paths; 9 restored; no new core path |
 | M061 | closed | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | `plans/closure/i2pcontrol-proposal-170/061-closure.md` | exact source boundary accepted and enforced |
-| M062 | corrective pass required for closure/evidence only; production fix accepted | `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md` | `plans/closure/i2pcontrol-proposal-170/062-closure.md` | M063 corrects stale records and incomplete indirect feature-activation guard |
-| M063 | ready | `plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md` | pending | M062 production implementation landed at `fac2a0c`; no other hard dependency |
+| M062 | closed (closure/evidence corrected by M063) | `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md` | `plans/closure/i2pcontrol-proposal-170/062-closure.md` (historical) | M063 reconciled stale records and strengthened indirect feature-activation guard |
+| M063 | closed | `plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md` | `plans/closure/i2pcontrol-proposal-170/063-closure.md` | M062 production implementation landed at `fac2a0c`; no other hard dependency |
 
 M051 from the source-completion roadmap remains independently blocked by absent substantive news/ban owners and is not a dependency of M063.

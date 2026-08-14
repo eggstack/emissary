@@ -149,7 +149,10 @@ M069 SOCKS + SOCKS-IRC                    |
                  M072 integrated reclosure
 ```
 
-M066, M067, M068, and M071 may proceed in parallel after M065 closes. M069 requires the accepted common IRC filter from M066 for `socksirc`. M070 requires closed HTTP server and HTTP client implementations and must be composition-only. M072 depends on every runtime-family milestone.
+M067, M068, M069, and M071 may proceed in parallel after M066 closes. M069
+uses the accepted common IRC filter from M066 for `socksirc`. M070 requires
+closed HTTP server and HTTP client implementations and must be composition-only.
+M072 depends on every runtime-family milestone.
 
 ### Phase-2 invariants
 

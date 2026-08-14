@@ -1,6 +1,6 @@
 # I2PControl TunnelManager
 
-Status: M065 runtime-foundation closure accepted; lifecycle reconciliation remains
+Status: M066 IRC runtime closure accepted; lifecycle reconciliation remains
 closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
@@ -14,8 +14,9 @@ The TunnelManager handler implements the `TunnelManager` JSON-RPC method for all
 - Compatibility `List` and capitalized action values
 - Lifecycle dispatch (start, stop, restart) through the backend registry
 - Ownership enforcement for startup-managed tunnels
-- Real control-plane lifecycle for generic `client` and `server`, with
-  explicit unsupported behavior for the remaining ten types
+- Real control-plane lifecycle for generic `client` and `server`, plus filtered
+  `ircclient` and registration-filtered `ircserver`; explicit unsupported
+  behavior remains for the other eight specialized types
 
 Production inventory is the deterministic union of startup-configured generic
 client/server definitions and persisted control-plane definitions. Startup
@@ -37,16 +38,19 @@ returned by `get`. The actual public destination is available to
 `ClientServicesInfo` only after the backend has established the session.
 Startup-managed server definitions remain externally owned.
 
-M065 also provides internal-only runtime seams for future specialized backends:
+M065 also provides internal-only runtime seams for specialized backends:
 the client seam owns one outbound Yosemite session, a validated local listener,
 and bounded per-connection tasks; the accepted-server seam owns one persistent
 session and passes the SAM-derived public peer identity plus stream to a
-protocol handler before any local target connection. These seams do not change
-the production registry: the ten specialized tunnel families remain explicit
+protocol handler before any local target connection. M066 consumes those seams
+for the IRC family. `ircclient` uses one bounded line-oriented filter for both
+traffic directions; `ircserver` filters registration before connecting to
+loopback. The other eight specialized tunnel families remain explicit
 unsupported backends until their own security/filter milestones close.
 
 After the durable definition and server-identity stores load, `StartOnLoad` is
-reconciled only for control-plane-owned generic `client` and `server`
+reconciled only for control-plane-owned generic `client`, `ircclient`,
+`server`, and `ircserver`
 definitions. Each start is isolated; a failed definition remains stopped and
 does not prevent the service or other eligible definitions from starting.
 Unsupported and startup-managed definitions are never auto-started.
@@ -378,6 +382,15 @@ status/error while preserving durable definitions.
 | `i2p.tunnel.ircNick` | string | IRC nick |
 | `i2p.tunnel.ircPassword` | string (redacted) | IRC password |
 | `i2p.tunnel.ircChannels` | string | Comma-separated channels |
+
+These fields are stored for Proposal 170 round-tripping but rejected by the
+M066 runtime before allocation. M066 forwards an explicitly configured I2P
+destination and does not synthesize IRC registration or channel automation.
+`ircclient` accepts only `TargetDestination`, `TargetPort`, `ReachableBy`, and
+`Port`; `ircserver` accepts loopback `TargetHost`/`Host` plus `TargetPort` or
+`Port`. I2CP and custom options, WEBIRC/cloak options, access/auth fields, and
+DCC-related options are rejected. Unsupported CTCP and DCC payloads are
+blocked by the common filter.
 
 ### Streamr options
 

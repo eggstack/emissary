@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Runtime Completion Roadmap
 
-Status: active; M064 and M065 closed; M066 is the next registered handoff
+Status: active; M064, M065, and M066 closed; M067 is the next registered handoff
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6` — current production head reviewed before this planning series
 
@@ -23,7 +23,7 @@ Canonical/internal authority:
 
 ## 1. Purpose
 
-Complete the ten Proposal 170 tunnel families that remain explicit unsupported backends while preserving the central containment requirement: Proposal 170-specific runtime policy and application-protocol logic should remain in `emissary-cli/src/i2pcontrol/**`, and the already security-reviewed router core should not acquire new tunnel-type behavior.
+Complete the ten Proposal 170 tunnel families that were initially explicit unsupported backends while preserving the central containment requirement: Proposal 170-specific runtime policy and application-protocol logic should remain in `emissary-cli/src/i2pcontrol/**`, and the already security-reviewed router core should not acquire new tunnel-type behavior.
 
 This roadmap does not treat byte forwarding as sufficient completion for specialized protocols. HTTP and IRC server/client types are security adapters. Their filtering/normalization behavior is required to prevent local/server identity leaks, spoofed proxy metadata, request-smuggling ambiguity, direct-connect address leakage, and protocol-confusion exposure.
 
@@ -32,7 +32,7 @@ The target production registry evolves monotonically:
 ```text
 current:
   client, server = real
-  other ten      = explicit UnsupportedTunnelBackend
+        remaining eight = explicit UnsupportedTunnelBackend
 
 phase progress:
   each family replaces only its own stub after independent closure
@@ -305,13 +305,15 @@ Status: closed; hard dependency M064 is closed. Closure:
 
 Add bounded reusable control-plane primitives for local listener ownership, accepted-stream server ownership, per-name task generation/cancellation where not already reusable, peer identity delivery to filters, and deterministic per-backend option-capability validation. Keep all production work under `i2pcontrol`.
 
-Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type. M066, M067, M068, and M071 are dependency-ready successors; only M066 is registered as the next handoff.
+Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type. M066, M067, M068, and M071 were dependency-ready successors; M066 is now closed and M067 is the next registered handoff.
 
 ### M066 — IRC client/server family
 
 Plan: `066-irc-client-server-tunnel-family.md`.
 
 Implement common IRC filter, real `ircclient`, and filtered accepted-stream `ircserver`. DCC and WEBIRC fail closed.
+
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/066-closure.md`.
 
 Exit: both types are real and independently security-tested; no local-address/registration bypass path is known.
 

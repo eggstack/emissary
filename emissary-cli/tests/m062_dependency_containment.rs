@@ -418,7 +418,13 @@ fn is_authorized_m065_path(path: &str) -> bool {
             | "emissary-cli/src/i2pcontrol/backends/mod.rs"
             | "emissary-cli/src/i2pcontrol/backends/client.rs"
             | "emissary-cli/src/i2pcontrol/backends/server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/registry.rs"
+            | "emissary-cli/src/i2pcontrol/backends/filters/mod.rs"
+            | "emissary-cli/src/i2pcontrol/backends/filters/irc.rs"
+            | "emissary-cli/src/i2pcontrol/backends/irc_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/irc_server.rs"
             | "emissary-cli/src/i2pcontrol/backends/options.rs"
+            | "emissary-cli/src/i2pcontrol/production.rs"
             | "emissary-cli/src/i2pcontrol/backends/runtime/mod.rs"
             | "emissary-cli/src/i2pcontrol/backends/runtime/task_group.rs"
             | "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"
@@ -450,6 +456,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md"
             | "plans/closure/i2pcontrol-proposal-170/062-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/063-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/066-closure.md"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }

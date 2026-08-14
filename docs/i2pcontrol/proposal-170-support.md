@@ -93,10 +93,10 @@ accepted integrated reclosure and final 43-row source audit.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because five of the 43 RouterInfo additions lack
-bounded authoritative sources and ten specialized tunnel data planes remain
-explicit unsupported runtimes. M065 closes shared runtime lifecycle and option
-validation primitives without claiming a new real tunnel type. The unavailable
-rows are router news, banned peers, transit-15s, and v4/v6 network-error.
+bounded authoritative sources and eight specialized tunnel data planes remain
+explicit unsupported runtimes. M066 adds real filtered `ircclient` and
+`ircserver` control-plane runtimes; the unavailable rows are router news, banned
+peers, transit-15s, and v4/v6 network-error.
 
 ## M038 live-runtime evidence
 
@@ -159,7 +159,9 @@ Retained candidate evidence includes:
 - exact 43-key RouterInfo matrix and explicit unavailable behavior;
 - enabled-mode runtime AddressBook authority.
 - M065 bounded I2PControl-owned client-listener and accepted-server runtime seams;
-- M065 deterministic backend option-capability validation with secret-safe errors.
+- M065 deterministic backend option-capability validation with secret-safe errors;
+- M066 bounded IRC parsing/filtering, filtered `ircclient`, and registration-filtered
+  `ircserver` runtimes with trusted peer-derived registration identity.
 
 M028 must not reimplement or broaden these areas.
 
@@ -211,7 +213,6 @@ lifecycle operations.
 The following other tunnel families remain intentionally out of scope:
 
 - HTTP client/server and bidirectional server;
-- IRC client/server;
 - SOCKS-IRC and CONNECT variants;
 - Streamr client/server;
 - any other missing listener, destination, LeaseSet, or traffic implementation.
@@ -220,6 +221,25 @@ Their definitions may parse and persist. Start/restart must return explicit
 not-implemented operation status; stop remains safe and inactive. They must not
 report running or open resources. M065's lifecycle seams are not registered as
 those tunnel types and do not change this status.
+
+### IRC tunnel runtime boundary
+
+`ircclient` and `ircserver` are operational only through the I2PControl-owned
+filtered paths. IRC lines are bounded and parsed without assuming UTF-8;
+client `USER` hostnames, PING/PONG tokens, PART reasons, and QUIT reasons are
+sanitized. Ordinary PRIVMSG/NOTICE and CTCP ACTION are supported. Unsupported
+CTCP, including DCC CHAT/SEND/RESUME/ACCEPT, is dropped; no auxiliary DCC
+listener or session is created. WEBIRC and configurable cloak options are
+rejected before allocation. IRC automation fields (`ircServer`, `ircPort`,
+`ircNick`, `ircPassword`, and `ircChannels`) are likewise rejected because
+M066 does not synthesize registration or channel behavior.
+
+`ircserver` accepts only bounded registration material, rejects obvious
+HTTP/Binary protocol probes, rewrites `USER` using the trusted accepted I2P
+peer identity, and connects only to loopback. It does not forward registration
+to the local IRCd until NICK and sanitized USER have been accepted. The
+post-registration path is a raw IRC stream as specified by M066; the client
+side remains filtered for the future `socksirc` composition.
 
 ## AddressBook
 

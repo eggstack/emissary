@@ -1,6 +1,6 @@
 # M069 — SOCKS and SOCKS-IRC Tunnels
 
-Status: blocked — hard dependencies on M065 and M066 closure
+Status: blocked — dependency-ready but not the next registered handoff
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 

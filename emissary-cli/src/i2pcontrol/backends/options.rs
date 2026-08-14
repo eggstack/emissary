@@ -165,6 +165,28 @@ pub const SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     CustomOptionPolicy::Accept,
 );
 
+/// Proposal 170 fields consumed by the filtered IRC client runtime.
+///
+/// IRC automation fields are deliberately rejected: this backend forwards an
+/// explicitly configured I2P destination and does not synthesize registration
+/// or channel commands on behalf of a user.
+pub const IRC_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
+    &["TargetDestination", "ListenPort"],
+    &[],
+    &["TargetPort", "ListenInterface"],
+    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Reject,
+);
+
+/// Proposal 170 fields consumed by the filtered IRC server runtime.
+pub const IRC_SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
+    &[],
+    &["TargetPort", "ListenPort"],
+    &["HostingDestination"],
+    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Reject,
+);
+
 fn present_runtime_fields(options: &TunnelOptions) -> Vec<&'static str> {
     let mut fields = Vec::new();
     for (field, present) in [

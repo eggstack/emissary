@@ -174,6 +174,12 @@ pub fn create_production_registry_with_server_store(
         Arc::new(super::client::ClientTunnelBackend::new(sam_tcp_port)) as Arc<dyn TunnelBackend>;
     let server = Arc::new(super::server::ServerTunnelBackend::new(
         sam_tcp_port,
+        server_store.clone(),
+    )) as Arc<dyn TunnelBackend>;
+    let irc_client = Arc::new(super::irc_client::IrcClientTunnelBackend::new(sam_tcp_port))
+        as Arc<dyn TunnelBackend>;
+    let irc_server = Arc::new(super::irc_server::IrcServerTunnelBackend::new(
+        sam_tcp_port,
         server_store,
     )) as Arc<dyn TunnelBackend>;
     let backends: Vec<Arc<dyn TunnelBackend>> = ALL_TUNNEL_TYPES
@@ -183,6 +189,10 @@ pub fn create_production_registry_with_server_store(
                 client.clone()
             } else if tt == TunnelType::Server {
                 server.clone()
+            } else if tt == TunnelType::IrcClient {
+                irc_client.clone()
+            } else if tt == TunnelType::IrcServer {
+                irc_server.clone()
             } else {
                 Arc::new(super::unsupported::UnsupportedTunnelBackend::new(tt))
                     as Arc<dyn TunnelBackend>
@@ -305,11 +315,13 @@ mod tests {
             registry.get(TunnelType::Client).tunnel_type(),
             TunnelType::Client
         );
-        assert_eq!(registry.get(TunnelType::Server).tunnel_type(), TunnelType::Server);
-        for &tunnel_type in ALL_TUNNEL_TYPES
-            .iter()
-            .filter(|&&tunnel_type| tunnel_type != TunnelType::Client && tunnel_type != TunnelType::Server)
-        {
+        assert_eq!(
+            registry.get(TunnelType::Server).tunnel_type(),
+            TunnelType::Server
+        );
+        for &tunnel_type in ALL_TUNNEL_TYPES.iter().filter(|&&tunnel_type| {
+            tunnel_type != TunnelType::Client && tunnel_type != TunnelType::Server
+        }) {
             assert!(matches!(
                 registry.get(tunnel_type).inspect(&test_definition(tunnel_type)).runtime_state,
                 TunnelRuntimeState::Unsupported

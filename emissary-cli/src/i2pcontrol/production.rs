@@ -33,33 +33,30 @@ use std::{
 
 use async_trait::async_trait;
 
-use crate::{
-    i2pcontrol::{
-        address_book_runtime::{
-            RuntimeAddressBookEntry, RuntimeAddressBookHandle,
-            RuntimeAddressBookSnapshot, RuntimeAddressBookType,
-        },
-        backends::{registry::TunnelBackendRegistry, BackendError, TunnelBackend},
-        control_plane::{AddressBookControl, ControlPlane, TunnelManagerControl},
-        domain::{
-            address_book::{
-                AddressBookConfiguration, AddressBookEntry, AdministrativeAddressBookType,
-                SubscriptionSet,
-            },
-            tunnel::{TunnelDefinition, TunnelName, TunnelType},
-        },
-        observability::LogRing,
-        router_info::{
-            ActivePeerSnapshot, ActivePeerSource, ActivePeerStats, BannedPeer, ClockSkew,
-            I2PTunnelStats, InspectionError, InspectionGroup, LogEntry, LogSnapshot,
-            NetworkSnapshot, NetworkStatus, PeerDirectorySnapshot, PeerDirectorySource,
-            PeerIdentity, PeerLimits, RecentTransitTraffic, RouterInfoControl, TransitBytes,
-            TransportBytes, TransportLimits, TunnelBuildStats, TunnelDetail, TunnelDetails,
-            TunnelSource, TunnelSummary,
-        },
-        server_secret_store::{ServerDestinationStore, StoredDestination},
-        stores::{address_book_store::AddressBookStore, tunnel_store::TunnelStore},
+use crate::i2pcontrol::{
+    address_book_runtime::{
+        RuntimeAddressBookEntry, RuntimeAddressBookHandle, RuntimeAddressBookSnapshot,
+        RuntimeAddressBookType,
     },
+    backends::{registry::TunnelBackendRegistry, BackendError, TunnelBackend},
+    control_plane::{AddressBookControl, ControlPlane, TunnelManagerControl},
+    domain::{
+        address_book::{
+            AddressBookConfiguration, AddressBookEntry, AdministrativeAddressBookType,
+            SubscriptionSet,
+        },
+        tunnel::{TunnelDefinition, TunnelName, TunnelType},
+    },
+    observability::LogRing,
+    router_info::{
+        ActivePeerSnapshot, ActivePeerSource, ActivePeerStats, BannedPeer, ClockSkew,
+        I2PTunnelStats, InspectionError, InspectionGroup, LogEntry, LogSnapshot, NetworkSnapshot,
+        NetworkStatus, PeerDirectorySnapshot, PeerDirectorySource, PeerIdentity, PeerLimits,
+        RecentTransitTraffic, RouterInfoControl, TransitBytes, TransportBytes, TransportLimits,
+        TunnelBuildStats, TunnelDetail, TunnelDetails, TunnelSource, TunnelSummary,
+    },
+    server_secret_store::{ServerDestinationStore, StoredDestination},
+    stores::{address_book_store::AddressBookStore, tunnel_store::TunnelStore},
 };
 
 use emissary_core::{
@@ -319,7 +316,10 @@ impl StartupTunnelInventory {
         let Some(definition) = definitions.get_mut(name) else {
             return Err("startup tunnel name is not configured".to_string());
         };
-        if definition.tunnel_type != TunnelType::Server {
+        if !matches!(
+            definition.tunnel_type,
+            TunnelType::Server | TunnelType::IrcServer
+        ) {
             return Err("startup tunnel is not a server definition".to_string());
         }
         if destination.is_empty() {
@@ -780,7 +780,12 @@ impl ProductionTunnelManagerControl {
         let referenced_server_identities = store
             .list()
             .iter()
-            .filter(|definition| definition.tunnel_type == TunnelType::Server)
+            .filter(|definition| {
+                matches!(
+                    definition.tunnel_type,
+                    TunnelType::Server | TunnelType::IrcServer
+                )
+            })
             .filter_map(|definition| {
                 definition
                     .raw_config
@@ -834,7 +839,10 @@ impl ProductionTunnelManagerControl {
                     != crate::i2pcontrol::domain::tunnel::StartIntent::StartOnLoad
                 || !matches!(
                     definition.tunnel_type,
-                    TunnelType::Client | TunnelType::Server
+                    TunnelType::Client
+                        | TunnelType::IrcClient
+                        | TunnelType::Server
+                        | TunnelType::IrcServer
                 )
             {
                 continue;
@@ -918,7 +926,10 @@ impl ProductionTunnelManagerControl {
         let backend = self.registry.get(definition.tunnel_type);
         match backend.start(&definition).await {
             Ok(()) => {
-                if definition.tunnel_type == TunnelType::Server {
+                if matches!(
+                    definition.tunnel_type,
+                    TunnelType::Server | TunnelType::IrcServer
+                ) {
                     let status = backend.inspect(&definition);
                     let Some(destination) = status.destination else {
                         let _ = backend.stop(&definition).await;
@@ -946,7 +957,10 @@ impl ProductionTunnelManagerControl {
         {
             let status = self.registry.get(definition.tunnel_type).inspect(&definition);
             definition.runtime_state = status.runtime_state;
-            if definition.tunnel_type == TunnelType::Server {
+            if matches!(
+                definition.tunnel_type,
+                TunnelType::Server | TunnelType::IrcServer
+            ) {
                 let public_destination = if status.destination.is_some() {
                     status.destination
                 } else {
@@ -983,7 +997,10 @@ impl ProductionTunnelManagerControl {
         &self,
         mut definition: TunnelDefinition,
     ) -> Result<TunnelDefinition, String> {
-        if definition.tunnel_type != TunnelType::Server {
+        if !matches!(
+            definition.tunnel_type,
+            TunnelType::Server | TunnelType::IrcServer
+        ) {
             return Ok(definition);
         }
         let identity = definition
@@ -1616,8 +1633,8 @@ impl RouterInfoControl for ProductionRouterInfoControl {
 mod tests {
     use super::*;
     use crate::{
-        i2pcontrol::address_book_runtime::{new_controlled_manager, RuntimeAddressBookType},
         config::AddressBookConfig,
+        i2pcontrol::address_book_runtime::{new_controlled_manager, RuntimeAddressBookType},
     };
 
     fn valid_destination(seed: u8) -> String {
@@ -1691,7 +1708,7 @@ mod tests {
             },
         )
         .await;
-        
+
         let adapter = ProductionAddressBookControl::new(control.clone(), base.join("addressbooks"));
 
         let mut config = AddressBookConfiguration::new();

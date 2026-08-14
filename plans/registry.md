@@ -28,128 +28,135 @@ Canonical direction:
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
-| I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no dependency-ready handoff | M061 source containment closed; M062 dependency-surface containment closed; M063 closure-corrective accepted; M051 remains independently blocked |
+| I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no containment corrective handoff | M061 source containment and M062/M063 dependency containment remain accepted authorities |
+| I2PControl Proposal 170 tunnel runtime completion | active; M064 ready | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M064 — current-head feature-disabled baseline corrective | M065 hard-blocked on M064; later family dependencies shown below |
+
+## Canonical scope amendment for tunnel runtimes
+
+Maintainer direction on 2026-08-14 intentionally reopens the ten Proposal 170 tunnel data planes that ADR-0001/ADR-0002 previously deferred.
+
+New controlling decision:
+
+- `plans/adrs/ADR-0003-proposal-170-tunnel-runtime-completion-and-filter-boundary.md`.
+
+ADR-0001 and ADR-0002 remain historical/controlling for exhaustive registration, truthful unsupported behavior, startup/control-plane ownership separation, generic client/server runtime ownership, server secret storage, and internal-only scope. ADR-0003 supersedes only their statements that the ten remaining Proposal 170 tunnel types must remain deferred/ineligible for real backends.
+
+The preferred implementation boundary is `emissary-cli/src/i2pcontrol/**`. M065-M072 do not authorize new `emissary-core/**` production paths. M064 is a separate narrow correction to an already accepted `events.rs` observation setter and adds no tunnel capability.
 
 ## Dependency-ready implementation plans
 
-No implementation plan is currently dependency-ready. M058–M063 are closed and their accepted closure records were not rewritten. M051 remains blocked with its accepted semantic limitation; no successor plan becomes ready.
+Exactly one plan is currently dependency-ready:
 
-## Recently closed / corrective milestones
+| Handoff | Status | Plan | Objective |
+|---|---|---|---|
+| M064 — Proposal 170 tunnel-runtime baseline corrective | ready | `plans/implementation/i2pcontrol-proposal-170/064-proposal-170-tunnel-runtime-baseline-corrective.md` | repair the existing feature-disabled/no-events unused-parameter regression before new runtime work |
 
-| Subsystem | Handoff | Status | Implementation plan | Closure record |
-|---|---|---|---|---|
-| I2PControl Proposal 170 containment | M063 — M062 closure consistency and indirect feature-activation guard corrective | closed | `plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md` | `plans/closure/i2pcontrol-proposal-170/063-closure.md` |
-| I2PControl Proposal 170 containment | M062 — I2PControl dependency-surface containment corrective | closed (closure/evidence corrected by M063) | `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md` | `plans/closure/i2pcontrol-proposal-170/062-closure.md` (historical evidence preserved) |
-| I2PControl Proposal 170 containment | M061 — independent containment reclosure | closed | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | `plans/closure/i2pcontrol-proposal-170/061-closure.md` |
+Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered as ready. Future handoffs are prewritten but remain blocked until their hard dependencies close.
 
-## Blocked roadmap successors
+## Prewritten blocked tunnel-runtime successors
 
 | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|
-| M051 — router news and banned peers | blocked with accepted semantic limitation | `plans/implementation/i2pcontrol-proposal-170/051-routerinfo-news-and-banned-peer-semantics.md` | substantive news/ban owners absent; no current owner-specific plan authorized |
+| M065 — I2PControl tunnel runtime/option primitives | blocked | `plans/implementation/i2pcontrol-proposal-170/065-i2pcontrol-tunnel-runtime-primitives.md` | M064 closed |
+| M066 — IRC client/server family | blocked | `plans/implementation/i2pcontrol-proposal-170/066-irc-client-server-tunnel-family.md` | M065 closed |
+| M067 — HTTP server | blocked | `plans/implementation/i2pcontrol-proposal-170/067-http-server-tunnel.md` | M065 closed |
+| M068 — HTTP client + CONNECT | blocked | `plans/implementation/i2pcontrol-proposal-170/068-http-client-and-connect-tunnels.md` | M065 closed |
+| M069 — SOCKS + SOCKS-IRC | blocked | `plans/implementation/i2pcontrol-proposal-170/069-socks-and-socks-irc-tunnels.md` | M065 + M066 closed |
+| M070 — HTTP bidirectional server composition | blocked | `plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md` | M067 + M068 closed |
+| M071 — Streamr client/server | blocked | `plans/implementation/i2pcontrol-proposal-170/071-streamr-client-server-tunnels.md` | M065 closed |
+| M072 — integrated tunnel-runtime reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/072-tunnel-runtime-completion-reclosure.md` | M066-M071 closed |
 
-M063 is not a source-completion successor and does not alter the M051 blocker.
+After M065 closes, M066, M067, M068, and M071 are independently dependency-ready and may be implemented in parallel. M069 waits for the common IRC filter. M070 waits for both accepted HTTP halves. M072 waits for every runtime-family milestone.
 
-## Current containment corrective scope
+## Tunnel-runtime security boundary
 
-Original containment planning baseline: `adb2f52543764b267b2bcb282d093111001ae4b2` — merged M057 closure head.
+The new scope is not permission to turn specialized tunnels into raw forwarding.
 
-M062 planning head: `a0d9f2dcc15fdeb5fcbe6658c0399ff9c8c9575b`.
+Durable rules:
 
-M062 implementation/closure commit and M063 planning baseline: `fac2a0cdf75e3aa805acaf976f5a1ca69da6cf2c`.
+- `httpserver` and the inbound half of `httpbidirserver` must use application-visible accepted I2P streams so request filtering occurs before local-service forwarding;
+- HTTP server completion requires bounded parsing, request-framing/request-smuggling defenses, trusted peer-derived I2P identity metadata, spoofed proxy/identity-header removal, safe Host/target handling, supported access/throttle controls, and response fingerprint/proxy-header filtering;
+- `ircclient` and `socksirc` use one common anonymity filter; DCC/unsupported CTCP remain fail-closed unless a later accepted plan explicitly implements them;
+- `ircserver` filters bounded registration and derives presented client hostname/cloak from actual I2P peer identity before local IRCd forwarding;
+- `socksirc` may not have a raw/unfiltered payload path;
+- HTTP client, CONNECT, and SOCKS direct-I2P routing must not use local OS DNS or direct LAN/localhost routing; clearnet requires explicitly configured I2P outproxy behavior;
+- Streamr subscriber/packet/task state is hard bounded;
+- a real backend must apply or reject runtime-relevant Proposal 170 options before allocation; security-sensitive persist-but-ignore behavior is forbidden.
 
-M063 implementation commit: see `plans/closure/i2pcontrol-proposal-170/063-closure.md` (`Implementation commit` section).
+## Current production baseline and containment authority
 
-Pinned upstream compare baseline/merge base: `eepnet/emissary@9b43484a21d5a1291c4881cdae62a36c527f8c0f`.
+Tunnel-runtime planning production baseline:
 
-M058–M061 established and enforced the minimum justified non-`i2pcontrol` source delta. M062 correctly closed the production dependency-surface leak:
+`a1296b018ce98d26a019bd5064dff9f4b47e0ad6`.
 
-- root `Cargo.toml` no longer carries an I2PControl-only `subtle` workspace declaration;
-- `emissary-cli/Cargo.toml` declares `subtle = { version = "2.6.1", default-features = false, optional = true }` locally;
-- `i2pcontrol = [..., "dep:subtle"]` explicitly activates the optional dependency;
-- `emissary-core` continues to declare `subtle` with a literal version for its independent DSA consumer;
-- `Cargo.lock` remained unchanged;
-- no production Rust source changed.
+At that baseline:
 
-M063 closed the M062 closure/evidence defects without altering the accepted production dependency state:
+- production registry has real generic `client` and `server` backends;
+- the other ten Proposal 170 types are explicit unsupported backends;
+- the current feature-disabled/no-events core check has a narrow unused-parameter regression in `emissary-core/src/events.rs::set_ipv4_testing/set_ipv6_testing`, owned by M064;
+- no specialized real backend is claimed yet.
 
-- the M062 implementation plan no longer says `Status: ready`;
-- registry and roadmap text correctly identify `a0d9f2d` as the M062 planning head and `fac2a0c` as the M062 implementation/closure commit;
-- registry and roadmap lifecycle status text agree on the closed disposition of M062 and M063;
-- `m062_dependency_containment.rs` now computes transitive local-feature reachability and rejects indirect regressions such as `ui -> i2pcontrol -> dep:subtle`.
+Accepted containment authorities remain:
 
-### Durable dependency rule
+- `plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml` + `m061_containment.rs` for source paths;
+- `plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml` + strengthened `m062_dependency_containment.rs` for direct dependency ownership and transitive local-feature activation.
 
-A direct dependency whose only direct consumer is `feature = "i2pcontrol"` code must be optional and feature-owned by `i2pcontrol`. It must not be an unconditional default-CLI dependency or a workspace-level dependency absent an independently justified non-I2PControl direct consumer.
+M062/M063 durable dependency rule:
 
-The rule applies transitively across local Cargo feature composition: an unrelated feature must not reach an activation of the I2PControl-only direct dependency through another local feature.
+A direct dependency whose only direct consumer is `feature = "i2pcontrol"` code must be optional and feature-owned by `i2pcontrol`. An unrelated local feature must not activate that dependency directly or indirectly through local feature composition.
 
-This concerns direct dependency activation. A crate may still legitimately appear transitively in a feature-disabled resolved graph; crate-name absence from `cargo tree` is not an acceptance criterion.
+## Accepted unrelated Proposal 170 support state
 
-The dependency authority remains `062-dependency-containment.toml`, enforced by `m062_dependency_containment.rs`; M063 strengthens that guard without changing dependency policy.
-
-## Retained and corrective milestone disposition
-
-| Handoff | Current status | Evidence / correction |
-|---|---|---|
-| M037 — earlier containment boundary reduction | closed historical containment evidence | `037-closure.md`; later RouterInfo source work expanded observation paths, so its manifest is not the final current authority |
-| M045 / M053 — known-peer directory corrective | closed | live `ProfileStorage` source accepted by `053-closure.md` |
-| M046 — active-peer inventory and limits | closed | `046-closure.md` |
-| M047 — active-peer statistics | closed | `047-closure.md` |
-| M048 — tunnel-pool counts/details | closed | `048-closure.md` |
-| M049 — rolling metrics/queues | corrected/closed through M054 and M056 | recent success + queue/TBM retained; transit 15s explicitly unavailable |
-| M050 — v4/v6 network state | corrected/closed through M055 and M056 | status.v6 + testing v4/v6 retained; error rows unavailable with no canonical owner |
-| M051 — news/banned peers | blocked with accepted limitation | `051-closure.md`; both rows remain unavailable |
-| M052 — integration reclosure | corrected/closed through M056 | historical `40/1/2` matrix superseded by accepted `37/1/5` audit |
-| M054–M056 | closed | transit/error truthfulness and integrated source reclosure accepted |
-| M057 | closed | planning-record consistency accepted; no production changes |
-| M058 | closed | `058-closure.md`; 47-path ledger and M059/M060 budgets frozen |
-| M059 | closed | `059-closure.md`; exact original-CLI budget implemented with no core changes |
-| M060 | closed | `060-closure.md`; 23 retained core paths, 9 formatting-only paths reverted, no new core path |
-| M061 | closed | `061-closure.md`; exact current source boundary accepted and enforced; no production changes |
-| M062 | closed (closure/evidence corrected by M063) | production dependency correction at `fac2a0c` accepted; M063 reconciled stale records and strengthened indirect feature-activation guard |
-| M063 | closed | `063-m062-closure-and-feature-guard-corrective.md`; planning/test-only closure corrective |
-
-## Accepted Proposal 170 support state
-
-The accepted RouterInfo source matrix remains exactly:
+The RouterInfo source matrix remains exactly:
 
 - 43 canonical Proposal 170 RouterInfo additions;
 - 37 available;
 - 1 protocol-permitted neutral;
 - 5 unavailable: transit 15s, news, banned peers, and both v4/v6 network-error rows.
 
-The historical M052-era 40/1/2 claim remains historical only. M054/M055 corrected three overclaims and M056 accepted 37/1/5. M063 did not change this matrix.
+M051 remains blocked with the accepted news/ban semantic limitation. Tunnel runtime completion does not create news/ban owners or reopen transit/error source decisions.
 
-Unsupported Emissary tunnel data planes remain out of scope. Do not implement them to improve Proposal 170 completeness.
+AddressBook `SetConfig`, unrelated base-I2PControl method limitations, and any environmental qualification in the support document remain separate. Completing tunnel runtimes must not be misrepresented as complete historical I2PControl support if those limitations remain.
 
-## Prohibited scope throughout M063
+## Recently closed containment/corrective milestones
 
-- `Cargo.toml`, `emissary-cli/Cargo.toml`, or `Cargo.lock` changes;
-- any production Rust source change;
-- any router/core/runtime behavior change;
-- any authentication algorithm change or replacement of the reviewed `subtle` primitive;
-- any dependency upgrade/refresh campaign;
-- any new Proposal 170 source, selector, method, alias, or compatibility behavior;
-- any unsupported tunnel data plane;
-- `.github/workflows/**`, remote CI expansion, release/publishing, coverage, fuzz, soak, or platform matrices;
-- upstream issues, pull requests, reviews, submissions, adoption, merge, maintainer contact, contribution preparation, branches/tags/releases, or connector writes against upstream/third-party repositories.
+| Subsystem | Handoff | Status | Implementation plan | Closure record |
+|---|---|---|---|---|
+| I2PControl Proposal 170 containment | M063 — M062 closure consistency and indirect feature-activation guard corrective | closed | `plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md` | `plans/closure/i2pcontrol-proposal-170/063-closure.md` |
+| I2PControl Proposal 170 containment | M062 — dependency-surface containment corrective | closed (closure/evidence corrected by M063) | `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md` | `plans/closure/i2pcontrol-proposal-170/062-closure.md` |
+| I2PControl Proposal 170 containment | M061 — independent containment reclosure | closed | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | `plans/closure/i2pcontrol-proposal-170/061-closure.md` |
 
-## Pinned authority
+## Blocked source successor
 
-Proposal 170 remains pinned internally to revision `2026-05-20` for this workstream. A materially changed external revision blocks affected implementation/closure and requires an explicit contract-rebase plan.
+| Handoff | Status | Plan | Hard dependency |
+|---|---|---|---|
+| M051 — router news and banned peers | blocked with accepted semantic limitation | `plans/implementation/i2pcontrol-proposal-170/051-routerinfo-news-and-banned-peer-semantics.md` | substantive news/ban owners absent; no current owner-specific plan authorized |
 
-Upstream `eepnet/emissary` is accessed read-only for comparison. The containment compare remains pinned to `9b43484a`; upstream advancement does not silently change the audit baseline.
+M051 is independent of M064-M072.
+
+## Verification policy for the new runtime series
+
+Keep verification local/package-scoped and proportional:
+
+- focused backend/filter/unit/integration tests;
+- fake/local SAM and local capture services where practical;
+- feature-disabled and feature-enabled `cargo check`;
+- retained M061 and M062/M063 containment tests;
+- bounded live child-process tests already present when relevant.
+
+Do not add hosted CI jobs, release/publishing machinery, coverage gates, fuzz infrastructure, soak farms, broad platform matrices, or public-network interoperability harnesses merely for this workstream.
 
 ## Registry maintenance rules
 
-1. M058–M061 remain closed and their accepted closure records are not rewritten.
-2. M062 production dependency correction remains accepted; its historical closure record is preserved and M063 records the closure/evidence correction.
-3. `061-containment-boundary.toml` plus `m061_containment.rs` remain the accepted source-boundary authority.
-4. `062-dependency-containment.toml` plus the strengthened `m062_dependency_containment.rs` remain the dependency-boundary authority.
-5. Preserve the accepted 37/1/5 RouterInfo disposition and M051 blocker.
-6. Keep Proposal 170 policy under I2PControl; outside source changes remain neutral owner/composition seams only.
-7. I2PControl-only direct dependencies must be optional and owned exclusively through the `i2pcontrol` feature, including transitive local-feature reachability.
-8. Keep verification local/package-scoped and proportional; do not expand CI/release apparatus.
-9. Overall Proposal 170 remains partial; containment completion does not imply source completeness.
-10. No upstream interaction is authorized.
+1. Only the next dependency-ready plan is normally marked/registered ready.
+2. M064 must close before M065 becomes ready.
+3. After M065, M066/M067/M068/M071 may become ready independently; registry should reflect whichever handoff(s) are actually assigned/active without rewriting future plan requirements.
+4. Preserve ADR-0003 scope: implement only the ten pinned Proposal 170 families, not adjacent tunnel/protocol features.
+5. Keep new specialized runtime/filter code under I2PControl wherever technically possible.
+6. No M065-M072 plan may add a new `emissary-core/**` production path without stopping and creating separate architecture/corrective planning.
+7. Preserve M061/M062/M063 containment/dependency authorities unless a separately accepted corrective explicitly supersedes them.
+8. Preserve RouterInfo 37/1/5 and M051 blocker unless separate source-owner work changes them.
+9. Do not silently accept/ignore runtime-relevant security options.
+10. Keep unsupported backends resource-free until the owning real-backend milestone closes.
+11. No upstream interaction is authorized. External specification/reference/source access is read-only only.
+12. All repository writes remain internal to `eggstack/emissary`.

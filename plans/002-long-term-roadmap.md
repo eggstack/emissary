@@ -1,18 +1,27 @@
 # Proposal 170 Long-Term Roadmap
 
-Status: active
+Status: active; tunnel-runtime completion phase authorized 2026-08-14
 
-This roadmap orders the work required to implement I2P Proposal 170 without expanding into missing tunnel data planes, router behavioral changes, or frontend work.
+This roadmap orders the work required to implement I2P Proposal 170 without expanding the public protocol, altering router behavior, or coupling the work to frontend state.
+
+The original phase deliberately stopped at contract completeness with explicit unsupported tunnel backends. Maintainer direction on 2026-08-14 intentionally adds a second phase: implement the ten remaining Proposal 170 tunnel families through bounded application-layer backends while preserving the established I2PControl containment boundary.
 
 Normative references:
 
 - `plans/000-long-term-specification.md`
 - `plans/001-terminology-and-domain-model.md`
+- `plans/003-planning-process.md`
 - `plans/adrs/ADR-0001-proposal-170-contract-and-stub-boundary.md`
+- `plans/adrs/ADR-0002-control-plane-tunnel-runtime-ownership.md`
+- `plans/adrs/ADR-0003-proposal-170-tunnel-runtime-completion-and-filter-boundary.md`
 
-The detailed workstream roadmap is `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`.
+Detailed subsystem roadmaps:
 
-## Dependency graph
+- source/truthfulness: `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`;
+- containment: `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md`;
+- tunnel runtime completion: `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`.
+
+## Phase 1 dependency graph — contract and truthful partial runtime
 
 ```text
 M001 Contract matrix and I2PControl foundation
@@ -35,13 +44,13 @@ M003 AddressBook   M004 TunnelManager   M005 RouterInfo inspection
                          M007 Conformance and closure
 ```
 
-M003, M004, and the non-core portions of M005 may proceed in parallel after M002 closes. M006 depends on stable tunnel and router/service inspection interfaces. M007 is the release gate.
+M001-M007 are historical canonical phases. Subsequent corrective/source/containment milestones refined them and established the current partial Proposal 170 state.
 
 ## Milestone M001 — Contract matrix and I2PControl foundation
 
 Primary class: invariant / infrastructure
 
-Establish:
+Established:
 
 - an exact Proposal 170 conformance matrix;
 - base I2PControl authentication and version behavior required by the extension;
@@ -49,15 +58,13 @@ Establish:
 - exact protocol/error DTOs;
 - bounded request handling and security defaults;
 - a typed method registry and control-plane interface boundary;
-- contract fixtures for all later milestones.
-
-Exit condition: the service foundation is production-shaped and tested, but Proposal 170 feature methods may remain explicitly unavailable until their owning milestone lands.
+- contract fixtures for later milestones.
 
 ## Milestone M002 — Control-plane domain and persistence
 
 Primary class: invariant / infrastructure
 
-Establish:
+Established:
 
 - canonical tunnel definitions covering every Proposal 170 option;
 - exhaustive tunnel type and action enums;
@@ -67,100 +74,113 @@ Establish:
 - explicit ownership and internal state models;
 - fake control-plane implementations for method tests.
 
-Exit condition: later handlers can implement the exact contract without reshaping storage or runtime ownership.
-
 ## Milestone M003 — AddressBook
 
 Primary class: capability
 
-Implement:
-
-- all four administrative books;
-- list, lookup, add/update, and delete semantics;
-- `SetConfig` and `SetSubscriptions`;
-- exact validation and response behavior;
-- persistence and restart recovery;
-- RouterInfo address-book selectors backed by the administrative stores.
-
-Exit condition: the complete Proposal 170 AddressBook API works without changing runtime resolver precedence.
+Implemented the Proposal 170 AddressBook contract to the repository's current truthful support level without changing runtime resolver precedence. Any remaining `SetConfig` limitation is separate from the tunnel-runtime completion phase.
 
 ## Milestone M004 — TunnelManager and explicit stubs
 
 Primary class: capability / infrastructure
 
-Implement:
+Established:
 
 - exact parsing for every declared tunnel type and option;
 - create, edit, get, delete, start, stop, restart, and permitted `All` behavior;
 - exhaustive backend registration;
-- real adapters only where current runtime ownership is safe and already available;
+- persistent definitions and deterministic status/error mapping;
 - explicit unsupported backends for missing data planes;
-- truthful handling of startup-managed tunnels;
-- persistent definitions and deterministic status/error mapping.
+- later real generic `client` and `server` backends through ADR-0002 and follow-up milestones.
 
-Exit condition: the public TunnelManager contract is complete, unsupported types have functional configuration CRUD, and no stub can report or simulate active service.
+The unsupported-backend design remains the safe intermediate state for a type until its new runtime milestone independently closes.
 
 ## Milestone M005 — RouterInfo inspection
 
 Primary class: capability / infrastructure
 
-Implement all Proposal 170 RouterInfo selectors using:
-
-- retained startup identity and serialized RouterInfo;
-- shared metric snapshots;
-- bounded tracing-backed log retrieval;
-- bounded read-only core inspection;
-- Proposal 170 tunnel and address-book registries;
-- exact selector-by-presence response filtering.
-
-Exit condition: every selector is implemented with truthful data, permitted null/error behavior, and no router mutation or frontend event interference.
+The accepted current matrix is 43 canonical Proposal 170 additions / 37 available / 1 protocol-permitted neutral / 5 unavailable. Tunnel runtime work MUST NOT reopen those source-owner decisions.
 
 ## Milestone M006 — ClientServicesInfo
 
 Primary class: capability
 
-Implement exact service selectors for:
-
-- I2PTunnel;
-- HTTPProxy;
-- SOCKS;
-- SAM;
-- BOB;
-- I2CP.
-
-Use actual listener/session state where available, explicit unavailable state where specified, and inactive representation for stubbed tunnels.
-
-Exit condition: all selectors return only requested sections and never report unsupported services as active.
+Implemented exact service selectors using real listener/session state where available and truthful inactive/unavailable state otherwise. As new control-plane tunnel families become real, ClientServicesInfo integration may be updated only where the pinned selector semantics require it.
 
 ## Milestone M007 — Conformance, hardening, and strict closure
 
 Primary class: invariant / polish
 
-Complete:
+Established protocol/security/persistence/containment closure for the contract-complete partial-runtime state. It is not historical authority that permanently forbids later real tunnel backends; ADR-0003 explicitly reopens that bounded runtime scope.
 
-- generated or matrix-driven protocol tests;
-- reference fixture compatibility;
-- authentication, negative-input, and denial-of-service tests;
-- concurrent-edit, cancellation, restart, and persistence-failure tests;
-- static guards against protocol expansion and frontend coupling;
-- support documentation distinguishing API and runtime completeness;
-- independent closure review.
+## Phase 2 — Proposal 170 tunnel runtime completion
 
-Exit condition: every conformance-matrix row has evidence, no high- or medium-severity correctness finding remains, and the completion statement in the long-term specification is accurate.
+Primary class: capability / security / containment
+
+Source roadmap: `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`.
+
+Implementation handoffs are numbered M064-M072 to continue the repository's active planning sequence.
+
+```text
+M064 current-head baseline/core-feature corrective
+    |
+    v
+M065 I2PControl-owned runtime/filter foundation
+    |
+    +------------------+------------------+------------------+
+    |                  |                  |                  |
+    v                  v                  v                  v
+M066 IRC family    M067 HTTP server   M068 HTTP client/  M071 Streamr family
+                                         CONNECT
+    |                                     |
+    v                                     |
+M069 SOCKS + SOCKS-IRC                    |
+    |                                     |
+    +------------------+------------------+
+                       |
+                       v
+                 M070 HTTP bidirectional
+                       |
+       +---------------+-------------------+
+       |               |                   |
+       +------- M066-M071 all closed ------+
+                       |
+                       v
+                 M072 integrated reclosure
+```
+
+M066, M067, M068, and M071 may proceed in parallel after M065 closes. M069 requires the accepted common IRC filter from M066 for `socksirc`. M070 requires closed HTTP server and HTTP client implementations and must be composition-only. M072 depends on every runtime-family milestone.
+
+### Phase-2 invariants
+
+- No new Proposal 170 method, field, action, tunnel type, or wire status is introduced.
+- New specialized runtime/filter code remains under `emissary-cli/src/i2pcontrol/**` wherever technically possible.
+- No new `emissary-core/**` production change is authorized for missing-tunnel implementation.
+- Existing startup services/tunnels are not adopted into control-plane ownership.
+- `httpserver` and `ircserver` use application-visible accepted I2P streams so filtering occurs before local-service forwarding.
+- HTTP/IRC security filters are minimum functionality, not post-completion polish.
+- Real backends reject runtime-relevant options they do not implement; security-sensitive persist-but-ignore behavior is forbidden.
+- Clearnet proxying requires an explicitly configured I2P outproxy; no arbitrary local DNS/LAN access is introduced.
+- DCC may remain explicitly unsupported in the initial IRC implementation rather than creating auxiliary tunnel machinery.
+- HTTP bidirectional support reuses closed HTTP server/client implementations rather than forking a third HTTP stack.
+- Streamr remains a small bounded datagram implementation rather than driving a generalized transport abstraction.
+- Verification remains local/package-focused; no new CI/release/fuzz/coverage apparatus is required by default.
+- No upstream interaction, submission, review, adoption, or contribution preparation is authorized.
 
 ## Deferred work outside this roadmap
 
-The following require separate roadmaps or explicit later plans:
+The following remain separate unless a later maintainer directive changes them:
 
-- runtime lifecycle migration of existing startup-managed tunnels;
-- missing client/server tunnel data planes;
-- runtime use and precedence of the four Proposal 170 address books;
+- runtime lifecycle migration/adoption of existing startup-managed tunnels and proxies;
+- tunnel types not declared by pinned Proposal 170;
+- runtime resolver-precedence changes for the four Proposal 170 address books;
+- the blocked RouterInfo news/banned-peer sources and other accepted unavailable source rows;
+- unrelated base I2PControl methods not required by the pinned Proposal 170 scope;
 - frontend management of I2PControl resources;
 - new I2PControl methods or fields;
-- cross-router interoperability certification beyond Proposal 170 contract conformance.
-
-A deferred real tunnel backend should replace one stub through the backend registry. It must not reopen Proposal 170 parsing, persistence, or handler design.
+- cross-router interoperability certification beyond the focused behavior needed to validate Proposal 170 tunnel families;
+- upstream contribution/review/merge activity.
 
 ## Roadmap completion rule
 
-The roadmap is not complete when only the server foundation or internal models exist. It closes only after M007 demonstrates exact external behavior and the explicit non-goals remain intact.
+The contract-complete partial-runtime state remains a valid intermediate state. The newly authorized tunnel-runtime phase closes only after M072 demonstrates that all newly implemented families are operational and secure within their declared capability sets, unsupported option behavior is truthful, application filters are non-bypassable, default/feature-disabled Emissary behavior remains unaffected, and the final support documentation accurately distinguishes any remaining limitations.

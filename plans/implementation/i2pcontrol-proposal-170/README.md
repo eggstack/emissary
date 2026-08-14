@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel-runtime completion phase active; M064 ready
+Status: partial Proposal 170 support; tunnel-runtime completion phase active; M064 closed; M065 ready
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -42,11 +42,13 @@ The implementation target is:
 
 ## Current handoff
 
-M064 is the only dependency-ready implementation plan:
+M065 is the only dependency-ready implementation plan:
 
-- `064-proposal-170-tunnel-runtime-baseline-corrective.md` — **ready**.
+- `065-i2pcontrol-tunnel-runtime-primitives.md` — **ready**.
 
 M064 repairs the existing feature-disabled/no-events unused-parameter regression in `emissary-core/src/events.rs` and establishes a clean baseline before new tunnel runtime work. It adds no capability.
+
+M064 closure: `plans/closure/i2pcontrol-proposal-170/064-closure.md`.
 
 Per `plans/003-planning-process.md`, future plans are prewritten for continuity but are not registered ready until their hard dependencies close.
 
@@ -54,8 +56,8 @@ Per `plans/003-planning-process.md`, future plans are prewritten for continuity 
 
 | Handoff | Status | Scope | Dependencies |
 |---|---|---|---|
-| M064 | ready | narrow current-head no-events/core-feature corrective | M063 closed |
-| M065 | blocked | I2PControl-owned client/accepted-server runtime primitives + option-capability validation | M064 |
+| M064 | closed | narrow current-head no-events/core-feature corrective | M063 closed |
+| M065 | ready | I2PControl-owned client/accepted-server runtime primitives + option-capability validation | M064 closed |
 | M066 | blocked | common IRC filter + real `ircclient` and `ircserver` | M065 |
 | M067 | blocked | secure filtered `httpserver` | M065 |
 | M068 | blocked | real `httpclient` + strict `connectclient` | M065 |

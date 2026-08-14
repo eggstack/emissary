@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Runtime Completion Roadmap
 
-Status: active; M064 ready
+Status: active; M064 closed; M065 ready
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6` — current production head reviewed before this planning series
 
@@ -290,6 +290,8 @@ Only the next dependency-ready plan is registered in `plans/registry.md`. Future
 
 Plan: `064-proposal-170-tunnel-runtime-baseline-corrective.md`.
 
+Status: closed. Closure: `plans/closure/i2pcontrol-proposal-170/064-closure.md`.
+
 Repair only the existing feature-disabled/no-events unused-parameter regression in `emissary-core/src/events.rs`. Prove feature-off/no-std and normal builds are back to the accepted state. No new runtime feature.
 
 Exit: clean baseline and exact single-defect correction.
@@ -297,6 +299,8 @@ Exit: clean baseline and exact single-defect correction.
 ### M065 — I2PControl-owned runtime/filter foundation
 
 Plan: `065-i2pcontrol-tunnel-runtime-primitives.md`.
+
+Status: ready; hard dependency M064 is closed.
 
 Add bounded reusable control-plane primitives for local listener ownership, accepted-stream server ownership, per-name task generation/cancellation where not already reusable, peer identity delivery to filters, and deterministic per-backend option-capability validation. Keep all production work under `i2pcontrol`.
 

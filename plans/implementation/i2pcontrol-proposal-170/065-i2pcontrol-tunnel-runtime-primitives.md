@@ -1,6 +1,6 @@
 # M065 — I2PControl Tunnel Runtime and Option-Capability Primitives
 
-Status: blocked — hard dependency on M064 closure
+Status: ready
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 

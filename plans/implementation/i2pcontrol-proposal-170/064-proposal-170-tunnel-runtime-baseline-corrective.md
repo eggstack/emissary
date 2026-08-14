@@ -1,6 +1,8 @@
 # M064 — Proposal 170 Tunnel-Runtime Baseline Corrective
 
-Status: ready
+Status: closed
+
+Closure record: `plans/closure/i2pcontrol-proposal-170/064-closure.md`.
 
 Planning baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6` — production head reviewed before the tunnel-runtime completion planning series
 

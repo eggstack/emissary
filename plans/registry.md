@@ -29,7 +29,7 @@ Canonical direction:
 |---|---|---|---|---|
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no containment corrective handoff | M061 source containment and M062/M063 dependency containment remain accepted authorities |
-| I2PControl Proposal 170 tunnel runtime completion | active; M064 ready | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M064 — current-head feature-disabled baseline corrective | M065 hard-blocked on M064; later family dependencies shown below |
+| I2PControl Proposal 170 tunnel runtime completion | active; M064 closed; M065 ready | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M065 — I2PControl tunnel runtime/option primitives | M066/M067/M068/M071 hard-blocked on M065; later family dependencies shown below |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -49,7 +49,7 @@ Exactly one plan is currently dependency-ready:
 
 | Handoff | Status | Plan | Objective |
 |---|---|---|---|
-| M064 — Proposal 170 tunnel-runtime baseline corrective | ready | `plans/implementation/i2pcontrol-proposal-170/064-proposal-170-tunnel-runtime-baseline-corrective.md` | repair the existing feature-disabled/no-events unused-parameter regression before new runtime work |
+| M065 — I2PControl tunnel runtime/option primitives | ready | `plans/implementation/i2pcontrol-proposal-170/065-i2pcontrol-tunnel-runtime-primitives.md` | build the bounded I2PControl-owned runtime and option-capability foundation |
 
 Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered as ready. Future handoffs are prewritten but remain blocked until their hard dependencies close.
 
@@ -57,7 +57,6 @@ Per `plans/003-planning-process.md`, only the next dependency-ready implementati
 
 | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|
-| M065 — I2PControl tunnel runtime/option primitives | blocked | `plans/implementation/i2pcontrol-proposal-170/065-i2pcontrol-tunnel-runtime-primitives.md` | M064 closed |
 | M066 — IRC client/server family | blocked | `plans/implementation/i2pcontrol-proposal-170/066-irc-client-server-tunnel-family.md` | M065 closed |
 | M067 — HTTP server | blocked | `plans/implementation/i2pcontrol-proposal-170/067-http-server-tunnel.md` | M065 closed |
 | M068 — HTTP client + CONNECT | blocked | `plans/implementation/i2pcontrol-proposal-170/068-http-client-and-connect-tunnels.md` | M065 closed |
@@ -93,7 +92,7 @@ At that baseline:
 
 - production registry has real generic `client` and `server` backends;
 - the other ten Proposal 170 types are explicit unsupported backends;
-- the current feature-disabled/no-events core check has a narrow unused-parameter regression in `emissary-core/src/events.rs::set_ipv4_testing/set_ipv6_testing`, owned by M064;
+- M064 repaired the feature-disabled/no-events unused-parameter regression in `emissary-core/src/events.rs::set_ipv4_testing/set_ipv6_testing`;
 - no specialized real backend is claimed yet.
 
 Accepted containment authorities remain:
@@ -125,6 +124,7 @@ AddressBook `SetConfig`, unrelated base-I2PControl method limitations, and any e
 | I2PControl Proposal 170 containment | M063 — M062 closure consistency and indirect feature-activation guard corrective | closed | `plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md` | `plans/closure/i2pcontrol-proposal-170/063-closure.md` |
 | I2PControl Proposal 170 containment | M062 — dependency-surface containment corrective | closed (closure/evidence corrected by M063) | `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md` | `plans/closure/i2pcontrol-proposal-170/062-closure.md` |
 | I2PControl Proposal 170 containment | M061 — independent containment reclosure | closed | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | `plans/closure/i2pcontrol-proposal-170/061-closure.md` |
+| I2PControl Proposal 170 tunnel runtime completion | M064 — tunnel-runtime baseline corrective | closed | `plans/implementation/i2pcontrol-proposal-170/064-proposal-170-tunnel-runtime-baseline-corrective.md` | `plans/closure/i2pcontrol-proposal-170/064-closure.md` |
 
 ## Blocked source successor
 
@@ -149,7 +149,7 @@ Do not add hosted CI jobs, release/publishing machinery, coverage gates, fuzz in
 ## Registry maintenance rules
 
 1. Only the next dependency-ready plan is normally marked/registered ready.
-2. M064 must close before M065 becomes ready.
+2. M064 is closed; M065 is the current dependency-ready handoff.
 3. After M065, M066/M067/M068/M071 may become ready independently; registry should reflect whichever handoff(s) are actually assigned/active without rewriting future plan requirements.
 4. Preserve ADR-0003 scope: implement only the ten pinned Proposal 170 families, not adjacent tunnel/protocol features.
 5. Keep new specialized runtime/filter code under I2PControl wherever technically possible.

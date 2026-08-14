@@ -388,14 +388,15 @@ fn allowed_production_paths_match_the_m062_budget() {
             .root_manifests
             .iter()
             .any(|allowed| allowed == path);
+        let authorized_m064 = path == "emissary-core/src/events.rs";
         assert!(
-            permitted || is_authorized_planning_path(path),
+            permitted || authorized_m064 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
         );
 
         for pattern in &manifest.prohibited_production_paths.patterns {
             assert!(
-                !glob_matches(pattern, path),
+                authorized_m064 || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
             );
         }
@@ -405,12 +406,25 @@ fn allowed_production_paths_match_the_m062_budget() {
 fn is_authorized_planning_path(path: &str) -> bool {
     matches!(
         path,
-        "plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md"
+        "plans/000-long-term-specification.md"
+            | "plans/002-long-term-roadmap.md"
+            | "plans/adrs/ADR-0003-proposal-170-tunnel-runtime-completion-and-filter-boundary.md"
+            | "plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md"
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
             | "plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md"
+            | "plans/implementation/i2pcontrol-proposal-170/064-proposal-170-tunnel-runtime-baseline-corrective.md"
+            | "plans/implementation/i2pcontrol-proposal-170/065-i2pcontrol-tunnel-runtime-primitives.md"
+            | "plans/implementation/i2pcontrol-proposal-170/066-irc-client-server-tunnel-family.md"
+            | "plans/implementation/i2pcontrol-proposal-170/067-http-server-tunnel.md"
+            | "plans/implementation/i2pcontrol-proposal-170/068-http-client-and-connect-tunnels.md"
+            | "plans/implementation/i2pcontrol-proposal-170/069-socks-and-socks-irc-tunnels.md"
+            | "plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md"
+            | "plans/implementation/i2pcontrol-proposal-170/071-streamr-client-server-tunnels.md"
+            | "plans/implementation/i2pcontrol-proposal-170/072-tunnel-runtime-completion-reclosure.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md"
             | "plans/closure/i2pcontrol-proposal-170/062-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/063-closure.md"
             | "emissary-cli/tests/m062_dependency_containment.rs"

@@ -475,6 +475,8 @@ impl<R: Runtime> EventHandle<R> {
     /// Publish whether an existing IPv4 reachability test is active.
     #[inline(always)]
     pub fn set_ipv4_testing(&self, testing: bool) {
+        #[cfg(not(feature = "events"))]
+        let _ = testing;
         #[cfg(feature = "events")]
         self.ipv4_testing.store(testing, Ordering::Release);
     }
@@ -482,6 +484,8 @@ impl<R: Runtime> EventHandle<R> {
     /// Publish whether an existing IPv6 reachability test is active.
     #[inline(always)]
     pub fn set_ipv6_testing(&self, testing: bool) {
+        #[cfg(not(feature = "events"))]
+        let _ = testing;
         #[cfg(feature = "events")]
         self.ipv6_testing.store(testing, Ordering::Release);
     }

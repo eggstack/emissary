@@ -71,9 +71,11 @@ handler panics are isolated to their connection. A narrow option-capability
 validator runs before listener/session allocation and reports only option names,
 never stored values.
 
-These helpers are lifecycle infrastructure only. M065 does not register
-`httpclient`, `httpserver`, IRC, SOCKS, CONNECT, Streamr, or bidirectional HTTP
-as real backends, and it does not alter startup-managed tunnel ownership.
+These helpers remain lifecycle infrastructure only. M065 itself did not
+register specialized backends; the subsequent M066-M071 adapters keep their
+protocol policy in I2PControl. Streamr intentionally does not use these
+streaming helpers: its producer/consumer loops own Yosemite datagrams and Tokio
+UDP directly, while startup-managed tunnel ownership remains unchanged.
 
 Core exposes purpose-specific, bounded owned snapshots and passive owner-local
 lifecycle facts. Aggregation, recovery, public bounds, and wire serialization

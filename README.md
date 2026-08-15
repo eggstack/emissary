@@ -24,11 +24,10 @@
   * TunnelManager configuration
   * ClientServicesInfo
 
-Proposal 170 administrative CRUD and the exact API surface are implemented. M065 adds
-I2PControl-owned listener/accepted-stream lifecycle primitives and deterministic runtime-option
-validation for future tunnel families; it does not promote any additional tunnel type to a real
-production backend. Tunnel data planes and inspection sources that Emissary does not own remain
-explicit unsupported/unavailable behavior. See
+Proposal 170 administrative CRUD and the exact API surface are implemented. I2PControl owns
+bounded runtime backends for the generic, HTTP, IRC, CONNECT, SOCKS, bidirectional HTTP, and
+Streamr families, with deterministic runtime-option validation. Tunnel data planes and inspection
+sources that Emissary does not own remain explicit unsupported/unavailable behavior. See
 [`docs/i2pcontrol/proposal-170-support.md`](docs/i2pcontrol/proposal-170-support.md).
 
 ### Directory layout

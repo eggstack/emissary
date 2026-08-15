@@ -429,6 +429,7 @@ fn is_authorized_tunnel_runtime_path(path: &str) -> bool {
             | "emissary-cli/src/i2pcontrol/backends/socks.rs"
             | "emissary-cli/src/i2pcontrol/backends/socks_irc.rs"
             | "emissary-cli/src/i2pcontrol/backends/http_bidir.rs"
+            | "emissary-cli/src/proxy/socks.rs"
     )
 }
 
@@ -440,6 +441,7 @@ fn is_authorized_m065_path(path: &str) -> bool {
             | "docs/i2pcontrol/README.md"
             | "docs/i2pcontrol/inspection-architecture.md"
             | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/proposal-170-conformance.md"
             | "docs/i2pcontrol/tunnel-manager.md"
             | "docs/i2pcontrol/tunnel-backends.md"
             | "plans/closure/i2pcontrol-proposal-170/064-closure.md"
@@ -458,6 +460,9 @@ fn is_authorized_m065_path(path: &str) -> bool {
             | "emissary-cli/src/i2pcontrol/backends/runtime/task_group.rs"
             | "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"
             | "emissary-cli/src/i2pcontrol/backends/runtime/accepted_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/streamr.rs"
+            | "docs/i2pcontrol/streamr-runtime.md"
+            | "plans/closure/i2pcontrol-proposal-170/071-closure.md"
     )
 }
 
@@ -466,6 +471,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
         path,
         "plans/000-long-term-specification.md"
             | "plans/002-long-term-roadmap.md"
+            | "plans/adrs/ADR-0001-proposal-170-contract-and-stub-boundary.md"
             | "plans/adrs/ADR-0003-proposal-170-tunnel-runtime-completion-and-filter-boundary.md"
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md"
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"

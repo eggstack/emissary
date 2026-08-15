@@ -25,10 +25,9 @@ RouterInfo requests from historical nested compatibility requests.
 M039 independently reviewed the complete M031–M038 final head and formally
 closed the authorized workstream as partial support.
 
-The expected bounded final status remains `partial Proposal 170 support` while
-the two Streamr tunnel data planes remain explicit unsupported runtimes. M066
-through M070 close the IRC, HTTP, CONNECT, SOCKS, and bidirectional HTTP
-families; M071 owns the remaining Streamr capability. The canonical
+The expected bounded final status remains `partial Proposal 170 support` because five
+RouterInfo additions remain unavailable. M066 through M071 close the IRC, HTTP, CONNECT,
+SOCKS, bidirectional HTTP, and Streamr families. The canonical
 43-addition matrix currently contains 37 available selectors, one
 protocol-permitted neutral selector, and five unavailable selectors; the
 unavailable rows are router news, banned peers, transit bandwidth over 15
@@ -172,7 +171,7 @@ Retained implementation includes:
 - standard authentication and JSON-RPC behavior;
 - exact Proposal 170 method/selector/action/type parsers and literal fixtures;
 - durable generation stores and atomic TunnelManager mutation;
-- explicit unsupported backends for the remaining Streamr data planes;
+- bounded Streamr producer/consumer datagram backends with fixed local UDP targets;
 - M065 bounded I2PControl-owned client-listener and accepted-server runtime primitives;
 - M065 backend-local option capability validation that rejects unsupported runtime options before
   listener/session allocation and redacts option values;
@@ -225,14 +224,20 @@ The retained matrix contains:
 Unavailable selectors fail explicitly and are never substituted with zero,
 false, empty, or semantically adjacent values.
 
-## Missing tunnel data planes
+## Streamr tunnel data plane
 
-The remaining unsupported data plane is Streamr. The M065 primitives and the
-closed M066-M070 family backends provide bounded lifecycle/filter seams for the
-implemented listener, destination, and traffic paths. Streamr definitions may
-parse and persist, but start/restart must fail explicitly until M071 closes.
-Stop must remain safe, and no unsupported type may report running or allocate a
-runtime resource.
+M071 provides bounded `streamrclient` and `streamrserver` runtimes. The server
+keeps a persistent Yosemite repliable-datagram identity, receives administrator-
+bound local UDP payloads, and fans them out to at most 16 subscribed destinations.
+The client sends a one-byte subscribe/refresh (`0`) every 15 seconds, attempts a
+best-effort unsubscribe (`1`) during bounded shutdown, and forwards received
+payloads only to its configured local IP/UDP target. Subscriptions expire after
+60 seconds without refresh and payloads are capped at 1200 bytes (Yosemite's
+4095-byte receive ceiling is retained as the transport buffer bound).
+
+Yosemite exposes the authenticated remote destination but not inbound datagram
+port metadata. Emissary therefore keys subscriptions by that trusted destination
+and uses the configured session port tuple; no core/router API change was needed.
 
 ## AddressBook enabled/disabled boundary
 

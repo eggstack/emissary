@@ -93,8 +93,7 @@ accepted integrated reclosure and final 43-row source audit.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because five of the 43 RouterInfo additions lack
-bounded authoritative sources and the two Streamr tunnel data planes remain
-explicit unsupported runtimes. M066 adds real filtered `ircclient` and
+bounded authoritative sources. M066 adds real filtered `ircclient` and
 `ircserver`, M067 adds filtered accepted-stream `httpserver`, M068 adds real
 `httpclient` and `connectclient`, M069 adds bounded `socks` and filtered
 `socksirc`, and M070 adds the deprecated composed `httpbidirserver`; the
@@ -208,7 +207,7 @@ Retained behavior:
 - startup-owned name collision and mutation rejection;
 - deterministic resource-free unsupported lifecycle behavior.
 
-### Missing tunnel data planes
+### Streamr tunnel runtime boundary
 
 The generic `client` and `server` types are the real control-plane lifecycle
 backends at this stage. They reuse the existing Yosemite streaming data planes
@@ -216,16 +215,15 @@ behind I2PControl-owned, per-name supervisors. Startup-managed client and
 server definitions remain externally managed and reject administrative
 lifecycle operations.
 
-The following other tunnel families remain intentionally out of scope:
-
-- HTTP bidirectional server;
-- Streamr client/server;
-- any other missing listener, destination, LeaseSet, or traffic implementation.
-
-Their definitions may parse and persist. Start/restart must return explicit
-not-implemented operation status; stop remains safe and inactive. They must not
-report running or open resources. M065's lifecycle seams are not registered as
-those tunnel types and do not change this status.
+`streamrserver` owns a persistent repliable-datagram identity and a
+administrator-bound local UDP source. `streamrclient` refreshes a bounded
+subscription every 15 seconds and forwards payloads only to its configured
+local IP/UDP target. The producer caps subscribers at 16, expires entries after
+60 seconds, and caps payloads at 1200 bytes. Control packets are exactly one
+byte (`0` subscribe/refresh, `1` unsubscribe); malformed or unknown controls do
+not create state. Yosemite exposes trusted peer destination identity but not
+inbound port metadata, so Emissary uses the trusted destination plus the fixed
+configured session port tuple and makes no core API change.
 
 ### SOCKS and SOCKS-IRC runtime boundary
 
@@ -298,10 +296,10 @@ M034 additionally proves:
 - disabled/default execution still does not construct or consult the control
   command seam.
 
-TunnelManager lifecycle reconciliation is now operational for control-plane
-generic `client` and `server` definitions. `StartOnLoad` is honored only for
-those definitions after durable state loads; startup-managed and unsupported
-definitions remain explicit non-auto-start boundaries.
+TunnelManager lifecycle reconciliation is operational for all twelve
+control-plane tunnel families. `StartOnLoad` is honored only for persisted
+control-plane definitions after durable state loads; startup-managed definitions
+remain externally managed.
 
 M028-corrected defect:
 

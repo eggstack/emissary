@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Runtime Completion Roadmap
 
-Status: active; M064-M070 closed; M071 is the next registered handoff
+Status: active; M064-M071 closed; M072 is the next registered handoff
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6` — current production head reviewed before this planning series
 
@@ -30,7 +30,7 @@ This roadmap does not treat byte forwarding as sufficient completion for special
 The target production registry evolves monotonically:
 
 ```text
-current:
+current before M071:
   client, server = real
         remaining two = explicit UnsupportedTunnelBackend (Streamr)
 
@@ -305,7 +305,7 @@ Status: closed; hard dependency M064 is closed. Closure:
 
 Add bounded reusable control-plane primitives for local listener ownership, accepted-stream server ownership, per-name task generation/cancellation where not already reusable, peer identity delivery to filters, and deterministic per-backend option-capability validation. Keep all production work under `i2pcontrol`.
 
-Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type. M066-M070 are now closed; M071 is the next registered handoff.
+Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type. M066-M071 are now closed; M072 is the next registered handoff.
 
 ### M066 — IRC client/server family
 
@@ -366,7 +366,7 @@ Implement bounded datagram producer/consumer behavior, subscription refresh/expi
 
 Exit: both Streamr types real with bounded state and no amplification/unbounded subscription issue.
 
-Status: ready; M065-M070 are closed and M071 is the next registered handoff.
+Status: closed; M065-M071 are closed and M072 is the next registered handoff.
 
 ### M072 — Integrated tunnel-runtime reclosure
 

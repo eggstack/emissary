@@ -31,6 +31,7 @@ pub mod runtime;
 pub mod server;
 pub mod socks;
 pub mod socks_irc;
+pub mod streamr;
 pub mod unsupported;
 
 use std::fmt;

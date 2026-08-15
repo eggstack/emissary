@@ -655,6 +655,10 @@ mod tests {
 
         drop(local_write);
         drop(remote_write);
+        drop(local_reader);
+        drop(remote_reader);
+        drop(local_read);
+        drop(remote_read);
         let _ = relay.await;
     }
 }

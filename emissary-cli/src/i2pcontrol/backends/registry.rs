@@ -200,7 +200,7 @@ pub fn create_production_registry_with_server_store_and_address_book(
     )) as Arc<dyn TunnelBackend>;
     let http_bidir = Arc::new(super::http_bidir::HttpBidirServerTunnelBackend::new(
         sam_tcp_port,
-        server_store,
+        server_store.clone(),
         address_book.clone(),
     )) as Arc<dyn TunnelBackend>;
     let http_client = Arc::new(match address_book.clone() {
@@ -223,6 +223,13 @@ pub fn create_production_registry_with_server_store_and_address_book(
             .with_address_book(address_book),
         None => super::socks_irc::SocksIrcTunnelBackend::new(sam_tcp_port),
     }) as Arc<dyn TunnelBackend>;
+    let streamr_client = Arc::new(super::streamr::StreamrClientTunnelBackend::new(
+        sam_tcp_port,
+    )) as Arc<dyn TunnelBackend>;
+    let streamr_server = Arc::new(super::streamr::StreamrServerTunnelBackend::new(
+        sam_tcp_port,
+        server_store,
+    )) as Arc<dyn TunnelBackend>;
     let backends: Vec<Arc<dyn TunnelBackend>> = ALL_TUNNEL_TYPES
         .iter()
         .map(|&tt| {
@@ -246,6 +253,10 @@ pub fn create_production_registry_with_server_store_and_address_book(
                 socks.clone()
             } else if tt == TunnelType::SocksIrc {
                 socks_irc.clone()
+            } else if tt == TunnelType::StreamrClient {
+                streamr_client.clone()
+            } else if tt == TunnelType::StreamrServer {
+                streamr_server.clone()
             } else {
                 Arc::new(super::unsupported::UnsupportedTunnelBackend::new(tt))
                     as Arc<dyn TunnelBackend>
@@ -394,11 +405,29 @@ mod tests {
                 && tunnel_type != TunnelType::IrcServer
                 && tunnel_type != TunnelType::Socks
                 && tunnel_type != TunnelType::SocksIrc
+                && tunnel_type != TunnelType::StreamrClient
+                && tunnel_type != TunnelType::StreamrServer
         }) {
             assert!(matches!(
                 registry.get(tunnel_type).inspect(&test_definition(tunnel_type)).runtime_state,
                 TunnelRuntimeState::Unsupported
             ));
+        }
+    }
+
+    #[test]
+    fn composed_production_registry_registers_real_streamr_backends() {
+        let root = tempfile::tempdir().unwrap();
+        let registry = create_production_registry_with_server_store(
+            7656,
+            ServerDestinationStore::new(root.path()),
+        )
+        .unwrap();
+
+        for tunnel_type in [TunnelType::StreamrClient, TunnelType::StreamrServer] {
+            let status = registry.get(tunnel_type).inspect(&test_definition(tunnel_type));
+            assert_eq!(status.tunnel_type, tunnel_type);
+            assert_eq!(status.runtime_state, TunnelRuntimeState::Stopped);
         }
     }
 }

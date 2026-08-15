@@ -1,6 +1,6 @@
 # M071 — Streamr Client and Streamr Server Tunnels
 
-Status: blocked — dependency-ready but not the next registered handoff
+Status: closed — implementation and local reclosure complete
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 
@@ -88,7 +88,11 @@ Before coding, confirm exact Yosemite APIs for:
 - payload size/error behavior;
 - cancellation/task ownership.
 
-Map these APIs to the adopted Streamr control semantics. If remote destination identity or required port metadata is unavailable, stop M071 and document the exact gap.
+Map these APIs to the adopted Streamr control semantics. Yosemite 0.7 exposes
+the authenticated remote destination but not inbound from/to port metadata.
+M071 therefore keys subscriptions by that trusted destination and uses the
+configured fixed session port tuple. No core/router API change is required;
+this bounded limitation is recorded in the closure evidence.
 
 ## 7. `streamrserver` / producer requirements
 

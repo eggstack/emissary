@@ -147,10 +147,22 @@ The Proposal 170 workstream may add bounded read-only core inspection required f
 - The internal model must preserve options that current runtime code does not understand.
 - Existing startup-managed tunnels cannot be fully controlled until separate lifecycle work lands.
 
+### Current amendment (M066-M071)
+
+The original stub boundary remains the contract rule for families without an
+I2PControl-owned runtime. M066-M071 independently replaced the ten planned
+specialized stubs with bounded adapters under the accepted ownership boundary;
+M071's Streamr client/server implementation is documented in
+`docs/i2pcontrol/streamr-runtime.md`. These adapters do not change Proposal
+170's public schema or add router-core tunnel APIs. Startup-owned services and
+inspection sources without a canonical Emissary owner remain deferred or
+explicitly unsupported.
+
 ### Neutral or deferred
 
 - Which currently available Emissary proxies or tunnels can safely receive real adapters is decided in the TunnelManager milestone after ownership inspection.
-- Missing tunnel data planes remain separate future projects.
+- Further tunnel data-plane work outside the M066-M071 owners remains separate
+  future projects.
 - Runtime resolver integration for the four Proposal 170 address books remains separate.
 - Frontend use of I2PControl remains separate.
 

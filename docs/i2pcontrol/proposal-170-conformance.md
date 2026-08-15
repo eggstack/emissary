@@ -1,6 +1,6 @@
 # Proposal 170 Conformance Matrix
 
-Status: partial Proposal 170 support; M056 final integrated reclosure accepted
+Status: partial Proposal 170 support; M071 Streamr runtime closure accepted
 
 Proposal 170 remains Open. This workstream is pinned to the revision created
 and last updated on `2026-05-20`.
@@ -27,11 +27,12 @@ M019 is superseded and non-controlling. M020–M027 remain retained evidence, an
 M027's final subsystem disposition remains historical invalidated evidence.
 M028 is implemented and closed with the required boundary evidence. M030
 reviewed the actual AddressBook final head and accepted partial Proposal 170
-support. M031 and M032 made only the generic control-plane `client` and `server`
-backends operational; the ten other tunnel families remain explicitly
-unsupported. M039 independently revalidated the earlier source/runtime/evidence
-boundary. The current controlling RouterInfo source disposition is accepted by
-M056 after the M054/M055 corrective heads.
+support. M031 and M032 made the generic control-plane `client` and `server`
+backends operational. M066-M071 then independently closed the remaining ten
+bounded tunnel-family adapters, including the dedicated Streamr datagram
+runtime in M071. M039 independently revalidated the earlier source/runtime/
+evidence boundary. The current controlling RouterInfo source disposition is
+accepted by M056 after the M054/M055 corrective heads.
 
 ## Retained machine-readable matrix
 
@@ -113,10 +114,14 @@ Retained M021/M023 evidence covers:
   power-loss durability where directory synchronization is available;
 - secret-safe persistence and output;
 - startup-managed inventory and ownership collision rules;
-- explicit resource-free unsupported runtime behavior.
+- explicit resource-free unsupported runtime behavior for families without an
+  I2PControl-owned data plane;
+- bounded real backends for all twelve declared tunnel families, with each
+  backend rejecting unsupported runtime-relevant options before allocation.
 
-Missing tunnel data planes are not implemented and are not counted as runtime
-coverage.
+The Streamr client/server datagram runtime is covered by the M071 closure record
+and is intentionally separate from the streaming adapters. Startup-owned
+services remain outside this control-plane runtime count.
 
 ### AddressBook
 

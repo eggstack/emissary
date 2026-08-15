@@ -239,6 +239,27 @@ pub const SOCKS_OPTIONS: OptionCapabilities = OptionCapabilities::new(
 /// the IRC filter is a payload policy, not a second option namespace.
 pub const SOCKS_IRC_OPTIONS: OptionCapabilities = SOCKS_OPTIONS;
 
+/// Streamr consumers require a producer destination and an administrator-selected
+/// local UDP target port. `ListenPort`, when present, is the fixed I2P source
+/// port used in the Streamr control datagrams.
+pub const STREAMR_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
+    &["TargetPort"],
+    &["TargetDestination", "StreamrTarget"],
+    &["ListenInterface", "ListenPort", "HostingDestination"],
+    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Reject,
+);
+
+/// Streamr producers require a local UDP source port. `TargetPort` is the
+/// configured I2P destination port used when fanning out payloads.
+pub const STREAMR_SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
+    &["ListenPort"],
+    &[],
+    &["TargetPort", "ListenInterface", "HostingDestination"],
+    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Reject,
+);
+
 fn present_runtime_fields(options: &TunnelOptions) -> Vec<&'static str> {
     let mut fields = Vec::new();
     for (field, present) in [

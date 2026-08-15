@@ -14,10 +14,8 @@ The TunnelManager handler implements the `TunnelManager` JSON-RPC method for all
 - Compatibility `List` and capitalized action values
 - Lifecycle dispatch (start, stop, restart) through the backend registry
 - Ownership enforcement for startup-managed tunnels
-- Real control-plane lifecycle for generic `client` and `server`, filtered
-  `ircclient`/`ircserver`, accepted-stream filtered `httpserver`, the composed
-  `httpbidirserver`, and bounded HTTP/CONNECT client proxies; explicit
-  unsupported behavior remains for the two Streamr types
+- Real control-plane lifecycle for all twelve tunnel families, including
+  bounded Streamr datagram producer/consumer runtimes
 
 Production inventory is the deterministic union of startup-configured generic
 client/server definitions and persisted control-plane definitions. Startup
@@ -48,8 +46,13 @@ for the IRC family and M067 consumes them for HTTP. `ircclient` uses one bounded
 line-oriented filter for both traffic directions; `ircserver` filters
 registration before connecting to loopback; `httpserver` normalizes bounded
 HTTP headers before connecting to loopback and filters response fingerprints.
-The two Streamr tunnel families remain explicit unsupported backends until M071
-closes.
+Streamr uses one owner loop per runtime. `streamrserver` accepts one-byte
+subscribe/refresh and unsubscribe controls from authenticated Yosemite peer
+destinations, expires subscriptions after 60 seconds, caps the set at 16, and
+fans out payloads of at most 1200 bytes. `streamrclient` refreshes every 15
+seconds and forwards payloads only to its administrator-configured local IP/UDP
+target. Yosemite's 4095-byte datagram receive ceiling is the transport buffer
+bound; no general UDP tunnel is introduced.
 
 After the durable definition and server-identity stores load, `StartOnLoad` is
 reconciled only for control-plane-owned `client`, `httpclient`, `connectclient`,
@@ -409,7 +412,18 @@ blocked by the common filter.
 
 | Field | Type | Description |
 |---|---|---|
-| `i2p.tunnel.streamrTarget` | string | Streamr target |
+| `TargetDestination` | string | Remote Streamr producer destination for `streamrclient` |
+| `i2p.tunnel.streamrTarget` | string | Alias for the remote Streamr producer destination |
+| `TargetHost` / `Host` | string | Local UDP target/source IP; defaults to `127.0.0.1` |
+| `TargetPort` | integer | Local UDP target port for `streamrclient`; I2P destination port for `streamrserver` |
+| `Port` | integer | Required local UDP source port for `streamrserver`; optional I2P source port for `streamrclient` |
+| `ReachableBy` | string | Typed local IP fallback when `TargetHost`/`Host` is absent |
+
+Streamr rejects I2CP/custom option maps and recognized tunnel length, quantity,
+variance, signature, and encryption options before session or UDP allocation.
+The server destination identity is generated and retained by the backend-owned
+`server-destinations/` store; subscriber state is intentionally ephemeral and is
+cleared on restart.
 
 ### I2CP and custom options
 

@@ -31,13 +31,16 @@ cargo test -p emissary-cli --no-default-features --features i2pcontrol
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 ```
 
-I2PControl supports the Proposal 170 contract. Its I2PControl-owned runtime primitives now
-provide bounded local-listener and accepted-stream lifecycle ownership plus fail-before-allocation
-option validation, but they do not themselves make specialized tunnel families operational.
-Tunnel data-plane backends and inspection sources without a canonical Emissary owner remain
-explicit unsupported/unavailable responses. Keep changes within
-`emissary-cli/src/i2pcontrol/` and its composition seams; do not turn the administrative API into
-a router lifecycle or protocol implementation.
+I2PControl supports the Proposal 170 contract. Its I2PControl-owned runtime primitives and
+specialized backends provide bounded local-listener, accepted-stream, and Streamr datagram
+lifecycle ownership plus fail-before-allocation option validation. Tunnel data-plane backends
+and inspection sources without a canonical Emissary owner remain explicit unsupported/unavailable
+responses. Keep changes within `emissary-cli/src/i2pcontrol/` and its composition seams; do not
+turn the administrative API into a router lifecycle or protocol implementation.
+
+Streamr is intentionally separate from TCP tunnel helpers. Preserve its documented
+16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh,
+and bounded shutdown limits. Remote datagrams must never choose a local UDP destination.
 
 Fuzz targets (requires nightly):
 ```bash

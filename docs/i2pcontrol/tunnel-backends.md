@@ -1,7 +1,7 @@
 # I2PControl Tunnel Backends
 
-Status: M070 closure accepted; ten tunnel families have bounded runtime
-backends; only Streamr remains unsupported
+Status: M071 closure accepted; all twelve tunnel families have bounded runtime
+backends
 
 This document describes the tunnel backend interface and registry in Emissary.
 
@@ -73,8 +73,7 @@ Lookup is total for valid tunnel types. The registry is constructed once at star
 `create_default_registry()` maps all 12 tunnel types to
 `UnsupportedTunnelBackend` for tests and dependency-light compositions. The
 production constructor with a server store registers the closed real backends
-for the generic, IRC, HTTP, CONNECT, SOCKS, and bidirectional HTTP families
-and retains unsupported backends only for Streamr. The composed server
+for all twelve tunnel families. The composed server
 backends use a fixed `server-destinations/` store below the I2PControl state
 root.
 
@@ -149,14 +148,14 @@ All 12 tunnel types are mapped to backends:
 | `socks` | Client | Bounded SOCKS4a/SOCKS5 CONNECT proxy |
 | `socksirc` | Client | SOCKS CONNECT composed with the IRC anonymity filter |
 | `connectclient` | Client | Strict HTTP CONNECT proxy with direct-I2P routing and explicit I2P outproxy support |
-| `streamrclient` | Client | Unsupported |
+| `streamrclient` | Client | Bounded Yosemite repliable datagram consumer |
 | `server` | Server | Yosemite streaming server with per-name supervisor and persistent destination identity |
 | `httpserver` | Server | Bounded filtered accepted-stream HTTP server |
 | `httpbidirserver` | Server | Deprecated composed filtered HTTP server plus direct-I2P local proxy; no clearnet outproxy |
 | `ircserver` | Server | Bounded filtered accepted-stream IRC server |
-| `streamrserver` | Server | Unsupported |
+| `streamrserver` | Server | Bounded Yosemite repliable datagram producer |
 
-Only the two Streamr datagram types remain explicit unsupported stubs. The
+The Streamr datagram types use a separate bounded producer/consumer runtime. The
 deprecated `httpbidirserver` type is a composition of the accepted HTTP server
 and HTTP client paths: its inbound side uses the HTTP server filter and its
 local proxy side uses the HTTP client sanitizer with outproxy routing disabled.

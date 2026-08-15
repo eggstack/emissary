@@ -1,6 +1,6 @@
 # M072 — Proposal 170 Tunnel Runtime Completion Reclosure
 
-Status: blocked — hard dependencies on M066-M071 closure
+Status: ready — hard dependencies on M066-M071 are closed
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 

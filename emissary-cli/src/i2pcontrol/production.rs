@@ -804,6 +804,7 @@ impl ProductionTunnelManagerControl {
                         | TunnelType::HttpServer
                         | TunnelType::HttpBidirServer
                         | TunnelType::IrcServer
+                        | TunnelType::StreamrServer
                 )
             })
             .filter_map(|definition| {
@@ -869,6 +870,8 @@ impl ProductionTunnelManagerControl {
                         | TunnelType::HttpServer
                         | TunnelType::HttpBidirServer
                         | TunnelType::IrcServer
+                        | TunnelType::StreamrClient
+                        | TunnelType::StreamrServer
                 )
             {
                 continue;
@@ -958,6 +961,7 @@ impl ProductionTunnelManagerControl {
                         | TunnelType::HttpServer
                         | TunnelType::HttpBidirServer
                         | TunnelType::IrcServer
+                        | TunnelType::StreamrServer
                 ) {
                     let status = backend.inspect(&definition);
                     let Some(destination) = status.destination else {
@@ -992,6 +996,7 @@ impl ProductionTunnelManagerControl {
                     | TunnelType::HttpServer
                     | TunnelType::HttpBidirServer
                     | TunnelType::IrcServer
+                    | TunnelType::StreamrServer
             ) {
                 let public_destination = if status.destination.is_some() {
                     status.destination
@@ -1035,6 +1040,7 @@ impl ProductionTunnelManagerControl {
                 | TunnelType::HttpServer
                 | TunnelType::HttpBidirServer
                 | TunnelType::IrcServer
+                | TunnelType::StreamrServer
         ) {
             return Ok(definition);
         }

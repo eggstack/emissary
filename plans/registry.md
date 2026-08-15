@@ -29,7 +29,8 @@ Canonical direction:
 |---|---|---|---|---|
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no containment corrective handoff | M061 source containment and M062/M063 dependency containment remain accepted authorities |
-| I2PControl Proposal 170 tunnel runtime completion | corrective pass required; M064-M071 closed | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M073 — generic option truthfulness corrective | M072 identified a medium generic client/server option-boundary finding |
+| I2PControl Proposal 170 tunnel runtime completion | corrective pass required; M064-M071 closed | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M073 — generic option truthfulness corrective | M072 identified a medium generic client/server option-boundary finding; security hardening M074-M079 remains ordered behind M073 |
+| I2PControl Proposal 170 tunnel security hardening | planned corrective; blocked by M073 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M074 — shared server admission/rate hardening (blocked) | M073 must close before the registry advances to M074; M075-M079 remain dependency-blocked successors |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -41,7 +42,7 @@ New controlling decision:
 
 ADR-0001 and ADR-0002 remain historical/controlling for exhaustive registration, truthful unsupported behavior, startup/control-plane ownership separation, generic client/server runtime ownership, server secret storage, and internal-only scope. ADR-0003 supersedes only their statements that the ten remaining Proposal 170 tunnel types must remain deferred/ineligible for real backends.
 
-The preferred implementation boundary is `emissary-cli/src/i2pcontrol/**`. M065-M072 do not authorize new `emissary-core/**` production paths. M064 is a separate narrow correction to an already accepted `events.rs` observation setter and adds no tunnel capability.
+The preferred implementation boundary is `emissary-cli/src/i2pcontrol/**`. M065-M079 do not authorize new `emissary-core/**` production paths. M064 is a separate narrow correction to an already accepted `events.rs` observation setter and adds no tunnel capability.
 
 ## Dependency-ready implementation plans
 
@@ -51,7 +52,7 @@ Exactly one plan is currently registered as dependency-ready:
 |---|---|---|---|
 | M073 — generic option truthfulness corrective | ready | `plans/implementation/i2pcontrol-proposal-170/073-generic-tunnel-option-truthfulness-corrective.md` | apply or reject every generic client/server runtime-relevant option |
 
-Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered as ready. Future handoffs are prewritten but remain blocked until their hard dependencies close.
+Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered as ready. M074-M079 are prewritten for handoff continuity but remain blocked until their hard dependencies close.
 
 ## Prewritten blocked tunnel-runtime successors
 
@@ -66,8 +67,24 @@ Per `plans/003-planning-process.md`, only the next dependency-ready implementati
 | M072 — integrated tunnel-runtime reclosure | corrective pass required | `plans/implementation/i2pcontrol-proposal-170/072-tunnel-runtime-completion-reclosure.md` | M066-M071 closed; generic option finding recorded |
 | M073 — generic tunnel option truthfulness corrective | ready | `plans/implementation/i2pcontrol-proposal-170/073-generic-tunnel-option-truthfulness-corrective.md` | M072 corrective finding |
 
-M071 is closed. M072 is formally reclosed with a corrective disposition and
-M073 is now the next registered handoff.
+M071 is closed. M072 is formally reclosed with a corrective disposition and M073 remains the current registered handoff.
+
+## Prewritten blocked tunnel-security successors
+
+The post-M072 security/anonymity review establishes a separate bounded corrective sequence. None of these plans supersedes or leapfrogs M073.
+
+| Handoff | Status | Plan | Hard dependency |
+|---|---|---|---|
+| M074 — shared server admission and rate-limit hardening | blocked | `plans/implementation/i2pcontrol-proposal-170/074-server-admission-and-rate-limit-hardening.md` | M073 closed |
+| M075 — generic server accepted-stream hardening | blocked | `plans/implementation/i2pcontrol-proposal-170/075-generic-server-accepted-stream-hardening.md` | M073 + M074 closed |
+| M076 — HTTP server anonymity and POST-throttle hardening | blocked | `plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md` | M073 + M074 closed |
+| M077 — IRC server lifetime and exhaustion hardening | blocked | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | M073 + M074 closed |
+| M078 — Streamr local-boundary hardening | blocked | `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md` | M073 closed; registry sequencing keeps it behind M074-M077 |
+| M079 — integrated tunnel-security reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md` | M074-M078 closed |
+
+Security-hardening planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
+
+The plans pin read-only behavioral/security reference snapshots from Java I2P and I2P+ and remain independently authored. No upstream interaction is authorized.
 
 ## Tunnel-runtime security boundary
 
@@ -76,13 +93,19 @@ The new scope is not permission to turn specialized tunnels into raw forwarding.
 Durable rules:
 
 - `httpserver` and the inbound half of `httpbidirserver` must use application-visible accepted I2P streams so request filtering occurs before local-service forwarding;
+- accepted-stream server families must use bounded global and peer-specific concurrency plus peer/aggregate connection-rate admission so one authenticated peer cannot monopolize the global pool;
+- when server admission/accounting state reaches its memory bound, a new attacker-controlled identity must fail closed rather than evicting active/throttled state;
+- generic control-plane `server` is planned under M075 to migrate from blind `STREAM FORWARD` to the same peer-aware accepted-stream boundary while remaining a raw byte relay after admission;
 - HTTP server completion requires bounded parsing, request-framing/request-smuggling defenses, trusted peer-derived I2P identity metadata, spoofed proxy/identity-header removal, safe Host/target handling, supported access/throttle controls, and response fingerprint/proxy-header filtering;
+- HTTP response hardening must remove `Date` at minimum and the independently adopted I2P+ backend/provider/cache/trace fingerprint set where it does not alter HTTP framing; request-side reverse-proxy identity such as `X-Real-IP` must not reach the loopback application;
+- HTTP POST limiter/accounting state must be bounded and churn-safe; active abusive state may not be evicted simply to admit a new identity;
 - `ircclient` and `socksirc` use one common anonymity filter; DCC/unsupported CTCP remain fail-closed unless a later accepted plan explicitly implements them;
-- `ircserver` filters bounded registration and derives presented client hostname/cloak from actual I2P peer identity before local IRCd forwarding;
+- `ircserver` filters bounded registration and derives presented client hostname/cloak from actual I2P peer identity before local IRCd forwarding; M077 adds a 10-minute activity-resetting post-registration inactivity bound rather than a fixed total session lifetime;
 - `socksirc` may not have a raw/unfiltered payload path;
 - HTTP client, CONNECT, and SOCKS direct-I2P routing must not use local OS DNS or direct LAN/localhost routing; clearnet requires explicitly configured I2P outproxy behavior;
-- Streamr subscriber/packet/task state is hard bounded;
-- a real backend must apply or reject runtime-relevant Proposal 170 options before allocation; security-sensitive persist-but-ignore behavior is forbidden.
+- Streamr subscriber/packet/task state is hard bounded; M078 makes the local UDP producer/client boundary loopback-only and aligns the subscriber ceiling to 10;
+- a real backend must apply or reject runtime-relevant Proposal 170 options before allocation; security-sensitive persist-but-ignore behavior is forbidden;
+- timing hardening must remove controllable resource/fingerprint signals rather than adding random/fixed sleeps or response jitter.
 
 ## Current production baseline and containment authority
 
@@ -90,14 +113,17 @@ Tunnel-runtime planning production baseline:
 
 `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`.
 
+Security-hardening planning baseline:
+
+`04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
+
 At the M072 reclosure head:
 
 - production registry has real generic `client` and `server` backends;
-- after M071, all ten formerly specialized Proposal 170 types are real bounded
-  backends, including the dedicated Streamr producer/consumer runtime;
+- after M071, all ten formerly specialized Proposal 170 types are real bounded backends, including the dedicated Streamr producer/consumer runtime;
 - M064 repaired the feature-disabled/no-events unused-parameter regression in `emissary-core/src/events.rs::set_ipv4_testing/set_ipv6_testing`;
-- M072 is reclosed with a corrective disposition; M073 owns the generic
-  client/server option-truthfulness repair.
+- M072 is reclosed with a corrective disposition; M073 owns the generic client/server option-truthfulness repair;
+- the later security review found additional server admission/fairness, generic-server accepted-stream, HTTP fingerprint/POST limiter, IRC idle-lifetime, and Streamr local-boundary hardening work; M074-M079 own those corrections without reopening unrelated Proposal 170 source scope.
 
 Accepted containment authorities remain:
 
@@ -117,9 +143,9 @@ The RouterInfo source matrix remains exactly:
 - 1 protocol-permitted neutral;
 - 5 unavailable: transit 15s, news, banned peers, and both v4/v6 network-error rows.
 
-M051 remains blocked with the accepted news/ban semantic limitation. Tunnel runtime completion does not create news/ban owners or reopen transit/error source decisions.
+M051 remains blocked with the accepted news/ban semantic limitation. Tunnel runtime/security hardening does not create news/ban owners or reopen transit/error source decisions.
 
-AddressBook `SetConfig`, unrelated base-I2PControl method limitations, and any environmental qualification in the support document remain separate. Completing tunnel runtimes must not be misrepresented as complete historical I2PControl support if those limitations remain.
+AddressBook `SetConfig`, unrelated base-I2PControl method limitations, and any environmental qualification in the support document remain separate. Completing tunnel runtimes or the security hardening sequence must not be misrepresented as complete historical I2PControl support if those limitations remain.
 
 ## Recently closed containment/corrective milestones
 
@@ -139,33 +165,33 @@ AddressBook `SetConfig`, unrelated base-I2PControl method limitations, and any e
 |---|---|---|---|
 | M051 — router news and banned peers | blocked with accepted semantic limitation | `plans/implementation/i2pcontrol-proposal-170/051-routerinfo-news-and-banned-peer-semantics.md` | substantive news/ban owners absent; no current owner-specific plan authorized |
 
-M051 is independent of M064-M072.
+M051 is independent of M064-M079.
 
-## Verification policy for the new runtime series
+## Verification policy for the tunnel runtime/security series
 
 Keep verification local/package-scoped and proportional:
 
 - focused backend/filter/unit/integration tests;
 - fake/local SAM and local capture services where practical;
+- paused-time deterministic limiter/expiry/idle tests where relevant;
 - feature-disabled and feature-enabled `cargo check`;
 - retained M061 and M062/M063 containment tests;
 - bounded live child-process tests already present when relevant.
 
-Do not add hosted CI jobs, release/publishing machinery, coverage gates, fuzz infrastructure, soak farms, broad platform matrices, or public-network interoperability harnesses merely for this workstream.
+Do not add hosted CI jobs, release/publishing machinery, coverage gates, fuzz infrastructure, soak farms, broad platform matrices, public-network deanonymization experiments, or interoperability harnesses merely for this workstream.
 
 ## Registry maintenance rules
 
 1. Only the next dependency-ready plan is normally marked/registered ready.
-2. M064-M071 are closed; M072 is corrective-pass-required; M073 is the current
-   dependency-ready handoff.
-3. M072 remains the integrated reclosure authority, but its generic option
-   finding must be closed by M073 before tunnel-runtime completion closes.
-4. Preserve ADR-0003 scope: implement only the ten pinned Proposal 170 families, not adjacent tunnel/protocol features.
-5. Keep new specialized runtime/filter code under I2PControl wherever technically possible.
-6. No M065-M072 plan may add a new `emissary-core/**` production path without stopping and creating separate architecture/corrective planning.
-7. Preserve M061/M062/M063 containment/dependency authorities unless a separately accepted corrective explicitly supersedes them.
-8. Preserve RouterInfo 37/1/5 and M051 blocker unless separate source-owner work changes them.
-9. Do not silently accept/ignore runtime-relevant security options.
-10. Keep unsupported backends resource-free until the owning real-backend milestone closes.
-11. No upstream interaction is authorized. External specification/reference/source access is read-only only.
-12. All repository writes remain internal to `eggstack/emissary`.
+2. M064-M071 are closed; M072 is corrective-pass-required; M073 remains the current dependency-ready handoff.
+3. M073 must close before M074 becomes ready. M074-M079 remain blocked/prewritten until their named hard dependencies close.
+4. M072 remains the integrated runtime reclosure authority for its historical head, but tunnel-runtime security may not be considered fully reclosed until M079 closes the post-M072 security findings.
+5. Preserve ADR-0003 scope: implement only the pinned Proposal 170 families, not adjacent tunnel/protocol features.
+6. Keep new runtime/filter/admission code under I2PControl wherever technically possible.
+7. No M073-M079 plan may add a new `emissary-core/**` production path without stopping and creating separate architecture/corrective planning.
+8. Preserve M061/M062/M063 containment/dependency authorities unless a separately accepted corrective explicitly supersedes them.
+9. Preserve RouterInfo 37/1/5 and M051 blocker unless separate source-owner work changes them.
+10. Do not silently accept/ignore runtime-relevant security options; underspecified fields must be rejected rather than guessed.
+11. Do not use artificial response jitter/fixed delays as an anonymity substitute for admission fairness, bounded lifetime, and fingerprint suppression.
+12. No upstream interaction is authorized. External specification/reference/source access is read-only only.
+13. All repository writes remain internal to `eggstack/emissary`.

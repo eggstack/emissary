@@ -11,9 +11,7 @@ use tokio::{
 };
 
 use super::{
-    filters::irc::{
-        command_and_params, normalize_line, read_bounded_line, rewrite_server_user,
-    },
+    filters::irc::{command_and_params, normalize_line, read_bounded_line, rewrite_server_user},
     options::{validate_options, OptionValidationError, IRC_SERVER_OPTIONS},
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
@@ -26,7 +24,6 @@ use crate::i2pcontrol::{
 const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_RUNTIME_TASKS: usize = 1000;
-const MAX_CONNECTIONS: usize = 128;
 
 /// Conservative registration bounds for the local IRCd boundary.
 pub const REGISTRATION_LINE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -41,6 +38,7 @@ struct IrcServerConfig {
     target_port: u16,
     sam_tcp_port: u16,
     destination: StoredDestination,
+    admission: ServerAdmissionPolicy,
 }
 
 #[derive(Debug)]
@@ -230,7 +228,7 @@ impl IrcServerRuntimeSupervisor {
                     name: config.name,
                     sam_tcp_port: config.sam_tcp_port,
                     destination: config.destination,
-                    max_connections: MAX_CONNECTIONS,
+                    admission: config.admission,
                     handler,
                 },
                 ready_cancellation.clone(),
@@ -249,9 +247,7 @@ impl IrcServerRuntimeSupervisor {
                     supervisor.publish_destination(&name, generation, &destination);
                     supervisor.mark_running(&name, generation)
                 } =>
-            {
-                Ok(())
-            }
+                Ok(()),
             Ok(Ok(Err(_))) | Ok(Err(_)) | Err(_) => {
                 let _ = self.stop_generation(&name, generation).await;
                 Err(BackendError::Internal {
@@ -339,7 +335,9 @@ where
         )
         .await
         .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "IRC registration line timeout"))??
-        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "incomplete IRC registration"))?;
+        .ok_or_else(|| {
+            io::Error::new(io::ErrorKind::UnexpectedEof, "incomplete IRC registration")
+        })?;
         if line_number == 0 && looks_like_wrong_protocol(&line) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -364,12 +362,11 @@ where
                 }
                 saw_user = true;
             }
-            _ => {
+            _ =>
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "unsupported IRC registration",
-                ))
-            }
+                )),
         }
         let safe_line = if command == "USER" {
             rewrite_server_user(&line, peer_hostname).ok_or_else(|| {
@@ -516,6 +513,9 @@ impl IrcServerTunnelBackend {
             IRC_SERVER_OPTIONS,
         )
         .map_err(option_error)?;
+        validate_raw_options(definition)?;
+        let admission = ServerAdmissionPolicy::from_raw_options(&definition.raw_config)
+            .map_err(invalid_option)?;
         let target_host = definition
             .raw_config
             .get("TargetHost")
@@ -541,7 +541,53 @@ impl IrcServerTunnelBackend {
             target_port,
             sam_tcp_port: self.sam_tcp_port,
             destination: StoredDestination::from_private(String::new()),
+            admission,
         })
+    }
+}
+
+fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
+    const SUPPORTED: &[&str] = &[
+        "TargetPort",
+        "ListenPort",
+        "TargetHost",
+        "Host",
+        "HostingDestination",
+        "MaxConcurrentConns",
+        "ClientPerMinute",
+        "ClientPerHour",
+        "ClientPerDay",
+        "TotalInPerMinute",
+        "TotalInPerHour",
+        "TotalInPerDay",
+    ];
+    const METADATA: &[&str] = &[
+        "name",
+        "type",
+        "Name",
+        "Type",
+        "Description",
+        "StartOnLoad",
+        "Action",
+    ];
+    for key in definition.raw_config.keys() {
+        if key.starts_with("__emissary_")
+            || SUPPORTED.contains(&key.as_str())
+            || METADATA.contains(&key.as_str())
+        {
+            continue;
+        }
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type: TunnelType::IrcServer,
+            option: key.clone(),
+        });
+    }
+    Ok(())
+}
+
+fn invalid_option(option: &str) -> BackendError {
+    BackendError::Internal {
+        message: format!("ircserver option {option} is invalid"),
     }
 }
 

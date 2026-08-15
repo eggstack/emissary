@@ -225,7 +225,7 @@ impl ServerRuntimeSupervisor {
         self.set_task(&name, generation, task);
 
         match tokio::time::timeout(START_TIMEOUT, ready_rx).await {
-            Ok(Ok(Ok(()))) => {
+            Ok(Ok(Ok(()))) =>
                 if self.mark_running(&name, generation) {
                     Ok(())
                 } else {
@@ -233,8 +233,7 @@ impl ServerRuntimeSupervisor {
                     Err(BackendError::Internal {
                         message: "server tunnel runtime exited during start".to_string(),
                     })
-                }
-            }
+                },
             Ok(Ok(Err(message))) => {
                 let _ = self.stop_generation(&name, generation).await;
                 Err(BackendError::Internal { message })
@@ -322,6 +321,8 @@ impl ServerTunnelBackend {
                 attempted_action: "start",
             });
         }
+        validate_raw_options(definition)?;
+        validate_i2cp_options(definition)?;
         let port =
             definition
                 .options
@@ -367,8 +368,10 @@ impl TunnelBackend for ServerTunnelBackend {
                 attempted_action: "start",
             });
         }
+        validate_raw_options(definition)?;
         validate_options(TunnelType::Server, &definition.options, SERVER_OPTIONS)
             .map_err(option_error)?;
+        validate_i2cp_options(definition)?;
         let store = self.destinations.as_ref().ok_or_else(|| BackendError::Internal {
             message: "server destination store is not composed".to_string(),
         })?;
@@ -403,6 +406,50 @@ impl TunnelBackend for ServerTunnelBackend {
     }
 }
 
+fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
+    const SUPPORTED: &[&str] = &[
+        "TargetPort",
+        "ListenPort",
+        "TargetHost",
+        "Host",
+        "i2cp",
+        "Port",
+        "ReachableBy",
+    ];
+    const METADATA: &[&str] = &[
+        "name",
+        "type",
+        "Name",
+        "Type",
+        "Description",
+        "StartOnLoad",
+        "Action",
+    ];
+    for key in definition.raw_config.keys() {
+        if key.starts_with("__emissary_")
+            || SUPPORTED.contains(&key.as_str())
+            || METADATA.contains(&key.as_str())
+        {
+            continue;
+        }
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type: TunnelType::Server,
+            option: key.clone(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_i2cp_options(definition: &TunnelDefinition) -> BackendResult<()> {
+    if definition.options.i2cp_options.keys().any(|key| key != "leaseSetEncType") {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type: TunnelType::Server,
+            option: "I2CPOptions".to_owned(),
+        });
+    }
+    Ok(())
+}
+
 fn option_error(error: OptionValidationError) -> BackendError {
     match error {
         OptionValidationError::Missing {
@@ -427,8 +474,10 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::i2pcontrol::domain::tunnel::{StartIntent, TunnelName, TunnelOptions};
-    use crate::i2pcontrol::server_secret_store::StoredDestination;
+    use crate::i2pcontrol::{
+        domain::tunnel::{StartIntent, TunnelName, TunnelOptions},
+        server_secret_store::StoredDestination,
+    };
     use emissary_core::crypto::base64_encode;
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
@@ -448,6 +497,30 @@ mod tests {
                 serde_json::json!(identity),
             )]),
         }
+    }
+
+    #[tokio::test]
+    async fn unimplemented_server_options_fail_before_store_or_session_allocation() {
+        let backend = ServerTunnelBackend::without_store(1);
+        let mut def = definition("unsupported-server-option", "identity");
+        def.options.is_private = Some(true);
+        assert!(matches!(
+            backend.start(&def).await,
+            Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::Server,
+                option
+            }) if option == "IsPrivate"
+        ));
+
+        let mut raw = definition("unsupported-server-raw", "identity");
+        raw.raw_config.insert("SignatureType".to_owned(), serde_json::json!("secret"));
+        assert!(matches!(
+            backend.start(&raw).await,
+            Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::Server,
+                option
+            }) if option == "SignatureType"
+        ));
     }
 
     async fn fake_sam() -> (u16, tokio::task::JoinHandle<()>) {

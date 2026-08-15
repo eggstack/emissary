@@ -6,8 +6,14 @@
 #![allow(dead_code, unused_imports)]
 
 mod accepted_server;
+mod admission;
 mod client_listener;
 mod task_group;
+
+pub use admission::{
+    AdmissionDecision, AdmissionLease, AdmissionRejection, ServerAdmissionPolicy,
+    ServerAdmissionState,
+};
 
 pub use accepted_server::{
     run_accepted_server, AcceptedServerConnection, AcceptedServerHandler,

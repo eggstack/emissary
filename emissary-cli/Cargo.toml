@@ -45,7 +45,7 @@ reqwest = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 subtle = { version = "2.6.1", default-features = false, optional = true }
 tempfile = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
 toml = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing = { workspace = true, features = ["log"] }

@@ -27,7 +27,7 @@ use crate::i2pcontrol::{
     backends::{
         runtime::{
             run_accepted_server, AcceptedServerConnection, AcceptedServerHandler,
-            AcceptedServerRuntimeConfig, AcceptedServerRuntimeError,
+            AcceptedServerRuntimeConfig, AcceptedServerRuntimeError, ServerAdmissionPolicy,
         },
         server::SERVER_IDENTITY_KEY,
     },
@@ -39,7 +39,6 @@ const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_RUNTIME_TASKS: usize = 1000;
-const DEFAULT_MAX_CONNECTIONS: usize = 128;
 const MAX_THROTTLE_ENTRIES: usize = 1024;
 const MAX_POST_LIMIT: usize = 1_000_000;
 const MAX_POST_WINDOW: u64 = 86_400;
@@ -59,7 +58,7 @@ struct HttpServerConfig {
     target_port: u16,
     sam_tcp_port: u16,
     destination: StoredDestination,
-    max_connections: usize,
+    admission: ServerAdmissionPolicy,
     policy: HttpServerPolicy,
     post_limiter: PostLimiter,
 }
@@ -291,7 +290,7 @@ impl HttpServerRuntimeSupervisor {
                     name: config.name,
                     sam_tcp_port: config.sam_tcp_port,
                     destination: config.destination,
-                    max_connections: config.max_connections,
+                    admission: config.admission,
                     handler,
                 },
                 ready_cancellation.clone(),
@@ -536,12 +535,8 @@ impl HttpServerTunnelBackend {
                 });
             }
         };
-        let max_connections = raw_u64(definition, "MaxConcurrentConns")
-            .map_err(|_| invalid_option("MaxConcurrentConns"))?
-            .unwrap_or(DEFAULT_MAX_CONNECTIONS as u64);
-        if max_connections == 0 || max_connections > DEFAULT_MAX_CONNECTIONS as u64 {
-            return Err(invalid_option("MaxConcurrentConns"));
-        }
+        let admission = ServerAdmissionPolicy::from_raw_options(&definition.raw_config)
+            .map_err(invalid_option)?;
         let post_limit = raw_u64(definition, "PostLimit")
             .map_err(|_| invalid_option("PostLimit"))?
             .unwrap_or(0);
@@ -559,7 +554,7 @@ impl HttpServerTunnelBackend {
             target_port,
             sam_tcp_port: self.sam_tcp_port,
             destination: StoredDestination::from_private(String::new()),
-            max_connections: max_connections as usize,
+            admission,
             policy: HttpServerPolicy {
                 website_host,
                 block_access_in_proxies: raw_bool(definition, "BlockAccessInProxies")?
@@ -687,6 +682,12 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "AccessOption",
         "AccessList",
         "MaxConcurrentConns",
+        "ClientPerMinute",
+        "ClientPerHour",
+        "ClientPerDay",
+        "TotalInPerMinute",
+        "TotalInPerHour",
+        "TotalInPerDay",
         "PostLimit",
         "PostLimitTime",
         "HostingDestination",
@@ -722,12 +723,6 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "AllowInternalSSL",
         "UniqueLocalAddressPerClient",
         "FilterFilePath",
-        "ClientPerMinute",
-        "ClientPerHour",
-        "ClientPerDay",
-        "TotalInPerMinute",
-        "TotalInPerHour",
-        "TotalInPerDay",
         "PerClientPeriod",
         "TotalPeriod",
         "TotalBanTime",
@@ -839,6 +834,30 @@ mod tests {
             result,
             Err(BackendError::UnsupportedOption { .. })
         ));
+    }
+
+    #[tokio::test]
+    async fn admission_options_use_reference_defaults_and_validate_before_allocation() {
+        let root = tempfile::tempdir().unwrap();
+        let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
+        let config = backend
+            .config_without_destination(&definition(&[(
+                "MaxConcurrentConns",
+                serde_json::json!(7),
+            )]))
+            .await
+            .unwrap();
+        assert_eq!(config.admission.max_concurrent_connections(), 7);
+
+        let invalid = backend
+            .config_without_destination(&definition(&[(
+                "MaxConcurrentConns",
+                serde_json::json!(0),
+            )]))
+            .await;
+        assert!(
+            matches!(invalid, Err(BackendError::Internal { message }) if message.contains("MaxConcurrentConns"))
+        );
     }
 
     #[test]

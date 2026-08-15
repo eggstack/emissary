@@ -6,10 +6,12 @@ use yosemite::{style, DestinationKind, Session, SessionOptions, Stream};
 
 use crate::i2pcontrol::server_secret_store::StoredDestination;
 
-use super::task_group::BoundedTaskGroup;
+use super::{
+    admission::{AdmissionDecision, ServerAdmissionPolicy, ServerAdmissionState},
+    task_group::BoundedTaskGroup,
+};
 
 const STOP_TIMEOUT: Duration = Duration::from_secs(5);
-const DEFAULT_MAX_CONNECTIONS: usize = 128;
 
 /// Immutable public identity obtained from the accepted I2P stream.
 #[derive(Clone, PartialEq, Eq)]
@@ -20,7 +22,7 @@ pub struct TrustedPeerIdentity {
 impl fmt::Debug for TrustedPeerIdentity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TrustedPeerIdentity")
-            .field("destination", &self.destination)
+            .field("destination", &"<redacted>")
             .finish()
     }
 }
@@ -42,6 +44,13 @@ impl TrustedPeerIdentity {
     /// Return the public destination reported by SAM for this connection.
     pub fn destination(&self) -> &str {
         &self.destination
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(destination: &str) -> Self {
+        Self {
+            destination: Arc::from(destination),
+        }
     }
 }
 
@@ -68,7 +77,7 @@ pub struct AcceptedServerRuntimeConfig {
     pub name: String,
     pub sam_tcp_port: u16,
     pub destination: StoredDestination,
-    pub max_connections: usize,
+    pub admission: ServerAdmissionPolicy,
     pub handler: AcceptedServerHandler,
 }
 
@@ -78,7 +87,7 @@ impl fmt::Debug for AcceptedServerRuntimeConfig {
             .field("name", &self.name)
             .field("sam_tcp_port", &self.sam_tcp_port)
             .field("destination", &self.destination)
-            .field("max_connections", &self.max_connections)
+            .field("admission", &self.admission)
             .finish_non_exhaustive()
     }
 }
@@ -124,7 +133,8 @@ pub async fn run_accepted_server(
 
     let public_destination = session.destination().to_owned();
     let _ = ready.send(Ok(public_destination));
-    let max_connections = config.max_connections.clamp(1, DEFAULT_MAX_CONNECTIONS);
+    let max_connections = config.admission.max_concurrent_connections();
+    let admission = ServerAdmissionState::new(config.admission);
     let handler = config.handler;
     let mut tasks = BoundedTaskGroup::new(max_connections);
 
@@ -139,8 +149,12 @@ pub async fn run_accepted_server(
                 let Some(peer) = TrustedPeerIdentity::from_stream(&stream) else {
                     continue;
                 };
+                let AdmissionDecision::Allowed(lease) = admission.try_acquire(&peer) else {
+                    continue;
+                };
                 let handler = Arc::clone(&handler);
                 let _ = tasks.try_spawn(async move {
+                    let _lease = lease;
                     let _ = std::panic::AssertUnwindSafe((handler)(AcceptedServerConnection {
                         stream,
                         peer,
@@ -226,7 +240,7 @@ mod tests {
             name: "accepted-server".to_owned(),
             sam_tcp_port: sam_port,
             destination: StoredDestination::from_private(base64_encode([7u8; 128])),
-            max_connections: 1,
+            admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
             handler,
         };
         let (cancel_tx, cancel_rx) = watch::channel(false);
@@ -256,7 +270,7 @@ mod tests {
                 name: "failure".to_owned(),
                 sam_tcp_port: 1,
                 destination: StoredDestination::from_private("private".to_owned()),
-                max_connections: 1,
+                admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
                 handler: Arc::new(|_| Box::pin(async {})),
             },
             cancel_rx,

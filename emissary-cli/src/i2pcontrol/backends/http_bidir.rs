@@ -21,6 +21,7 @@ use super::{
     runtime::{
         run_accepted_server, run_client_listener, AcceptedServerRuntimeConfig,
         AcceptedServerRuntimeError, ClientListenerRuntimeConfig, ClientListenerRuntimeError,
+        ServerAdmissionPolicy,
     },
     server::SERVER_IDENTITY_KEY,
     BackendError, BackendResult, BackendStatus, TunnelBackend,
@@ -35,7 +36,6 @@ const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_RUNTIME_TASKS: usize = 1000;
 const MAX_CONNECTIONS: usize = 128;
-const DEFAULT_MAX_CONNECTIONS: usize = 128;
 const MAX_POST_LIMIT: usize = 1_000_000;
 const MAX_POST_WINDOW: u64 = 86_400;
 
@@ -48,7 +48,7 @@ struct HttpBidirConfig {
     listen_port: u16,
     sam_tcp_port: u16,
     destination: StoredDestination,
-    server_max_connections: usize,
+    admission: ServerAdmissionPolicy,
     server_policy: HttpServerPolicy,
     post_limiter: PostLimiter,
     proxy_username: Option<String>,
@@ -356,7 +356,7 @@ async fn run_composite(
             name: format!("{}-server", config.name),
             sam_tcp_port: config.sam_tcp_port,
             destination: config.destination,
-            max_connections: config.server_max_connections,
+            admission: config.admission,
             handler: server_handler,
         },
         child_receiver.clone(),
@@ -578,11 +578,8 @@ impl HttpBidirServerTunnelBackend {
             Some("deny") => AccessOption::Deny,
             Some(_) => return Err(invalid_option("AccessOption")),
         };
-        let server_max_connections =
-            raw_u64(definition, "MaxConcurrentConns")?.unwrap_or(DEFAULT_MAX_CONNECTIONS as u64);
-        if server_max_connections == 0 || server_max_connections > DEFAULT_MAX_CONNECTIONS as u64 {
-            return Err(invalid_option("MaxConcurrentConns"));
-        }
+        let admission = ServerAdmissionPolicy::from_raw_options(&definition.raw_config)
+            .map_err(invalid_option)?;
         let post_limit = raw_u64(definition, "PostLimit")?.unwrap_or(0);
         let post_window = raw_u64(definition, "PostLimitTime")?.unwrap_or(60);
         if post_limit > MAX_POST_LIMIT as u64
@@ -599,7 +596,7 @@ impl HttpBidirServerTunnelBackend {
             listen_port,
             sam_tcp_port: self.sam_tcp_port,
             destination: StoredDestination::from_private(String::new()),
-            server_max_connections: server_max_connections as usize,
+            admission,
             server_policy: HttpServerPolicy {
                 website_host,
                 block_access_in_proxies: raw_bool(definition, "BlockAccessInProxies")?
@@ -722,6 +719,12 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "AccessOption",
         "AccessList",
         "MaxConcurrentConns",
+        "ClientPerMinute",
+        "ClientPerHour",
+        "ClientPerDay",
+        "TotalInPerMinute",
+        "TotalInPerHour",
+        "TotalInPerDay",
         "PostLimit",
         "PostLimitTime",
         "HostingDestination",
@@ -815,6 +818,17 @@ mod tests {
         assert!(
             super::super::filters::http_client::HttpClientRequest::parse(request, None).is_err()
         );
+    }
+
+    #[test]
+    fn inbound_server_uses_shared_admission_policy() {
+        let mut definition = definition();
+        definition
+            .raw_config
+            .insert("MaxConcurrentConns".to_owned(), serde_json::json!(9));
+        let backend = HttpBidirServerTunnelBackend::new(1, ServerDestinationStore::new("."), None);
+        let config = backend.config_without_destination(&definition).unwrap();
+        assert_eq!(config.admission.max_concurrent_connections(), 9);
     }
 
     async fn fake_sam() -> (u16, tokio::task::JoinHandle<()>) {

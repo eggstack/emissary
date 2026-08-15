@@ -231,7 +231,7 @@ impl ClientRuntimeSupervisor {
         self.set_task(&name, generation, task);
 
         match tokio::time::timeout(START_TIMEOUT, ready_rx).await {
-            Ok(Ok(Ok(()))) => {
+            Ok(Ok(Ok(()))) =>
                 if self.mark_running(&name, generation) {
                     Ok(())
                 } else {
@@ -239,8 +239,7 @@ impl ClientRuntimeSupervisor {
                     Err(BackendError::Internal {
                         message: "client tunnel runtime exited during start".to_string(),
                     })
-                }
-            }
+                },
             Ok(Ok(Err(message))) => {
                 let _ = self.stop_generation(&name, generation).await;
                 Err(BackendError::Internal { message })
@@ -307,6 +306,7 @@ impl ClientTunnelBackend {
                 attempted_action: "start",
             });
         }
+        validate_raw_options(definition)?;
         validate_options(TunnelType::Client, &definition.options, CLIENT_OPTIONS)
             .map_err(option_error)?;
         let destination = definition
@@ -338,6 +338,44 @@ impl ClientTunnelBackend {
             sam_tcp_port: self.supervisor.sam_tcp_port,
         })
     }
+}
+
+fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
+    const SUPPORTED: &[&str] = &[
+        "TargetDestination",
+        "Destination",
+        "TargetPort",
+        "ListenInterface",
+        "ListenPort",
+        "ReachableBy",
+        "Port",
+        "i2p.tunnel.clientDest",
+        "i2p.tunnel.clientDestPort",
+        "i2p.tunnel.listenInterface",
+        "i2p.tunnel.listenPort",
+    ];
+    const METADATA: &[&str] = &[
+        "name",
+        "type",
+        "Name",
+        "Type",
+        "Description",
+        "StartOnLoad",
+        "Action",
+    ];
+    for key in definition.raw_config.keys() {
+        if key.starts_with("__emissary_")
+            || SUPPORTED.contains(&key.as_str())
+            || METADATA.contains(&key.as_str())
+        {
+            continue;
+        }
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type: TunnelType::Client,
+            option: key.clone(),
+        });
+    }
+    Ok(())
 }
 
 fn option_error(error: OptionValidationError) -> BackendError {
@@ -406,6 +444,31 @@ mod tests {
             },
             raw_config: Default::default(),
         }
+    }
+
+    #[test]
+    fn unimplemented_client_options_fail_before_runtime_allocation() {
+        let backend = ClientTunnelBackend::new(1);
+        let mut def = definition("unsupported-client-option");
+        def.options.access_list = Some("private-peer".to_owned());
+        assert!(matches!(
+            backend.config(&def),
+            Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::Client,
+                option
+            }) if option == "AccessList"
+        ));
+
+        let mut raw = definition("unsupported-client-raw");
+        raw.raw_config
+            .insert("i2p.tunnel.future".to_owned(), serde_json::json!("secret"));
+        assert!(matches!(
+            backend.config(&raw),
+            Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::Client,
+                option
+            }) if option == "i2p.tunnel.future"
+        ));
     }
 
     async fn fake_sam() -> (u16, tokio::task::JoinHandle<()>) {

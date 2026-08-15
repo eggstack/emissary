@@ -10,6 +10,7 @@ use std::fmt;
 use crate::i2pcontrol::domain::tunnel::{TunnelOptions, TunnelType};
 
 /// Policy for the protocol-defined custom option namespace.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CustomOptionPolicy {
     /// Accept and pass the namespace to the backend's protocol adapter.
@@ -140,29 +141,18 @@ pub fn validate_options(
 pub const CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &["TargetDestination", "ListenPort"],
     &[],
-    &[
-        "TargetPort",
-        "ListenInterface",
-        "AccessList",
-        "AllowPlaintext",
-    ],
-    CustomOptionPolicy::Accept,
-    CustomOptionPolicy::Accept,
+    &["TargetPort", "ListenInterface"],
+    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Reject,
 );
 
 /// Runtime fields supported by the existing generic server backend.
 pub const SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &[],
     &["TargetPort", "ListenPort"],
-    &[
-        "HostingDestination",
-        "IsPrivate",
-        "HashCash",
-        "SignatureType",
-        "Consumer",
-    ],
-    CustomOptionPolicy::Accept,
-    CustomOptionPolicy::Accept,
+    &["TargetHost", "Host"],
+    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Reject,
 );
 
 /// Proposal 170 fields consumed by the filtered IRC client runtime.

@@ -375,10 +375,16 @@ status/error while preserving durable definitions.
 
 The `httpserver` backend additionally supports loopback-only `TargetHost`/`Host`,
 `TargetPort`/`Port`, `WebsiteHostname`/`SpoofedHost`, access-list and
-referer/User-Agent policy, bounded `MaxConcurrentConns`, and peer-keyed
-`PostLimit`/`PostLimitTime`. It rejects TLS termination, compression/custom
-options, proxy/outproxy settings, upgrades, and other recognized options it
-does not consume before session allocation. Request headers are normalized
+referer/User-Agent policy, bounded `MaxConcurrentConns`, peer/aggregate
+`ClientPerMinute`/`ClientPerHour`/`ClientPerDay` and
+`TotalInPerMinute`/`TotalInPerHour`/`TotalInPerDay` admission, and peer-keyed
+`PostLimit`/`PostLimitTime`. Absent admission values default to 30 global
+connections, 8 concurrent connections per peer, peer rates 30/80/200 per
+minute/hour/day, and aggregate rates 50 per minute and unlimited per hour/day.
+It rejects TLS termination, compression/custom options, proxy/outproxy
+settings, `FilterFilePath`, `UniqueLocalAddressPerClient`, `MultiHoming`, and
+the underspecified `PerClientPeriod`/`TotalPeriod`/`TotalBanTime` before session
+allocation. Request headers are normalized
 before the local target is connected, and response fingerprint headers are
 removed before forwarding.
 
@@ -404,9 +410,12 @@ M066 runtime before allocation. M066 forwards an explicitly configured I2P
 destination and does not synthesize IRC registration or channel automation.
 `ircclient` accepts only `TargetDestination`, `TargetPort`, `ReachableBy`, and
 `Port`; `ircserver` accepts loopback `TargetHost`/`Host` plus `TargetPort` or
-`Port`. I2CP and custom options, WEBIRC/cloak options, access/auth fields, and
-DCC-related options are rejected. Unsupported CTCP and DCC payloads are
-blocked by the common filter.
+`Port`, and uses the same bounded peer-aware admission policy as `httpserver`.
+The HTTP and IRC accepted-server families share the 30/8 concurrency defaults
+and the peer/aggregate minute/hour/day controls described above. I2CP and
+custom options, WEBIRC/cloak options, access/auth fields, and DCC-related
+options are rejected. Unsupported CTCP and DCC payloads are blocked by the
+common filter.
 
 ### Streamr options
 

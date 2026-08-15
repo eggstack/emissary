@@ -390,18 +390,43 @@ fn allowed_production_paths_match_the_m062_budget() {
             .any(|allowed| allowed == path);
         let authorized_m064 = path == "emissary-core/src/events.rs";
         let authorized_m065 = is_authorized_m065_path(path);
+        let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
-            permitted || authorized_m064 || authorized_m065 || is_authorized_planning_path(path),
+            permitted
+                || authorized_m064
+                || authorized_m065
+                || authorized_tunnel_runtime
+                || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
         );
 
         for pattern in &manifest.prohibited_production_paths.patterns {
             assert!(
-                authorized_m064 || authorized_m065 || !glob_matches(pattern, path),
+                authorized_m064
+                    || authorized_m065
+                    || authorized_tunnel_runtime
+                    || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
             );
         }
     }
+}
+
+fn is_authorized_tunnel_runtime_path(path: &str) -> bool {
+    matches!(
+        path,
+        "emissary-cli/src/i2pcontrol/backends/filters/http.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/irc_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/accepted_server.rs"
+            | "emissary-cli/src/i2pcontrol/server.rs"
+            | "plans/closure/i2pcontrol-proposal-170/067-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/068-closure.md"
+            | "emissary-cli/src/i2pcontrol/backends/connect_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/filters/http_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/filters/proxy.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_client.rs"
+    )
 }
 
 fn is_authorized_m065_path(path: &str) -> bool {

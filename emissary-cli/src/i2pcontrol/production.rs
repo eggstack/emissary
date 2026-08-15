@@ -750,13 +750,30 @@ impl ProductionTunnelManagerControl {
         startup: StartupTunnelInventory,
         sam_tcp_port: Option<u16>,
     ) -> Result<Self, String> {
+        Self::new_with_startup_inventory_and_sam_port_and_address_book(
+            dir,
+            startup,
+            sam_tcp_port,
+            None,
+        )
+    }
+
+    /// Create the production tunnel manager with the runtime address-book
+    /// resolver used by dynamic HTTP/CONNECT client targets.
+    pub fn new_with_startup_inventory_and_sam_port_and_address_book(
+        dir: PathBuf,
+        startup: StartupTunnelInventory,
+        sam_tcp_port: Option<u16>,
+        address_book: Option<Arc<RuntimeAddressBookHandle>>,
+    ) -> Result<Self, String> {
         let state_root = dir.parent().unwrap_or(dir.as_path()).to_path_buf();
         let server_destinations = ServerDestinationStore::new(state_root);
         let registry = match sam_tcp_port {
             Some(port) => {
-                crate::i2pcontrol::backends::registry::create_production_registry_with_server_store(
+                crate::i2pcontrol::backends::registry::create_production_registry_with_server_store_and_address_book(
                     port,
                     server_destinations.clone(),
+                    address_book,
                 )
             }
             None => crate::i2pcontrol::backends::registry::create_default_registry(),
@@ -840,7 +857,9 @@ impl ProductionTunnelManagerControl {
                 || !matches!(
                     definition.tunnel_type,
                     TunnelType::Client
+                        | TunnelType::HttpClient
                         | TunnelType::IrcClient
+                        | TunnelType::ConnectClient
                         | TunnelType::Server
                         | TunnelType::HttpServer
                         | TunnelType::IrcServer

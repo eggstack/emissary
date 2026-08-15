@@ -1,6 +1,6 @@
 # M070 — HTTP Bidirectional Server Composition
 
-Status: blocked — hard dependencies on M067 and M068 closure
+Status: blocked — dependency-ready but not the next registered handoff
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 

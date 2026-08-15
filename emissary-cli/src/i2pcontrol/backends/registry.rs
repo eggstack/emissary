@@ -19,6 +19,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use super::TunnelBackend;
+use crate::i2pcontrol::address_book_runtime::RuntimeAddressBookHandle;
 use crate::i2pcontrol::{
     domain::tunnel::{TunnelType, ALL_TUNNEL_ACTIONS, ALL_TUNNEL_TYPES},
     server_secret_store::ServerDestinationStore,
@@ -166,9 +167,20 @@ pub fn create_production_registry(
 }
 
 /// Create the production registry with a composed backend-owned server store.
+#[allow(dead_code)]
 pub fn create_production_registry_with_server_store(
     sam_tcp_port: u16,
     server_store: ServerDestinationStore,
+) -> Result<TunnelBackendRegistry, RegistryError> {
+    create_production_registry_with_server_store_and_address_book(sam_tcp_port, server_store, None)
+}
+
+/// Create the production registry with the control-plane address-book resolver
+/// used by dynamic HTTP/CONNECT client targets.
+pub fn create_production_registry_with_server_store_and_address_book(
+    sam_tcp_port: u16,
+    server_store: ServerDestinationStore,
+    address_book: Option<Arc<RuntimeAddressBookHandle>>,
 ) -> Result<TunnelBackendRegistry, RegistryError> {
     let client =
         Arc::new(super::client::ClientTunnelBackend::new(sam_tcp_port)) as Arc<dyn TunnelBackend>;
@@ -186,6 +198,16 @@ pub fn create_production_registry_with_server_store(
         sam_tcp_port,
         server_store,
     )) as Arc<dyn TunnelBackend>;
+    let http_client = Arc::new(match address_book.clone() {
+        Some(address_book) => super::http_client::HttpClientTunnelBackend::new(sam_tcp_port)
+            .with_address_book(address_book),
+        None => super::http_client::HttpClientTunnelBackend::new(sam_tcp_port),
+    }) as Arc<dyn TunnelBackend>;
+    let connect_client = Arc::new(match address_book {
+        Some(address_book) => super::connect_client::ConnectClientTunnelBackend::new(sam_tcp_port)
+            .with_address_book(address_book),
+        None => super::connect_client::ConnectClientTunnelBackend::new(sam_tcp_port),
+    }) as Arc<dyn TunnelBackend>;
     let backends: Vec<Arc<dyn TunnelBackend>> = ALL_TUNNEL_TYPES
         .iter()
         .map(|&tt| {
@@ -199,6 +221,10 @@ pub fn create_production_registry_with_server_store(
                 irc_server.clone()
             } else if tt == TunnelType::HttpServer {
                 http_server.clone()
+            } else if tt == TunnelType::HttpClient {
+                http_client.clone()
+            } else if tt == TunnelType::ConnectClient {
+                connect_client.clone()
             } else {
                 Arc::new(super::unsupported::UnsupportedTunnelBackend::new(tt))
                     as Arc<dyn TunnelBackend>

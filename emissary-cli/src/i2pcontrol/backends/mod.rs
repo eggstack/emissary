@@ -17,8 +17,10 @@
 // DEALINGS IN THE SOFTWARE.
 
 pub mod client;
+pub mod connect_client;
 pub mod fake;
 pub mod filters;
+pub mod http_client;
 pub mod irc_client;
 pub mod irc_server;
 pub mod http_server;

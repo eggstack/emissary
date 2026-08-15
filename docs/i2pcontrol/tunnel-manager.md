@@ -15,8 +15,9 @@ The TunnelManager handler implements the `TunnelManager` JSON-RPC method for all
 - Lifecycle dispatch (start, stop, restart) through the backend registry
 - Ownership enforcement for startup-managed tunnels
 - Real control-plane lifecycle for generic `client` and `server`, filtered
-  `ircclient`/`ircserver`, and accepted-stream filtered `httpserver`; explicit
-  unsupported behavior remains for the other seven specialized types
+  `ircclient`/`ircserver`, accepted-stream filtered `httpserver`, and bounded
+  HTTP/CONNECT client proxies; explicit unsupported behavior remains for the
+  other five specialized types
 
 Production inventory is the deterministic union of startup-configured generic
 client/server definitions and persisted control-plane definitions. Startup
@@ -47,12 +48,12 @@ for the IRC family and M067 consumes them for HTTP. `ircclient` uses one bounded
 line-oriented filter for both traffic directions; `ircserver` filters
 registration before connecting to loopback; `httpserver` normalizes bounded
 HTTP headers before connecting to loopback and filters response fingerprints.
-The other seven specialized tunnel families remain explicit unsupported
+The other five specialized tunnel families remain explicit unsupported
 backends until their own security/filter milestones close.
 
 After the durable definition and server-identity stores load, `StartOnLoad` is
-reconciled only for control-plane-owned generic `client`, `ircclient`,
-`server`, `httpserver`, and `ircserver`
+reconciled only for control-plane-owned `client`, `httpclient`, `connectclient`,
+`ircclient`, `server`, `httpserver`, and `ircserver`
 definitions. Each start is isolated; a failed definition remains stopped and
 does not prevent the service or other eligible definitions from starting.
 Unsupported and startup-managed definitions are never auto-started.

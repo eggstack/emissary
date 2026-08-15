@@ -164,6 +164,9 @@ Retained candidate evidence includes:
 - M066 bounded IRC parsing/filtering, filtered `ircclient`, and registration-filtered
   `ircserver` runtimes with trusted peer-derived registration identity;
 - M067 bounded HTTP request normalization and response filtering for `httpserver`.
+- M068 bounded HTTP client and strict CONNECT client proxies with I2P-only
+  target routing, explicit outproxy handling, proxy authentication, and
+  generation-safe local listener lifecycle.
 
 M028 must not reimplement or broaden these areas.
 

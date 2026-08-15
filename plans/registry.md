@@ -29,7 +29,7 @@ Canonical direction:
 |---|---|---|---|---|
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no containment corrective handoff | M061 source containment and M062/M063 dependency containment remain accepted authorities |
-| I2PControl Proposal 170 tunnel runtime completion | active; M064/M065/M066/M067 closed; M068 ready | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M068 — HTTP client + CONNECT | M069/M071 are dependency-ready after their hard dependencies; M070/M072 remain blocked on later family closure |
+| I2PControl Proposal 170 tunnel runtime completion | active; M064-M068 closed; M069 ready | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M069 — SOCKS + SOCKS-IRC | M070/M071 are dependency-ready but not the next registered handoff; M072 remains blocked on later family closure |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -49,7 +49,7 @@ Exactly one plan is currently registered as dependency-ready:
 
 | Handoff | Status | Plan | Objective |
 |---|---|---|---|
-| M068 — HTTP client + CONNECT | ready | `plans/implementation/i2pcontrol-proposal-170/068-http-client-and-connect-tunnels.md` | implement the sanitized direct-I2P HTTP client and CONNECT family |
+| M069 — SOCKS + SOCKS-IRC | ready | `plans/implementation/i2pcontrol-proposal-170/069-socks-and-socks-irc-tunnels.md` | implement bounded SOCKS TCP CONNECT and compose the accepted IRC filter |
 
 Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered as ready. Future handoffs are prewritten but remain blocked until their hard dependencies close.
 
@@ -59,13 +59,13 @@ Per `plans/003-planning-process.md`, only the next dependency-ready implementati
 |---|---|---|---|
 | M066 — IRC client/server family | closed | `plans/implementation/i2pcontrol-proposal-170/066-irc-client-server-tunnel-family.md` | M065 closed; closure accepted |
 | M067 — HTTP server | closed | `plans/implementation/i2pcontrol-proposal-170/067-http-server-tunnel.md` | M065 closed; closure accepted |
-| M068 — HTTP client + CONNECT | ready | `plans/implementation/i2pcontrol-proposal-170/068-http-client-and-connect-tunnels.md` | M065 closed |
-| M069 — SOCKS + SOCKS-IRC | blocked — dependency-ready but not the next registered handoff | `plans/implementation/i2pcontrol-proposal-170/069-socks-and-socks-irc-tunnels.md` | M065 + M066 closed |
-| M070 — HTTP bidirectional server composition | blocked | `plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md` | M067 + M068 closed |
+| M068 — HTTP client + CONNECT | closed | `plans/implementation/i2pcontrol-proposal-170/068-http-client-and-connect-tunnels.md` | M065 closed; closure accepted |
+| M069 — SOCKS + SOCKS-IRC | ready | `plans/implementation/i2pcontrol-proposal-170/069-socks-and-socks-irc-tunnels.md` | M065 + M066 closed |
+| M070 — HTTP bidirectional server composition | blocked — dependency-ready but not the next registered handoff | `plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md` | M067 + M068 closed |
 | M071 — Streamr client/server | blocked — dependency-ready but not the next registered handoff | `plans/implementation/i2pcontrol-proposal-170/071-streamr-client-server-tunnels.md` | M065 closed |
 | M072 — integrated tunnel-runtime reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/072-tunnel-runtime-completion-reclosure.md` | M066-M071 closed |
 
-After M067 closes, M068, M069, and M071 are independently dependency-ready and may be implemented in parallel. Project convention registers M068 as the next handoff. M070 waits for both accepted HTTP halves. M072 waits for every runtime-family milestone.
+After M068 closes, M069, M070, and M071 are dependency-ready. Project convention registers M069 as the next handoff. M070 waits for both accepted HTTP halves. M072 waits for every runtime-family milestone.
 
 ## Tunnel-runtime security boundary
 
@@ -125,6 +125,7 @@ AddressBook `SetConfig`, unrelated base-I2PControl method limitations, and any e
 | I2PControl Proposal 170 containment | M062 — dependency-surface containment corrective | closed (closure/evidence corrected by M063) | `plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md` | `plans/closure/i2pcontrol-proposal-170/062-closure.md` |
 | I2PControl Proposal 170 containment | M061 — independent containment reclosure | closed | `plans/implementation/i2pcontrol-proposal-170/061-containment-reclosure.md` | `plans/closure/i2pcontrol-proposal-170/061-closure.md` |
 | I2PControl Proposal 170 tunnel runtime completion | M066 — IRC client/server family | closed | `plans/implementation/i2pcontrol-proposal-170/066-irc-client-server-tunnel-family.md` | `plans/closure/i2pcontrol-proposal-170/066-closure.md` |
+| I2PControl Proposal 170 tunnel runtime completion | M068 — HTTP client + CONNECT family | closed | `plans/implementation/i2pcontrol-proposal-170/068-http-client-and-connect-tunnels.md` | `plans/closure/i2pcontrol-proposal-170/068-closure.md` |
 | I2PControl Proposal 170 tunnel runtime completion | M065 — runtime/option foundation | closed | `plans/implementation/i2pcontrol-proposal-170/065-i2pcontrol-tunnel-runtime-primitives.md` | `plans/closure/i2pcontrol-proposal-170/065-closure.md` |
 | I2PControl Proposal 170 tunnel runtime completion | M064 — tunnel-runtime baseline corrective | closed | `plans/implementation/i2pcontrol-proposal-170/064-proposal-170-tunnel-runtime-baseline-corrective.md` | `plans/closure/i2pcontrol-proposal-170/064-closure.md` |
 
@@ -151,8 +152,8 @@ Do not add hosted CI jobs, release/publishing machinery, coverage gates, fuzz in
 ## Registry maintenance rules
 
 1. Only the next dependency-ready plan is normally marked/registered ready.
-2. M064, M065, and M066 are closed; M067 is the current dependency-ready handoff.
-3. After M066, M067/M068/M069/M071 may become ready independently; registry should reflect whichever handoff(s) are actually assigned/active without rewriting future plan requirements.
+2. M064-M068 are closed; M069 is the current dependency-ready handoff.
+3. After M068, M069/M070/M071 are dependency-ready independently; registry should reflect whichever handoff(s) are actually assigned/active without rewriting future plan requirements.
 4. Preserve ADR-0003 scope: implement only the ten pinned Proposal 170 families, not adjacent tunnel/protocol features.
 5. Keep new specialized runtime/filter code under I2PControl wherever technically possible.
 6. No M065-M072 plan may add a new `emissary-core/**` production path without stopping and creating separate architecture/corrective planning.

@@ -42,12 +42,23 @@ impl fmt::Debug for ClientStreamConnector {
 impl ClientStreamConnector {
     /// Open one outbound stream without holding the session mutex across I/O.
     pub async fn connect(&self) -> Result<yosemite::Stream, ClientListenerRuntimeError> {
+        self.connect_to(self.destination.as_ref(), self.destination_port)
+            .await
+    }
+
+    /// Open one outbound stream to a request-selected I2P destination without
+    /// holding the session mutex across I/O.
+    pub async fn connect_to(
+        &self,
+        destination: &str,
+        destination_port: u16,
+    ) -> Result<yosemite::Stream, ClientListenerRuntimeError> {
         let future = {
             let mut session = self.session.lock();
             session.connect_detached_with_options(
-                self.destination.as_ref(),
+                destination,
                 StreamOptions {
-                    dst_port: self.destination_port,
+                    dst_port: destination_port,
                     ..Default::default()
                 },
             )

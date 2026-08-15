@@ -187,6 +187,24 @@ pub const IRC_SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     CustomOptionPolicy::Reject,
 );
 
+/// Proposal 170 HTTP proxy options consumed by the control-plane client.
+pub const HTTP_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
+    &["ListenPort"],
+    &[],
+    &["ListenInterface", "ProxyUsername", "ProxyPassword"],
+    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Reject,
+);
+
+/// Proposal 170 CONNECT proxy options consumed by the control-plane client.
+pub const CONNECT_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
+    &["ListenPort"],
+    &[],
+    &["ListenInterface", "ProxyUsername", "ProxyPassword"],
+    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Reject,
+);
+
 fn present_runtime_fields(options: &TunnelOptions) -> Vec<&'static str> {
     let mut fields = Vec::new();
     for (field, present) in [

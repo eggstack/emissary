@@ -804,7 +804,7 @@ pub async fn init_server(
         I2pControlError::Config("I2PControl requires the runtime address-book owner".into())
     })?;
     let address_books = Arc::new(ProductionAddressBookControl::new(
-        address_book_handle,
+        Arc::clone(&address_book_handle),
         ab_dir,
     ));
     address_books.load().await.map_err(|e| {
@@ -821,10 +821,11 @@ pub async fn init_server(
     })?;
     let startup_tunnel_inventory = ctx.startup_tunnel_inventory.unwrap_or_default();
     let tunnels: Arc<ProductionTunnelManagerControl> = Arc::new(
-        ProductionTunnelManagerControl::new_with_startup_inventory_and_sam_port(
+        ProductionTunnelManagerControl::new_with_startup_inventory_and_sam_port_and_address_book(
             tm_dir.clone(),
             startup_tunnel_inventory,
             ctx.sam_tcp_port,
+            Some(address_book_handle),
         )
         .map_err(|e| {
             I2pControlError::Persistence(format!("failed to create tunnel manager: {e}"))

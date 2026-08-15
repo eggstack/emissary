@@ -1,6 +1,8 @@
 # M068 — HTTP Client and CONNECT Client Tunnels
 
-Status: ready
+Status: closed
+
+Closure: `plans/closure/i2pcontrol-proposal-170/068-closure.md`.
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 

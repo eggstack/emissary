@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: planned corrective security work; M075 closed; M076 next; M077 ready; M078-M079 blocked
+Status: planned corrective security work; M076 closed; M077 next; M078-M079 blocked
 
 Planning production baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
@@ -216,7 +216,7 @@ Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/075-closure.md`.
 
 Bring response filtering to Java parity and adopt the non-framing I2P+ fingerprint denylist; include `Date` and request-side `X-Real-IP`/equivalent proxy identity handling. Replace eviction-bypassable POST limiter state with bounded fail-closed state.
 
-Status: ready; next registered handoff after M075.
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/076-closure.md`.
 
 ### M077 — IRC server lifetime/exhaustion hardening
 

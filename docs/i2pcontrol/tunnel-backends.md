@@ -1,9 +1,9 @@
 # I2PControl Tunnel Backends
 
-Status: M075 generic server accepted-stream hardening closed; M076/M077 ready
+Status: M076 HTTP anonymity/POST-throttle hardening closed; M077 ready
 
 All twelve tunnel families have bounded production backends. The integrated
-runtime/security phase remains open for the ordered M076-M079 corrective work.
+runtime/security phase remains open for the ordered M077-M079 corrective work.
 
 This document describes the tunnel backend interface and registry in Emissary.
 

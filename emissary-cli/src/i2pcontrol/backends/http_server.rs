@@ -1,10 +1,11 @@
 //! Accepted-stream HTTP reverse tunnel for Proposal 170 `httpserver`.
 
 use std::{
-    collections::HashMap,
+    collections::{hash_map::DefaultHasher, HashMap, VecDeque},
+    hash::{Hash, Hasher},
     io,
     sync::Arc,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use futures::FutureExt;
@@ -13,6 +14,7 @@ use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, BufReader},
     net::TcpStream,
     task::JoinHandle,
+    time::Instant,
 };
 
 use super::{
@@ -67,7 +69,51 @@ struct HttpServerConfig {
 pub(crate) struct PostLimiter {
     limit: usize,
     window: Duration,
-    entries: Arc<Mutex<HashMap<String, (Instant, usize)>>>,
+    state: Arc<Mutex<PostLimiterState>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct PostPeerKey([u8; 8]);
+
+impl PostPeerKey {
+    fn from_peer(peer: &str) -> Self {
+        let mut hasher = DefaultHasher::new();
+        peer.hash(&mut hasher);
+        Self(hasher.finish().to_be_bytes())
+    }
+}
+
+#[derive(Debug)]
+struct PostEntry {
+    started: Instant,
+    count: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PostExpiry {
+    at: Instant,
+    key: PostPeerKey,
+}
+
+#[derive(Debug, Default)]
+struct PostLimiterState {
+    entries: HashMap<PostPeerKey, PostEntry>,
+    expirations: VecDeque<PostExpiry>,
+}
+
+impl PostLimiterState {
+    fn reap(&mut self, now: Instant) {
+        while self.expirations.front().is_some_and(|expiry| expiry.at <= now) {
+            let expiry = self.expirations.pop_front().expect("front exists");
+            let remove = self
+                .entries
+                .get(&expiry.key)
+                .is_some_and(|entry| entry.started <= expiry.at && expiry.at <= now);
+            if remove {
+                self.entries.remove(&expiry.key);
+            }
+        }
+    }
 }
 
 impl PostLimiter {
@@ -75,7 +121,7 @@ impl PostLimiter {
         Self {
             limit,
             window,
-            entries: Arc::new(Mutex::new(HashMap::new())),
+            state: Arc::new(Mutex::new(PostLimiterState::default())),
         }
     }
 
@@ -84,23 +130,39 @@ impl PostLimiter {
             return true;
         }
         let now = Instant::now();
-        let mut entries = self.entries.lock();
-        entries.retain(|_, (started, _)| now.duration_since(*started) < self.window);
-        let entry = entries.entry(peer.to_owned()).or_insert((now, 0));
-        if entry.1 >= self.limit {
+        let key = PostPeerKey::from_peer(peer);
+        let mut state = self.state.lock();
+        state.reap(now);
+        if let Some(entry) = state.entries.get_mut(&key) {
+            if entry.count >= self.limit {
+                return false;
+            }
+            entry.count += 1;
+            return true;
+        }
+        if state.entries.len() >= MAX_THROTTLE_ENTRIES {
+            // Active/unexpired state is never evicted to admit attacker-
+            // controlled identity churn.  Expired state was reclaimed above.
             return false;
         }
-        entry.1 += 1;
-        if entries.len() > MAX_THROTTLE_ENTRIES {
-            if let Some(oldest) = entries
-                .iter()
-                .min_by_key(|(_, (started, _))| *started)
-                .map(|(key, _)| key.clone())
-            {
-                entries.remove(&oldest);
-            }
-        }
+        state.entries.insert(
+            key,
+            PostEntry {
+                started: now,
+                count: 1,
+            },
+        );
+        state.expirations.push_back(PostExpiry {
+            at: now + self.window,
+            key,
+        });
         true
+    }
+
+    #[cfg(test)]
+    fn state_sizes(&self) -> (usize, usize) {
+        let state = self.state.lock();
+        (state.entries.len(), state.expirations.len())
     }
 }
 
@@ -860,12 +922,89 @@ mod tests {
         );
     }
 
-    #[test]
-    fn post_limiter_is_bounded_and_peer_keyed() {
+    #[tokio::test(start_paused = true)]
+    async fn post_limiter_is_bounded_and_peer_keyed() {
         let limiter = PostLimiter::new(1, Duration::from_secs(60));
         assert!(limiter.allow("peer-a"));
         assert!(!limiter.allow("peer-a"));
         assert!(limiter.allow("peer-b"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn post_limiter_denies_churn_without_evicting_active_entries() {
+        let limiter = PostLimiter::new(1, Duration::from_secs(60));
+        for index in 0..MAX_THROTTLE_ENTRIES {
+            assert!(limiter.allow(&format!("peer-{index}")));
+        }
+        assert_eq!(
+            limiter.state_sizes(),
+            (MAX_THROTTLE_ENTRIES, MAX_THROTTLE_ENTRIES)
+        );
+        assert!(!limiter.allow("new-peer"));
+        assert!(!limiter.allow("peer-0"));
+        assert_eq!(
+            limiter.state_sizes(),
+            (MAX_THROTTLE_ENTRIES, MAX_THROTTLE_ENTRIES)
+        );
+
+        tokio::time::advance(Duration::from_secs(60)).await;
+        assert!(limiter.allow("new-peer"));
+        assert_eq!(limiter.state_sizes(), (1, 1));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn post_limiter_counts_only_write_methods() {
+        let limiter = PostLimiter::new(1, Duration::from_secs(60));
+        assert!(limiter.allow("peer-a"));
+        assert!(!limiter.allow("peer-a"));
+        assert_eq!(limiter.state_sizes(), (1, 1));
+    }
+
+    #[tokio::test]
+    async fn rejected_post_does_not_connect_to_local_backend() {
+        let local_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let local_port = local_listener.local_addr().unwrap().port();
+        let local = tokio::spawn(async move {
+            tokio::time::timeout(Duration::from_millis(100), local_listener.accept()).await
+        });
+        let (mut client, server) = duplex(64 * 1024);
+        let (server_read, server_write) = tokio::io::split(server);
+        let limiter = PostLimiter::new(1, Duration::from_secs(60));
+        assert!(limiter.allow("peer-destination"));
+        let task = tokio::spawn(handle_http_stream(
+            server_read,
+            server_write,
+            "peer-destination".to_owned(),
+            "127.0.0.1".to_owned(),
+            local_port,
+            HttpServerPolicy {
+                website_host: "localhost".to_owned(),
+                ..HttpServerPolicy {
+                    website_host: "localhost".to_owned(),
+                    block_access_in_proxies: false,
+                    block_referers: false,
+                    allow_referer: true,
+                    block_user_agents: false,
+                    allow_user_agent: true,
+                    user_agents: None,
+                    access_list: None,
+                    access_option: AccessOption::Allow,
+                }
+            },
+            limiter,
+        ));
+        client
+            .write_all(b"POST /write HTTP/1.1\r\nContent-Length: 0\r\n\r\n")
+            .await
+            .unwrap();
+        client.shutdown().await.unwrap();
+        let mut response = Vec::new();
+        client.read_to_end(&mut response).await.unwrap();
+        assert!(String::from_utf8(response)
+            .unwrap()
+            .starts_with("HTTP/1.1 429 Too Many Requests\r\n"));
+        task.await.unwrap().unwrap();
+        assert!(local.await.unwrap().is_err());
     }
 
     #[tokio::test]

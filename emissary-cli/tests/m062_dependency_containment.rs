@@ -507,6 +507,8 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/072-option-capability-matrix.toml"
             | "plans/closure/i2pcontrol-proposal-170/073-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/074-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/075-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/076-closure.md"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }

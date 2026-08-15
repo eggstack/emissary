@@ -20,6 +20,12 @@ pub const MAX_HEADER_BYTES: usize = 32 * 1024;
 pub const MAX_RESPONSE_LINE: usize = 8 * 1024;
 pub const MAX_RESPONSE_HEADER_BYTES: usize = 32 * 1024;
 
+// The largest destination representation accepted by the core reference
+// parser is 391 serialized bytes (the key-certificate form), which is 524
+// bytes in padded I2P Base64.  Keep the authenticated peer value below the
+// old arbitrary 64 KiB allowance before it can become local HTTP metadata.
+pub const MAX_TRUSTED_DESTINATION_TEXT: usize = 524;
+
 const HOP_BY_HOP: &[&str] = &[
     "connection",
     "keep-alive",
@@ -33,14 +39,22 @@ const HOP_BY_HOP: &[&str] = &[
 ];
 
 const PROXY_IDENTITY: &[&str] = &[
+    "cf-connecting-ip",
+    "fastly-client-ip",
     "forwarded",
     "via",
+    "true-client-ip",
     "x-forwarded-for",
     "x-forwarded-host",
     "x-forwarded-server",
+    "x-real-ip",
+    "x-client-ip",
+    "x-cluster-client-ip",
     "proxy",
     "proxy-connection",
 ];
+
+const REQUEST_PRIVACY: &[&str] = &["priority", "sec-gpc"];
 
 const I2P_IDENTITY: &[&str] = &[
     "x-i2p-desthash",
@@ -51,9 +65,29 @@ const I2P_IDENTITY: &[&str] = &[
 ];
 
 const RESPONSE_FINGERPRINTS: &[&str] = &[
+    "age",
+    "alt-svc",
+    "date",
+    "expires",
+    "pragma",
+    "referer",
     "server",
+    "strict-transport-security",
+    "via",
+    "x-cache",
+    "x-cache-hits",
+    "x-cloud-trace-context",
+    "x-contextid",
+    "x-goog-generation",
+    "x-goog-hash",
+    "x-guploader-uploadid",
+    "x-hacker",
+    "x-nananana",
+    "x-pantheon-styx-hostname",
     "x-powered-by",
     "x-runtime",
+    "x-served-by",
+    "x-styx-req-id",
     "proxy",
     "proxy-connection",
 ];
@@ -102,6 +136,7 @@ pub async fn read_and_sanitize_request<R: AsyncBufRead + Unpin>(
     peer_destination: &str,
     policy: &HttpServerPolicy,
 ) -> io::Result<SanitizedRequest> {
+    validate_trusted_destination(peer_destination)?;
     let request_line =
         read_line_with_timeout(reader, REQUEST_LINE_TIMEOUT, MAX_REQUEST_LINE).await?;
     let (method, target, version) = parse_request_line(&request_line)?;
@@ -191,6 +226,7 @@ pub async fn read_and_sanitize_request<R: AsyncBufRead + Unpin>(
         if HOP_BY_HOP.contains(&name.as_str())
             || nominated.contains(name.as_str())
             || PROXY_IDENTITY.contains(&name.as_str())
+            || REQUEST_PRIVACY.contains(&name.as_str())
             || I2P_IDENTITY.contains(&name.as_str())
             || (eq(&name, "referer") && (policy.block_referers || !policy.allow_referer))
             || (eq(&name, "user-agent") && (policy.block_user_agents || !policy.allow_user_agent))
@@ -259,6 +295,12 @@ pub async fn read_and_filter_response<R: AsyncBufRead + Unpin>(
     let nominated = connection_nominated_headers(&headers);
     for header in headers {
         let name = header.name.to_ascii_lowercase();
+        if eq(&name, "content-length") || eq(&name, "transfer-encoding") {
+            // Re-emit only the validated framing selected above.  In
+            // particular, removing Transfer-Encoding while forwarding raw
+            // chunk bytes would change the response body interpretation.
+            continue;
+        }
         if RESPONSE_FINGERPRINTS.contains(&name.as_str())
             || HOP_BY_HOP.contains(&name.as_str())
             || nominated.contains(name.as_str())
@@ -266,6 +308,11 @@ pub async fn read_and_filter_response<R: AsyncBufRead + Unpin>(
             continue;
         }
         append_header(&mut output, &header.name, &header.value);
+    }
+    if chunked {
+        append_header(&mut output, "Transfer-Encoding", "chunked");
+    } else if let Some(length) = content_lengths.first() {
+        append_header(&mut output, "Content-Length", &length.to_string());
     }
     output.extend_from_slice(b"Connection: close\r\n\r\n");
     Ok(SanitizedResponse {
@@ -322,6 +369,21 @@ fn peer_allowed(peer: &str, policy: &HttpServerPolicy) -> bool {
         AccessOption::Allow => matches,
         AccessOption::Deny => !matches,
     }
+}
+
+fn validate_trusted_destination(destination: &str) -> io::Result<()> {
+    if destination.is_empty()
+        || destination.len() > MAX_TRUSTED_DESTINATION_TEXT
+        || destination
+            .chars()
+            .any(|character| character.is_control() || character.is_whitespace())
+    {
+        return Err(invalid(
+            io::ErrorKind::InvalidData,
+            "trusted peer identity is too large or malformed",
+        ));
+    }
+    Ok(())
 }
 
 fn parse_request_line(line: &[u8]) -> io::Result<(String, String, String)> {
@@ -671,7 +733,84 @@ mod tests {
     async fn response_filter_removes_fingerprints_and_hop_by_hop_headers() {
         let (mut writer, reader) = duplex(64 * 1024);
         writer
-            .write_all(b"HTTP/1.1 200 OK\r\nServer: secret\r\nX-Powered-By: framework\r\nContent-Length: 5\r\n\r\nhello")
+            .write_all(b"HTTP/1.1 200 OK\r\nDaTe: clock\r\nServer: secret\r\nX-Powered-By: framework\r\nContent-Type: text/plain\r\nSet-Cookie: safe=1\r\nContent-Length: 5\r\n\r\nhello")
+            .await
+            .unwrap();
+        writer.shutdown().await.unwrap();
+        let mut reader = BufReader::new(reader);
+        let response = read_and_filter_response(&mut reader).await.unwrap();
+        let output = String::from_utf8(response.head).unwrap();
+        assert!(!output.contains("clock"));
+        assert!(!output.contains("secret"));
+        assert!(!output.contains("framework"));
+        assert!(output.contains("Content-Type: text/plain\r\n"));
+        assert!(output.contains("Set-Cookie: safe=1\r\n"));
+        assert!(output.contains("Content-Length: 5\r\n"));
+        assert_eq!(response.content_length, Some(5));
+    }
+
+    #[tokio::test]
+    async fn removes_every_adopted_response_fingerprint_case_insensitively() {
+        let mut input = b"HTTP/1.1 200 OK\r\n".to_vec();
+        for (index, name) in RESPONSE_FINGERPRINTS.iter().enumerate() {
+            input.extend_from_slice(
+                format!("{}: secret-{index}\r\n", name.to_ascii_uppercase()).as_bytes(),
+            );
+        }
+        input.extend_from_slice(b"Content-Length: 0\r\nContent-Type: text/plain\r\n\r\n");
+
+        let (mut writer, reader) = duplex(64 * 1024);
+        writer.write_all(&input).await.unwrap();
+        writer.shutdown().await.unwrap();
+        let mut reader = BufReader::new(reader);
+        let response = read_and_filter_response(&mut reader).await.unwrap();
+        let output = String::from_utf8(response.head).unwrap();
+        for index in 0..RESPONSE_FINGERPRINTS.len() {
+            assert!(!output.contains(&format!("secret-{index}")));
+        }
+        assert!(output.contains("Content-Length: 0\r\n"));
+        assert!(output.contains("Content-Type: text/plain\r\n"));
+    }
+
+    #[tokio::test]
+    async fn removes_proxy_identity_and_adopted_request_privacy_headers() {
+        let result = request(
+            b"GET / HTTP/1.1\r\nForwarded: for=10.0.0.1\r\nVia: proxy\r\nX-Forwarded-For: 10.0.0.2\r\nX-Forwarded-Host: evil\r\nX-Forwarded-Server: evil\r\nProxy: evil\r\nX-Real-IP: 10.0.0.3\r\nx-client-ip: 10.0.0.4\r\nTrue-Client-IP: 10.0.0.5\r\nCF-Connecting-IP: 10.0.0.6\r\nFastly-Client-IP: 10.0.0.7\r\nX-Cluster-Client-IP: 10.0.0.8\r\nPriority: u=1\r\nSec-GPC: 1\r\n\r\n",
+            &policy(),
+        )
+        .await
+        .unwrap();
+        let output = String::from_utf8(result.head).unwrap().to_ascii_lowercase();
+        for marker in [
+            "x-real-ip",
+            "x-client-ip",
+            "true-client-ip",
+            "cf-connecting-ip",
+            "fastly-client-ip",
+            "x-cluster-client-ip",
+            "x-forwarded-for",
+            "x-forwarded-host",
+            "x-forwarded-server",
+            "forwarded",
+            "via",
+            "proxy",
+            "priority",
+            "sec-gpc",
+        ] {
+            assert!(
+                !output.contains(marker),
+                "unexpected forwarded header: {marker}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn preserves_valid_chunked_response_framing() {
+        let (mut writer, reader) = duplex(64 * 1024);
+        writer
+            .write_all(
+                b"HTTP/1.1 200 OK\r\nSeRvEr: secret\r\nTransfer-Encoding: ChUnKeD\r\n\r\n5\r\nhello\r\n0\r\n\r\n",
+            )
             .await
             .unwrap();
         writer.shutdown().await.unwrap();
@@ -679,8 +818,21 @@ mod tests {
         let response = read_and_filter_response(&mut reader).await.unwrap();
         let output = String::from_utf8(response.head).unwrap();
         assert!(!output.contains("secret"));
-        assert!(!output.contains("framework"));
-        assert!(output.contains("Content-Length: 5\r\n"));
-        assert_eq!(response.content_length, Some(5));
+        assert!(output.contains("Transfer-Encoding: chunked\r\n"));
+        assert!(response.chunked);
+        let mut body = Vec::new();
+        reader.read_to_end(&mut body).await.unwrap();
+        assert_eq!(body, b"5\r\nhello\r\n0\r\n\r\n");
+    }
+
+    #[tokio::test]
+    async fn rejects_over_bound_trusted_identity_before_building_request() {
+        let (mut writer, reader) = duplex(64 * 1024);
+        writer.write_all(b"GET / HTTP/1.1\r\n\r\n").await.unwrap();
+        writer.shutdown().await.unwrap();
+        let mut reader = BufReader::new(reader);
+        let identity = "a".repeat(MAX_TRUSTED_DESTINATION_TEXT + 1);
+        let error = read_and_sanitize_request(&mut reader, &identity, &policy()).await.unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
     }
 }

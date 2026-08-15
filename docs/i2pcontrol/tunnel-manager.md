@@ -1,6 +1,6 @@
 # I2PControl TunnelManager
 
-Status: M075 generic server accepted-stream hardening closed; M076-M077 ready;
+Status: M076 HTTP anonymity/POST-throttle hardening closed; M077 ready;
 lifecycle reconciliation remains closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
@@ -388,9 +388,15 @@ minute/hour/day, and aggregate rates 50 per minute and unlimited per hour/day.
 It rejects TLS termination, compression/custom options, proxy/outproxy
 settings, `FilterFilePath`, `UniqueLocalAddressPerClient`, `MultiHoming`, and
 the underspecified `PerClientPeriod`/`TotalPeriod`/`TotalBanTime` before session
-allocation. Request headers are normalized
-before the local target is connected, and response fingerprint headers are
-removed before forwarding.
+allocation. Request proxy identity and privacy headers are stripped, trusted
+peer identity injection is bounded to the 524-byte reference destination
+representation, and response fingerprint/provider/cache/trace headers are
+removed before forwarding. Content-Length and valid chunked framing are
+re-emitted in normalized form; application headers such as cookies and
+Content-Type are preserved. `PostLimit`/`PostLimitTime` uses fixed-size hashed
+peer accounting with lazy expiry and denies unseen peers when its 1024-entry
+table is full; it never evicts active state. The same server filter and
+limiter are consumed by the inbound `httpbidirserver` composition.
 
 ### Proxy options
 

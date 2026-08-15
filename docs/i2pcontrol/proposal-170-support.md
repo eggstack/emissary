@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M075 closed; M076-M079 corrective work remains
+Status: partial Proposal 170 support; M076 closed; M077-M079 corrective work remains
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -21,8 +21,8 @@ Tunnel-runtime reclosure:
 - M073: `plans/closure/i2pcontrol-proposal-170/073-closure.md` — closed;
 - M074: `plans/closure/i2pcontrol-proposal-170/074-closure.md` — closed;
 - M075: `plans/closure/i2pcontrol-proposal-170/075-closure.md` — closed;
-- M076: next registered ready security-hardening handoff; M077 is ready but
-  remains unregistered.
+- M076: `plans/closure/i2pcontrol-proposal-170/076-closure.md` — closed;
+- M077: next registered ready security-hardening handoff.
 
 Closed handoffs:
 
@@ -90,7 +90,7 @@ The repository remains partial Proposal 170 support. M044 reviewed the earlier
 corrected final head and accepted that source/method disposition; the later
 tunnel-runtime security sequence added bounded admission, generic accepted
 server relay, HTTP anonymity, IRC lifetime, and Streamr local-boundary
-correctives. M076-M079 remain open, so the security-hardening phase is not yet
+correctives. M077-M079 remain open, so the security-hardening phase is not yet
 closed.
 M039 remains a historical invalidated closure.
 
@@ -263,15 +263,18 @@ blocked exactly as they are for `ircclient`.
 `httpserver` is operational only through the I2PControl-owned accepted-stream
 runtime. It reads and bounds the request line/header block before opening the
 loopback target, rejects ambiguous Content-Length/Transfer-Encoding framing,
-obs-fold, upgrades, proxy identity, and spoofed `X-I2P-*` headers, then injects
+obs-fold, upgrades, proxy identity/privacy headers, and spoofed `X-I2P-*`
+headers, then injects
 peer identity derived from the accepted SAM stream. Configured Host rewriting,
 access lists, proxy/referer/User-Agent policy, peer-aware admission (30 global
 connections by default, 8 per peer, and bounded peer/aggregate minute/hour/day
 rates), and peer-keyed POST/PUT/PATCH throttling are applied before local
 connection. The inbound half of `httpbidirserver` consumes the same policy.
-Local
-response headers are parsed and identifying server/proxy headers are removed
-before the bounded response body is streamed back. TLS, compression, custom
+Local response headers are parsed and identifying server/proxy/provider/cache/
+trace headers are removed before the bounded response body is streamed back;
+validated Content-Length and chunked framing remain intact, while application
+headers are preserved. Trusted peer identity injection is bounded to the
+reference-valid destination representation. TLS, compression, custom
 options, arbitrary target hosts, and unsupported Proposal 170 modes reject
 before destination/session allocation.
 
@@ -412,7 +415,8 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M073 | closed | generic client/server option apply-or-reject corrective |
 | M074 | closed | shared peer-aware server admission and rate-limit hardening |
 | M075 | closed | generic server accepted-stream raw relay hardening |
-| M076/M077 | ready | HTTP anonymity/POST-throttle and IRC lifetime hardening |
+| M076 | closed | HTTP anonymity/POST-throttle hardening |
+| M077 | ready | IRC lifetime and exhaustion hardening |
 
 ## Final-status rule
 

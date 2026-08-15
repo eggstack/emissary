@@ -1,6 +1,6 @@
 # I2PControl TunnelManager
 
-Status: M074 server admission hardening closed; M075-M077 dependency-ready;
+Status: M075 generic server accepted-stream hardening closed; M076-M077 ready;
 lifecycle reconciliation remains closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
@@ -28,8 +28,12 @@ never adopted by I2PControl. Control-plane-created generic `client` definitions
 use an independent Yosemite streaming session and an I2PControl-owned,
 per-name supervisor with readiness, cancellation, restart, and failure cleanup.
 
-Control-plane-created generic `server` definitions use the existing Yosemite
-streaming server data plane through the same bounded per-name ownership model.
+Control-plane-created generic `server` definitions use the I2PControl-owned
+Yosemite accepted-stream runtime through the same bounded per-name ownership
+model. Shared peer-aware admission runs before any local-target connection,
+then the admitted stream is relayed byte-for-byte to a fixed loopback target;
+the generic backend does not parse an application protocol or issue SAM
+`STREAM FORWARD`.
 The first successful start allocates a stable internal identity and stores its
 persistent destination below `server-destinations/` in the I2PControl state
 root. The key is never accepted as `PrivKeyFile`, copied into `rawConfig`, or

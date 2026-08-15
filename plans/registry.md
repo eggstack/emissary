@@ -30,7 +30,7 @@ Canonical direction:
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no containment corrective handoff | M061 source containment and M062/M063 dependency containment remain accepted authorities |
 | I2PControl Proposal 170 tunnel runtime completion | closed through M074 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no runtime-completion handoff | M072 accepted after M073; M074 is separately closed in the security-hardening sequence |
-| I2PControl Proposal 170 tunnel security hardening | planned corrective; M074 closed | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M075 — generic server accepted-stream hardening | M075 is the next registered handoff; M076/M077 are hard-dependency ready but unregistered; M078/M079 remain blocked |
+| I2PControl Proposal 170 tunnel security hardening | planned corrective; M075 closed | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M076 — HTTP anonymity and POST-throttle hardening | M076 is the next registered handoff; M077 is hard-dependency ready but unregistered; M078/M079 remain blocked |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -50,9 +50,9 @@ Exactly one plan is currently registered as dependency-ready:
 
 | Handoff | Status | Plan | Objective |
 |---|---|---|---|
-| M075 — generic server accepted-stream hardening | ready | `plans/implementation/i2pcontrol-proposal-170/075-generic-server-accepted-stream-hardening.md` | apply M074 admission to generic server |
+| M076 — HTTP server anonymity and POST-throttle hardening | ready | `plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md` | remove HTTP identity/fingerprint and POST-throttle bypasses |
 
-Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered as ready. M074-M079 are prewritten for handoff continuity but remain blocked until their hard dependencies close.
+Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered as ready. M077 remains prewritten and ready but unregistered; M078/M079 remain blocked until their hard dependencies close.
 
 ## Prewritten blocked tunnel-runtime successors
 
@@ -64,21 +64,21 @@ Per `plans/003-planning-process.md`, only the next dependency-ready implementati
 | M069 — SOCKS + SOCKS-IRC | closed | `plans/implementation/i2pcontrol-proposal-170/069-socks-and-socks-irc-tunnels.md` | M065 + M066 closed; closure accepted |
 | M070 — HTTP bidirectional server composition | closed | `plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md` | M067 + M068 closed; closure accepted |
 | M071 — Streamr client/server | closed | `plans/implementation/i2pcontrol-proposal-170/071-streamr-client-server-tunnels.md` | M065 closed; closure accepted |
-| M072 — integrated tunnel-runtime reclosure | corrective pass required | `plans/implementation/i2pcontrol-proposal-170/072-tunnel-runtime-completion-reclosure.md` | M066-M071 closed; generic option finding recorded |
+| M072 — integrated tunnel-runtime reclosure | closed | `plans/implementation/i2pcontrol-proposal-170/072-tunnel-runtime-completion-reclosure.md` | M066-M071 closed; accepted after M073 |
 | M073 — generic tunnel option truthfulness corrective | closed | `plans/implementation/i2pcontrol-proposal-170/073-generic-tunnel-option-truthfulness-corrective.md` | M072 corrective finding; closure accepted |
 
-M071 is closed. M072 is accepted after M073, and M074 is closed. M075 is the
-current registered handoff; M076 and M077 are ready but unregistered.
+M071-M075 are closed. M076 is the current registered handoff; M077 is ready but
+unregistered. M078 and M079 remain blocked by their named dependencies.
 
 ## Prewritten blocked tunnel-security successors
 
-The post-M072 security/anonymity review establishes a separate bounded corrective sequence. M073 and M074 are closed; M075 is next and none of the later plans leapfrogs it.
+The post-M072 security/anonymity review establishes a separate bounded corrective sequence. M073-M075 are closed; M076 is next and none of the later plans leapfrogs it.
 
 | Handoff | Status | Plan | Hard dependency |
 |---|---|---|---|
 | M074 — shared server admission and rate-limit hardening | closed | `plans/implementation/i2pcontrol-proposal-170/074-server-admission-and-rate-limit-hardening.md` | M073 closed; closure accepted |
-| M075 — generic server accepted-stream hardening | ready | `plans/implementation/i2pcontrol-proposal-170/075-generic-server-accepted-stream-hardening.md` | M073 + M074 closed; next registered handoff |
-| M076 — HTTP server anonymity and POST-throttle hardening | ready, unregistered | `plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md` | M073 + M074 closed |
+| M075 — generic server accepted-stream hardening | closed | `plans/implementation/i2pcontrol-proposal-170/075-generic-server-accepted-stream-hardening.md` | M073 + M074 closed; closure accepted |
+| M076 — HTTP server anonymity and POST-throttle hardening | ready | `plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md` | M073 + M074 closed; next registered handoff |
 | M077 — IRC server lifetime and exhaustion hardening | ready, unregistered | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | M073 + M074 closed |
 | M078 — Streamr local-boundary hardening | blocked | `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md` | registry sequencing keeps it behind M075-M077 |
 | M079 — integrated tunnel-security reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md` | M074-M078 closed |
@@ -96,7 +96,7 @@ Durable rules:
 - `httpserver` and the inbound half of `httpbidirserver` must use application-visible accepted I2P streams so request filtering occurs before local-service forwarding;
 - accepted-stream server families must use bounded global and peer-specific concurrency plus peer/aggregate connection-rate admission so one authenticated peer cannot monopolize the global pool;
 - when server admission/accounting state reaches its memory bound, a new attacker-controlled identity must fail closed rather than evicting active/throttled state;
-- generic control-plane `server` is planned under M075 to migrate from blind `STREAM FORWARD` to the same peer-aware accepted-stream boundary while remaining a raw byte relay after admission;
+- generic control-plane `server` was migrated under M075 from blind `STREAM FORWARD` to the same peer-aware accepted-stream boundary while remaining a raw byte relay after admission;
 - HTTP server completion requires bounded parsing, request-framing/request-smuggling defenses, trusted peer-derived I2P identity metadata, spoofed proxy/identity-header removal, safe Host/target handling, supported access/throttle controls, and response fingerprint/proxy-header filtering;
 - HTTP response hardening must remove `Date` at minimum and the independently adopted I2P+ backend/provider/cache/trace fingerprint set where it does not alter HTTP framing; request-side reverse-proxy identity such as `X-Real-IP` must not reach the loopback application;
 - HTTP POST limiter/accounting state must be bounded and churn-safe; active abusive state may not be evicted simply to admit a new identity;
@@ -184,8 +184,8 @@ Do not add hosted CI jobs, release/publishing machinery, coverage gates, fuzz in
 ## Registry maintenance rules
 
 1. Only the next dependency-ready plan is normally marked/registered ready.
-2. M064-M074 are closed; M075 is the current dependency-ready handoff.
-3. M076 and M077 may be marked ready after their hard dependencies close but remain unregistered until sequencing advances; M078/M079 remain blocked by their named dependencies.
+2. M064-M075 are closed; M076 is the current dependency-ready handoff.
+3. M077 is ready but remains unregistered until sequencing advances; M078/M079 remain blocked by their named dependencies.
 4. M072 remains the integrated runtime reclosure authority for its historical head, but tunnel-runtime security may not be considered fully reclosed until M079 closes the post-M072 security findings.
 5. Preserve ADR-0003 scope: implement only the pinned Proposal 170 families, not adjacent tunnel/protocol features.
 6. Keep new runtime/filter/admission code under I2PControl wherever technically possible.

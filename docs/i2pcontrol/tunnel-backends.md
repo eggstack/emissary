@@ -1,10 +1,9 @@
 # I2PControl Tunnel Backends
 
-Status: M072 reclosed; M073 generic option corrective required
+Status: M075 generic server accepted-stream hardening closed; M076/M077 ready
 
 All twelve tunnel families have bounded production backends. The integrated
-runtime phase remains open because M072 found generic `client`/`server` typed
-and raw options that need explicit apply-or-reject correction under M073.
+runtime/security phase remains open for the ordered M076-M079 corrective work.
 
 This document describes the tunnel backend interface and registry in Emissary.
 
@@ -152,7 +151,7 @@ All 12 tunnel types are mapped to backends:
 | `socksirc` | Client | SOCKS CONNECT composed with the IRC anonymity filter |
 | `connectclient` | Client | Strict HTTP CONNECT proxy with direct-I2P routing and explicit I2P outproxy support |
 | `streamrclient` | Client | Bounded Yosemite repliable datagram consumer |
-| `server` | Server | Yosemite streaming server with per-name supervisor and persistent destination identity |
+| `server` | Server | Peer-admitted accepted-stream raw relay with per-name supervisor and persistent destination identity |
 | `httpserver` | Server | Bounded filtered accepted-stream HTTP server |
 | `httpbidirserver` | Server | Deprecated composed filtered HTTP server plus direct-I2P local proxy; no clearnet outproxy |
 | `ircserver` | Server | Bounded filtered accepted-stream IRC server |
@@ -166,13 +165,17 @@ It owns both halves under one lifecycle generation and keeps one persistent
 server destination identity; its client SAM session is a non-published sibling
 session and never creates a second persistent destination.
 
-The generic server maps `Port`/`TargetPort` to the existing Yosemite
-`STREAM FORWARD` local port and accepts only loopback target-host semantics.
-It publishes the actual public destination after session setup; private
-destination material is stored only in the backend-owned secret store. Stopped
-control-plane servers retain identity across restart and rename. Running
-server rename is rejected, and delete awaits the exact runtime task before
-removing durable definition and identity state.
+The generic server uses the I2PControl-owned accepted-stream runtime, so
+authenticated peer admission and the shared global/per-peer rate and
+concurrency limits run before the handler connects to a local target. After
+admission it performs a raw byte relay to the fixed loopback target; it does
+not parse HTTP, IRC, or another application protocol. It never uses SAM
+`STREAM FORWARD`. The backend publishes the actual public destination after
+session setup; private destination material is stored only in the backend-owned
+secret store. Stopped control-plane servers retain identity across restart and
+rename. Running server rename is rejected, and delete awaits the exact runtime
+task before removing durable definition and identity state. Startup-managed
+server forwarding remains owned by the startup server manager and is unchanged.
 
 The production manager serializes start, stop, restart, edit, rename, and
 delete per exact tunnel name. Post-load reconciliation starts only eligible

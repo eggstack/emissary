@@ -4,24 +4,24 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::FutureExt;
 use parking_lot::Mutex;
-use tokio::task::JoinHandle;
+use tokio::{io, net::TcpStream, task::JoinHandle};
 
 use super::{
     options::{validate_options, OptionValidationError, SERVER_OPTIONS},
+    runtime::{
+        run_accepted_server, AcceptedServerConnection, AcceptedServerHandler,
+        AcceptedServerRuntimeConfig, AcceptedServerRuntimeError, ServerAdmissionPolicy,
+    },
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
-use crate::{
-    i2pcontrol::{
-        domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
-        server_secret_store::ServerDestinationStore,
-    },
-    tunnel_server::{
-        run_single_server, DestinationObserver, ServerRuntimeError, ServerTunnelRuntimeConfig,
-    },
+use crate::i2pcontrol::{
+    domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
+    server_secret_store::{ServerDestinationStore, StoredDestination},
 };
 
 const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
+const TARGET_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_RUNTIME_TASKS: usize = 1000;
 pub(crate) const SERVER_IDENTITY_KEY: &str = "__emissary_server_destination_identity";
 pub(crate) const SERVER_PUBLIC_DESTINATION_KEY: &str = "__emissary_server_public_destination";
@@ -40,6 +40,14 @@ struct RuntimeEntry {
 struct RuntimeMap {
     next_generation: u64,
     entries: HashMap<String, RuntimeEntry>,
+}
+
+struct GenericServerRuntimeConfig {
+    name: String,
+    target_port: u16,
+    destination: StoredDestination,
+    sam_tcp_port: u16,
+    admission: ServerAdmissionPolicy,
 }
 
 /// Bounded, per-name runtime supervisor for control-plane server tunnels.
@@ -137,7 +145,7 @@ impl ServerRuntimeSupervisor {
         map: Arc<Mutex<RuntimeMap>>,
         name: String,
         generation: u64,
-        result: Result<(), ServerRuntimeError>,
+        result: Result<(), AcceptedServerRuntimeError>,
         cancelled: bool,
     ) {
         let mut runtime = map.lock();
@@ -197,35 +205,38 @@ impl ServerRuntimeSupervisor {
         Ok(())
     }
 
-    /// Start one server runtime and wait for a real destination and forward.
-    pub async fn start(&self, config: ServerTunnelRuntimeConfig) -> BackendResult<()> {
+    /// Start one server runtime and wait for a real destination and session.
+    async fn start(&self, config: GenericServerRuntimeConfig) -> BackendResult<()> {
         let name = config.name.clone();
         let (generation, cancellation) = self.reserve(&name)?;
         let task_name = name.clone();
         let ready_cancellation = cancellation.clone();
         let map = Arc::clone(&self.inner);
-        let supervisor = self.clone();
-        let observer: DestinationObserver = Arc::new(move |observed_name, destination| {
-            supervisor.publish_destination(observed_name, generation, destination);
-        });
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
-            let result = std::panic::AssertUnwindSafe(run_single_server(
-                config,
+            let handler = make_accepted_handler(config.target_port);
+            let result = std::panic::AssertUnwindSafe(run_accepted_server(
+                AcceptedServerRuntimeConfig {
+                    name: config.name,
+                    sam_tcp_port: config.sam_tcp_port,
+                    destination: config.destination,
+                    admission: config.admission,
+                    handler,
+                },
                 ready_cancellation.clone(),
                 ready_tx,
-                Some(observer),
             ))
             .catch_unwind()
             .await
-            .unwrap_or(Err(ServerRuntimeError::Panicked));
+            .unwrap_or(Err(AcceptedServerRuntimeError::Panicked));
             let cancelled = *ready_cancellation.borrow();
             ServerRuntimeSupervisor::complete(map, task_name, generation, result, cancelled).await;
         });
         self.set_task(&name, generation, task);
 
         match tokio::time::timeout(START_TIMEOUT, ready_rx).await {
-            Ok(Ok(Ok(()))) =>
+            Ok(Ok(Ok(destination))) => {
+                self.publish_destination(&name, generation, &destination);
                 if self.mark_running(&name, generation) {
                     Ok(())
                 } else {
@@ -233,10 +244,13 @@ impl ServerRuntimeSupervisor {
                     Err(BackendError::Internal {
                         message: "server tunnel runtime exited during start".to_string(),
                     })
-                },
-            Ok(Ok(Err(message))) => {
+                }
+            }
+            Ok(Ok(Err(_))) => {
                 let _ = self.stop_generation(&name, generation).await;
-                Err(BackendError::Internal { message })
+                Err(BackendError::Internal {
+                    message: "server tunnel runtime failed to start".to_string(),
+                })
             }
             Ok(Err(_)) | Err(_) => {
                 let _ = self.stop_generation(&name, generation).await;
@@ -312,8 +326,7 @@ impl ServerTunnelBackend {
     fn runtime_config(
         &self,
         definition: &TunnelDefinition,
-        destination: &str,
-    ) -> BackendResult<ServerTunnelRuntimeConfig> {
+    ) -> BackendResult<(u16, ServerAdmissionPolicy)> {
         if definition.ownership != TunnelOwnership::ControlPlane {
             return Err(BackendError::InvalidState {
                 tunnel_type: TunnelType::Server,
@@ -331,12 +344,12 @@ impl ServerTunnelBackend {
                 .ok_or_else(|| BackendError::Internal {
                     message: "server target port is required".to_string(),
                 })?;
-        if let Some(host) = definition
+        if let Some(value) = definition
             .raw_config
             .get("TargetHost")
             .or_else(|| definition.raw_config.get("Host"))
-            .and_then(|value| value.as_str())
         {
+            let host = value.as_str().ok_or_else(|| invalid_option("TargetHost"))?;
             if !matches!(host, "127.0.0.1" | "localhost") {
                 return Err(BackendError::Internal {
                     message: "server target host is not supported by the existing data plane"
@@ -344,13 +357,9 @@ impl ServerTunnelBackend {
                 });
             }
         }
-        Ok(ServerTunnelRuntimeConfig {
-            name: definition.name.as_str().to_string(),
-            port,
-            destination: destination.to_string(),
-            sam_tcp_port: self.supervisor.sam_tcp_port,
-            lease_set_enc_type: definition.options.i2cp_options.get("leaseSetEncType").cloned(),
-        })
+        let admission = ServerAdmissionPolicy::from_raw_options(&definition.raw_config)
+            .map_err(invalid_option)?;
+        Ok((port, admission))
     }
 }
 
@@ -372,6 +381,7 @@ impl TunnelBackend for ServerTunnelBackend {
         validate_options(TunnelType::Server, &definition.options, SERVER_OPTIONS)
             .map_err(option_error)?;
         validate_i2cp_options(definition)?;
+        let (target_port, admission) = self.runtime_config(definition)?;
         let store = self.destinations.as_ref().ok_or_else(|| BackendError::Internal {
             message: "server destination store is not composed".to_string(),
         })?;
@@ -386,7 +396,13 @@ impl TunnelBackend for ServerTunnelBackend {
                 message: "server destination identity is unavailable".to_string(),
             })?;
         self.supervisor
-            .start(self.runtime_config(definition, destination.as_str())?)
+            .start(GenericServerRuntimeConfig {
+                name: definition.name.as_str().to_string(),
+                target_port,
+                destination,
+                sam_tcp_port: self.supervisor.sam_tcp_port,
+                admission,
+            })
             .await
     }
 
@@ -412,6 +428,13 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "ListenPort",
         "TargetHost",
         "Host",
+        "MaxConcurrentConns",
+        "ClientPerMinute",
+        "ClientPerHour",
+        "ClientPerDay",
+        "TotalInPerMinute",
+        "TotalInPerHour",
+        "TotalInPerDay",
         "i2cp",
         "Port",
         "ReachableBy",
@@ -438,6 +461,29 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         });
     }
     Ok(())
+}
+
+fn invalid_option(option: &str) -> BackendError {
+    BackendError::Internal {
+        message: format!("server option {option} is invalid"),
+    }
+}
+
+fn make_accepted_handler(target_port: u16) -> AcceptedServerHandler {
+    Arc::new(move |connection| Box::pin(relay_accepted_connection(connection, target_port)))
+}
+
+async fn relay_accepted_connection(mut connection: AcceptedServerConnection, target_port: u16) {
+    let Ok(Ok(mut target)) = tokio::time::timeout(
+        TARGET_CONNECT_TIMEOUT,
+        TcpStream::connect(("127.0.0.1", target_port)),
+    )
+    .await
+    else {
+        return;
+    };
+
+    let _ = io::copy_bidirectional(&mut connection.stream, &mut target).await;
 }
 
 fn validate_i2cp_options(definition: &TunnelDefinition) -> BackendResult<()> {
@@ -523,6 +569,38 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn admission_options_are_applied_and_non_loopback_targets_fail_before_allocation() {
+        let backend = ServerTunnelBackend::without_store(1);
+        let mut def = definition("admission-options", "identity");
+        def.raw_config.insert("MaxConcurrentConns".to_owned(), serde_json::json!(7));
+        def.raw_config.insert("ClientPerMinute".to_owned(), serde_json::json!(11));
+        let (_, policy) = backend.runtime_config(&def).unwrap();
+        assert_eq!(policy.max_concurrent_connections(), 7);
+
+        def.raw_config.insert("TargetHost".to_owned(), serde_json::json!("192.0.2.1"));
+        assert!(matches!(
+            backend.runtime_config(&def),
+            Err(BackendError::Internal { message })
+                if message.contains("target host")
+        ));
+    }
+
+    #[tokio::test]
+    async fn generic_server_debug_is_secret_safe() {
+        let root = tempfile::tempdir().unwrap();
+        let store = ServerDestinationStore::new(root.path());
+        store.load().await.unwrap();
+        let identity = ServerDestinationStore::new_identity();
+        let private = base64_encode([3u8; 128]);
+        store
+            .put(&identity, StoredDestination::from_private(private.clone()))
+            .await
+            .unwrap();
+        let backend = ServerTunnelBackend::new(1, store);
+        assert!(!format!("{backend:?}").contains(&private));
+    }
+
     async fn fake_sam() -> (u16, tokio::task::JoinHandle<()>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -585,10 +663,14 @@ mod tests {
             backend.inspect(&first).destination.as_deref(),
             Some("server-destination")
         );
+        let first_destination = backend.inspect(&first).destination;
         assert!(matches!(
             backend.start(&first).await,
             Err(BackendError::InvalidState { .. })
         ));
+        backend.stop(&first).await.unwrap();
+        backend.start(&first).await.unwrap();
+        assert_eq!(backend.inspect(&first).destination, first_destination);
         backend.stop(&first).await.unwrap();
         assert_eq!(
             backend.inspect(&first).runtime_state,
@@ -599,6 +681,137 @@ mod tests {
             TunnelRuntimeState::Stopped
         );
         sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn generic_server_uses_accepted_stream_and_relays_bytes_without_forwarding() {
+        let target_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_port = target_listener.local_addr().unwrap().port();
+        let target_listener = Arc::new(target_listener);
+        let sam_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let sam_port = sam_listener.local_addr().unwrap().port();
+        let (done_tx, done_rx) = tokio::sync::oneshot::channel();
+        let done_tx = Arc::new(tokio::sync::Mutex::new(Some(done_tx)));
+        let commands = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let observed_done = Arc::clone(&done_tx);
+        let observed_listener = Arc::clone(&target_listener);
+        let observed_commands = Arc::clone(&commands);
+        let sam_task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = sam_listener.accept().await else {
+                    return;
+                };
+                let observed_commands = Arc::clone(&observed_commands);
+                let observed_done = Arc::clone(&observed_done);
+                let observed_listener = Arc::clone(&observed_listener);
+                tokio::spawn(async move {
+                    let (read_half, mut write_half) = stream.into_split();
+                    let mut reader = BufReader::new(read_half);
+                    let mut line = String::new();
+                    loop {
+                        line.clear();
+                        if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                            return;
+                        }
+                        observed_commands.lock().push(line.trim().to_owned());
+                        if line.starts_with("HELLO") {
+                            write_half
+                                .write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n")
+                                .await
+                                .unwrap();
+                        } else if line.starts_with("SESSION CREATE") {
+                            write_half
+                                .write_all(
+                                    b"SESSION STATUS RESULT=OK DESTINATION=server-destination\n",
+                                )
+                                .await
+                                .unwrap();
+                        } else if line.starts_with("STREAM ACCEPT") {
+                            write_half
+                                .write_all(b"STREAM STATUS RESULT=OK\npeer-destination\nfrom-i2p")
+                                .await
+                                .unwrap();
+                            let (mut target, _) = match tokio::time::timeout(
+                                Duration::from_secs(1),
+                                observed_listener.accept(),
+                            )
+                            .await
+                            {
+                                Ok(Ok(connection)) => connection,
+                                _ => {
+                                    if let Some(sender) = observed_done.lock().await.take() {
+                                        let _ =
+                                            sender.send(Err("target was not connected".to_owned()));
+                                    }
+                                    return;
+                                }
+                            };
+                            let mut inbound = [0; 8];
+                            if tokio::io::AsyncReadExt::read_exact(&mut target, &mut inbound)
+                                .await
+                                .is_err()
+                                || inbound != *b"from-i2p"
+                            {
+                                if let Some(sender) = observed_done.lock().await.take() {
+                                    let _ = sender
+                                        .send(Err("raw inbound payload was changed".to_owned()));
+                                }
+                                return;
+                            }
+                            target.write_all(b"to-i2p").await.unwrap();
+                            target.shutdown().await.unwrap();
+                            let mut outbound = [0; 6];
+                            if tokio::io::AsyncReadExt::read_exact(&mut reader, &mut outbound)
+                                .await
+                                .is_err()
+                                || outbound != *b"to-i2p"
+                            {
+                                if let Some(sender) = observed_done.lock().await.take() {
+                                    let _ = sender
+                                        .send(Err("raw outbound payload was changed".to_owned()));
+                                }
+                                return;
+                            }
+                            if let Some(sender) = observed_done.lock().await.take() {
+                                let _ = sender.send(Ok(()));
+                            }
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+
+        let root = tempfile::tempdir().unwrap();
+        let store = ServerDestinationStore::new(root.path());
+        store.load().await.unwrap();
+        let identity = ServerDestinationStore::new_identity();
+        store
+            .put(
+                &identity,
+                StoredDestination::from_private(base64_encode([9u8; 128])),
+            )
+            .await
+            .unwrap();
+        let backend = ServerTunnelBackend::new(sam_port, store);
+        let mut def = definition("accepted-server", &identity);
+        def.options.listen_port = Some(target_port);
+
+        backend.start(&def).await.unwrap();
+        let relay_result = tokio::time::timeout(Duration::from_secs(2), done_rx).await;
+        assert!(
+            relay_result.is_ok(),
+            "relay fixture timed out; commands: {:?}",
+            commands.lock()
+        );
+        assert_eq!(relay_result.unwrap().unwrap(), Ok(()));
+        backend.stop(&def).await.unwrap();
+        sam_task.abort();
+        let _ = sam_task.await;
+
+        let commands = commands.lock();
+        assert!(commands.iter().any(|command| command.starts_with("STREAM ACCEPT")));
+        assert!(!commands.iter().any(|command| command.starts_with("STREAM FORWARD")));
     }
 
     #[tokio::test]

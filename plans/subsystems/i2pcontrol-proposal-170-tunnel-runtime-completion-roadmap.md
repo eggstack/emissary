@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Runtime Completion Roadmap
 
-Status: corrective pass required; M064-M071 closed; M072 reclosed; M073 is the next registered handoff
+Status: closed after M073; M064-M073 closed; M074-M079 are separate security hardening
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6` — current production head reviewed before this planning series
 
@@ -374,7 +374,7 @@ Plan: `072-tunnel-runtime-completion-reclosure.md`.
 
 Reconcile production registry, all twelve types, option capability matrices, support documentation, containment, feature-disabled/default behavior, persistence/restart, lifecycle contention, and security evidence. No new family implementation should originate here except tiny directly demonstrated corrective fixes within predeclared budgets; material findings generate a new corrective plan.
 
-Status: corrective pass required; closure:
+Status: closed after M073; closure:
 `plans/closure/i2pcontrol-proposal-170/072-closure.md`.
 
 Exit: final support statement is evidence-backed and no high/medium correctness/security/containment finding remains. M072 found a medium generic client/server option-truthfulness defect and created M073 rather than absorbing an option-semantics change into reclosure.
@@ -388,7 +388,7 @@ runtime-relevant option is applied or rejected before allocation. Preserve the
 public schema and existing data plane; unsupported controls remain explicitly
 rejected.
 
-Status: ready; hard corrective predecessor M072 has an explicit bounded finding.
+Status: closed; hard corrective predecessor M072's explicit bounded finding is resolved.
 
 Exit: the M072 integrated option matrix has no silent-accept rows for generic
 client/server backends, and M072 can be accepted without changing unrelated
@@ -447,4 +447,4 @@ A family implementation must stop and require corrective/replanning if:
 
 ## 14. Final closure statement
 
-M072/M073 may close this roadmap only when the registry has real backends for all ten newly authorized families, every backend's security/option capability set is truthfully documented, HTTP/IRC filtering is non-bypassable, containment/default-build invariants remain intact, and no upstream interaction occurred. If any declared family remains stubbed or silently accepts a relevant option, the roadmap remains corrective and the exact blocker must be named rather than hidden.
+M072/M073 close this runtime-completion roadmap with real backends for all ten newly authorized families, documented security/option capability sets, non-bypassable HTTP/IRC filtering, intact containment/default-build invariants, and no upstream interaction. The separate M074-M079 security-hardening roadmap remains open until its own corrective sequence closes.

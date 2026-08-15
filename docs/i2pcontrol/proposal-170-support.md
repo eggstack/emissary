@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M072 corrective pass required
+Status: partial Proposal 170 support; M075 closed; M076-M079 corrective work remains
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -16,10 +16,13 @@ Current roadmap:
 
 Tunnel-runtime reclosure:
 
-- M072: `plans/closure/i2pcontrol-proposal-170/072-closure.md` — corrective
-  pass required for generic client/server option truthfulness;
-- M073: `plans/implementation/i2pcontrol-proposal-170/073-generic-tunnel-option-truthfulness-corrective.md`
-  — next ready corrective handoff.
+- M072: `plans/closure/i2pcontrol-proposal-170/072-closure.md` — accepted after
+  the generic option corrective;
+- M073: `plans/closure/i2pcontrol-proposal-170/073-closure.md` — closed;
+- M074: `plans/closure/i2pcontrol-proposal-170/074-closure.md` — closed;
+- M075: `plans/closure/i2pcontrol-proposal-170/075-closure.md` — closed;
+- M076: next registered ready security-hardening handoff; M077 is ready but
+  remains unregistered.
 
 Closed handoffs:
 
@@ -85,8 +88,10 @@ implementation.
 
 The repository remains partial Proposal 170 support. M044 reviewed the earlier
 corrected final head and accepted that source/method disposition; the later
-tunnel-runtime M072 reclosure found a medium generic client/server option
-truthfulness defect, so the tunnel-runtime completion phase is not yet closed.
+tunnel-runtime security sequence added bounded admission, generic accepted
+server relay, HTTP anonymity, IRC lifetime, and Streamr local-boundary
+correctives. M076-M079 remain open, so the security-hardening phase is not yet
+closed.
 M039 remains a historical invalidated closure.
 
 M028 owns the status/feature-boundary correction. M030 owns the destination
@@ -403,8 +408,11 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M055 | closed | network-error truthfulness correction; explicit unavailable dispositions |
 | M056 | closed | integrated reclosure; final 37 available / 1 neutral / 5 unavailable audit |
 | M066–M071 | closed | real IRC, HTTP, CONNECT, SOCKS, bidirectional HTTP, and Streamr tunnel families |
-| M072 | corrective pass required | integrated twelve-type reclosure found generic option truthfulness gap |
-| M073 | ready | generic client/server option apply-or-reject corrective |
+| M072 | closed after M073 | integrated twelve-type runtime reclosure |
+| M073 | closed | generic client/server option apply-or-reject corrective |
+| M074 | closed | shared peer-aware server admission and rate-limit hardening |
+| M075 | closed | generic server accepted-stream raw relay hardening |
+| M076/M077 | ready | HTTP anonymity/POST-throttle and IRC lifetime hardening |
 
 ## Final-status rule
 

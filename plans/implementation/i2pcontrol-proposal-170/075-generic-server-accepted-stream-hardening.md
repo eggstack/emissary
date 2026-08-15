@@ -1,6 +1,6 @@
 # M075 — Generic Server Accepted-Stream Hardening
 
-Status: ready — hard dependencies M073 and M074 closed; M075 is next
+Status: closed — implementation and closure accepted
 
 Source roadmap:
 

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Runtime Completion Roadmap
 
-Status: active; M064, M065, and M066 closed; M067 is the next registered handoff
+Status: active; M064, M065, M066, and M067 closed; M068 is the next registered handoff
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6` — current production head reviewed before this planning series
 
@@ -322,6 +322,8 @@ Exit: both types are real and independently security-tested; no local-address/re
 Plan: `067-http-server-tunnel.md`.
 
 Implement the security-critical accepted-stream HTTP server with request/response filters, identity-header handling, Host policy, framing checks, time/size bounds, concurrency and configured throttles.
+
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/067-closure.md`.
 
 Exit: `httpserver` replaces its stub only after negative security tests prove the local backend never sees unsanitized initial headers.
 

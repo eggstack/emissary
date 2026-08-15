@@ -1,6 +1,6 @@
 # M071 — Streamr Client and Streamr Server Tunnels
 
-Status: blocked — hard dependency on M065 closure
+Status: blocked — dependency-ready but not the next registered handoff
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 

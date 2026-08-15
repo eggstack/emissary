@@ -1,6 +1,6 @@
 # M068 — HTTP Client and CONNECT Client Tunnels
 
-Status: blocked — hard dependency on M065 closure
+Status: ready
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 

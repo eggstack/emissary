@@ -1,6 +1,6 @@
 # M067 — HTTP Server Tunnel
 
-Status: blocked — hard dependency on M065 closure
+Status: closed — implementation and closure accepted
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 

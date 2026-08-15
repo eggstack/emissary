@@ -152,8 +152,8 @@ Do not add hosted CI jobs, release/publishing machinery, coverage gates, fuzz in
 ## Registry maintenance rules
 
 1. Only the next dependency-ready plan is normally marked/registered ready.
-2. M064-M068 are closed; M069 is the current dependency-ready handoff.
-3. After M068, M069/M070/M071 are dependency-ready independently; registry should reflect whichever handoff(s) are actually assigned/active without rewriting future plan requirements.
+2. M064-M069 are closed; M070 is the current dependency-ready handoff.
+3. After M069, M070/M071 are dependency-ready independently; registry should reflect whichever handoff(s) are actually assigned/active without rewriting future plan requirements.
 4. Preserve ADR-0003 scope: implement only the ten pinned Proposal 170 families, not adjacent tunnel/protocol features.
 5. Keep new specialized runtime/filter code under I2PControl wherever technically possible.
 6. No M065-M072 plan may add a new `emissary-core/**` production path without stopping and creating separate architecture/corrective planning.

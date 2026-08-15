@@ -426,6 +426,8 @@ fn is_authorized_tunnel_runtime_path(path: &str) -> bool {
             | "emissary-cli/src/i2pcontrol/backends/filters/http_client.rs"
             | "emissary-cli/src/i2pcontrol/backends/filters/proxy.rs"
             | "emissary-cli/src/i2pcontrol/backends/http_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/socks.rs"
+            | "emissary-cli/src/i2pcontrol/backends/socks_irc.rs"
     )
 }
 
@@ -482,6 +484,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/062-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/063-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/066-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/069-closure.md"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }

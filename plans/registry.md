@@ -29,7 +29,7 @@ Canonical direction:
 |---|---|---|---|---|
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no containment corrective handoff | M061 source containment and M062/M063 dependency containment remain accepted authorities |
-| I2PControl Proposal 170 tunnel runtime completion | active; M064-M068 closed; M069 ready | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M069 — SOCKS + SOCKS-IRC | M070/M071 are dependency-ready but not the next registered handoff; M072 remains blocked on later family closure |
+| I2PControl Proposal 170 tunnel runtime completion | active; M064-M069 closed; M070 ready | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M070 — HTTP bidirectional server composition | M071 is dependency-ready but not the next registered handoff; M072 remains blocked on later family closure |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -49,7 +49,7 @@ Exactly one plan is currently registered as dependency-ready:
 
 | Handoff | Status | Plan | Objective |
 |---|---|---|---|
-| M069 — SOCKS + SOCKS-IRC | ready | `plans/implementation/i2pcontrol-proposal-170/069-socks-and-socks-irc-tunnels.md` | implement bounded SOCKS TCP CONNECT and compose the accepted IRC filter |
+| M070 — HTTP bidirectional server composition | ready | `plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md` | compose the closed HTTP server and client runtime/filter halves |
 
 Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered as ready. Future handoffs are prewritten but remain blocked until their hard dependencies close.
 
@@ -60,12 +60,12 @@ Per `plans/003-planning-process.md`, only the next dependency-ready implementati
 | M066 — IRC client/server family | closed | `plans/implementation/i2pcontrol-proposal-170/066-irc-client-server-tunnel-family.md` | M065 closed; closure accepted |
 | M067 — HTTP server | closed | `plans/implementation/i2pcontrol-proposal-170/067-http-server-tunnel.md` | M065 closed; closure accepted |
 | M068 — HTTP client + CONNECT | closed | `plans/implementation/i2pcontrol-proposal-170/068-http-client-and-connect-tunnels.md` | M065 closed; closure accepted |
-| M069 — SOCKS + SOCKS-IRC | ready | `plans/implementation/i2pcontrol-proposal-170/069-socks-and-socks-irc-tunnels.md` | M065 + M066 closed |
-| M070 — HTTP bidirectional server composition | blocked — dependency-ready but not the next registered handoff | `plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md` | M067 + M068 closed |
+| M069 — SOCKS + SOCKS-IRC | closed | `plans/implementation/i2pcontrol-proposal-170/069-socks-and-socks-irc-tunnels.md` | M065 + M066 closed; closure accepted |
+| M070 — HTTP bidirectional server composition | ready | `plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md` | M067 + M068 closed |
 | M071 — Streamr client/server | blocked — dependency-ready but not the next registered handoff | `plans/implementation/i2pcontrol-proposal-170/071-streamr-client-server-tunnels.md` | M065 closed |
 | M072 — integrated tunnel-runtime reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/072-tunnel-runtime-completion-reclosure.md` | M066-M071 closed |
 
-After M068 closes, M069, M070, and M071 are dependency-ready. Project convention registers M069 as the next handoff. M070 waits for both accepted HTTP halves. M072 waits for every runtime-family milestone.
+After M069 closes, M070 and M071 are dependency-ready. Project convention registers M070 as the next handoff. M071 remains unregistered until M070 is handled, and M072 waits for every runtime-family milestone.
 
 ## Tunnel-runtime security boundary
 

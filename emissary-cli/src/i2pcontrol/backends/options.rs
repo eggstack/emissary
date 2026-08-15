@@ -205,6 +205,21 @@ pub const CONNECT_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     CustomOptionPolicy::Reject,
 );
 
+/// Proposal 170 SOCKS frontend options. The target is selected by each
+/// SOCKS request, so a persisted TargetDestination is deliberately not part
+/// of this capability set.
+pub const SOCKS_OPTIONS: OptionCapabilities = OptionCapabilities::new(
+    &["ListenPort"],
+    &[],
+    &["ListenInterface", "ProxyUsername", "ProxyPassword"],
+    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Reject,
+);
+
+/// SOCKS-IRC has the same listener and proxy-authentication surface as SOCKS;
+/// the IRC filter is a payload policy, not a second option namespace.
+pub const SOCKS_IRC_OPTIONS: OptionCapabilities = SOCKS_OPTIONS;
+
 fn present_runtime_fields(options: &TunnelOptions) -> Vec<&'static str> {
     let mut fields = Vec::new();
     for (field, present) in [

@@ -859,6 +859,8 @@ impl ProductionTunnelManagerControl {
                     TunnelType::Client
                         | TunnelType::HttpClient
                         | TunnelType::IrcClient
+                        | TunnelType::Socks
+                        | TunnelType::SocksIrc
                         | TunnelType::ConnectClient
                         | TunnelType::Server
                         | TunnelType::HttpServer

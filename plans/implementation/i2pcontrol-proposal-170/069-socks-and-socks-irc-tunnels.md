@@ -1,6 +1,8 @@
 # M069 — SOCKS and SOCKS-IRC Tunnels
 
-Status: ready
+Status: closed
+
+Closure: `plans/closure/i2pcontrol-proposal-170/069-closure.md`.
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 

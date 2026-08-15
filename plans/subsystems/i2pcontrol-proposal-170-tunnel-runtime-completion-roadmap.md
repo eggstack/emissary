@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Runtime Completion Roadmap
 
-Status: active; M064-M068 closed; M069 is the next registered handoff
+Status: active; M064-M069 closed; M070 is the next registered handoff
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6` — current production head reviewed before this planning series
 
@@ -305,7 +305,7 @@ Status: closed; hard dependency M064 is closed. Closure:
 
 Add bounded reusable control-plane primitives for local listener ownership, accepted-stream server ownership, per-name task generation/cancellation where not already reusable, peer identity delivery to filters, and deterministic per-backend option-capability validation. Keep all production work under `i2pcontrol`.
 
-Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type. M066-M068 are now closed; M069 is the next registered handoff.
+Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type. M066-M069 are now closed; M070 is the next registered handoff.
 
 ### M066 — IRC client/server family
 
@@ -335,6 +335,8 @@ Implement control-plane HTTP proxy and CONNECT-only proxy with anonymity-sensiti
 
 Exit: `httpclient` and `connectclient` real, with no local DNS/open-LAN route and no silent security-option ignores.
 
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/068-closure.md`.
+
 ### M069 — SOCKS and SOCKS-IRC
 
 Plan: `069-socks-and-socks-irc-tunnels.md`.
@@ -342,6 +344,8 @@ Plan: `069-socks-and-socks-irc-tunnels.md`.
 Implement SOCKS4a/5 TCP CONNECT frontend, safe target routing, auth/exposure policy, and `socksirc` composition using M066's IRC filter.
 
 Exit: both types real; unsupported SOCKS commands fail correctly; SOCKS-IRC has no alternate/unfiltered relay path.
+
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/069-closure.md`.
 
 ### M070 — HTTP bidirectional server composition
 
@@ -351,6 +355,8 @@ Compose closed M067 and M068 runtime/filter components into `httpbidirserver` wi
 
 Exit: no third HTTP parser/filter implementation exists; lifecycle cancels both halves exactly.
 
+Status: ready; M067, M068, and M069 are closed. M070 is the next registered handoff.
+
 ### M071 — Streamr client/server
 
 Plan: `071-streamr-client-server-tunnels.md`.
@@ -358,6 +364,8 @@ Plan: `071-streamr-client-server-tunnels.md`.
 Implement bounded datagram producer/consumer behavior, subscription refresh/expiry, UDP local endpoints, packet/subscriber limits, and exact lifecycle.
 
 Exit: both Streamr types real with bounded state and no amplification/unbounded subscription issue.
+
+Status: blocked — dependency-ready but not the next registered handoff.
 
 ### M072 — Integrated tunnel-runtime reclosure
 

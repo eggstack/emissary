@@ -203,10 +203,20 @@ pub fn create_production_registry_with_server_store_and_address_book(
             .with_address_book(address_book),
         None => super::http_client::HttpClientTunnelBackend::new(sam_tcp_port),
     }) as Arc<dyn TunnelBackend>;
-    let connect_client = Arc::new(match address_book {
+    let connect_client = Arc::new(match address_book.clone() {
         Some(address_book) => super::connect_client::ConnectClientTunnelBackend::new(sam_tcp_port)
             .with_address_book(address_book),
         None => super::connect_client::ConnectClientTunnelBackend::new(sam_tcp_port),
+    }) as Arc<dyn TunnelBackend>;
+    let socks = Arc::new(match address_book.clone() {
+        Some(address_book) =>
+            super::socks::SocksTunnelBackend::new(sam_tcp_port).with_address_book(address_book),
+        None => super::socks::SocksTunnelBackend::new(sam_tcp_port),
+    }) as Arc<dyn TunnelBackend>;
+    let socks_irc = Arc::new(match address_book {
+        Some(address_book) => super::socks_irc::SocksIrcTunnelBackend::new(sam_tcp_port)
+            .with_address_book(address_book),
+        None => super::socks_irc::SocksIrcTunnelBackend::new(sam_tcp_port),
     }) as Arc<dyn TunnelBackend>;
     let backends: Vec<Arc<dyn TunnelBackend>> = ALL_TUNNEL_TYPES
         .iter()
@@ -225,6 +235,10 @@ pub fn create_production_registry_with_server_store_and_address_book(
                 http_client.clone()
             } else if tt == TunnelType::ConnectClient {
                 connect_client.clone()
+            } else if tt == TunnelType::Socks {
+                socks.clone()
+            } else if tt == TunnelType::SocksIrc {
+                socks_irc.clone()
             } else {
                 Arc::new(super::unsupported::UnsupportedTunnelBackend::new(tt))
                     as Arc<dyn TunnelBackend>
@@ -355,10 +369,24 @@ mod tests {
             registry.get(TunnelType::HttpServer).tunnel_type(),
             TunnelType::HttpServer
         );
+        assert_eq!(
+            registry.get(TunnelType::Socks).tunnel_type(),
+            TunnelType::Socks
+        );
+        assert_eq!(
+            registry.get(TunnelType::SocksIrc).tunnel_type(),
+            TunnelType::SocksIrc
+        );
         for &tunnel_type in ALL_TUNNEL_TYPES.iter().filter(|&&tunnel_type| {
             tunnel_type != TunnelType::Client
                 && tunnel_type != TunnelType::Server
                 && tunnel_type != TunnelType::HttpServer
+                && tunnel_type != TunnelType::HttpClient
+                && tunnel_type != TunnelType::ConnectClient
+                && tunnel_type != TunnelType::IrcClient
+                && tunnel_type != TunnelType::IrcServer
+                && tunnel_type != TunnelType::Socks
+                && tunnel_type != TunnelType::SocksIrc
         }) {
             assert!(matches!(
                 registry.get(tunnel_type).inspect(&test_definition(tunnel_type)).runtime_state,

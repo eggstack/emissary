@@ -28,6 +28,8 @@ pub mod options;
 pub mod registry;
 pub mod runtime;
 pub mod server;
+pub mod socks;
+pub mod socks_irc;
 pub mod unsupported;
 
 use std::fmt;

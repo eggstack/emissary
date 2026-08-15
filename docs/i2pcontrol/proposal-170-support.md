@@ -93,10 +93,11 @@ accepted integrated reclosure and final 43-row source audit.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because five of the 43 RouterInfo additions lack
-bounded authoritative sources and seven specialized tunnel data planes remain
+bounded authoritative sources and three specialized tunnel data planes remain
 explicit unsupported runtimes. M066 adds real filtered `ircclient` and
-`ircserver` control-plane runtimes, and M067 adds a filtered accepted-stream
-`httpserver`; the unavailable rows are router news, banned peers, transit-15s,
+`ircserver`, M067 adds filtered accepted-stream `httpserver`, M068 adds real
+`httpclient` and `connectclient`, and M069 adds bounded `socks` and filtered
+`socksirc`; the unavailable rows are router news, banned peers, transit-15s,
 and v4/v6 network-error.
 
 ## M038 live-runtime evidence
@@ -217,8 +218,7 @@ lifecycle operations.
 
 The following other tunnel families remain intentionally out of scope:
 
-- HTTP client and bidirectional server;
-- SOCKS-IRC and CONNECT variants;
+- HTTP bidirectional server;
 - Streamr client/server;
 - any other missing listener, destination, LeaseSet, or traffic implementation.
 
@@ -226,6 +226,24 @@ Their definitions may parse and persist. Start/restart must return explicit
 not-implemented operation status; stop remains safe and inactive. They must not
 report running or open resources. M065's lifecycle seams are not registered as
 those tunnel types and do not change this status.
+
+### SOCKS and SOCKS-IRC runtime boundary
+
+`socks` accepts bounded SOCKS4a and SOCKS5 TCP CONNECT negotiation. SOCKS4
+literal IPv4, SOCKS5 literal IPv4/IPv6, BIND, UDP ASSOCIATE, arbitrary DNS
+resolution, localhost/private targets, and unsupported options fail closed
+before a Yosemite connection is opened. I2P domain targets resolve only through
+the approved I2P/address-book path. Clearnet targets require one explicitly
+configured I2P-hosted SOCKS5 outproxy; Emissary never opens a local clearnet
+socket. Loopback is the safe default listener, and non-loopback exposure
+requires configured username/password authentication. After establishment,
+`socks` intentionally relays arbitrary application bytes, so SOCKS alone does
+not provide application-layer anonymity.
+
+`socksirc` uses the exact same negotiation, target routing, lifecycle, and
+authentication path, then enters the M066 stateful IRC filter in both
+directions. It has no raw relay alternative; unsupported CTCP and DCC remain
+blocked exactly as they are for `ircclient`.
 
 ### HTTP server runtime boundary
 

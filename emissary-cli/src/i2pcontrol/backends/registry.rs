@@ -140,7 +140,13 @@ pub fn create_default_registry() -> Result<TunnelBackendRegistry, RegistryError>
     TunnelBackendRegistry::new(backends)
 }
 
-/// Create the production registry with real generic client and server backends.
+/// Create the dependency-light registry used by tests and non-production
+/// construction paths.
+///
+/// The specialized server backends require the composed, path-confined
+/// destination store. Production composition must use
+/// [`create_production_registry_with_server_store_and_address_book`] so all
+/// twelve tunnel types receive their real backend.
 #[allow(dead_code)]
 pub fn create_production_registry(
     sam_tcp_port: u16,
@@ -372,51 +378,7 @@ mod tests {
     }
 
     #[test]
-    fn production_registry_has_only_known_real_backends() {
-        let registry = create_production_registry(7656).unwrap();
-        assert_eq!(registry.len(), ALL_TUNNEL_TYPES.len());
-        assert_eq!(
-            registry.get(TunnelType::Client).tunnel_type(),
-            TunnelType::Client
-        );
-        assert_eq!(
-            registry.get(TunnelType::Server).tunnel_type(),
-            TunnelType::Server
-        );
-        assert_eq!(
-            registry.get(TunnelType::HttpServer).tunnel_type(),
-            TunnelType::HttpServer
-        );
-        assert_eq!(
-            registry.get(TunnelType::Socks).tunnel_type(),
-            TunnelType::Socks
-        );
-        assert_eq!(
-            registry.get(TunnelType::SocksIrc).tunnel_type(),
-            TunnelType::SocksIrc
-        );
-        for &tunnel_type in ALL_TUNNEL_TYPES.iter().filter(|&&tunnel_type| {
-            tunnel_type != TunnelType::Client
-                && tunnel_type != TunnelType::Server
-                && tunnel_type != TunnelType::HttpServer
-                && tunnel_type != TunnelType::HttpClient
-                && tunnel_type != TunnelType::ConnectClient
-                && tunnel_type != TunnelType::IrcClient
-                && tunnel_type != TunnelType::IrcServer
-                && tunnel_type != TunnelType::Socks
-                && tunnel_type != TunnelType::SocksIrc
-                && tunnel_type != TunnelType::StreamrClient
-                && tunnel_type != TunnelType::StreamrServer
-        }) {
-            assert!(matches!(
-                registry.get(tunnel_type).inspect(&test_definition(tunnel_type)).runtime_state,
-                TunnelRuntimeState::Unsupported
-            ));
-        }
-    }
-
-    #[test]
-    fn composed_production_registry_registers_real_streamr_backends() {
+    fn composed_production_registry_registers_real_backends_for_all_types() {
         let root = tempfile::tempdir().unwrap();
         let registry = create_production_registry_with_server_store(
             7656,
@@ -424,7 +386,8 @@ mod tests {
         )
         .unwrap();
 
-        for tunnel_type in [TunnelType::StreamrClient, TunnelType::StreamrServer] {
+        assert_eq!(registry.len(), ALL_TUNNEL_TYPES.len());
+        for &tunnel_type in ALL_TUNNEL_TYPES {
             let status = registry.get(tunnel_type).inspect(&test_definition(tunnel_type));
             assert_eq!(status.tunnel_type, tunnel_type);
             assert_eq!(status.runtime_state, TunnelRuntimeState::Stopped);

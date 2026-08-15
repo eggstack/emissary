@@ -1,6 +1,6 @@
 # I2PControl for Emissary
 
-Status: partial Proposal 170 support
+Status: partial Proposal 170 support; M072 corrective pass required
 
 Proposal 170 remains **Open**. This documentation is pinned to the revision
 created and last updated on `2026-05-20`.
@@ -24,6 +24,12 @@ M035 corrected the base method inventory and separated direct Proposal 170
 RouterInfo requests from historical nested compatibility requests.
 M039 independently reviewed the complete M031–M038 final head and formally
 closed the authorized workstream as partial support.
+
+The later M066–M071 tunnel-family sequence made all twelve production tunnel
+types real. M072's integrated reclosure found a medium generic `client`/`server`
+option-truthfulness defect; M073 is the ready corrective handoff. This does not
+reopen the accepted RouterInfo 37/1/5 matrix or the unrelated AddressBook/base
+method limitations.
 
 The expected bounded final status remains `partial Proposal 170 support` because five
 RouterInfo additions remain unavailable. M066 through M071 close the IRC, HTTP, CONNECT,

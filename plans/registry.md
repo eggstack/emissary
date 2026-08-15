@@ -29,7 +29,7 @@ Canonical direction:
 |---|---|---|---|---|
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no containment corrective handoff | M061 source containment and M062/M063 dependency containment remain accepted authorities |
-| I2PControl Proposal 170 tunnel runtime completion | active; M064-M071 closed | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M072 — integrated reclosure | M072 is ready |
+| I2PControl Proposal 170 tunnel runtime completion | corrective pass required; M064-M071 closed | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M073 — generic option truthfulness corrective | M072 identified a medium generic client/server option-boundary finding |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -49,7 +49,7 @@ Exactly one plan is currently registered as dependency-ready:
 
 | Handoff | Status | Plan | Objective |
 |---|---|---|---|
-| M072 — integrated reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/072-tunnel-runtime-completion-reclosure.md` | independently reclose all twelve tunnel runtimes |
+| M073 — generic option truthfulness corrective | ready | `plans/implementation/i2pcontrol-proposal-170/073-generic-tunnel-option-truthfulness-corrective.md` | apply or reject every generic client/server runtime-relevant option |
 
 Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered as ready. Future handoffs are prewritten but remain blocked until their hard dependencies close.
 
@@ -63,9 +63,11 @@ Per `plans/003-planning-process.md`, only the next dependency-ready implementati
 | M069 — SOCKS + SOCKS-IRC | closed | `plans/implementation/i2pcontrol-proposal-170/069-socks-and-socks-irc-tunnels.md` | M065 + M066 closed; closure accepted |
 | M070 — HTTP bidirectional server composition | closed | `plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md` | M067 + M068 closed; closure accepted |
 | M071 — Streamr client/server | closed | `plans/implementation/i2pcontrol-proposal-170/071-streamr-client-server-tunnels.md` | M065 closed; closure accepted |
-| M072 — integrated tunnel-runtime reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/072-tunnel-runtime-completion-reclosure.md` | M066-M071 closed |
+| M072 — integrated tunnel-runtime reclosure | corrective pass required | `plans/implementation/i2pcontrol-proposal-170/072-tunnel-runtime-completion-reclosure.md` | M066-M071 closed; generic option finding recorded |
+| M073 — generic tunnel option truthfulness corrective | ready | `plans/implementation/i2pcontrol-proposal-170/073-generic-tunnel-option-truthfulness-corrective.md` | M072 corrective finding |
 
-M071 is closed and M072 is now the next registered handoff.
+M071 is closed. M072 is formally reclosed with a corrective disposition and
+M073 is now the next registered handoff.
 
 ## Tunnel-runtime security boundary
 
@@ -88,13 +90,14 @@ Tunnel-runtime planning production baseline:
 
 `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`.
 
-At that baseline:
+At the M072 reclosure head:
 
 - production registry has real generic `client` and `server` backends;
 - after M071, all ten formerly specialized Proposal 170 types are real bounded
   backends, including the dedicated Streamr producer/consumer runtime;
 - M064 repaired the feature-disabled/no-events unused-parameter regression in `emissary-core/src/events.rs::set_ipv4_testing/set_ipv6_testing`;
-- M072 is the remaining integrated reclosure and evidence-refresh handoff.
+- M072 is reclosed with a corrective disposition; M073 owns the generic
+  client/server option-truthfulness repair.
 
 Accepted containment authorities remain:
 
@@ -153,8 +156,10 @@ Do not add hosted CI jobs, release/publishing machinery, coverage gates, fuzz in
 ## Registry maintenance rules
 
 1. Only the next dependency-ready plan is normally marked/registered ready.
-2. M064-M071 are closed; M072 is the current dependency-ready handoff.
-3. After M071 closes, M072 is the next registered handoff.
+2. M064-M071 are closed; M072 is corrective-pass-required; M073 is the current
+   dependency-ready handoff.
+3. M072 remains the integrated reclosure authority, but its generic option
+   finding must be closed by M073 before tunnel-runtime completion closes.
 4. Preserve ADR-0003 scope: implement only the ten pinned Proposal 170 families, not adjacent tunnel/protocol features.
 5. Keep new specialized runtime/filter code under I2PControl wherever technically possible.
 6. No M065-M072 plan may add a new `emissary-core/**` production path without stopping and creating separate architecture/corrective planning.

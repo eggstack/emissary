@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel-runtime completion phase active; M064-M071 closed; M072 next
+Status: partial Proposal 170 support; M064-M071 closed; M072 corrective pass required; M073 ready
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -42,7 +42,8 @@ The implementation target is:
 
 ## Current handoff
 
-M071 is closed. M072 is the next registered dependency-ready implementation plan:
+M071 is closed. M072 is formally reclosed with a corrective disposition. M073
+is the next registered dependency-ready implementation plan:
 
 - `065-i2pcontrol-tunnel-runtime-primitives.md` — **closed**; closure:
   `plans/closure/i2pcontrol-proposal-170/065-closure.md`.
@@ -58,6 +59,10 @@ M071 is closed. M072 is the next registered dependency-ready implementation plan
   `plans/closure/i2pcontrol-proposal-170/070-closure.md`.
 - `071-streamr-client-server-tunnels.md` — **closed**; closure:
   `plans/closure/i2pcontrol-proposal-170/071-closure.md`.
+- `072-tunnel-runtime-completion-reclosure.md` — **corrective pass required**;
+  closure:
+  `plans/closure/i2pcontrol-proposal-170/072-closure.md`.
+- `073-generic-tunnel-option-truthfulness-corrective.md` — **ready**.
 
 M064 repairs the existing feature-disabled/no-events unused-parameter regression in `emissary-core/src/events.rs` and establishes a clean baseline before new tunnel runtime work. It adds no capability.
 
@@ -77,9 +82,12 @@ Per `plans/003-planning-process.md`, future plans are prewritten for continuity 
 | M069 | closed | SOCKS4a/5 CONNECT + `socksirc` composed with M066 filter | M065, M066 |
 | M070 | closed | `httpbidirserver` composition of M067/M068 | M067, M068 |
 | M071 | closed | bounded Streamr client/server datagram family | M065 |
-| M072 | ready | integrated twelve-type runtime/security/containment reclosure | M066-M071 |
+| M072 | corrective pass required | integrated twelve-type runtime/security/containment reclosure | M066-M071 |
+| M073 | ready | generic client/server option truthfulness corrective | M072 audit finding |
 
-M072 is now the next registered handoff.
+M073 is now the next registered handoff. The specialized M066-M071 families
+remain closed; M072 cannot be accepted until M073 removes the generic option
+truthfulness finding.
 
 ## Security-critical family rules
 

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Runtime Completion Roadmap
 
-Status: active; M064-M071 closed; M072 is the next registered handoff
+Status: corrective pass required; M064-M071 closed; M072 reclosed; M073 is the next registered handoff
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6` — current production head reviewed before this planning series
 
@@ -305,7 +305,7 @@ Status: closed; hard dependency M064 is closed. Closure:
 
 Add bounded reusable control-plane primitives for local listener ownership, accepted-stream server ownership, per-name task generation/cancellation where not already reusable, peer identity delivery to filters, and deterministic per-backend option-capability validation. Keep all production work under `i2pcontrol`.
 
-Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type. M066-M071 are now closed; M072 is the next registered handoff.
+Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type. M066-M071 are closed; M072 is reclosed with a corrective disposition and M073 is the next registered handoff.
 
 ### M066 — IRC client/server family
 
@@ -366,7 +366,7 @@ Implement bounded datagram producer/consumer behavior, subscription refresh/expi
 
 Exit: both Streamr types real with bounded state and no amplification/unbounded subscription issue.
 
-Status: closed; M065-M071 are closed and M072 is the next registered handoff.
+Status: closed; M065-M071 are closed; M072 is reclosed with a corrective disposition and M073 is the next registered handoff.
 
 ### M072 — Integrated tunnel-runtime reclosure
 
@@ -374,7 +374,25 @@ Plan: `072-tunnel-runtime-completion-reclosure.md`.
 
 Reconcile production registry, all twelve types, option capability matrices, support documentation, containment, feature-disabled/default behavior, persistence/restart, lifecycle contention, and security evidence. No new family implementation should originate here except tiny directly demonstrated corrective fixes within predeclared budgets; material findings generate a new corrective plan.
 
-Exit: final support statement is evidence-backed and no high/medium correctness/security/containment finding remains.
+Status: corrective pass required; closure:
+`plans/closure/i2pcontrol-proposal-170/072-closure.md`.
+
+Exit: final support statement is evidence-backed and no high/medium correctness/security/containment finding remains. M072 found a medium generic client/server option-truthfulness defect and created M073 rather than absorbing an option-semantics change into reclosure.
+
+### M073 — Generic tunnel option truthfulness corrective
+
+Plan: `073-generic-tunnel-option-truthfulness-corrective.md`.
+
+Repair the generic `client` and `server` option boundary so every typed and raw
+runtime-relevant option is applied or rejected before allocation. Preserve the
+public schema and existing data plane; unsupported controls remain explicitly
+rejected.
+
+Status: ready; hard corrective predecessor M072 has an explicit bounded finding.
+
+Exit: the M072 integrated option matrix has no silent-accept rows for generic
+client/server backends, and M072 can be accepted without changing unrelated
+Proposal 170 source limitations.
 
 ## 10. Verification discipline
 
@@ -429,4 +447,4 @@ A family implementation must stop and require corrective/replanning if:
 
 ## 14. Final closure statement
 
-M072 may close this roadmap only when the registry has real backends for all ten newly authorized families, their security/option capability sets are truthfully documented, HTTP/IRC filtering is non-bypassable, containment/default-build invariants remain intact, and no upstream interaction occurred. If any declared family remains stubbed, the roadmap remains partial and the exact blocker must be named rather than hidden.
+M072/M073 may close this roadmap only when the registry has real backends for all ten newly authorized families, every backend's security/option capability set is truthfully documented, HTTP/IRC filtering is non-bypassable, containment/default-build invariants remain intact, and no upstream interaction occurred. If any declared family remains stubbed or silently accepts a relevant option, the roadmap remains corrective and the exact blocker must be named rather than hidden.

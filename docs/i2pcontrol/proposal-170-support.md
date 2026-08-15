@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support
+Status: partial Proposal 170 support; M072 corrective pass required
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -12,6 +12,14 @@ Historical invalidation:
 Current roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
+- tunnel-runtime completion: `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`
+
+Tunnel-runtime reclosure:
+
+- M072: `plans/closure/i2pcontrol-proposal-170/072-closure.md` — corrective
+  pass required for generic client/server option truthfulness;
+- M073: `plans/implementation/i2pcontrol-proposal-170/073-generic-tunnel-option-truthfulness-corrective.md`
+  — next ready corrective handoff.
 
 Closed handoffs:
 
@@ -75,9 +83,11 @@ implementation.
 
 ## Current overall disposition
 
-The repository is closed for the authorized in-scope dimensions. M044 reviewed
-the corrected final head and accepted the final disposition as partial Proposal
-170 support. M039 remains a historical invalidated closure.
+The repository remains partial Proposal 170 support. M044 reviewed the earlier
+corrected final head and accepted that source/method disposition; the later
+tunnel-runtime M072 reclosure found a medium generic client/server option
+truthfulness defect, so the tunnel-runtime completion phase is not yet closed.
+M039 remains a historical invalidated closure.
 
 M028 owns the status/feature-boundary correction. M030 owns the destination
 authority, lookup precedence, bounded import/repair, and independent final-head
@@ -388,6 +398,9 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M054 | closed | transit-15s truthfulness correction; explicit unavailable disposition |
 | M055 | closed | network-error truthfulness correction; explicit unavailable dispositions |
 | M056 | closed | integrated reclosure; final 37 available / 1 neutral / 5 unavailable audit |
+| M066–M071 | closed | real IRC, HTTP, CONNECT, SOCKS, bidirectional HTTP, and Streamr tunnel families |
+| M072 | corrective pass required | integrated twelve-type reclosure found generic option truthfulness gap |
+| M073 | ready | generic client/server option apply-or-reject corrective |
 
 ## Final-status rule
 

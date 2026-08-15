@@ -1,7 +1,10 @@
 # I2PControl Tunnel Backends
 
-Status: M071 closure accepted; all twelve tunnel families have bounded runtime
-backends
+Status: M072 reclosed; M073 generic option corrective required
+
+All twelve tunnel families have bounded production backends. The integrated
+runtime phase remains open because M072 found generic `client`/`server` typed
+and raw options that need explicit apply-or-reject correction under M073.
 
 This document describes the tunnel backend interface and registry in Emissary.
 

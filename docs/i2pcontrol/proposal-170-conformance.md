@@ -1,6 +1,6 @@
 # Proposal 170 Conformance Matrix
 
-Status: partial Proposal 170 support; M071 Streamr runtime closure accepted
+Status: partial Proposal 170 support; M072 reclosed with M073 corrective pass required
 
 Proposal 170 remains Open. This workstream is pinned to the revision created
 and last updated on `2026-05-20`.
@@ -33,6 +33,12 @@ bounded tunnel-family adapters, including the dedicated Streamr datagram
 runtime in M071. M039 independently revalidated the earlier source/runtime/
 evidence boundary. The current controlling RouterInfo source disposition is
 accepted by M056 after the M054/M055 corrective heads.
+
+M072 reclosed the twelve-type runtime composition and found that generic
+`client`/`server` runtime-relevant options can still be silently accepted in
+some typed/raw paths. M073 owns that bounded corrective pass. Until M073
+closes, all twelve family backends are real in production composition, but the
+runtime-completion phase is not claimed fully closed.
 
 ## Retained machine-readable matrix
 

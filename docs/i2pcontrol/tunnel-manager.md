@@ -1,6 +1,6 @@
 # I2PControl TunnelManager
 
-Status: M070 HTTP bidirectional runtime closure accepted; lifecycle
+Status: M072 reclosed with M073 generic option corrective required; lifecycle
 reconciliation remains closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.

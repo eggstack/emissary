@@ -1,6 +1,6 @@
 # M076 — HTTP Server Anonymity and POST-Throttle Hardening
 
-Status: implemented — production changes landed; closure evidence recorded separately
+Status: closed — implementation and closure accepted
 
 Source roadmap:
 

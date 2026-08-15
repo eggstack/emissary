@@ -1,6 +1,6 @@
 # M077 — IRC Server Lifetime and Exhaustion Hardening
 
-Status: blocked — hard dependencies M073 and M074
+Status: ready — hard dependencies M073 and M074 closed; awaiting registry turn
 
 Source roadmap:
 

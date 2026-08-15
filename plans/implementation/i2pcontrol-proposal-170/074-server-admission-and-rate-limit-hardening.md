@@ -1,6 +1,6 @@
 # M074 — Shared Server Admission and Rate-Limit Hardening
 
-Status: blocked — prewritten corrective successor; hard dependency M073 must close first
+Status: closed — implementation and closure recorded
 
 Source roadmap:
 

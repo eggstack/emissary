@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; M064-M071 closed; M072 corrective pass required; M073 ready
+Status: partial Proposal 170 support; M064-M074 closed; M075 next
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -42,8 +42,8 @@ The implementation target is:
 
 ## Current handoff
 
-M071 is closed. M072 is formally reclosed with a corrective disposition. M073
-is the next registered dependency-ready implementation plan:
+M071 is closed. M072 is formally accepted after M073. M073 and M074 are
+closed; M075 is the next registered dependency-ready implementation plan:
 
 - `065-i2pcontrol-tunnel-runtime-primitives.md` — **closed**; closure:
   `plans/closure/i2pcontrol-proposal-170/065-closure.md`.
@@ -59,10 +59,12 @@ is the next registered dependency-ready implementation plan:
   `plans/closure/i2pcontrol-proposal-170/070-closure.md`.
 - `071-streamr-client-server-tunnels.md` — **closed**; closure:
   `plans/closure/i2pcontrol-proposal-170/071-closure.md`.
-- `072-tunnel-runtime-completion-reclosure.md` — **corrective pass required**;
-  closure:
+- `072-tunnel-runtime-completion-reclosure.md` — **closed**; closure:
   `plans/closure/i2pcontrol-proposal-170/072-closure.md`.
-- `073-generic-tunnel-option-truthfulness-corrective.md` — **ready**.
+- `073-generic-tunnel-option-truthfulness-corrective.md` — **closed**; closure:
+  `plans/closure/i2pcontrol-proposal-170/073-closure.md`.
+- `074-server-admission-and-rate-limit-hardening.md` — **closed**; closure:
+  `plans/closure/i2pcontrol-proposal-170/074-closure.md`.
 
 M064 repairs the existing feature-disabled/no-events unused-parameter regression in `emissary-core/src/events.rs` and establishes a clean baseline before new tunnel runtime work. It adds no capability.
 
@@ -82,12 +84,16 @@ Per `plans/003-planning-process.md`, future plans are prewritten for continuity 
 | M069 | closed | SOCKS4a/5 CONNECT + `socksirc` composed with M066 filter | M065, M066 |
 | M070 | closed | `httpbidirserver` composition of M067/M068 | M067, M068 |
 | M071 | closed | bounded Streamr client/server datagram family | M065 |
-| M072 | corrective pass required | integrated twelve-type runtime/security/containment reclosure | M066-M071 |
-| M073 | ready | generic client/server option truthfulness corrective | M072 audit finding |
+| M072 | closed | integrated twelve-type runtime/security/containment reclosure | M066-M071 |
+| M073 | closed | generic client/server option truthfulness corrective | M072 audit finding |
+| M074 | closed | shared server admission/rate-limit hardening | M073 |
+| M075 | ready | generic server accepted-stream hardening | M073, M074 |
+| M076 | ready | HTTP anonymity and POST-throttle hardening | M073, M074 |
+| M077 | ready | IRC server lifetime and exhaustion hardening | M073, M074 |
 
-M073 is now the next registered handoff. The specialized M066-M071 families
-remain closed; M072 cannot be accepted until M073 removes the generic option
-truthfulness finding.
+M075 is now the next registered handoff. M076 and M077 are also hard-dependency
+ready but remain unregistered until the planning sequence advances. The
+specialized M066-M071 families remain closed.
 
 ## Security-critical family rules
 

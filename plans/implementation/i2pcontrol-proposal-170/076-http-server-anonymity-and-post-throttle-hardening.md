@@ -1,6 +1,6 @@
 # M076 — HTTP Server Anonymity and POST-Throttle Hardening
 
-Status: blocked — hard dependencies M073 and M074
+Status: ready — hard dependencies M073 and M074 closed; awaiting registry turn
 
 Source roadmap:
 

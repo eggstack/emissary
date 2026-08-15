@@ -1,6 +1,6 @@
 # M072 Closure — Proposal 170 Tunnel Runtime Completion Reclosure
 
-Status: corrective pass required
+Status: closed after M073 corrective pass
 
 Source implementation plan:
 
@@ -55,8 +55,8 @@ external review artifact exists.
 | All twelve production types are real | composed production registry test; `production.rs` composition | pass |
 | Default/test registry remains intentionally unsupported and resource-free | default-registry tests; M061 containment tests | pass |
 | Specialized backends validate options before allocation | M066–M071 closures and package tests | pass |
-| Generic `client` applies/rejects every runtime-relevant option | `client.rs`, `options.rs` audit | **fail — M073** |
-| Generic `server` applies/rejects every runtime-relevant option | `server.rs`, `options.rs` audit | **fail — M073** |
+| Generic `client` applies/rejects every runtime-relevant option | M073 closure; `client.rs`, `options.rs` | pass |
+| Generic `server` applies/rejects every runtime-relevant option | M073 closure; `server.rs`, `options.rs` | pass |
 | Lifecycle generation, cancellation, restart, and server identity | M065–M071 closures; backend lifecycle tests | pass for reviewed paths |
 | HTTP inbound/outbound filtering and framing safety | M067/M068/M070 closures and filter tests | pass |
 | IRC common filter, registration identity, DCC/WEBIRC fail-closed | M066/M069 closures and filter tests | pass |
@@ -69,7 +69,7 @@ external review artifact exists.
 | M064 remains the only planned core correction | baseline diff and containment review | pass |
 | RouterInfo remains 37/1/5; M051 remains separate | support docs and registry | pass |
 | Documentation truthfully distinguishes partial Proposal 170 support | docs review | pass after status updates in this change |
-| No high/medium finding remains | generic option finding | **fail — medium; M073 required** |
+| No high/medium finding remains | M073 closure and M074 closure | pass for M072 scope |
 
 ## 4. Confirmed unclosed finding
 
@@ -145,9 +145,10 @@ blocker rather than represented as complete support.
 
 ## 8. Future-plan unblock review
 
-- M073 is now ready as the sole next tunnel-runtime corrective handoff because
-  its scope is bounded by this finding and requires no new external interface.
-- No M074+ tunnel-runtime plan exists to unblock.
+- M073 is closed as the bounded corrective successor for the generic option
+  finding.
+- M074 is closed as the next security-hardening milestone and owns the shared
+  accepted-server admission boundary.
 - M051 remains independently blocked: no substantive router-news or banned-peer
   owners exist, and M072 creates no such owner.
 - Containment M061 and dependency M062/M063 remain closed authorities; no
@@ -164,6 +165,7 @@ eventual commit and push of this internal branch only.
 
 ## 10. Final disposition
 
-**Corrective pass required.** M072 is formally reclosed as not accepted until
-M073 proves that generic `client` and `server` runtime-relevant options are
-applied or rejected before allocation.
+**Closed.** M072 is formally accepted after M073 proved that generic `client`
+and `server` runtime-relevant options are applied or rejected before
+allocation. The later M074-M079 security sequence remains a separate corrective
+workstream governed by its own closures.

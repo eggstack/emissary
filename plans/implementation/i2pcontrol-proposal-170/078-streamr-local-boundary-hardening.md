@@ -1,6 +1,6 @@
 # M078 — Streamr Local Boundary Hardening
 
-Status: blocked — prewritten successor; M073 must close before registration advances
+Status: blocked — sequencing successor; M075-M077 must close before registration advances
 
 Source roadmap:
 

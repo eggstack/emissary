@@ -260,8 +260,11 @@ runtime. It reads and bounds the request line/header block before opening the
 loopback target, rejects ambiguous Content-Length/Transfer-Encoding framing,
 obs-fold, upgrades, proxy identity, and spoofed `X-I2P-*` headers, then injects
 peer identity derived from the accepted SAM stream. Configured Host rewriting,
-access lists, proxy/referer/User-Agent policy, concurrent-connection limits, and
-peer-keyed POST/PUT/PATCH throttling are applied before local connection. Local
+access lists, proxy/referer/User-Agent policy, peer-aware admission (30 global
+connections by default, 8 per peer, and bounded peer/aggregate minute/hour/day
+rates), and peer-keyed POST/PUT/PATCH throttling are applied before local
+connection. The inbound half of `httpbidirserver` consumes the same policy.
+Local
 response headers are parsed and identifying server/proxy headers are removed
 before the bounded response body is streamed back. TLS, compression, custom
 options, arbitrary target hosts, and unsupported Proposal 170 modes reject
@@ -283,8 +286,9 @@ M066 does not synthesize registration or channel behavior.
 HTTP/Binary protocol probes, rewrites `USER` using the trusted accepted I2P
 peer identity, and connects only to loopback. It does not forward registration
 to the local IRCd until NICK and sanitized USER have been accepted. The
-post-registration path is a raw IRC stream as specified by M066; the client
-side remains filtered for the future `socksirc` composition.
+post-registration path is a raw IRC stream as specified by M066; accepted
+streams use the same bounded peer-aware admission policy as `httpserver`, and
+the client side remains filtered for the future `socksirc` composition.
 
 ## AddressBook
 

@@ -484,7 +484,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn peer_fairness_preserves_other_peer_capacity() {
-        let policy = ServerAdmissionPolicy::new(4, 0, 0, 0, 0, 0, 0).unwrap();
+        let policy = ServerAdmissionPolicy::new(20, 0, 0, 0, 0, 0, 0).unwrap();
         let state = ServerAdmissionState::new(policy);
         let first = peer("first");
         let mut leases = Vec::new();
@@ -493,10 +493,10 @@ mod tests {
                 leases.push(lease);
             }
         }
-        assert_eq!(leases.len(), 4.min(DEFAULT_MAX_CONCURRENT_PER_PEER));
+        assert_eq!(leases.len(), DEFAULT_MAX_CONCURRENT_PER_PEER);
         assert!(matches!(
             state.try_acquire(&peer("second")),
-            AdmissionDecision::Denied(AdmissionRejection::GlobalConcurrency)
+            AdmissionDecision::Allowed(_)
         ));
         drop(leases.pop());
         assert!(matches!(

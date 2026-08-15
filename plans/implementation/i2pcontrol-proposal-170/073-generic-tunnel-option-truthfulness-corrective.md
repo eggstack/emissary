@@ -1,6 +1,6 @@
 # M073 — Generic Tunnel Option Truthfulness Corrective
 
-Status: ready — corrective successor to M072
+Status: closed — implementation and closure recorded
 
 Source roadmap: `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`.
 

@@ -1,6 +1,6 @@
 # M072 — Proposal 170 Tunnel Runtime Completion Reclosure
 
-Status: corrective pass required — M072 reclosure recorded; M073 owns the generic option finding
+Status: closed — M072 reclosure accepted after M073
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6`
 

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: planned corrective security work; M073 remains the only dependency-ready handoff; M074-M079 are prewritten successors
+Status: planned corrective security work; M074 closed; M075 next; M076-M077 ready; M078-M079 blocked
 
 Planning production baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 

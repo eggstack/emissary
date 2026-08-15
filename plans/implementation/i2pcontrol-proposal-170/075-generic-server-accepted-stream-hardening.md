@@ -1,6 +1,6 @@
 # M075 — Generic Server Accepted-Stream Hardening
 
-Status: blocked — hard dependencies M073 and M074
+Status: ready — hard dependencies M073 and M074 closed; M075 is next
 
 Source roadmap:
 

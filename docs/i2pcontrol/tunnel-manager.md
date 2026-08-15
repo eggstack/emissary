@@ -1,7 +1,7 @@
 # I2PControl TunnelManager
 
-Status: M072 reclosed with M073 generic option corrective required; lifecycle
-reconciliation remains closed against the pinned Proposal 170 revision
+Status: M074 server admission hardening closed; M075-M077 dependency-ready;
+lifecycle reconciliation remains closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
 Wire/CRUD/persistence evidence is distinct from runtime data-plane support.

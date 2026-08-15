@@ -65,14 +65,14 @@ struct HttpServerConfig {
 }
 
 #[derive(Clone, Debug)]
-struct PostLimiter {
+pub(crate) struct PostLimiter {
     limit: usize,
     window: Duration,
     entries: Arc<Mutex<HashMap<String, (Instant, usize)>>>,
 }
 
 impl PostLimiter {
-    fn new(limit: usize, window: Duration) -> Self {
+    pub(crate) fn new(limit: usize, window: Duration) -> Self {
         Self {
             limit,
             window,
@@ -280,17 +280,12 @@ impl HttpServerRuntimeSupervisor {
         let supervisor = self.clone();
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
-            let handler: AcceptedServerHandler = Arc::new(move |connection| {
-                let target_host = config.target_host.clone();
-                let target_port = config.target_port;
-                let policy = config.policy.clone();
-                let limiter = config.post_limiter.clone();
-                Box::pin(async move {
-                    let _ =
-                        handle_connection(connection, target_host, target_port, policy, limiter)
-                            .await;
-                })
-            });
+            let handler = make_accepted_handler(
+                config.target_host.clone(),
+                config.target_port,
+                config.policy.clone(),
+                config.post_limiter.clone(),
+            );
             let result = std::panic::AssertUnwindSafe(run_accepted_server(
                 AcceptedServerRuntimeConfig {
                     name: config.name,
@@ -374,6 +369,25 @@ async fn handle_connection(
         limiter,
     )
     .await
+}
+
+/// Build the accepted-stream handler used by both `httpserver` and the
+/// composed `httpbidirserver` backend. Keeping this seam here ensures the
+/// composite cannot accidentally grow a second HTTP server filter path.
+pub(crate) fn make_accepted_handler(
+    target_host: String,
+    target_port: u16,
+    policy: HttpServerPolicy,
+    limiter: PostLimiter,
+) -> AcceptedServerHandler {
+    Arc::new(move |connection| {
+        let target_host = target_host.clone();
+        let policy = policy.clone();
+        let limiter = limiter.clone();
+        Box::pin(async move {
+            let _ = handle_connection(connection, target_host, target_port, policy, limiter).await;
+        })
+    })
 }
 
 async fn handle_http_stream<R, W>(

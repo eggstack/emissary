@@ -1,7 +1,7 @@
 # I2PControl TunnelManager
 
-Status: M066 IRC runtime closure accepted; lifecycle reconciliation remains
-closed against the pinned Proposal 170 revision
+Status: M070 HTTP bidirectional runtime closure accepted; lifecycle
+reconciliation remains closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
 Wire/CRUD/persistence evidence is distinct from runtime data-plane support.
@@ -15,9 +15,9 @@ The TunnelManager handler implements the `TunnelManager` JSON-RPC method for all
 - Lifecycle dispatch (start, stop, restart) through the backend registry
 - Ownership enforcement for startup-managed tunnels
 - Real control-plane lifecycle for generic `client` and `server`, filtered
-  `ircclient`/`ircserver`, accepted-stream filtered `httpserver`, and bounded
-  HTTP/CONNECT client proxies; explicit unsupported behavior remains for the
-  other five specialized types
+  `ircclient`/`ircserver`, accepted-stream filtered `httpserver`, the composed
+  `httpbidirserver`, and bounded HTTP/CONNECT client proxies; explicit
+  unsupported behavior remains for the two Streamr types
 
 Production inventory is the deterministic union of startup-configured generic
 client/server definitions and persisted control-plane definitions. Startup
@@ -48,12 +48,13 @@ for the IRC family and M067 consumes them for HTTP. `ircclient` uses one bounded
 line-oriented filter for both traffic directions; `ircserver` filters
 registration before connecting to loopback; `httpserver` normalizes bounded
 HTTP headers before connecting to loopback and filters response fingerprints.
-The other five specialized tunnel families remain explicit unsupported
-backends until their own security/filter milestones close.
+The two Streamr tunnel families remain explicit unsupported backends until M071
+closes.
 
 After the durable definition and server-identity stores load, `StartOnLoad` is
 reconciled only for control-plane-owned `client`, `httpclient`, `connectclient`,
-`ircclient`, `server`, `httpserver`, and `ircserver`
+`ircclient`, `socks`, `socksirc`, `server`, `httpserver`, `httpbidirserver`, and
+`ircserver`
 definitions. Each start is isolated; a failed definition remains stopped and
 does not prevent the service or other eligible definitions from starting.
 Unsupported and startup-managed definitions are never auto-started.

@@ -19,8 +19,8 @@
 use std::{collections::HashMap, sync::Arc};
 
 use super::TunnelBackend;
-use crate::i2pcontrol::address_book_runtime::RuntimeAddressBookHandle;
 use crate::i2pcontrol::{
+    address_book_runtime::RuntimeAddressBookHandle,
     domain::tunnel::{TunnelType, ALL_TUNNEL_ACTIONS, ALL_TUNNEL_TYPES},
     server_secret_store::ServerDestinationStore,
 };
@@ -196,7 +196,12 @@ pub fn create_production_registry_with_server_store_and_address_book(
     )) as Arc<dyn TunnelBackend>;
     let http_server = Arc::new(super::http_server::HttpServerTunnelBackend::new(
         sam_tcp_port,
+        server_store.clone(),
+    )) as Arc<dyn TunnelBackend>;
+    let http_bidir = Arc::new(super::http_bidir::HttpBidirServerTunnelBackend::new(
+        sam_tcp_port,
         server_store,
+        address_book.clone(),
     )) as Arc<dyn TunnelBackend>;
     let http_client = Arc::new(match address_book.clone() {
         Some(address_book) => super::http_client::HttpClientTunnelBackend::new(sam_tcp_port)
@@ -231,6 +236,8 @@ pub fn create_production_registry_with_server_store_and_address_book(
                 irc_server.clone()
             } else if tt == TunnelType::HttpServer {
                 http_server.clone()
+            } else if tt == TunnelType::HttpBidirServer {
+                http_bidir.clone()
             } else if tt == TunnelType::HttpClient {
                 http_client.clone()
             } else if tt == TunnelType::ConnectClient {

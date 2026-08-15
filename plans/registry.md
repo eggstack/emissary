@@ -29,7 +29,7 @@ Canonical direction:
 |---|---|---|---|---|
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no containment corrective handoff | M061 source containment and M062/M063 dependency containment remain accepted authorities |
-| I2PControl Proposal 170 tunnel runtime completion | active; M064-M069 closed; M070 ready | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M070 — HTTP bidirectional server composition | M071 is dependency-ready but not the next registered handoff; M072 remains blocked on later family closure |
+| I2PControl Proposal 170 tunnel runtime completion | active; M064-M070 closed; M071 ready | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M071 — Streamr client/server tunnels | M072 remains blocked on M071 closure |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -49,7 +49,7 @@ Exactly one plan is currently registered as dependency-ready:
 
 | Handoff | Status | Plan | Objective |
 |---|---|---|---|
-| M070 — HTTP bidirectional server composition | ready | `plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md` | compose the closed HTTP server and client runtime/filter halves |
+| M071 — Streamr client/server | ready | `plans/implementation/i2pcontrol-proposal-170/071-streamr-client-server-tunnels.md` | implement bounded Streamr client/server datagram runtimes |
 
 Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered as ready. Future handoffs are prewritten but remain blocked until their hard dependencies close.
 
@@ -61,11 +61,11 @@ Per `plans/003-planning-process.md`, only the next dependency-ready implementati
 | M067 — HTTP server | closed | `plans/implementation/i2pcontrol-proposal-170/067-http-server-tunnel.md` | M065 closed; closure accepted |
 | M068 — HTTP client + CONNECT | closed | `plans/implementation/i2pcontrol-proposal-170/068-http-client-and-connect-tunnels.md` | M065 closed; closure accepted |
 | M069 — SOCKS + SOCKS-IRC | closed | `plans/implementation/i2pcontrol-proposal-170/069-socks-and-socks-irc-tunnels.md` | M065 + M066 closed; closure accepted |
-| M070 — HTTP bidirectional server composition | ready | `plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md` | M067 + M068 closed |
-| M071 — Streamr client/server | blocked — dependency-ready but not the next registered handoff | `plans/implementation/i2pcontrol-proposal-170/071-streamr-client-server-tunnels.md` | M065 closed |
+| M070 — HTTP bidirectional server composition | closed | `plans/implementation/i2pcontrol-proposal-170/070-http-bidirectional-server-composition.md` | M067 + M068 closed; closure accepted |
+| M071 — Streamr client/server | ready | `plans/implementation/i2pcontrol-proposal-170/071-streamr-client-server-tunnels.md` | M065 closed |
 | M072 — integrated tunnel-runtime reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/072-tunnel-runtime-completion-reclosure.md` | M066-M071 closed |
 
-After M069 closes, M070 and M071 are dependency-ready. Project convention registers M070 as the next handoff. M071 remains unregistered until M070 is handled, and M072 waits for every runtime-family milestone.
+M070 is closed and M071 is now the next registered handoff. M072 remains blocked until M071 closes.
 
 ## Tunnel-runtime security boundary
 
@@ -152,8 +152,8 @@ Do not add hosted CI jobs, release/publishing machinery, coverage gates, fuzz in
 ## Registry maintenance rules
 
 1. Only the next dependency-ready plan is normally marked/registered ready.
-2. M064-M069 are closed; M070 is the current dependency-ready handoff.
-3. After M069, M070/M071 are dependency-ready independently; registry should reflect whichever handoff(s) are actually assigned/active without rewriting future plan requirements.
+2. M064-M070 are closed; M071 is the current dependency-ready handoff.
+3. After M070 closes, M071 is the next registered handoff; M072 remains blocked until M071 closes.
 4. Preserve ADR-0003 scope: implement only the ten pinned Proposal 170 families, not adjacent tunnel/protocol features.
 5. Keep new specialized runtime/filter code under I2PControl wherever technically possible.
 6. No M065-M072 plan may add a new `emissary-core/**` production path without stopping and creating separate architecture/corrective planning.

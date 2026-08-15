@@ -428,6 +428,7 @@ fn is_authorized_tunnel_runtime_path(path: &str) -> bool {
             | "emissary-cli/src/i2pcontrol/backends/http_client.rs"
             | "emissary-cli/src/i2pcontrol/backends/socks.rs"
             | "emissary-cli/src/i2pcontrol/backends/socks_irc.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_bidir.rs"
     )
 }
 
@@ -440,6 +441,7 @@ fn is_authorized_m065_path(path: &str) -> bool {
             | "docs/i2pcontrol/inspection-architecture.md"
             | "docs/i2pcontrol/proposal-170-support.md"
             | "docs/i2pcontrol/tunnel-manager.md"
+            | "docs/i2pcontrol/tunnel-backends.md"
             | "plans/closure/i2pcontrol-proposal-170/064-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/065-closure.md"
             | "emissary-cli/src/i2pcontrol/backends/mod.rs"
@@ -485,6 +487,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/063-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/066-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/069-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/070-closure.md"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }

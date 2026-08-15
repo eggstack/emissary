@@ -196,6 +196,25 @@ pub const HTTP_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     CustomOptionPolicy::Reject,
 );
 
+/// The composed HTTP bidirectional server accepts the union of the already
+/// implemented server and local-client typed fields. Outproxy fields are not
+/// part of this capability declaration and are rejected by its backend before
+/// any session or listener allocation.
+pub const HTTP_BIDIR_SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
+    &["TargetPort", "ListenPort"],
+    &[],
+    &[
+        "ListenInterface",
+        "HostingDestination",
+        "AccessList",
+        "HttpHost",
+        "ProxyUsername",
+        "ProxyPassword",
+    ],
+    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Reject,
+);
+
 /// Proposal 170 CONNECT proxy options consumed by the control-plane client.
 pub const CONNECT_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &["ListenPort"],

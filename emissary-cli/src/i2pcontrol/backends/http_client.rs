@@ -295,8 +295,50 @@ impl RuntimeSupervisor {
 }
 
 fn make_handler(config: HttpClientConfig) -> ClientConnectionHandler {
+    make_handler_parts(
+        config.outproxy,
+        config.proxy_username,
+        config.proxy_password,
+        config.require_auth,
+        config.policy,
+        config.address_book,
+    )
+}
+
+/// Build the M068 HTTP client handler with direct-I2P-only routing. The
+/// composed backend uses this seam instead of reimplementing request parsing,
+/// header sanitization, or response relay behavior.
+pub(crate) fn make_no_outproxy_handler(
+    proxy_username: Option<String>,
+    proxy_password: Option<String>,
+    require_auth: bool,
+    policy: HttpClientPolicy,
+    address_book: Option<Arc<RuntimeAddressBookHandle>>,
+) -> ClientConnectionHandler {
+    make_handler_parts(
+        None,
+        proxy_username,
+        proxy_password,
+        require_auth,
+        policy,
+        address_book,
+    )
+}
+
+fn make_handler_parts(
+    outproxy: Option<OutproxyTarget>,
+    proxy_username: Option<String>,
+    proxy_password: Option<String>,
+    require_auth: bool,
+    policy: HttpClientPolicy,
+    address_book: Option<Arc<RuntimeAddressBookHandle>>,
+) -> ClientConnectionHandler {
     Arc::new(move |stream, connector| {
-        let config = config.clone();
+        let outproxy = outproxy.clone();
+        let proxy_username = proxy_username.clone();
+        let proxy_password = proxy_password.clone();
+        let policy = policy.clone();
+        let address_book = address_book.clone();
         Box::pin(async move {
             let mut reader = BufReader::new(stream);
             let Ok(header_block) = read_header_block(&mut reader).await else {
@@ -304,31 +346,30 @@ fn make_handler(config: HttpClientConfig) -> ClientConnectionHandler {
                 let _ = write_proxy_error(&mut stream, 400, "Bad Request").await;
                 return;
             };
-            let Ok(request) = HttpClientRequest::parse(&header_block, config.outproxy.clone())
-            else {
+            let Ok(request) = HttpClientRequest::parse(&header_block, outproxy.clone()) else {
                 let mut stream = reader.into_inner();
                 let _ = write_proxy_error(&mut stream, 400, "Bad Request").await;
                 return;
             };
-            if config.require_auth
+            if require_auth
                 && !credentials_match(
                     request.proxy_authorization.as_deref(),
-                    config.proxy_username.as_deref().unwrap_or_default(),
-                    config.proxy_password.as_deref().unwrap_or_default(),
+                    proxy_username.as_deref().unwrap_or_default(),
+                    proxy_password.as_deref().unwrap_or_default(),
                 )
             {
                 let mut stream = reader.into_inner();
                 let _ = write_proxy_error(&mut stream, 407, "Proxy Authentication Required").await;
                 return;
             }
-            let Ok(mut target) = request.target(config.outproxy.clone()) else {
+            let Ok(mut target) = request.target(outproxy.clone()) else {
                 let mut stream = reader.into_inner();
                 let _ = write_proxy_error(&mut stream, 403, "Forbidden").await;
                 return;
             };
             let destination = match &mut target {
                 HttpTarget::I2p { destination, .. } => {
-                    match resolve_destination(destination, config.address_book.as_ref()).await {
+                    match resolve_destination(destination, address_book.as_ref()).await {
                         Some(resolved) => {
                             *destination = resolved.clone();
                             resolved
@@ -342,7 +383,6 @@ fn make_handler(config: HttpClientConfig) -> ClientConnectionHandler {
                 }
                 HttpTarget::Clearnet { outproxy, .. } => outproxy.destination.clone(),
             };
-            let policy = config.policy.clone();
             let Ok(serialized) = request.serialize(&destination, &target, &policy) else {
                 let mut stream = reader.into_inner();
                 let _ = write_proxy_error(&mut stream, 400, "Bad Request").await;

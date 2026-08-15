@@ -800,7 +800,10 @@ impl ProductionTunnelManagerControl {
             .filter(|definition| {
                 matches!(
                     definition.tunnel_type,
-                    TunnelType::Server | TunnelType::HttpServer | TunnelType::IrcServer
+                    TunnelType::Server
+                        | TunnelType::HttpServer
+                        | TunnelType::HttpBidirServer
+                        | TunnelType::IrcServer
                 )
             })
             .filter_map(|definition| {
@@ -864,6 +867,7 @@ impl ProductionTunnelManagerControl {
                         | TunnelType::ConnectClient
                         | TunnelType::Server
                         | TunnelType::HttpServer
+                        | TunnelType::HttpBidirServer
                         | TunnelType::IrcServer
                 )
             {
@@ -950,7 +954,10 @@ impl ProductionTunnelManagerControl {
             Ok(()) => {
                 if matches!(
                     definition.tunnel_type,
-                    TunnelType::Server | TunnelType::HttpServer | TunnelType::IrcServer
+                    TunnelType::Server
+                        | TunnelType::HttpServer
+                        | TunnelType::HttpBidirServer
+                        | TunnelType::IrcServer
                 ) {
                     let status = backend.inspect(&definition);
                     let Some(destination) = status.destination else {
@@ -981,7 +988,10 @@ impl ProductionTunnelManagerControl {
             definition.runtime_state = status.runtime_state;
             if matches!(
                 definition.tunnel_type,
-                TunnelType::Server | TunnelType::HttpServer | TunnelType::IrcServer
+                TunnelType::Server
+                    | TunnelType::HttpServer
+                    | TunnelType::HttpBidirServer
+                    | TunnelType::IrcServer
             ) {
                 let public_destination = if status.destination.is_some() {
                     status.destination
@@ -1021,7 +1031,10 @@ impl ProductionTunnelManagerControl {
     ) -> Result<TunnelDefinition, String> {
         if !matches!(
             definition.tunnel_type,
-            TunnelType::Server | TunnelType::HttpServer | TunnelType::IrcServer
+            TunnelType::Server
+                | TunnelType::HttpServer
+                | TunnelType::HttpBidirServer
+                | TunnelType::IrcServer
         ) {
             return Ok(definition);
         }

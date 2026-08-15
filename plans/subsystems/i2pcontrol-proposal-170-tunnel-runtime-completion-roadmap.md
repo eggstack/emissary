@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Runtime Completion Roadmap
 
-Status: active; M064-M069 closed; M070 is the next registered handoff
+Status: active; M064-M070 closed; M071 is the next registered handoff
 
 Planning production baseline: `a1296b018ce98d26a019bd5064dff9f4b47e0ad6` — current production head reviewed before this planning series
 
@@ -32,7 +32,7 @@ The target production registry evolves monotonically:
 ```text
 current:
   client, server = real
-        remaining eight = explicit UnsupportedTunnelBackend
+        remaining two = explicit UnsupportedTunnelBackend (Streamr)
 
 phase progress:
   each family replaces only its own stub after independent closure
@@ -305,7 +305,7 @@ Status: closed; hard dependency M064 is closed. Closure:
 
 Add bounded reusable control-plane primitives for local listener ownership, accepted-stream server ownership, per-name task generation/cancellation where not already reusable, peer identity delivery to filters, and deterministic per-backend option-capability validation. Keep all production work under `i2pcontrol`.
 
-Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type. M066-M069 are now closed; M070 is the next registered handoff.
+Exit: test backends demonstrate outgoing/accepted stream lifecycle, cancellation, peer identity, and fail-before-allocation option rejection without registering a previously unsupported production type. M066-M070 are now closed; M071 is the next registered handoff.
 
 ### M066 — IRC client/server family
 
@@ -355,7 +355,8 @@ Compose closed M067 and M068 runtime/filter components into `httpbidirserver` wi
 
 Exit: no third HTTP parser/filter implementation exists; lifecycle cancels both halves exactly.
 
-Status: ready; M067, M068, and M069 are closed. M070 is the next registered handoff.
+Status: closed; M067, M068, and M069 are closed. Closure:
+`plans/closure/i2pcontrol-proposal-170/070-closure.md`.
 
 ### M071 — Streamr client/server
 
@@ -365,7 +366,7 @@ Implement bounded datagram producer/consumer behavior, subscription refresh/expi
 
 Exit: both Streamr types real with bounded state and no amplification/unbounded subscription issue.
 
-Status: blocked — dependency-ready but not the next registered handoff.
+Status: ready; M065-M070 are closed and M071 is the next registered handoff.
 
 ### M072 — Integrated tunnel-runtime reclosure
 

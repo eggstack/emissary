@@ -93,12 +93,13 @@ accepted integrated reclosure and final 43-row source audit.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because five of the 43 RouterInfo additions lack
-bounded authoritative sources and three specialized tunnel data planes remain
+bounded authoritative sources and the two Streamr tunnel data planes remain
 explicit unsupported runtimes. M066 adds real filtered `ircclient` and
 `ircserver`, M067 adds filtered accepted-stream `httpserver`, M068 adds real
-`httpclient` and `connectclient`, and M069 adds bounded `socks` and filtered
-`socksirc`; the unavailable rows are router news, banned peers, transit-15s,
-and v4/v6 network-error.
+`httpclient` and `connectclient`, M069 adds bounded `socks` and filtered
+`socksirc`, and M070 adds the deprecated composed `httpbidirserver`; the
+unavailable rows are router news, banned peers, transit-15s, and v4/v6
+network-error.
 
 ## M038 live-runtime evidence
 
@@ -149,8 +150,7 @@ Retained candidate evidence includes:
   notification execution, and strict request IDs;
 - exact Proposal 170 direct method/selector/action/type parsing;
 - literal external-contract fixtures;
-- typed twelve-tunnel administrative inventory and exhaustive unsupported
-  backend registry;
+- typed twelve-tunnel administrative inventory and exhaustive backend registry;
 - exact TunnelManager result shapes, validation, atomic persistence, and secret
   handling;
 - operational control-plane-owned generic `client` and `server` runtime

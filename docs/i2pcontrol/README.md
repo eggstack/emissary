@@ -26,9 +26,9 @@ M039 independently reviewed the complete M031–M038 final head and formally
 closed the authorized workstream as partial support.
 
 The expected bounded final status remains `partial Proposal 170 support` while
-missing tunnel data planes remain explicit unsupported runtimes. M065 closes the
-common runtime/option foundation only; it does not claim any newly operational
-tunnel type. The canonical
+the two Streamr tunnel data planes remain explicit unsupported runtimes. M066
+through M070 close the IRC, HTTP, CONNECT, SOCKS, and bidirectional HTTP
+families; M071 owns the remaining Streamr capability. The canonical
 43-addition matrix currently contains 37 available selectors, one
 protocol-permitted neutral selector, and five unavailable selectors; the
 unavailable rows are router news, banned peers, transit bandwidth over 15
@@ -172,7 +172,7 @@ Retained implementation includes:
 - standard authentication and JSON-RPC behavior;
 - exact Proposal 170 method/selector/action/type parsers and literal fixtures;
 - durable generation stores and atomic TunnelManager mutation;
-- explicit unsupported backends for missing tunnel data planes;
+- explicit unsupported backends for the remaining Streamr data planes;
 - M065 bounded I2PControl-owned client-listener and accepted-server runtime primitives;
 - M065 backend-local option capability validation that rejects unsupported runtime options before
   listener/session allocation and redacts option values;
@@ -227,11 +227,10 @@ false, empty, or semantically adjacent values.
 
 ## Missing tunnel data planes
 
-This workstream does not implement missing HTTP, IRC, SOCKS-IRC, CONNECT,
-Streamr, bidirectional, or other listener/destination/LeaseSet/traffic paths.
-The M065 primitives are lifecycle/filter seams for those future backends, not
-standalone protocol implementations. Their definitions may parse and persist,
-but start/restart must fail explicitly until each family closes its own plan.
+The remaining unsupported data plane is Streamr. The M065 primitives and the
+closed M066-M070 family backends provide bounded lifecycle/filter seams for the
+implemented listener, destination, and traffic paths. Streamr definitions may
+parse and persist, but start/restart must fail explicitly until M071 closes.
 Stop must remain safe, and no unsupported type may report running or allocate a
 runtime resource.
 

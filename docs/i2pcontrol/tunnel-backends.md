@@ -1,7 +1,7 @@
 # I2PControl Tunnel Backends
 
-Status: M039 final-head review accepted; client/server lifecycle implemented;
-other families remain unsupported
+Status: M070 closure accepted; ten tunnel families have bounded runtime
+backends; only Streamr remains unsupported
 
 This document describes the tunnel backend interface and registry in Emissary.
 
@@ -72,10 +72,11 @@ Lookup is total for valid tunnel types. The registry is constructed once at star
 
 `create_default_registry()` maps all 12 tunnel types to
 `UnsupportedTunnelBackend` for tests and dependency-light compositions. The
-production constructor uses `create_production_registry(sam_tcp_port)`, which
-registers real backends for `client` and `server` and retains unsupported
-backends for the other ten types. The composed server backend uses a fixed
-`server-destinations/` store below the I2PControl state root.
+production constructor with a server store registers the closed real backends
+for the generic, IRC, HTTP, CONNECT, SOCKS, and bidirectional HTTP families
+and retains unsupported backends only for Streamr. The composed server
+backends use a fixed `server-destinations/` store below the I2PControl state
+root.
 
 ```rust
 pub fn create_default_registry() -> Result<TunnelBackendRegistry, RegistryError> {
@@ -143,20 +144,25 @@ All 12 tunnel types are mapped to backends:
 | Type | Category | Backend |
 |---|---|---|
 | `client` | Client | Yosemite streaming client with per-name supervisor |
-| `httpclient` | Client | Unsupported |
-| `ircclient` | Client | Unsupported |
-| `socks` | Client | Unsupported |
-| `socksirc` | Client | Unsupported |
-| `connectclient` | Client | Unsupported |
+| `httpclient` | Client | Bounded HTTP client proxy with direct-I2P routing and explicit I2P outproxy support |
+| `ircclient` | Client | Bounded IRC anonymity filter over a Yosemite stream |
+| `socks` | Client | Bounded SOCKS4a/SOCKS5 CONNECT proxy |
+| `socksirc` | Client | SOCKS CONNECT composed with the IRC anonymity filter |
+| `connectclient` | Client | Strict HTTP CONNECT proxy with direct-I2P routing and explicit I2P outproxy support |
 | `streamrclient` | Client | Unsupported |
 | `server` | Server | Yosemite streaming server with per-name supervisor and persistent destination identity |
-| `httpserver` | Server | Unsupported |
-| `httpbidirserver` | Server | Unsupported |
-| `ircserver` | Server | Unsupported |
+| `httpserver` | Server | Bounded filtered accepted-stream HTTP server |
+| `httpbidirserver` | Server | Deprecated composed filtered HTTP server plus direct-I2P local proxy; no clearnet outproxy |
+| `ircserver` | Server | Bounded filtered accepted-stream IRC server |
 | `streamrserver` | Server | Unsupported |
 
-HTTP, IRC, SOCKS-IRC, CONNECT, Streamr, and bidirectional HTTP data planes are
-deferred outside the I2PControl scope and remain explicit unsupported stubs.
+Only the two Streamr datagram types remain explicit unsupported stubs. The
+deprecated `httpbidirserver` type is a composition of the accepted HTTP server
+and HTTP client paths: its inbound side uses the HTTP server filter and its
+local proxy side uses the HTTP client sanitizer with outproxy routing disabled.
+It owns both halves under one lifecycle generation and keeps one persistent
+server destination identity; its client SAM session is a non-published sibling
+session and never creates a second persistent destination.
 
 The generic server maps `Port`/`TargetPort` to the existing Yosemite
 `STREAM FORWARD` local port and accepts only loopback target-host semantics.

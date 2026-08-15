@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel-runtime completion phase active; M064-M069 closed; M070 next
+Status: partial Proposal 170 support; tunnel-runtime completion phase active; M064-M070 closed; M071 next
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -42,7 +42,7 @@ The implementation target is:
 
 ## Current handoff
 
-M069 is closed. M070 is the next registered dependency-ready implementation plan:
+M070 is closed. M071 is the next registered dependency-ready implementation plan:
 
 - `065-i2pcontrol-tunnel-runtime-primitives.md` — **closed**; closure:
   `plans/closure/i2pcontrol-proposal-170/065-closure.md`.
@@ -54,7 +54,9 @@ M069 is closed. M070 is the next registered dependency-ready implementation plan
   `plans/closure/i2pcontrol-proposal-170/068-closure.md`.
 - `069-socks-and-socks-irc-tunnels.md` — **closed**; closure:
   `plans/closure/i2pcontrol-proposal-170/069-closure.md`.
-- `070-http-bidirectional-server-composition.md` — **ready**.
+- `070-http-bidirectional-server-composition.md` — **closed**; closure:
+  `plans/closure/i2pcontrol-proposal-170/070-closure.md`.
+- `071-streamr-client-server-tunnels.md` — **ready**.
 
 M064 repairs the existing feature-disabled/no-events unused-parameter regression in `emissary-core/src/events.rs` and establishes a clean baseline before new tunnel runtime work. It adds no capability.
 
@@ -72,11 +74,11 @@ Per `plans/003-planning-process.md`, future plans are prewritten for continuity 
 | M067 | closed | secure filtered `httpserver` | M065 |
 | M068 | closed | real `httpclient` + strict `connectclient` | M065 |
 | M069 | closed | SOCKS4a/5 CONNECT + `socksirc` composed with M066 filter | M065, M066 |
-| M070 | ready | `httpbidirserver` composition of M067/M068 | M067, M068 |
-| M071 | blocked — dependency-ready but not the next registered handoff | bounded Streamr client/server datagram family | M065 |
+| M070 | closed | `httpbidirserver` composition of M067/M068 | M067, M068 |
+| M071 | ready | bounded Streamr client/server datagram family | M065 |
 | M072 | blocked | integrated twelve-type runtime/security/containment reclosure | M066-M071 |
 
-After M069 closes, M070 and M071 are dependency-ready successors. Project convention registers only M070 as the next handoff; M071 remains available but unregistered, and M072 waits for all families.
+M071 is now the next registered handoff. M072 remains blocked until M071 closes.
 
 ## Security-critical family rules
 

@@ -14,9 +14,9 @@ The TunnelManager handler implements the `TunnelManager` JSON-RPC method for all
 - Compatibility `List` and capitalized action values
 - Lifecycle dispatch (start, stop, restart) through the backend registry
 - Ownership enforcement for startup-managed tunnels
-- Real control-plane lifecycle for generic `client` and `server`, plus filtered
-  `ircclient` and registration-filtered `ircserver`; explicit unsupported
-  behavior remains for the other eight specialized types
+- Real control-plane lifecycle for generic `client` and `server`, filtered
+  `ircclient`/`ircserver`, and accepted-stream filtered `httpserver`; explicit
+  unsupported behavior remains for the other seven specialized types
 
 Production inventory is the deterministic union of startup-configured generic
 client/server definitions and persisted control-plane definitions. Startup
@@ -43,14 +43,16 @@ the client seam owns one outbound Yosemite session, a validated local listener,
 and bounded per-connection tasks; the accepted-server seam owns one persistent
 session and passes the SAM-derived public peer identity plus stream to a
 protocol handler before any local target connection. M066 consumes those seams
-for the IRC family. `ircclient` uses one bounded line-oriented filter for both
-traffic directions; `ircserver` filters registration before connecting to
-loopback. The other eight specialized tunnel families remain explicit
-unsupported backends until their own security/filter milestones close.
+for the IRC family and M067 consumes them for HTTP. `ircclient` uses one bounded
+line-oriented filter for both traffic directions; `ircserver` filters
+registration before connecting to loopback; `httpserver` normalizes bounded
+HTTP headers before connecting to loopback and filters response fingerprints.
+The other seven specialized tunnel families remain explicit unsupported
+backends until their own security/filter milestones close.
 
 After the durable definition and server-identity stores load, `StartOnLoad` is
 reconciled only for control-plane-owned generic `client`, `ircclient`,
-`server`, and `ircserver`
+`server`, `httpserver`, and `ircserver`
 definitions. Each start is isolated; a failed definition remains stopped and
 does not prevent the service or other eligible definitions from starting.
 Unsupported and startup-managed definitions are never auto-started.
@@ -365,6 +367,15 @@ status/error while preserving durable definitions.
 | `i2p.tunnel.sslCertificate` | string | SSL certificate path |
 | `i2p.tunnel.sslKey` | string (redacted) | SSL key path |
 | `i2p.tunnel.httpHost` | string | HTTP host |
+
+The `httpserver` backend additionally supports loopback-only `TargetHost`/`Host`,
+`TargetPort`/`Port`, `WebsiteHostname`/`SpoofedHost`, access-list and
+referer/User-Agent policy, bounded `MaxConcurrentConns`, and peer-keyed
+`PostLimit`/`PostLimitTime`. It rejects TLS termination, compression/custom
+options, proxy/outproxy settings, upgrades, and other recognized options it
+does not consume before session allocation. Request headers are normalized
+before the local target is connected, and response fingerprint headers are
+removed before forwarding.
 
 ### Proxy options
 

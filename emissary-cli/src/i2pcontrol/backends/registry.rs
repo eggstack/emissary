@@ -180,6 +180,10 @@ pub fn create_production_registry_with_server_store(
         as Arc<dyn TunnelBackend>;
     let irc_server = Arc::new(super::irc_server::IrcServerTunnelBackend::new(
         sam_tcp_port,
+        server_store.clone(),
+    )) as Arc<dyn TunnelBackend>;
+    let http_server = Arc::new(super::http_server::HttpServerTunnelBackend::new(
+        sam_tcp_port,
         server_store,
     )) as Arc<dyn TunnelBackend>;
     let backends: Vec<Arc<dyn TunnelBackend>> = ALL_TUNNEL_TYPES
@@ -193,6 +197,8 @@ pub fn create_production_registry_with_server_store(
                 irc_client.clone()
             } else if tt == TunnelType::IrcServer {
                 irc_server.clone()
+            } else if tt == TunnelType::HttpServer {
+                http_server.clone()
             } else {
                 Arc::new(super::unsupported::UnsupportedTunnelBackend::new(tt))
                     as Arc<dyn TunnelBackend>
@@ -308,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    fn production_registry_has_only_client_and_server_as_real_backends() {
+    fn production_registry_has_only_known_real_backends() {
         let registry = create_production_registry(7656).unwrap();
         assert_eq!(registry.len(), ALL_TUNNEL_TYPES.len());
         assert_eq!(
@@ -319,8 +325,14 @@ mod tests {
             registry.get(TunnelType::Server).tunnel_type(),
             TunnelType::Server
         );
+        assert_eq!(
+            registry.get(TunnelType::HttpServer).tunnel_type(),
+            TunnelType::HttpServer
+        );
         for &tunnel_type in ALL_TUNNEL_TYPES.iter().filter(|&&tunnel_type| {
-            tunnel_type != TunnelType::Client && tunnel_type != TunnelType::Server
+            tunnel_type != TunnelType::Client
+                && tunnel_type != TunnelType::Server
+                && tunnel_type != TunnelType::HttpServer
         }) {
             assert!(matches!(
                 registry.get(tunnel_type).inspect(&test_definition(tunnel_type)).runtime_state,

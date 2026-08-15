@@ -28,7 +28,10 @@ impl fmt::Debug for TrustedPeerIdentity {
 impl TrustedPeerIdentity {
     fn from_stream(stream: &Stream) -> Option<Self> {
         let destination = stream.remote_destination();
-        if destination.is_empty() || destination.chars().any(char::is_control) {
+        if destination.is_empty()
+            || destination.len() > 64 * 1024
+            || destination.chars().any(char::is_control)
+        {
             return None;
         }
         Some(Self {

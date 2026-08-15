@@ -21,6 +21,7 @@ pub mod fake;
 pub mod filters;
 pub mod irc_client;
 pub mod irc_server;
+pub mod http_server;
 pub mod options;
 pub mod registry;
 pub mod runtime;

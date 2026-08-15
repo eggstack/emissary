@@ -93,10 +93,11 @@ accepted integrated reclosure and final 43-row source audit.
 
 Expected final disposition under the authorized scope remains
 `partial Proposal 170 support` because five of the 43 RouterInfo additions lack
-bounded authoritative sources and eight specialized tunnel data planes remain
+bounded authoritative sources and seven specialized tunnel data planes remain
 explicit unsupported runtimes. M066 adds real filtered `ircclient` and
-`ircserver` control-plane runtimes; the unavailable rows are router news, banned
-peers, transit-15s, and v4/v6 network-error.
+`ircserver` control-plane runtimes, and M067 adds a filtered accepted-stream
+`httpserver`; the unavailable rows are router news, banned peers, transit-15s,
+and v4/v6 network-error.
 
 ## M038 live-runtime evidence
 
@@ -161,7 +162,8 @@ Retained candidate evidence includes:
 - M065 bounded I2PControl-owned client-listener and accepted-server runtime seams;
 - M065 deterministic backend option-capability validation with secret-safe errors;
 - M066 bounded IRC parsing/filtering, filtered `ircclient`, and registration-filtered
-  `ircserver` runtimes with trusted peer-derived registration identity.
+  `ircserver` runtimes with trusted peer-derived registration identity;
+- M067 bounded HTTP request normalization and response filtering for `httpserver`.
 
 M028 must not reimplement or broaden these areas.
 
@@ -212,7 +214,7 @@ lifecycle operations.
 
 The following other tunnel families remain intentionally out of scope:
 
-- HTTP client/server and bidirectional server;
+- HTTP client and bidirectional server;
 - SOCKS-IRC and CONNECT variants;
 - Streamr client/server;
 - any other missing listener, destination, LeaseSet, or traffic implementation.
@@ -221,6 +223,20 @@ Their definitions may parse and persist. Start/restart must return explicit
 not-implemented operation status; stop remains safe and inactive. They must not
 report running or open resources. M065's lifecycle seams are not registered as
 those tunnel types and do not change this status.
+
+### HTTP server runtime boundary
+
+`httpserver` is operational only through the I2PControl-owned accepted-stream
+runtime. It reads and bounds the request line/header block before opening the
+loopback target, rejects ambiguous Content-Length/Transfer-Encoding framing,
+obs-fold, upgrades, proxy identity, and spoofed `X-I2P-*` headers, then injects
+peer identity derived from the accepted SAM stream. Configured Host rewriting,
+access lists, proxy/referer/User-Agent policy, concurrent-connection limits, and
+peer-keyed POST/PUT/PATCH throttling are applied before local connection. Local
+response headers are parsed and identifying server/proxy headers are removed
+before the bounded response body is streamed back. TLS, compression, custom
+options, arbitrary target hosts, and unsupported Proposal 170 modes reject
+before destination/session allocation.
 
 ### IRC tunnel runtime boundary
 

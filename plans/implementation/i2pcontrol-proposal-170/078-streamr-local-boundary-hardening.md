@@ -1,6 +1,6 @@
 # M078 — Streamr Local Boundary Hardening
 
-Status: ready — hard dependencies M075-M077 closed; next registered handoff
+Status: closed — implementation and closure accepted
 
 Source roadmap:
 

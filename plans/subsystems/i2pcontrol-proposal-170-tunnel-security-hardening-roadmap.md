@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: planned corrective security work; M077 closed; M078 next; M079 blocked
+Status: planned corrective security work; M078 closed; M079 next
 
 Planning production baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
@@ -228,11 +228,13 @@ Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/077-closure.md`.
 
 Make local UDP producer/client targets loopback-only for this Proposal 170 implementation, reduce maximum subscribers to the Java reference ceiling of 10, preserve 60-second expiry/15-second refresh/1200-byte payload bound, and revalidate destination/control bounds.
 
-Status: ready; next registered handoff.
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/078-closure.md`.
 
 ### M079 — Integrated tunnel-security reclosure
 
 Independently re-audit all newly introduced tunnel families and the generic server after the corrective sequence. The workstream may not close with a high/medium anonymity, resource-exhaustion, option-truthfulness, containment, or lifecycle finding.
+
+Status: ready; next registered handoff.
 
 ## 10. Verification discipline
 

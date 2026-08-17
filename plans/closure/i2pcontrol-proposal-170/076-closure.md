@@ -13,6 +13,7 @@ Source roadmap:
 Implementation commit:
 
 - 3cf082e — feat(i2pcontrol): harden HTTP anonymity and POST throttling
+- f454e35 — fix(i2pcontrol): strip all forwarded identity headers
 
 ## 1. Disposition
 
@@ -30,7 +31,7 @@ or filter was introduced.
 |---|---|---|
 | Java parity response filtering | filters/http.rs::RESPONSE_FINGERPRINTS includes Date, Server, X-Powered-By, X-Runtime, Proxy, and Proxy-Connection; mixed-case table test | pass |
 | I2P+ non-framing anonymity denylist | Explicit lowercase table includes age/cache/provider/trace/HSTS and related fields; table-driven mixed-case test covers every entry | pass |
-| Common request proxy identity cannot reach backend | Expanded PROXY_IDENTITY and capture test cover Forwarded, Via, X-Forwarded-*, X-Real-IP, X-Client-IP, True-Client-IP, Cloudflare/Fastly/cluster names, and proxy names | pass |
+| Common request proxy identity cannot reach backend | Case-insensitive proxy-identity helper strips Forwarded, Via, the complete X-Forwarded-* namespace, X-Real-IP, X-Client-IP, True-Client-IP, Cloudflare/Fastly/cluster names, and proxy names; capture tests cover representative X-Forwarded-Proto/Port/Prefix variants | pass |
 | Deliberate privacy header decision | Priority and Sec-GPC are adopted in REQUEST_PRIVACY; request capture test and docs record their stripping as anonymity/fingerprinting policy | pass |
 | Spoofed I2P identity is replaced | Existing end-to-end local capture test verifies attacker X-I2P-* values do not survive and trusted Host/identity headers are rebuilt | pass |
 | Trusted identity output is bounded | MAX_TRUSTED_DESTINATION_TEXT = 524, derived from the 391-byte reference destination key-certificate form and padded I2P Base64; over-bound identity test fails before request construction/local connect | pass |
@@ -102,7 +103,9 @@ M077 is now unblocked by M076, marked ready in its handoff, and registered as
 the next dependency-ready plan. M078 remains blocked by the sequencing rule
 until M077 closes. M079 remains blocked until M074-M078 close. Independent
 source milestone M051 remains blocked by its accepted absence of substantive
-news/ban owners and is unaffected by M076.
+news/ban owners and is unaffected by M076. A post-closure registry audit after
+the X-Forwarded-* namespace correction found no additional dependency-ready
+successor or status transition.
 
 ## 6. Internal-only external interaction attestation
 

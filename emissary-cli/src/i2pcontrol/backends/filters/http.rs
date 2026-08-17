@@ -225,7 +225,7 @@ pub async fn read_and_sanitize_request<R: AsyncBufRead + Unpin>(
             || nominated.contains(name.as_str())
             || is_proxy_identity_header(&name)
             || REQUEST_PRIVACY.contains(&name.as_str())
-            || I2P_IDENTITY.contains(&name.as_str())
+            || is_i2p_identity_header(&name)
             || (eq(&name, "referer") && (policy.block_referers || !policy.allow_referer))
             || (eq(&name, "user-agent") && (policy.block_user_agents || !policy.allow_user_agent))
             || eq(&name, "host")
@@ -372,6 +372,11 @@ fn peer_allowed(peer: &str, policy: &HttpServerPolicy) -> bool {
 fn is_proxy_identity_header(name: &str) -> bool {
     let name = name.to_ascii_lowercase();
     PROXY_IDENTITY.contains(&name.as_str()) || name.starts_with("x-forwarded-")
+}
+
+fn is_i2p_identity_header(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    I2P_IDENTITY.contains(&name.as_str()) || name.starts_with("x-i2p-")
 }
 
 fn validate_trusted_destination(destination: &str) -> io::Result<()> {
@@ -778,7 +783,7 @@ mod tests {
     #[tokio::test]
     async fn removes_proxy_identity_and_adopted_request_privacy_headers() {
         let result = request(
-            b"GET / HTTP/1.1\r\nForwarded: for=10.0.0.1\r\nVia: proxy\r\nX-Forwarded-For: 10.0.0.2\r\nX-Forwarded-Host: evil\r\nX-Forwarded-Server: evil\r\nX-Forwarded-Proto: https\r\nX-Forwarded-Port: 443\r\nX-Forwarded-Prefix: /admin\r\nProxy: evil\r\nX-Real-IP: 10.0.0.3\r\nx-client-ip: 10.0.0.4\r\nTrue-Client-IP: 10.0.0.5\r\nCF-Connecting-IP: 10.0.0.6\r\nFastly-Client-IP: 10.0.0.7\r\nX-Cluster-Client-IP: 10.0.0.8\r\nPriority: u=1\r\nSec-GPC: 1\r\n\r\n",
+            b"GET / HTTP/1.1\r\nForwarded: for=10.0.0.1\r\nVia: proxy\r\nX-Forwarded-For: 10.0.0.2\r\nX-Forwarded-Host: evil\r\nX-Forwarded-Server: evil\r\nX-Forwarded-Proto: https\r\nX-Forwarded-Port: 443\r\nX-Forwarded-Prefix: /admin\r\nProxy: evil\r\nX-Real-IP: 10.0.0.3\r\nx-client-ip: 10.0.0.4\r\nTrue-Client-IP: 10.0.0.5\r\nCF-Connecting-IP: 10.0.0.6\r\nFastly-Client-IP: 10.0.0.7\r\nX-Cluster-Client-IP: 10.0.0.8\r\nX-I2P-Fake: attacker\r\nPriority: u=1\r\nSec-GPC: 1\r\n\r\n",
             &policy(),
         )
         .await
@@ -797,6 +802,7 @@ mod tests {
             "x-forwarded-proto",
             "x-forwarded-port",
             "x-forwarded-prefix",
+            "x-i2p-fake",
             "forwarded",
             "via",
             "proxy",

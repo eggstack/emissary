@@ -12,6 +12,7 @@ use super::{
 };
 
 const STOP_TIMEOUT: Duration = Duration::from_secs(5);
+pub const MAX_TRUSTED_PEER_DESTINATION_TEXT: usize = 524;
 
 /// Immutable public identity obtained from the accepted I2P stream.
 #[derive(Clone, PartialEq, Eq)]
@@ -31,8 +32,11 @@ impl TrustedPeerIdentity {
     fn from_stream(stream: &Stream) -> Option<Self> {
         let destination = stream.remote_destination();
         if destination.is_empty()
-            || destination.len() > 64 * 1024
-            || destination.chars().any(char::is_control)
+            || destination.len() > MAX_TRUSTED_PEER_DESTINATION_TEXT
+            || !destination.is_ascii()
+            || destination
+                .chars()
+                .any(|character| character.is_control() || character.is_whitespace())
         {
             return None;
         }

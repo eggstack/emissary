@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M076 closed; M077-M079 corrective work remains
+Status: partial Proposal 170 support; M079 tunnel-security reclosure closed
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -22,7 +22,9 @@ Tunnel-runtime reclosure:
 - M074: `plans/closure/i2pcontrol-proposal-170/074-closure.md` — closed;
 - M075: `plans/closure/i2pcontrol-proposal-170/075-closure.md` — closed;
 - M076: `plans/closure/i2pcontrol-proposal-170/076-closure.md` — closed;
-- M077: next registered ready security-hardening handoff.
+- M077: `plans/closure/i2pcontrol-proposal-170/077-closure.md` — closed;
+- M078: `plans/closure/i2pcontrol-proposal-170/078-closure.md` — closed;
+- M079: `plans/closure/i2pcontrol-proposal-170/079-closure.md` — closed.
 
 Closed handoffs:
 
@@ -90,8 +92,9 @@ The repository remains partial Proposal 170 support. M044 reviewed the earlier
 corrected final head and accepted that source/method disposition; the later
 tunnel-runtime security sequence added bounded admission, generic accepted
 server relay, HTTP anonymity, IRC lifetime, and Streamr local-boundary
-correctives. M077-M079 remain open, so the security-hardening phase is not yet
-closed.
+correctives. M079 independently reclosed the integrated final head, so the
+security-hardening phase is closed while the unrelated RouterInfo limitations
+remain.
 M039 remains a historical invalidated closure.
 
 M028 owns the status/feature-boundary correction. M030 owns the destination
@@ -421,7 +424,9 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M074 | closed | shared peer-aware server admission and rate-limit hardening |
 | M075 | closed | generic server accepted-stream raw relay hardening |
 | M076 | closed | HTTP anonymity/POST-throttle hardening |
-| M077 | ready | IRC lifetime and exhaustion hardening |
+| M077 | closed | IRC lifetime and exhaustion hardening |
+| M078 | closed | Streamr local-boundary hardening |
+| M079 | closed | integrated tunnel-security reclosure |
 
 ## Final-status rule
 

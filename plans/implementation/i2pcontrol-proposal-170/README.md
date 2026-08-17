@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; M064-M078 closed; M079 next
+Status: partial Proposal 170 support; M064-M079 closed
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -42,8 +42,8 @@ The implementation target is:
 
 ## Current handoff
 
-M071 is closed. M072 is formally accepted after M073. M073-M078 are closed;
-M079 is the next registered dependency-ready implementation plan:
+M071 is closed. M072 is formally accepted after M073. M073-M079 are closed;
+M079 is the final integrated tunnel-security reclosure:
 
 - `065-i2pcontrol-tunnel-runtime-primitives.md` — **closed**; closure:
   `plans/closure/i2pcontrol-proposal-170/065-closure.md`.
@@ -97,10 +97,9 @@ Per `plans/003-planning-process.md`, future plans are prewritten for continuity 
 | M076 | closed | HTTP anonymity and POST-throttle hardening | M073, M074 |
 | M077 | closed | IRC server lifetime and exhaustion hardening | M073, M074, M076 |
 | M078 | closed | Streamr local-boundary hardening | M075, M076, M077 |
-| M079 | ready | integrated tunnel-security reclosure | M074-M078 |
+| M079 | closed | integrated tunnel-security reclosure | M074-M078 |
 
-M079 is now the next registered handoff. The specialized M066-M071 families
-remain closed.
+M079 is formally closed. The specialized M066-M071 families remain closed.
 
 ## Security-critical family rules
 

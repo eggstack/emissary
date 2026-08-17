@@ -1,9 +1,10 @@
 # I2PControl Tunnel Backends
 
-Status: M076 HTTP anonymity/POST-throttle hardening closed; M077 ready
+Status: M079 integrated tunnel-security reclosure closed
 
 All twelve tunnel families have bounded production backends. The integrated
-runtime/security phase remains open for the ordered M077-M079 corrective work.
+runtime/security phase is closed by the M079 final-head reclosure; Proposal 170
+still has the separately documented RouterInfo/source limitations.
 
 This document describes the tunnel backend interface and registry in Emissary.
 
@@ -181,7 +182,36 @@ The production manager serializes start, stop, restart, edit, rename, and
 delete per exact tunnel name. Post-load reconciliation starts only eligible
 control-plane client/server definitions with `StartOnLoad`; failures are
 isolated and leave the definition stopped. Restart stops the prior generation
-before reloading and starting the latest durable definition.
+before reloading and starting the latest durable definition. A persisted
+published server destination is identity metadata only and never becomes a
+local target address.
+
+## Runtime option capability matrix
+
+Every runtime-relevant option is either consumed by the named backend or
+rejected before destination/session/listener allocation. Administrative
+metadata and the lossless `rawConfig` round-trip surface do not imply runtime
+support.
+
+| Tunnel types | Consumed runtime fields | Recognized-but-unimplemented fields rejected before allocation |
+|---|---|---|
+| `client` | `TargetDestination`, `TargetPort`, `ListenInterface`, `ListenPort` | access/plaintext/custom/I2CP and other typed/raw fields |
+| `httpclient` | listener, proxy auth, HTTP policy, direct I2P target, explicit I2P outproxy | TLS, arbitrary clearnet/direct target, unsupported proxy/outproxy modes, custom/I2CP |
+| `ircclient` | I2P target, ports, listener, common IRC filter | IRC automation, access/auth/WEBIRC/cloak, custom/I2CP |
+| `socks`, `socksirc` | loopback/authenticated listener, SOCKS CONNECT policy and (for `socksirc`) IRC filter | BIND, UDP ASSOCIATE, arbitrary DNS, unsafe targets, custom/I2CP |
+| `connectclient` | listener/auth, strict CONNECT parsing, direct I2P or explicit I2P outproxy | unsupported methods, unsafe direct targets, unsupported proxy/outproxy modes, custom/I2CP |
+| `streamrclient` | producer destination, loopback target, UDP target/source ports, 15-second refresh | non-loopback addresses, tunnel shaping/signature/encryption, custom/I2CP |
+| `server` | loopback target/port, persistent identity, shared admission and `leaseSetEncType` | access/privacy/consumer/signature/hashcash, unsupported raw fields, custom/I2CP |
+| `httpserver` | loopback target, Host/access policy, shared admission, peer-keyed POST limiter, persistent identity | TLS, proxy/outproxy, `FilterFilePath`, `UniqueLocalAddressPerClient`, `MultiHoming`, underspecified periods/ban time, custom/I2CP |
+| `httpbidirserver` | shared filtered inbound HTTP path plus authenticated local proxy, loopback bind/target, shared admission and POST limiter | unsupported TLS/outproxy/filter/address/period options, custom/I2CP |
+| `ircserver` | bounded registration, trusted peer hostname, loopback target, shared admission, inactivity relay | IRC automation, WEBIRC/cloak/access/auth/DCC options, custom/I2CP |
+| `streamrserver` | persistent identity, loopback UDP source, ten subscribers, 60-second expiry, 1200-byte payload, bounded transport | non-loopback addresses, tunnel shaping/signature/encryption, custom/I2CP |
+
+`HostingDestination` on server definitions is published destination metadata.
+It is not a local target selector and is ignored as such by all server
+backends. `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `FilterFilePath`,
+`UniqueLocalAddressPerClient`, and `MultiHoming` remain explicitly rejected
+where the backend cannot give them authoritative semantics.
 
 ## Design rationale
 

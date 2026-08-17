@@ -513,9 +513,8 @@ impl HttpBidirServerTunnelBackend {
         .map_err(option_error)?;
         validate_raw_options(definition)?;
 
-        let target_host = raw_string(definition, "TargetHost")
-            .or_else(|| raw_string(definition, "Host"))
-            .or_else(|| raw_string(definition, "HostingDestination"))
+        let target_host = raw_string(definition, "TargetHost")?
+            .or(raw_string(definition, "Host")?)
             .unwrap_or_else(|| "127.0.0.1".to_owned());
         if !matches!(target_host.as_str(), "127.0.0.1" | "localhost" | "::1") {
             return Err(invalid_option("TargetHost must be loopback"));
@@ -535,7 +534,7 @@ impl HttpBidirServerTunnelBackend {
             Some(value) =>
                 value.parse::<IpAddr>().map_err(|_| invalid_option("ListenInterface"))?,
         };
-        let proxy_username = raw_string(definition, "ProxyUsername")
+        let proxy_username = raw_string(definition, "ProxyUsername")?
             .or_else(|| definition.options.proxy_username.clone());
         let proxy_password = definition.options.proxy_password.as_deref().map(str::to_owned);
         if proxy_username.is_some() != proxy_password.is_some() {
@@ -548,9 +547,9 @@ impl HttpBidirServerTunnelBackend {
             return Err(invalid_option("ProxyAuth requires credentials"));
         }
 
-        let website = raw_string(definition, "WebsiteHostname")
+        let website = raw_string(definition, "WebsiteHostname")?
             .or_else(|| definition.options.http_host.clone());
-        let spoofed = raw_string(definition, "SpoofedHost");
+        let spoofed = raw_string(definition, "SpoofedHost")?;
         if website.is_some() && spoofed.is_some() && website != spoofed {
             return Err(invalid_option("WebsiteHostname/SpoofedHost"));
         }
@@ -563,7 +562,7 @@ impl HttpBidirServerTunnelBackend {
         {
             return Err(invalid_option("WebsiteHostname"));
         }
-        let access_list = raw_string(definition, "AccessList")
+        let access_list = raw_string(definition, "AccessList")?
             .or_else(|| definition.options.access_list.clone())
             .map(|value| {
                 value
@@ -573,7 +572,7 @@ impl HttpBidirServerTunnelBackend {
                     .collect::<Vec<_>>()
             })
             .filter(|entries| !entries.is_empty());
-        let access_option = match raw_string(definition, "AccessOption").as_deref() {
+        let access_option = match raw_string(definition, "AccessOption")?.as_deref() {
             None | Some("allow") => AccessOption::Allow,
             Some("deny") => AccessOption::Deny,
             Some(_) => return Err(invalid_option("AccessOption")),
@@ -605,7 +604,7 @@ impl HttpBidirServerTunnelBackend {
                 allow_referer: raw_bool(definition, "AllowReferer")?.unwrap_or(true),
                 block_user_agents: raw_bool(definition, "BlockUserAgents")?.unwrap_or(false),
                 allow_user_agent: raw_bool(definition, "AllowUserAgent")?.unwrap_or(true),
-                user_agents: raw_string(definition, "UserAgents").map(|value| {
+                user_agents: raw_string(definition, "UserAgents")?.map(|value| {
                     value
                         .split(',')
                         .map(|entry| entry.trim().to_owned())
@@ -675,12 +674,12 @@ impl TunnelBackend for HttpBidirServerTunnelBackend {
     }
 }
 
-fn raw_string(definition: &TunnelDefinition, key: &str) -> Option<String> {
+fn raw_string(definition: &TunnelDefinition, key: &str) -> BackendResult<Option<String>> {
     definition
         .raw_config
         .get(key)
-        .and_then(|value| value.as_str())
-        .map(str::to_owned)
+        .map(|value| value.as_str().map(str::to_owned).ok_or_else(|| invalid_option(key)))
+        .transpose()
 }
 
 fn raw_bool(definition: &TunnelDefinition, key: &str) -> Result<Option<bool>, BackendError> {
@@ -934,5 +933,18 @@ mod tests {
         );
         drop(occupied);
         sam_task.abort();
+    }
+
+    #[test]
+    fn persisted_public_destination_does_not_select_local_target() {
+        let backend = HttpBidirServerTunnelBackend::new(
+            7656,
+            ServerDestinationStore::new(tempfile::tempdir().unwrap().path()),
+            None,
+        );
+        let mut definition = definition();
+        definition.options.hosting_destination = Some("published-server-destination".to_owned());
+        let config = backend.config_without_destination(&definition).unwrap();
+        assert_eq!(config.target_host, "127.0.0.1");
     }
 }

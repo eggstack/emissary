@@ -1,6 +1,6 @@
 # M079 — Proposal 170 Tunnel Security Reclosure
 
-Status: ready — hard dependencies M074, M075, M076, M077, and M078 closed
+Status: closed — implementation and independent closure accepted
 
 Source roadmap:
 

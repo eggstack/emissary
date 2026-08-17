@@ -356,32 +356,6 @@ impl ServerAdmissionState {
             return AdmissionDecision::Denied(AdmissionRejection::GlobalConcurrency);
         }
 
-        {
-            let peer_record = if is_new {
-                if state.peers.try_reserve(1).is_err() {
-                    return AdmissionDecision::Denied(AdmissionRejection::PeerStateCapacity);
-                }
-                let retention = state.retention;
-                state.peers.entry(key).or_insert_with(|| PeerRecord {
-                    active: 0,
-                    counters: Counters::new(now),
-                    expires_at: now + retention,
-                })
-            } else {
-                state.peers.get_mut(&key).expect("peer checked above")
-            };
-            if peer_record.active >= self.inner.policy.max_concurrent_per_peer {
-                return AdmissionDecision::Denied(AdmissionRejection::PeerConcurrency);
-            }
-            if !peer_record.counters.allow(
-                now,
-                self.inner.policy.client_per_minute,
-                self.inner.policy.client_per_hour,
-                self.inner.policy.client_per_day,
-            ) {
-                return AdmissionDecision::Denied(AdmissionRejection::PeerRate);
-            }
-        }
         if !state.aggregate.allow(
             now,
             self.inner.policy.total_in_per_minute,
@@ -389,6 +363,33 @@ impl ServerAdmissionState {
             self.inner.policy.total_in_per_day,
         ) {
             return AdmissionDecision::Denied(AdmissionRejection::AggregateRate);
+        }
+
+        if is_new {
+            if state.peers.try_reserve(1).is_err() {
+                return AdmissionDecision::Denied(AdmissionRejection::PeerStateCapacity);
+            }
+            let retention = state.retention;
+            state.peers.insert(
+                key,
+                PeerRecord {
+                    active: 0,
+                    counters: Counters::new(now),
+                    expires_at: now + retention,
+                },
+            );
+        }
+        let peer_record = state.peers.get_mut(&key).expect("peer inserted above");
+        if peer_record.active >= self.inner.policy.max_concurrent_per_peer {
+            return AdmissionDecision::Denied(AdmissionRejection::PeerConcurrency);
+        }
+        if !peer_record.counters.allow(
+            now,
+            self.inner.policy.client_per_minute,
+            self.inner.policy.client_per_hour,
+            self.inner.policy.client_per_day,
+        ) {
+            return AdmissionDecision::Denied(AdmissionRejection::PeerRate);
         }
 
         let retention = state.retention;
@@ -423,6 +424,11 @@ impl ServerAdmissionState {
             state.active,
             state.peers.values().map(|peer| peer.active).sum(),
         )
+    }
+
+    #[cfg(test)]
+    fn peer_state_len(&self) -> usize {
+        self.inner.state.lock().peers.len()
     }
 }
 
@@ -605,5 +611,23 @@ mod tests {
             state.try_acquire(&peer("new")),
             AdmissionDecision::Allowed(_)
         ));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn aggregate_rate_denial_does_not_allocate_new_peer_state() {
+        let policy =
+            ServerAdmissionPolicy::new(10, 0, 0, 0, 1, 0, 0).unwrap().with_peer_capacity(2);
+        let state = ServerAdmissionState::new(policy);
+        let lease = match state.try_acquire(&peer("first")) {
+            AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected result: {other:?}"),
+        };
+
+        assert!(matches!(
+            state.try_acquire(&peer("second")),
+            AdmissionDecision::Denied(AdmissionRejection::AggregateRate)
+        ));
+        assert_eq!(state.peer_state_len(), 1);
+        drop(lease);
     }
 }

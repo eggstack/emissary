@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: planned corrective security work; M078 closed; M079 next
+Status: closed; M079 final-head reclosure accepted
 
 Planning production baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
@@ -234,7 +234,7 @@ Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/078-closure.md`.
 
 Independently re-audit all newly introduced tunnel families and the generic server after the corrective sequence. The workstream may not close with a high/medium anonymity, resource-exhaustion, option-truthfulness, containment, or lifecycle finding.
 
-Status: ready; next registered handoff.
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/079-closure.md`.
 
 ## 10. Verification discipline
 
@@ -257,4 +257,8 @@ Stop the affected milestone and record a corrective/architecture blocker if:
 
 ## 12. Final closure rule
 
-M073 alone is no longer sufficient to declare the tunnel-runtime security phase complete. The post-M072 security review establishes additional corrective work. The tunnel runtime/security workstream remains corrective until M079 closes with explicit evidence that the new server types no longer expose the identified controllable saturation, idle-pinning, HTTP fingerprint, limiter-churn, or local-UDP trust-boundary defects.
+M073 alone was not sufficient to declare the tunnel-runtime security phase
+complete. M079 now closes the post-M072 security review with explicit evidence
+that the new server types no longer expose the identified controllable
+saturation, idle-pinning, HTTP fingerprint, limiter-churn, or local-UDP
+trust-boundary defects.

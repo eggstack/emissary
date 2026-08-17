@@ -18,6 +18,7 @@ pub use admission::{
 pub use accepted_server::{
     run_accepted_server, AcceptedServerConnection, AcceptedServerHandler,
     AcceptedServerRuntimeConfig, AcceptedServerRuntimeError, TrustedPeerIdentity,
+    MAX_TRUSTED_PEER_DESTINATION_TEXT,
 };
 pub use client_listener::{
     run_client_listener, ClientConnectionHandler, ClientListenerRuntimeConfig,

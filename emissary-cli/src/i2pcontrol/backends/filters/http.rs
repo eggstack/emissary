@@ -149,9 +149,7 @@ pub async fn read_and_sanitize_request<R: AsyncBufRead + Unpin>(
         return Err(invalid(io::ErrorKind::InvalidData, "ambiguous host header"));
     }
 
-    let proxy_seen = headers
-        .iter()
-        .any(|header| PROXY_IDENTITY.contains(&header.name.to_ascii_lowercase().as_str()));
+    let proxy_seen = headers.iter().any(|header| is_proxy_identity_header(&header.name));
     if policy.block_access_in_proxies && proxy_seen {
         return Err(invalid(
             io::ErrorKind::PermissionDenied,
@@ -225,7 +223,7 @@ pub async fn read_and_sanitize_request<R: AsyncBufRead + Unpin>(
         let name = header.name.to_ascii_lowercase();
         if HOP_BY_HOP.contains(&name.as_str())
             || nominated.contains(name.as_str())
-            || PROXY_IDENTITY.contains(&name.as_str())
+            || is_proxy_identity_header(&name)
             || REQUEST_PRIVACY.contains(&name.as_str())
             || I2P_IDENTITY.contains(&name.as_str())
             || (eq(&name, "referer") && (policy.block_referers || !policy.allow_referer))
@@ -369,6 +367,11 @@ fn peer_allowed(peer: &str, policy: &HttpServerPolicy) -> bool {
         AccessOption::Allow => matches,
         AccessOption::Deny => !matches,
     }
+}
+
+fn is_proxy_identity_header(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    PROXY_IDENTITY.contains(&name.as_str()) || name.starts_with("x-forwarded-")
 }
 
 fn validate_trusted_destination(destination: &str) -> io::Result<()> {
@@ -775,7 +778,7 @@ mod tests {
     #[tokio::test]
     async fn removes_proxy_identity_and_adopted_request_privacy_headers() {
         let result = request(
-            b"GET / HTTP/1.1\r\nForwarded: for=10.0.0.1\r\nVia: proxy\r\nX-Forwarded-For: 10.0.0.2\r\nX-Forwarded-Host: evil\r\nX-Forwarded-Server: evil\r\nProxy: evil\r\nX-Real-IP: 10.0.0.3\r\nx-client-ip: 10.0.0.4\r\nTrue-Client-IP: 10.0.0.5\r\nCF-Connecting-IP: 10.0.0.6\r\nFastly-Client-IP: 10.0.0.7\r\nX-Cluster-Client-IP: 10.0.0.8\r\nPriority: u=1\r\nSec-GPC: 1\r\n\r\n",
+            b"GET / HTTP/1.1\r\nForwarded: for=10.0.0.1\r\nVia: proxy\r\nX-Forwarded-For: 10.0.0.2\r\nX-Forwarded-Host: evil\r\nX-Forwarded-Server: evil\r\nX-Forwarded-Proto: https\r\nX-Forwarded-Port: 443\r\nX-Forwarded-Prefix: /admin\r\nProxy: evil\r\nX-Real-IP: 10.0.0.3\r\nx-client-ip: 10.0.0.4\r\nTrue-Client-IP: 10.0.0.5\r\nCF-Connecting-IP: 10.0.0.6\r\nFastly-Client-IP: 10.0.0.7\r\nX-Cluster-Client-IP: 10.0.0.8\r\nPriority: u=1\r\nSec-GPC: 1\r\n\r\n",
             &policy(),
         )
         .await
@@ -791,6 +794,9 @@ mod tests {
             "x-forwarded-for",
             "x-forwarded-host",
             "x-forwarded-server",
+            "x-forwarded-proto",
+            "x-forwarded-port",
+            "x-forwarded-prefix",
             "forwarded",
             "via",
             "proxy",

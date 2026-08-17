@@ -294,7 +294,10 @@ M066 does not synthesize registration or channel behavior.
 HTTP/Binary protocol probes, rewrites `USER` using the trusted accepted I2P
 peer identity, and connects only to loopback. It does not forward registration
 to the local IRCd until NICK and sanitized USER have been accepted. The
-post-registration path is a raw IRC stream as specified by M066; accepted
+post-registration path is a raw IRC stream as specified by M066. Its local IRCd
+connect is bounded to five seconds, and the accepted stream expires after ten
+minutes of inactivity; successful traffic in either direction resets that
+deadline, so active IRC sessions are not capped by total lifetime. Accepted
 streams use the same bounded peer-aware admission policy as `httpserver`, and
 the client side remains filtered for the future `socksirc` composition.
 

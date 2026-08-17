@@ -48,7 +48,9 @@ session and passes the SAM-derived public peer identity plus stream to a
 protocol handler before any local target connection. M066 consumes those seams
 for the IRC family and M067 consumes them for HTTP. `ircclient` uses one bounded
 line-oriented filter for both traffic directions; `ircserver` filters
-registration before connecting to loopback; `httpserver` normalizes bounded
+registration before connecting to loopback, bounds the local connect to five
+seconds, and expires registered-idle streams after ten minutes while resetting
+the deadline on traffic; `httpserver` normalizes bounded
 HTTP headers before connecting to loopback and filters response fingerprints.
 Streamr uses one owner loop per runtime. `streamrserver` accepts one-byte
 subscribe/refresh and unsubscribe controls from authenticated Yosemite peer

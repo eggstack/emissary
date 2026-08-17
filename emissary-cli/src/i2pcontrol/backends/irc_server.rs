@@ -1,11 +1,11 @@
 //! Bounded registration-filtered control-plane-owned IRC server tunnel.
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, future::Future, sync::Arc, time::Duration};
 
 use futures::FutureExt;
 use parking_lot::Mutex;
 use tokio::{
-    io::{self, AsyncBufRead, AsyncWriteExt, BufReader},
+    io::{self, AsyncBufRead, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
     net::TcpStream,
     task::JoinHandle,
 };
@@ -24,12 +24,15 @@ use crate::i2pcontrol::{
 const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_RUNTIME_TASKS: usize = 1000;
+const TARGET_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const RELAY_BUFFER_SIZE: usize = 8192;
 
 /// Conservative registration bounds for the local IRCd boundary.
 pub const REGISTRATION_LINE_TIMEOUT: Duration = Duration::from_secs(5);
 pub const REGISTRATION_TIMEOUT: Duration = Duration::from_secs(15);
 pub const MAX_REGISTRATION_LINES: usize = 12;
 pub const MAX_REGISTRATION_LINE: usize = 1024;
+pub const POST_REGISTRATION_INACTIVITY: Duration = Duration::from_secs(10 * 60);
 
 #[derive(Debug, Clone)]
 struct IrcServerConfig {
@@ -299,7 +302,7 @@ async fn handle_accepted_connection(
     if !valid_hostname(&peer_hostname) {
         return Ok(());
     }
-    let (remote_read, mut remote_write) = io::split(connection.stream);
+    let (remote_read, remote_write) = io::split(connection.stream);
     let mut remote_reader = BufReader::new(remote_read);
     let registration = tokio::time::timeout(
         REGISTRATION_TIMEOUT,
@@ -308,16 +311,89 @@ async fn handle_accepted_connection(
     .await
     .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "IRC registration timeout"))??;
 
-    let mut local = TcpStream::connect((target_host.as_str(), target_port)).await?;
+    let mut local = match connect_local_target(target_host.as_str(), target_port).await {
+        Ok(stream) => stream,
+        Err(_) => return Ok(()),
+    };
     for line in registration {
         local.write_all(&line).await?;
     }
-    let (mut local_read, mut local_write) = local.into_split();
-    let remote_to_local = io::copy(&mut remote_reader, &mut local_write);
-    let local_to_remote = io::copy(&mut local_read, &mut remote_write);
-    tokio::select! {
-        result = remote_to_local => result.map(|_| ()),
-        result = local_to_remote => result.map(|_| ()),
+    let (local_read, local_write) = local.into_split();
+    relay_with_inactivity(remote_reader, remote_write, local_read, local_write).await
+}
+
+async fn connect_local_target(host: &str, port: u16) -> io::Result<TcpStream> {
+    bounded_connect(TcpStream::connect((host, port))).await
+}
+
+async fn bounded_connect<F>(connect: F) -> io::Result<TcpStream>
+where
+    F: Future<Output = io::Result<TcpStream>>,
+{
+    match tokio::time::timeout(TARGET_CONNECT_TIMEOUT, connect).await {
+        Ok(Ok(stream)) => Ok(stream),
+        Ok(Err(_)) | Err(_) => Err(io::Error::new(
+            io::ErrorKind::ConnectionAborted,
+            "IRC local target unavailable",
+        )),
+    }
+}
+
+async fn relay_with_inactivity<RemoteRead, RemoteWrite, LocalRead, LocalWrite>(
+    remote_read: RemoteRead,
+    remote_write: RemoteWrite,
+    local_read: LocalRead,
+    local_write: LocalWrite,
+) -> io::Result<()>
+where
+    RemoteRead: AsyncRead + Unpin,
+    RemoteWrite: AsyncWrite + Unpin,
+    LocalRead: AsyncRead + Unpin,
+    LocalWrite: AsyncWrite + Unpin,
+{
+    let (activity_tx, mut activity_rx) = tokio::sync::watch::channel(0_u64);
+    let mut remote_to_local = Box::pin(relay_direction(
+        remote_read,
+        local_write,
+        activity_tx.clone(),
+    ));
+    let mut local_to_remote = Box::pin(relay_direction(local_read, remote_write, activity_tx));
+    let deadline = tokio::time::sleep(POST_REGISTRATION_INACTIVITY);
+    tokio::pin!(deadline);
+
+    loop {
+        tokio::select! {
+            result = &mut remote_to_local => return result,
+            result = &mut local_to_remote => return result,
+            changed = activity_rx.changed() => {
+                if changed.is_err() {
+                    return Ok(());
+                }
+                deadline.as_mut().reset(tokio::time::Instant::now() + POST_REGISTRATION_INACTIVITY);
+            }
+            _ = &mut deadline => return Ok(()),
+        }
+    }
+}
+
+async fn relay_direction<ReadHalf, WriteHalf>(
+    mut reader: ReadHalf,
+    mut writer: WriteHalf,
+    activity: tokio::sync::watch::Sender<u64>,
+) -> io::Result<()>
+where
+    ReadHalf: AsyncRead + Unpin,
+    WriteHalf: AsyncWrite + Unpin,
+{
+    let mut buffer = [0_u8; RELAY_BUFFER_SIZE];
+    loop {
+        let length = reader.read(&mut buffer).await?;
+        if length == 0 {
+            writer.shutdown().await?;
+            return Ok(());
+        }
+        writer.write_all(&buffer[..length]).await?;
+        activity.send_modify(|sequence| *sequence = sequence.wrapping_add(1));
     }
 }
 
@@ -653,6 +729,165 @@ mod tests {
             }
         };
         tokio::join!(read, write);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn registered_idle_peer_expires_and_releases_admission() {
+        let (remote_peer, remote_stream) = duplex(4096);
+        let (local_peer, local_stream) = duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (local_read, local_write) = io::split(local_stream);
+        let admission =
+            ServerAdmissionState::new(ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap());
+        let peer = TrustedPeerIdentity::for_test("peer-destination");
+        let lease = match admission.try_acquire(&peer) {
+            AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected admission result: {other:?}"),
+        };
+        let relay = tokio::spawn(async move {
+            let _lease = lease;
+            relay_with_inactivity(remote_read, remote_write, local_read, local_write).await
+        });
+
+        tokio::time::advance(POST_REGISTRATION_INACTIVITY).await;
+        assert!(relay.await.unwrap().is_ok());
+        assert!(matches!(
+            admission.try_acquire(&peer),
+            AdmissionDecision::Allowed(_)
+        ));
+        drop(remote_peer);
+        drop(local_peer);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn activity_resets_idle_deadline_without_fixed_lifetime() {
+        let (mut remote_peer, remote_stream) = duplex(4096);
+        let (mut local_peer, local_stream) = duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (local_read, local_write) = io::split(local_stream);
+        let relay = tokio::spawn(relay_with_inactivity(
+            remote_read,
+            remote_write,
+            local_read,
+            local_write,
+        ));
+
+        for sequence in 0..3 {
+            tokio::time::advance(POST_REGISTRATION_INACTIVITY - Duration::from_secs(60)).await;
+            let message = [b'0' + sequence, b'\n'];
+            remote_peer.write_all(&message).await.unwrap();
+            let mut received = [0_u8; 2];
+            local_peer.read_exact(&mut received).await.unwrap();
+            assert_eq!(received, message);
+        }
+        tokio::time::advance(Duration::from_secs(2 * 60)).await;
+        assert!(!relay.is_finished());
+
+        drop(remote_peer);
+        drop(local_peer);
+        relay.abort();
+        let _ = relay.await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn traffic_in_either_direction_resets_idle_deadline() {
+        let (mut remote_peer, remote_stream) = duplex(4096);
+        let (mut local_peer, local_stream) = duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (local_read, local_write) = io::split(local_stream);
+        let relay = tokio::spawn(relay_with_inactivity(
+            remote_read,
+            remote_write,
+            local_read,
+            local_write,
+        ));
+
+        tokio::time::advance(POST_REGISTRATION_INACTIVITY - Duration::from_secs(60)).await;
+        local_peer.write_all(b"PING\r\n").await.unwrap();
+        let mut received = [0_u8; 6];
+        remote_peer.read_exact(&mut received).await.unwrap();
+        assert_eq!(&received, b"PING\r\n");
+        tokio::time::advance(Duration::from_secs(2 * 60)).await;
+        assert!(!relay.is_finished());
+
+        drop(remote_peer);
+        drop(local_peer);
+        relay.abort();
+        let _ = relay.await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn inactivity_closes_both_relay_directions() {
+        let (mut remote_peer, remote_stream) = duplex(4096);
+        let (mut local_peer, local_stream) = duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (local_read, local_write) = io::split(local_stream);
+        let relay = tokio::spawn(relay_with_inactivity(
+            remote_read,
+            remote_write,
+            local_read,
+            local_write,
+        ));
+
+        tokio::time::advance(POST_REGISTRATION_INACTIVITY).await;
+        assert!(relay.await.unwrap().is_ok());
+        assert!(remote_peer.write_all(b"after-timeout").await.is_err());
+        assert!(local_peer.write_all(b"after-timeout").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn remote_eof_ends_relay() {
+        let (remote_peer, remote_stream) = duplex(4096);
+        let (local_peer, local_stream) = duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (local_read, local_write) = io::split(local_stream);
+        let relay = tokio::spawn(relay_with_inactivity(
+            remote_read,
+            remote_write,
+            local_read,
+            local_write,
+        ));
+        drop(remote_peer);
+        assert!(tokio::time::timeout(Duration::from_secs(1), relay)
+            .await
+            .unwrap()
+            .unwrap()
+            .is_ok());
+        drop(local_peer);
+    }
+
+    #[tokio::test]
+    async fn local_eof_ends_relay_without_waiting_for_idle_expiry() {
+        let (remote_peer, remote_stream) = duplex(4096);
+        let (local_peer, local_stream) = duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (local_read, local_write) = io::split(local_stream);
+        let relay = tokio::spawn(relay_with_inactivity(
+            remote_read,
+            remote_write,
+            local_read,
+            local_write,
+        ));
+        drop(local_peer);
+        assert!(tokio::time::timeout(Duration::from_secs(1), relay)
+            .await
+            .unwrap()
+            .unwrap()
+            .is_ok());
+        drop(remote_peer);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn local_target_connect_is_bounded_and_sanitized() {
+        let error = bounded_connect(std::future::pending::<io::Result<TcpStream>>())
+            .await
+            .unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::ConnectionAborted);
+        let message = error.to_string();
+        assert_eq!(message, "IRC local target unavailable");
+        assert!(!message.contains("127.0.0.1"));
+        assert!(!message.contains("6667"));
+        assert!(!message.contains("timed out"));
     }
 
     #[tokio::test]

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: planned corrective security work; M076 closed; M077 next; M078-M079 blocked
+Status: planned corrective security work; M077 closed; M078 next; M079 blocked
 
 Planning production baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
@@ -222,9 +222,13 @@ Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/076-closure.md`.
 
 Add a 10-minute post-registration inactivity deadline that resets on successful traffic, target-connect timeout, and cancellation-safe relay behavior. Preserve the accepted registration filter and raw post-registration IRC semantics.
 
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/077-closure.md`.
+
 ### M078 — Streamr local-boundary hardening
 
 Make local UDP producer/client targets loopback-only for this Proposal 170 implementation, reduce maximum subscribers to the Java reference ceiling of 10, preserve 60-second expiry/15-second refresh/1200-byte payload bound, and revalidate destination/control bounds.
+
+Status: ready; next registered handoff.
 
 ### M079 — Integrated tunnel-security reclosure
 

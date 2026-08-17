@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; M064-M075 closed; M076 next
+Status: partial Proposal 170 support; M064-M077 closed; M078 next
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -42,8 +42,8 @@ The implementation target is:
 
 ## Current handoff
 
-M071 is closed. M072 is formally accepted after M073. M073, M074, and M075 are
-closed; M076 is the next registered dependency-ready implementation plan:
+M071 is closed. M072 is formally accepted after M073. M073-M077 are closed;
+M078 is the next registered dependency-ready implementation plan:
 
 - `065-i2pcontrol-tunnel-runtime-primitives.md` — **closed**; closure:
   `plans/closure/i2pcontrol-proposal-170/065-closure.md`.
@@ -67,6 +67,10 @@ closed; M076 is the next registered dependency-ready implementation plan:
   `plans/closure/i2pcontrol-proposal-170/074-closure.md`.
 - `075-generic-server-accepted-stream-hardening.md` — **closed**; closure:
   `plans/closure/i2pcontrol-proposal-170/075-closure.md`.
+- `076-http-server-anonymity-and-post-throttle-hardening.md` — **closed**; closure:
+  `plans/closure/i2pcontrol-proposal-170/076-closure.md`.
+- `077-irc-server-lifetime-and-exhaustion-hardening.md` — **closed**; closure:
+  `plans/closure/i2pcontrol-proposal-170/077-closure.md`.
 
 M064 repairs the existing feature-disabled/no-events unused-parameter regression in `emissary-core/src/events.rs` and establishes a clean baseline before new tunnel runtime work. It adds no capability.
 
@@ -90,13 +94,12 @@ Per `plans/003-planning-process.md`, future plans are prewritten for continuity 
 | M073 | closed | generic client/server option truthfulness corrective | M072 audit finding |
 | M074 | closed | shared server admission/rate-limit hardening | M073 |
 | M075 | closed | generic server accepted-stream hardening | M073, M074 |
-| M076 | ready | HTTP anonymity and POST-throttle hardening | M073, M074 |
-| M077 | ready | IRC server lifetime and exhaustion hardening | M073, M074 |
+| M076 | closed | HTTP anonymity and POST-throttle hardening | M073, M074 |
+| M077 | closed | IRC server lifetime and exhaustion hardening | M073, M074, M076 |
+| M078 | ready | Streamr local-boundary hardening | M075, M076, M077 |
 
-M076 is now the next registered handoff. M077 is also hard-dependency ready but
-remains unregistered until the planning sequence advances. M078 and M079 remain
-blocked by their named sequence dependencies. The specialized M066-M071
-families remain closed.
+M078 is now the next registered handoff. M079 remains blocked by its named
+dependency on M078. The specialized M066-M071 families remain closed.
 
 ## Security-critical family rules
 

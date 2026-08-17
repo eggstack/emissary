@@ -1,6 +1,6 @@
 # M077 — IRC Server Lifetime and Exhaustion Hardening
 
-Status: ready — hard dependencies M073, M074, and M076 closed; next registered handoff
+Status: closed — implementation and closure accepted
 
 Source roadmap:
 

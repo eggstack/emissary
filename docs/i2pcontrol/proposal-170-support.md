@@ -231,14 +231,16 @@ server definitions remain externally managed and reject administrative
 lifecycle operations.
 
 `streamrserver` owns a persistent repliable-datagram identity and a
-administrator-bound local UDP source. `streamrclient` refreshes a bounded
-subscription every 15 seconds and forwards payloads only to its configured
-local IP/UDP target. The producer caps subscribers at 16, expires entries after
-60 seconds, and caps payloads at 1200 bytes. Control packets are exactly one
-byte (`0` subscribe/refresh, `1` unsubscribe); malformed or unknown controls do
-not create state. Yosemite exposes trusted peer destination identity but not
-inbound port metadata, so Emissary uses the trusted destination plus the fixed
-configured session port tuple and makes no core API change.
+loopback-only local UDP source. `streamrclient` refreshes a bounded subscription
+every 15 seconds and forwards payloads only to its configured loopback UDP
+target. The producer caps subscribers at 10, expires entries after 60 seconds,
+and caps payloads at 1200 bytes; destination text is bounded at 524 bytes.
+Control packets are exactly one byte (`0` subscribe/refresh, `1` unsubscribe);
+malformed or unknown controls do not create state. Non-loopback local-address
+configuration is rejected before allocation, and unexpected non-loopback local
+UDP sources are ignored. Yosemite exposes trusted peer destination identity but
+not inbound port metadata, so Emissary uses the trusted destination plus the
+fixed configured session port tuple and makes no core API change.
 
 ### SOCKS and SOCKS-IRC runtime boundary
 

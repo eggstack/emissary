@@ -43,7 +43,14 @@ pub const MAX_TRANSPORT_PACKET: usize = 0xfff;
 /// Application payload cap kept below the raw datagram transport ceiling.
 pub const MAX_STREAMR_PAYLOAD: usize = 1200;
 /// Maximum number of active consumers for one producer.
-pub const MAX_SUBSCRIBERS: usize = 16;
+pub const MAX_SUBSCRIBERS: usize = 10;
+/// Largest textual representation of a reference I2P destination.
+///
+/// The core destination parser accepts at most 391 serialized bytes, which is
+/// 524 bytes in padded I2P Base64. Base32 destinations are shorter, so this
+/// bound covers both ordinary reference forms without retaining an arbitrary
+/// large identity supplied by a remote peer.
+pub const MAX_STREAMR_DESTINATION_TEXT: usize = 524;
 /// Consumers must refresh before this interval expires.
 pub const SUBSCRIPTION_EXPIRY: Duration = Duration::from_secs(60);
 /// Refresh cadence is safely below the expiry window.
@@ -274,10 +281,12 @@ impl SubscriptionState {
     /// Apply one exact Streamr control packet.
     pub fn apply_control(&mut self, peer: &str, control: &[u8], now: Instant) -> bool {
         if peer.is_empty()
-            || peer.len() > 64 * 1024
+            || peer.len() > MAX_STREAMR_DESTINATION_TEXT
             || peer
                 .chars()
                 .any(|character| character.is_control() || character.is_whitespace())
+            || peer.contains('/')
+            || peer.contains('\\')
         {
             return false;
         }
@@ -345,7 +354,7 @@ async fn run_streamr_client(
             }
         },
     };
-    let output = match UdpSocket::bind("0.0.0.0:0").await {
+    let output = match UdpSocket::bind(SocketAddr::new(config.local_target.ip(), 0)).await {
         Ok(socket) => socket,
         Err(_) => {
             let _ = ready.send(Err("streamr client UDP setup failed".to_owned()));
@@ -379,7 +388,7 @@ async fn run_streamr_client(
             }
             result = session.recv_from(&mut receive_buffer) => {
                 let Ok((length, _peer)) = result else { return false; };
-                if length <= MAX_STREAMR_PAYLOAD {
+                if payload_is_forwardable(length) {
                     let _ = output.send_to(&receive_buffer[..length], config.local_target).await;
                 }
             }
@@ -440,8 +449,11 @@ async fn run_streamr_server(
                 }
             }
             result = socket.recv_from(&mut udp_buffer) => {
-                let Ok((length, _source)) = result else { return false; };
-                if length > MAX_STREAMR_PAYLOAD { continue; }
+                let Ok((length, source)) = result else { return false; };
+                if !local_udp_source_allowed(source) {
+                    continue;
+                }
+                if !payload_is_forwardable(length) { continue; }
                 let peers = state.snapshot();
                 for peer in peers {
                     let _ = session.send_to_with_options(
@@ -497,7 +509,7 @@ impl StreamrClientTunnelBackend {
             .ok_or_else(|| BackendError::Internal {
                 message: "streamrclient producer destination is invalid".to_owned(),
             })?;
-        let target_host = local_host(definition)?;
+        let target_host = local_loopback_address(definition, TunnelType::StreamrClient)?;
         let target_port =
             definition.options.target_port.ok_or_else(|| BackendError::MissingOption {
                 tunnel_type: TunnelType::StreamrClient,
@@ -625,7 +637,7 @@ impl StreamrServerTunnelBackend {
             })?;
         Ok(StreamrServerConfig {
             name: definition.name.as_str().to_owned(),
-            bind_address: local_host(definition)?,
+            bind_address: local_loopback_address(definition, TunnelType::StreamrServer)?,
             local_port,
             source_port: local_port,
             destination_port: definition.options.target_port.unwrap_or(0),
@@ -718,19 +730,55 @@ impl TunnelBackend for StreamrServerTunnelBackend {
     }
 }
 
-fn local_host(definition: &TunnelDefinition) -> BackendResult<IpAddr> {
-    let value = definition
-        .raw_config
-        .get("TargetHost")
-        .or_else(|| definition.raw_config.get("Host"))
-        .and_then(|value| value.as_str())
-        .or(definition.options.listen_interface.as_deref());
-    match value {
-        None => Ok(DEFAULT_BIND_ADDRESS),
-        Some(value) => value.parse::<IpAddr>().map_err(|_| BackendError::Internal {
-            message: "Streamr local UDP host must be an IP address".to_owned(),
-        }),
+fn local_loopback_address(
+    definition: &TunnelDefinition,
+    tunnel_type: TunnelType,
+) -> BackendResult<IpAddr> {
+    let mut selected = None;
+    for option in ["TargetHost", "Host", "ReachableBy"] {
+        let Some(value) = definition.raw_config.get(option) else {
+            continue;
+        };
+        let value = value.as_str().ok_or_else(|| invalid_local_address(tunnel_type, option))?;
+        let address = value
+            .parse::<IpAddr>()
+            .map_err(|_| invalid_local_address(tunnel_type, option))?;
+        if !address.is_loopback() {
+            return Err(non_loopback_local_address(tunnel_type, option));
+        }
+        selected.get_or_insert(address);
     }
+    if let Some(value) = definition.options.listen_interface.as_deref() {
+        let address = value
+            .parse::<IpAddr>()
+            .map_err(|_| invalid_local_address(tunnel_type, "ListenInterface"))?;
+        if !address.is_loopback() {
+            return Err(non_loopback_local_address(tunnel_type, "ListenInterface"));
+        }
+        selected.get_or_insert(address);
+    }
+    Ok(selected.unwrap_or(DEFAULT_BIND_ADDRESS))
+}
+
+fn invalid_local_address(tunnel_type: TunnelType, option: &str) -> BackendError {
+    BackendError::Internal {
+        message: format!("{} {option} must be an IP address", tunnel_type.as_str()),
+    }
+}
+
+fn non_loopback_local_address(tunnel_type: TunnelType, option: &str) -> BackendError {
+    BackendError::UnsupportedOption {
+        tunnel_type,
+        option: format!("{option} must be loopback"),
+    }
+}
+
+fn local_udp_source_allowed(source: SocketAddr) -> bool {
+    source.ip().is_loopback()
+}
+
+fn payload_is_forwardable(length: usize) -> bool {
+    length <= MAX_STREAMR_PAYLOAD
 }
 
 fn validate_raw_streamr_options(
@@ -778,11 +826,13 @@ fn validate_raw_streamr_options(
 
 fn valid_destination(value: &str) -> bool {
     !value.is_empty()
-        && value.len() <= 64 * 1024
+        && value.len() <= MAX_STREAMR_DESTINATION_TEXT
+        && value.is_ascii()
         && !value
             .chars()
             .any(|character| character.is_control() || character.is_whitespace())
         && !value.contains('/')
+        && !value.contains('\\')
 }
 
 fn option_error(error: OptionValidationError) -> BackendError {
@@ -841,12 +891,46 @@ mod tests {
         assert!(!state.apply_control("peer", &[], now));
         assert!(!state.apply_control("peer", &[2], now));
         assert!(!state.apply_control("peer", &[0, 0], now));
+        assert!(!state.apply_control(&"a".repeat(MAX_STREAMR_DESTINATION_TEXT + 1), &[0], now));
+        assert!(!state.apply_control("peer with whitespace", &[0], now));
+        assert!(!state.apply_control("peer/with-slash", &[0], now));
         assert!(state.apply_control("peer", &[0], now));
         assert!(state.apply_control("peer", &[1], now));
         assert_eq!(state.len(), 0);
         assert!(state.apply_control("peer", &[0], now));
         state.expire(now + SUBSCRIPTION_EXPIRY);
         assert_eq!(state.len(), 0);
+    }
+
+    #[test]
+    fn destination_text_bound_matches_reference_representation() {
+        assert!(valid_destination(&"a".repeat(MAX_STREAMR_DESTINATION_TEXT)));
+        assert!(!valid_destination(
+            &"a".repeat(MAX_STREAMR_DESTINATION_TEXT + 1)
+        ));
+        assert!(!valid_destination("peer\nname"));
+        assert!(!valid_destination("peer name"));
+        assert!(!valid_destination("peer/name"));
+        assert!(!valid_destination("péèr"));
+    }
+
+    #[test]
+    fn local_udp_source_policy_is_loopback_only() {
+        assert!(local_udp_source_allowed("127.0.0.1:9000".parse().unwrap()));
+        assert!(local_udp_source_allowed("[::1]:9000".parse().unwrap()));
+        assert!(!local_udp_source_allowed("192.0.2.1:9000".parse().unwrap()));
+        assert!(!local_udp_source_allowed(
+            "[2001:db8::1]:9000".parse().unwrap()
+        ));
+    }
+
+    #[test]
+    fn payload_and_transport_bounds_remain_exact() {
+        assert!(payload_is_forwardable(MAX_STREAMR_PAYLOAD));
+        assert!(!payload_is_forwardable(MAX_STREAMR_PAYLOAD + 1));
+        assert_eq!(MAX_TRANSPORT_PACKET, 4095);
+        assert_eq!(SUBSCRIPTION_EXPIRY, Duration::from_secs(60));
+        assert_eq!(SUBSCRIPTION_REFRESH, Duration::from_secs(15));
     }
 
     #[test]
@@ -865,6 +949,137 @@ mod tests {
         ));
         def.options.target_destination = Some("producer-destination".to_owned());
         assert!(backend.config(&def).is_ok());
+    }
+
+    #[test]
+    fn loopback_defaults_and_explicit_v4_v6_addresses_are_accepted() {
+        let client = StreamrClientTunnelBackend::new(7656);
+        let mut client_def = definition(TunnelType::StreamrClient);
+        client_def.options.target_port = Some(9000);
+        client_def.options.target_destination = Some("producer-destination".to_owned());
+        assert_eq!(
+            client.config(&client_def).unwrap().local_target,
+            "127.0.0.1:9000".parse().unwrap()
+        );
+
+        client_def
+            .raw_config
+            .insert("TargetHost".to_owned(), serde_json::json!("127.0.0.1"));
+        assert_eq!(
+            client.config(&client_def).unwrap().local_target,
+            "127.0.0.1:9000".parse().unwrap()
+        );
+        client_def.raw_config.insert("TargetHost".to_owned(), serde_json::json!("::1"));
+        assert_eq!(
+            client.config(&client_def).unwrap().local_target,
+            "[::1]:9000".parse().unwrap()
+        );
+
+        let server = StreamrServerTunnelBackend::new(
+            7656,
+            ServerDestinationStore::new(tempfile::tempdir().unwrap().path()),
+        );
+        let mut server_def = definition(TunnelType::StreamrServer);
+        server_def.options.listen_port = Some(9001);
+        assert_eq!(
+            server
+                .config(
+                    &server_def,
+                    StoredDestination::from_private("private".to_owned())
+                )
+                .unwrap()
+                .bind_address,
+            DEFAULT_BIND_ADDRESS
+        );
+        server_def.raw_config.insert("Host".to_owned(), serde_json::json!("::1"));
+        assert_eq!(
+            server
+                .config(
+                    &server_def,
+                    StoredDestination::from_private("private".to_owned())
+                )
+                .unwrap()
+                .bind_address,
+            "::1".parse::<IpAddr>().unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn non_loopback_addresses_reject_before_runtime_reservation() {
+        let backend = StreamrClientTunnelBackend::new(7656);
+        let mut client_definition = definition(TunnelType::StreamrClient);
+        client_definition.options.target_port = Some(9000);
+        client_definition.options.target_destination = Some("producer-destination".to_owned());
+        client_definition
+            .raw_config
+            .insert("TargetHost".to_owned(), serde_json::json!("0.0.0.0"));
+        let error = backend.start(&client_definition).await.unwrap_err();
+        assert!(matches!(
+            error,
+            BackendError::UnsupportedOption { option, .. }
+                if option == "TargetHost must be loopback"
+        ));
+        assert!(matches!(
+            backend.inspect(&client_definition).runtime_state,
+            TunnelRuntimeState::Stopped
+        ));
+
+        client_definition.raw_config.clear();
+        client_definition.options.listen_interface = Some("192.0.2.1".to_owned());
+        let error = backend.start(&client_definition).await.unwrap_err();
+        assert!(matches!(
+            error,
+            BackendError::UnsupportedOption { option, .. }
+                if option == "ListenInterface must be loopback"
+        ));
+
+        let server = StreamrServerTunnelBackend::new(
+            7656,
+            ServerDestinationStore::new(tempfile::tempdir().unwrap().path()),
+        );
+        let mut server_definition = definition(TunnelType::StreamrServer);
+        server_definition.options.listen_port = Some(9001);
+        server_definition
+            .raw_config
+            .insert("ReachableBy".to_owned(), serde_json::json!("2001:db8::1"));
+        let error = server.config(
+            &server_definition,
+            StoredDestination::from_private("private".to_owned()),
+        );
+        assert!(matches!(
+            error,
+            Err(BackendError::UnsupportedOption { option, .. })
+                if option == "ReachableBy must be loopback"
+        ));
+
+        for value in ["192.0.2.1", "198.51.100.1", "2001:db8::2"] {
+            server_definition.raw_config.insert(
+                "TargetHost".to_owned(),
+                serde_json::Value::String(value.to_owned()),
+            );
+            assert!(matches!(
+                server.config(
+                    &server_definition,
+                    StoredDestination::from_private("private".to_owned()),
+                ),
+                Err(BackendError::UnsupportedOption { option, .. })
+                    if option == "TargetHost must be loopback"
+            ));
+        }
+    }
+
+    #[test]
+    fn local_target_is_fixed_by_configuration() {
+        let backend = StreamrClientTunnelBackend::new(7656);
+        let mut definition = definition(TunnelType::StreamrClient);
+        definition.options.target_port = Some(9000);
+        definition.options.target_destination = Some("producer-destination".to_owned());
+        definition
+            .raw_config
+            .insert("TargetHost".to_owned(), serde_json::json!("127.0.0.1"));
+        let config = backend.config(&definition).unwrap();
+        assert_eq!(config.local_target, "127.0.0.1:9000".parse().unwrap());
+        assert_ne!(config.producer, config.local_target.to_string());
     }
 
     #[test]

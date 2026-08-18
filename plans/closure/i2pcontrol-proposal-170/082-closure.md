@@ -22,8 +22,7 @@ Corrective predecessor closures:
 
 Planning production baseline: `1618de172e7a78a193fc1bb117af269f31174030`.
 
-Implementation commit: recorded in the M082 implementation commit
-message (`feat(i2pcontrol): implement M082 HTTP peer identity and Expect-framing corrective`).
+Implementation commit: `0fbbe83` (`feat(i2pcontrol): implement M082 HTTP peer identity and Expect-framing corrective`).
 
 ## 1. Retained implementation evidence
 

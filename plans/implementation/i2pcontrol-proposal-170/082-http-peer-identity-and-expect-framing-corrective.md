@@ -1,6 +1,10 @@
 # M082 — HTTP Peer Identity and Expect-Framing Corrective
 
-Status: ready — M080 and M081 closed; current registered handoff
+Status: closed — implementation and closure accepted at the pinned head
+
+Closure:
+
+- `plans/closure/i2pcontrol-proposal-170/082-closure.md`.
 
 Source roadmap:
 
@@ -10,6 +14,13 @@ Original implementation/closure:
 
 - M076: `plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md`;
 - M076 closure: `plans/closure/i2pcontrol-proposal-170/076-closure.md`.
+
+Inherited closures:
+
+- M080: `plans/closure/i2pcontrol-proposal-170/080-closure.md` — canonical
+  `TrustedPeerIdentity` boundary that M082 consumes unchanged;
+- M081: `plans/closure/i2pcontrol-proposal-170/081-closure.md` — sequencing
+  gate that unblocked M082.
 
 Planning production baseline: `1618de172e7a78a193fc1bb117af269f31174030`.
 

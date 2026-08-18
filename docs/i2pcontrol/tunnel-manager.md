@@ -1,8 +1,7 @@
 # I2PControl TunnelManager
 
-Status: M080 server admission transactionality/cardinality corrective closed;
-M081 generic server `leaseSetEncType` apply-or-reject corrective closed;
-M082/M077-M079 corrective work remains; lifecycle reconciliation remains
+Status: M080-M082 server security corrective sequence closed;
+M077-M079 corrective work remains; lifecycle reconciliation remains
 closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.

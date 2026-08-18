@@ -30,7 +30,7 @@ Canonical direction:
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no containment corrective handoff | M061 source containment and M062/M063 dependency containment remain accepted authorities |
 | I2PControl Proposal 170 tunnel runtime completion | historical runtime completion accepted; current security closure reopened | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no separate runtime handoff | M072/M073 historical closure evidence remains valid for their pinned heads; M081 re-establishes the M073 generic-server option truthfulness invariant at the current head |
-| I2PControl Proposal 170 tunnel security hardening | M080-M081 closed; M082/M077-M079 corrective work remains | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M082 — HTTP peer identity and Expect-framing corrective | independent post-M076 review found M074 admission-state defects, M075 leaseSet option regression, and M076 HTTP identity/Expect defects; M080 closes the admission transactionality/cardinality defects; M081 closes the accepted-but-ignored `leaseSetEncType` regression |
+| I2PControl Proposal 170 tunnel security hardening | M080-M082 closed; M077-M079 corrective work remains | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M077 — IRC server lifetime/exhaustion hardening | independent post-M076 review found M074 admission-state defects, M075 leaseSet option regression, and M076 HTTP identity/Expect defects; M080 closes the admission transactionality/cardinality defects; M081 closes the accepted-but-ignored `leaseSetEncType` regression; M082 closes the HTTP structural-Destination, Expect, and POST peer-key defects |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -46,7 +46,7 @@ Exactly one plan is currently registered as dependency-ready:
 
 | Handoff | Status | Plan | Objective |
 |---|---|---|---|
-| M082 — HTTP peer identity and Expect-framing corrective | ready | `plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md` | restore the structural 524-byte Destination bound, reject `Expect: 100-continue` before local target allocation, and replace HTTP POST limiter peer keys with the canonical M080 cryptographic Destination identity |
+| M077 — IRC server lifetime/exhaustion hardening | ready | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | add activity-resetting post-registration idle expiry to `ircserver` without parsing or reframing normal IRC traffic, building on the M080 canonical cryptographic peer identity |
 
 Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered `ready`.
 
@@ -57,14 +57,14 @@ The independent review of head `1618de172e7a78a193fc1bb117af269f31174030` invali
 | Handoff | Status | Plan | Dependency / blocker |
 |---|---|---|---|
 | M074 — shared server admission/rate hardening | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/074-server-admission-and-rate-limit-hardening.md` | M080 owns the discovered transactional/cardinality defects |
-| M075 — generic server accepted-stream hardening | corrective pass required for current truthfulness invariant; accepted-stream architecture retained | `plans/implementation/i2pcontrol-proposal-170/075-generic-server-accepted-stream-hardening.md` | M081 owns the `leaseSetEncType` accepted-but-ignored regression; M080 repairs inherited admission state |
-| M076 — HTTP anonymity/POST hardening | corrective pass required; fingerprint work retained | `plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md` | M082 owns valid-Destination bound, `Expect`, and POST peer-key correction; M080 repairs inherited admission state |
+| M075 — generic server accepted-stream hardening | closed | `plans/implementation/i2pcontrol-proposal-170/075-generic-server-accepted-stream-hardening.md` | M081 closed the `leaseSetEncType` accepted-but-ignored regression; M080 repaired inherited admission state |
+| M076 — HTTP anonymity/POST hardening | closed | `plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md` | M082 closed the valid-Destination bound, `Expect`, and POST peer-key correction |
 | M080 — admission transactionality/cardinality corrective | closed | `plans/implementation/i2pcontrol-proposal-170/080-server-admission-transactionality-and-cardinality-corrective.md` | closure: `plans/closure/i2pcontrol-proposal-170/080-closure.md`; implementation commit `f07bf14acd18f3ee6dff89d993ca73f2a14a85b7` |
 | M081 — generic server LeaseSet option truthfulness corrective | closed | `plans/implementation/i2pcontrol-proposal-170/081-generic-server-leaseset-option-truthfulness-corrective.md` | closure: `plans/closure/i2pcontrol-proposal-170/081-closure.md`; accepted-stream `SESSION CREATE` now carries the validated `leaseSetEncType` and the M075 accepted-but-ignored regression is closed |
-| M082 — HTTP peer identity and Expect-framing corrective | ready | `plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md` | current registered handoff; M080 provides canonical trusted peer identity; M081 sequence gate is now closed |
-| M077 — IRC server lifetime/exhaustion hardening | blocked | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | M082 must close before the original security sequence resumes |
-| M078 — Streamr local-boundary hardening | blocked | `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md` | M082 and M077 must close first |
-| M079 — integrated tunnel-security reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md` | M082 plus M077-M078 must close; M079 independently re-audits the final head |
+| M082 — HTTP peer identity and Expect-framing corrective | closed | `plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md` | closure: `plans/closure/i2pcontrol-proposal-170/082-closure.md`; structural trusted peer identity is consumed through the M080 `TrustedPeerIdentity` boundary, `Expect` requests are rejected with fixed `417 Expectation Failed` semantics before local target allocation, and the POST limiter is keyed by the canonical 32-byte Destination hash |
+| M077 — IRC server lifetime/exhaustion hardening | ready | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | next registered handoff; consumes the M080 canonical cryptographic peer identity for its activity-resetting post-registration idle expiry |
+| M078 — Streamr local-boundary hardening | blocked | `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md` | M077 must close first |
+| M079 — integrated tunnel-security reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md` | M077-M078 must close; M079 independently re-audits the final head |
 
 ## Corrective findings controlling M080-M082
 
@@ -113,13 +113,15 @@ ServerTunnelBackend::runtime_config
 
 Closure evidence: `plans/closure/i2pcontrol-proposal-170/081-closure.md`.
 
-### M082 / M076 HTTP correctness
+### M082 / M076 HTTP correctness (closed)
 
-M076's 524-character trusted-Destination ceiling is based on a legacy-sized Destination assumption and can reject valid current I2P key-certificate/signature forms. HTTP must use structural Destination validation and a bound derived from all currently supported forms.
+M076's 524-character trusted-Destination ceiling is based on a legacy-sized Destination assumption and can reject valid current I2P key-certificate/signature forms. M082 replaces the magic ceiling with the M080 structural `TrustedPeerIdentity::from_stream` validation so the HTTP filter consumes the same 32-byte canonical cryptographic peer identity as the shared admission state.
 
-`Expect: 100-continue` is currently forwarded while Emissary waits for the request body before reading the local response, creating a client/backend wait cycle until body timeout. M082 rejects expectations before local target allocation rather than adding a broader informational-response state machine.
+`Expect: 100-continue` was forwarded while Emissary waits for the request body before reading the local response, creating a client/backend wait cycle until body timeout. M082 now rejects every request carrying an `Expect` header (single, duplicate, mixed-case `100-Continue`, or unknown expectation tokens) with a fixed `417 Expectation Failed` response and `Connection: close` before any local target connection, releasing the M080 admission lease on handler return.
 
-M082 also replaces HTTP POST limiter `DefaultHasher` peer keys with the canonical Destination ID and revalidates its auxiliary expiry bound.
+The HTTP POST limiter previously keyed peers with an 8-byte `DefaultHasher` digest of the textual peer string. M082 moves the key to the canonical 32-byte Destination hash derived from `TrustedPeerIdentity::canonical_id()`, leaving the `MAX_THROTTLE_ENTRIES = 1024` bound and the "active/unexpired entries are never evicted" rule intact.
+
+Closure evidence: `plans/closure/i2pcontrol-proposal-170/082-closure.md`.
 
 ## Durable tunnel security boundary
 
@@ -178,9 +180,9 @@ Do not add hosted CI jobs, release machinery, coverage gates, generalized fuzz i
 
 ## Registry maintenance rules
 
-1. M082 is the sole dependency-ready handoff.
-2. M077 must remain blocked until M082 closes.
-3. M078 remains behind M077; M079 remains behind M082 and M077-M078.
+1. M077 is the sole dependency-ready handoff.
+2. M078 must remain blocked until M077 closes.
+3. M079 remains behind M077 and M078.
 4. M079, not an implementation-agent assertion, is the final independent tunnel-security reclosure authority.
 5. Any high/medium finding discovered by M079 creates another narrow corrective plan; it may not be hidden inside closure.
 6. Preserve ADR-0003 scope: no adjacent tunnel/protocol features.

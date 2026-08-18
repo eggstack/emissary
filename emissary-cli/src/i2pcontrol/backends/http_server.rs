@@ -1,8 +1,7 @@
 //! Accepted-stream HTTP reverse tunnel for Proposal 170 `httpserver`.
 
 use std::{
-    collections::{hash_map::DefaultHasher, HashMap, VecDeque},
-    hash::{Hash, Hasher},
+    collections::{HashMap, VecDeque},
     io,
     sync::Arc,
     time::Duration,
@@ -30,6 +29,7 @@ use crate::i2pcontrol::{
         runtime::{
             run_accepted_server, AcceptedServerConnection, AcceptedServerHandler,
             AcceptedServerRuntimeConfig, AcceptedServerRuntimeError, ServerAdmissionPolicy,
+            TrustedPeerIdentity,
         },
         server::SERVER_IDENTITY_KEY,
     },
@@ -72,14 +72,12 @@ pub(crate) struct PostLimiter {
     state: Arc<Mutex<PostLimiterState>>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct PostPeerKey([u8; 8]);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct PostPeerKey([u8; 32]);
 
 impl PostPeerKey {
-    fn from_peer(peer: &str) -> Self {
-        let mut hasher = DefaultHasher::new();
-        peer.hash(&mut hasher);
-        Self(hasher.finish().to_be_bytes())
+    fn from_peer(peer: &TrustedPeerIdentity) -> Self {
+        Self(*peer.canonical_id())
     }
 }
 
@@ -125,7 +123,7 @@ impl PostLimiter {
         }
     }
 
-    fn allow(&self, peer: &str) -> bool {
+    fn allow(&self, peer: &TrustedPeerIdentity) -> bool {
         if self.limit == 0 {
             return true;
         }
@@ -419,7 +417,7 @@ async fn handle_connection(
     policy: HttpServerPolicy,
     limiter: PostLimiter,
 ) -> io::Result<()> {
-    let peer = connection.peer.destination().to_owned();
+    let peer = connection.peer;
     let (remote_read, remote_write) = tokio::io::split(connection.stream);
     handle_http_stream(
         remote_read,
@@ -455,7 +453,7 @@ pub(crate) fn make_accepted_handler(
 async fn handle_http_stream<R, W>(
     remote_read: R,
     mut remote_write: W,
-    peer: String,
+    peer: TrustedPeerIdentity,
     target_host: String,
     target_port: u16,
     policy: HttpServerPolicy,
@@ -469,7 +467,7 @@ where
     let request = match read_and_sanitize_request(&mut remote_reader, &peer, &policy).await {
         Ok(request) => request,
         Err(error) => {
-            send_error(&mut remote_write, error_kind_status(error.kind())).await?;
+            send_error(&mut remote_write, error.status_line()).await?;
             return Ok(());
         }
     };
@@ -513,16 +511,6 @@ async fn send_error<W: tokio::io::AsyncWrite + Unpin>(
 ) -> io::Result<()> {
     let response = format!("HTTP/1.1 {status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
     writer.write_all(response.as_bytes()).await
-}
-
-fn error_kind_status(kind: io::ErrorKind) -> &'static str {
-    match kind {
-        io::ErrorKind::PermissionDenied => "403 Forbidden",
-        io::ErrorKind::TimedOut => "408 Request Timeout",
-        io::ErrorKind::InvalidData => "400 Bad Request",
-        io::ErrorKind::Unsupported => "501 Not Implemented",
-        _ => "400 Bad Request",
-    }
 }
 
 /// Real backend for the control-plane-owned Proposal 170 `httpserver` type.
@@ -846,7 +834,10 @@ fn option_error(error: OptionValidationError) -> BackendError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::i2pcontrol::domain::tunnel::{StartIntent, TunnelName, TunnelOptions};
+    use crate::i2pcontrol::{
+        backends::runtime::peer_identity::test_fixtures::distinct_peer,
+        domain::tunnel::{StartIntent, TunnelName, TunnelOptions},
+    };
     use tokio::io::{duplex, AsyncReadExt, AsyncWriteExt};
 
     fn definition(raw_config: &[(&str, serde_json::Value)]) -> TunnelDefinition {
@@ -926,38 +917,55 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn post_limiter_is_bounded_and_peer_keyed() {
         let limiter = PostLimiter::new(1, Duration::from_secs(60));
-        assert!(limiter.allow("peer-a"));
-        assert!(!limiter.allow("peer-a"));
-        assert!(limiter.allow("peer-b"));
+        let peer_a = distinct_peer(0xA0);
+        let peer_b = distinct_peer(0xB0);
+        assert!(limiter.allow(&peer_a));
+        assert!(!limiter.allow(&peer_a));
+        assert!(limiter.allow(&peer_b));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn post_limiter_keys_distinct_peers_independently() {
+        let limiter = PostLimiter::new(1, Duration::from_secs(60));
+        let peer_a = distinct_peer(0xA1);
+        let peer_b = distinct_peer(0xB1);
+        assert!(limiter.allow(&peer_a));
+        assert!(!limiter.allow(&peer_a));
+        assert!(limiter.allow(&peer_b));
+        assert_eq!(limiter.state_sizes(), (2, 2));
     }
 
     #[tokio::test(start_paused = true)]
     async fn post_limiter_denies_churn_without_evicting_active_entries() {
+        use crate::i2pcontrol::backends::runtime::peer_identity::test_fixtures::distinct_peer_u32;
         let limiter = PostLimiter::new(1, Duration::from_secs(60));
-        for index in 0..MAX_THROTTLE_ENTRIES {
-            assert!(limiter.allow(&format!("peer-{index}")));
+        let peers: Vec<_> = (0..MAX_THROTTLE_ENTRIES as u32).map(distinct_peer_u32).collect();
+        for peer in &peers {
+            assert!(limiter.allow(peer));
         }
         assert_eq!(
             limiter.state_sizes(),
             (MAX_THROTTLE_ENTRIES, MAX_THROTTLE_ENTRIES)
         );
-        assert!(!limiter.allow("new-peer"));
-        assert!(!limiter.allow("peer-0"));
+        let new_peer = distinct_peer(0xFE);
+        assert!(!limiter.allow(&new_peer));
+        assert!(!limiter.allow(&peers[0]));
         assert_eq!(
             limiter.state_sizes(),
             (MAX_THROTTLE_ENTRIES, MAX_THROTTLE_ENTRIES)
         );
 
         tokio::time::advance(Duration::from_secs(60)).await;
-        assert!(limiter.allow("new-peer"));
+        assert!(limiter.allow(&new_peer));
         assert_eq!(limiter.state_sizes(), (1, 1));
     }
 
     #[tokio::test(start_paused = true)]
     async fn post_limiter_counts_only_write_methods() {
         let limiter = PostLimiter::new(1, Duration::from_secs(60));
-        assert!(limiter.allow("peer-a"));
-        assert!(!limiter.allow("peer-a"));
+        let peer = distinct_peer(0xC0);
+        assert!(limiter.allow(&peer));
+        assert!(!limiter.allow(&peer));
         assert_eq!(limiter.state_sizes(), (1, 1));
     }
 
@@ -971,11 +979,12 @@ mod tests {
         let (mut client, server) = duplex(64 * 1024);
         let (server_read, server_write) = tokio::io::split(server);
         let limiter = PostLimiter::new(1, Duration::from_secs(60));
-        assert!(limiter.allow("peer-destination"));
+        let peer = distinct_peer(0xD0);
+        assert!(limiter.allow(&peer));
         let task = tokio::spawn(handle_http_stream(
             server_read,
             server_write,
-            "peer-destination".to_owned(),
+            peer,
             "127.0.0.1".to_owned(),
             local_port,
             HttpServerPolicy {
@@ -1030,10 +1039,11 @@ mod tests {
 
         let (mut client, server) = duplex(64 * 1024);
         let (server_read, server_write) = tokio::io::split(server);
+        let peer = distinct_peer(0xE0);
         let task = tokio::spawn(handle_http_stream(
             server_read,
             server_write,
-            "peer-destination".to_owned(),
+            peer,
             "127.0.0.1".to_owned(),
             local_port,
             HttpServerPolicy {
@@ -1065,5 +1075,59 @@ mod tests {
         assert!(response.ends_with("\r\n\r\nok"));
         task.await.unwrap().unwrap();
         local.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn expect_request_is_rejected_with_417_before_local_allocation() {
+        let local_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let local_port = local_listener.local_addr().unwrap().port();
+        let local = tokio::spawn(async move {
+            tokio::time::timeout(Duration::from_millis(150), local_listener.accept()).await
+        });
+        let (mut client, server) = duplex(64 * 1024);
+        let (server_read, server_write) = tokio::io::split(server);
+        let task = tokio::spawn(handle_http_stream(
+            server_read,
+            server_write,
+            distinct_peer(0xE1),
+            "127.0.0.1".to_owned(),
+            local_port,
+            HttpServerPolicy {
+                website_host: "configured.i2p".to_owned(),
+                ..HttpServerPolicy {
+                    website_host: "localhost".to_owned(),
+                    block_access_in_proxies: false,
+                    block_referers: false,
+                    allow_referer: true,
+                    block_user_agents: false,
+                    allow_user_agent: true,
+                    user_agents: None,
+                    access_list: None,
+                    access_option: AccessOption::Allow,
+                }
+            },
+            PostLimiter::new(0, Duration::from_secs(60)),
+        ));
+        client
+            .write_all(
+                b"POST /upload HTTP/1.1\r\nExpect: 100-continue\r\nContent-Length: 0\r\n\r\n",
+            )
+            .await
+            .unwrap();
+        client.shutdown().await.unwrap();
+        let mut response = Vec::new();
+        client.read_to_end(&mut response).await.unwrap();
+        let response = String::from_utf8(response).unwrap();
+        assert!(
+            response.starts_with("HTTP/1.1 417 Expectation Failed\r\n"),
+            "got: {response}"
+        );
+        assert!(response.contains("Connection: close\r\n"));
+        assert!(response.ends_with("\r\n\r\n"));
+        task.await.unwrap().unwrap();
+        assert!(
+            local.await.unwrap().is_err(),
+            "local backend must not be connected for Expect requests"
+        );
     }
 }

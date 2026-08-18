@@ -10,6 +10,8 @@ use tokio::io::{
     AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
 };
 
+use crate::i2pcontrol::backends::runtime::TrustedPeerIdentity;
+
 pub const REQUEST_LINE_TIMEOUT: Duration = Duration::from_secs(5);
 pub const HEADER_TIMEOUT: Duration = Duration::from_secs(15);
 pub const BODY_TIMEOUT: Duration = Duration::from_secs(60);
@@ -19,12 +21,6 @@ pub const MAX_HEADER_COUNT: usize = 64;
 pub const MAX_HEADER_BYTES: usize = 32 * 1024;
 pub const MAX_RESPONSE_LINE: usize = 8 * 1024;
 pub const MAX_RESPONSE_HEADER_BYTES: usize = 32 * 1024;
-
-// The largest destination representation accepted by the core reference
-// parser is 391 serialized bytes (the key-certificate form), which is 524
-// bytes in padded I2P Base64.  Keep the authenticated peer value below the
-// old arbitrary 64 KiB allowance before it can become local HTTP metadata.
-pub const MAX_TRUSTED_DESTINATION_TEXT: usize = 524;
 
 const HOP_BY_HOP: &[&str] = &[
     "connection",
@@ -125,6 +121,55 @@ pub struct SanitizedResponse {
     pub head: Vec<u8>,
 }
 
+/// Categorical rejection for `read_and_sanitize_request`. The variant selects
+/// the fixed HTTP status emitted to the remote peer; no target/backend
+/// detail ever crosses this boundary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RequestSanitizeError {
+    /// `Expect` header (single, duplicate, mixed-case, or unknown token).
+    ExpectUnsupported,
+    /// HTTP upgrade / `Connection: upgrade`.
+    UpgradeUnsupported,
+    /// Conflicting/ambiguous framing, obs-fold, oversized line/header, etc.
+    Malformed,
+    /// Host header duplication, invalid absolute target, etc.
+    BadRequest,
+    /// Proxy identity header seen while `BlockAccessInProxies` is set.
+    ProxyBlocked,
+    /// Referer header seen while referer policy forbids it.
+    RefererBlocked,
+    /// User-Agent header seen while user-agent policy forbids it.
+    UserAgentBlocked,
+    /// Access-list entry did not match.
+    AccessDenied,
+    /// Header or request-line read deadline elapsed.
+    TimedOut,
+}
+
+impl RequestSanitizeError {
+    pub fn status_line(&self) -> &'static str {
+        match self {
+            Self::ExpectUnsupported => "417 Expectation Failed",
+            Self::UpgradeUnsupported => "501 Not Implemented",
+            Self::Malformed => "400 Bad Request",
+            Self::BadRequest => "400 Bad Request",
+            Self::ProxyBlocked => "403 Forbidden",
+            Self::RefererBlocked => "403 Forbidden",
+            Self::UserAgentBlocked => "403 Forbidden",
+            Self::AccessDenied => "403 Forbidden",
+            Self::TimedOut => "408 Request Timeout",
+        }
+    }
+}
+
+impl std::fmt::Display for RequestSanitizeError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.status_line())
+    }
+}
+
+impl std::error::Error for RequestSanitizeError {}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Header {
     pub name: String,
@@ -133,39 +178,39 @@ pub struct Header {
 
 pub async fn read_and_sanitize_request<R: AsyncBufRead + Unpin>(
     reader: &mut R,
-    peer_destination: &str,
+    peer: &TrustedPeerIdentity,
     policy: &HttpServerPolicy,
-) -> io::Result<SanitizedRequest> {
-    validate_trusted_destination(peer_destination)?;
-    let request_line =
-        read_line_with_timeout(reader, REQUEST_LINE_TIMEOUT, MAX_REQUEST_LINE).await?;
-    let (method, target, version) = parse_request_line(&request_line)?;
+) -> Result<SanitizedRequest, RequestSanitizeError> {
+    let peer_destination = peer.destination();
+    let request_line = read_line_with_timeout(reader, REQUEST_LINE_TIMEOUT, MAX_REQUEST_LINE)
+        .await
+        .map_err(map_read_error)?;
+    let (method, target, version) =
+        parse_request_line(&request_line).map_err(map_request_line_error)?;
     let headers = tokio::time::timeout(HEADER_TIMEOUT, read_headers(reader, MAX_HEADER_BYTES))
         .await
-        .map_err(|_| invalid(io::ErrorKind::TimedOut, "HTTP header timeout"))??;
+        .map_err(|_| RequestSanitizeError::TimedOut)?
+        .map_err(|_| RequestSanitizeError::Malformed)?;
 
     let host_count = headers.iter().filter(|header| eq(&header.name, "host")).count();
     if host_count > 1 {
-        return Err(invalid(io::ErrorKind::InvalidData, "ambiguous host header"));
+        return Err(RequestSanitizeError::Malformed);
     }
 
     let proxy_seen = headers
         .iter()
         .any(|header| PROXY_IDENTITY.contains(&header.name.to_ascii_lowercase().as_str()));
     if policy.block_access_in_proxies && proxy_seen {
-        return Err(invalid(
-            io::ErrorKind::PermissionDenied,
-            "proxy access blocked",
-        ));
+        return Err(RequestSanitizeError::ProxyBlocked);
     }
 
     if !peer_allowed(peer_destination, policy) {
-        return Err(invalid(io::ErrorKind::PermissionDenied, "access denied"));
+        return Err(RequestSanitizeError::AccessDenied);
     }
 
     let referer_seen = headers.iter().any(|header| eq(&header.name, "referer"));
     if (policy.block_referers || !policy.allow_referer) && referer_seen {
-        return Err(invalid(io::ErrorKind::PermissionDenied, "referer blocked"));
+        return Err(RequestSanitizeError::RefererBlocked);
     }
 
     let user_agent = headers
@@ -173,17 +218,11 @@ pub async fn read_and_sanitize_request<R: AsyncBufRead + Unpin>(
         .find(|header| eq(&header.name, "user-agent"))
         .map(|header| header.value.trim());
     if (policy.block_user_agents || !policy.allow_user_agent) && user_agent.is_some() {
-        return Err(invalid(
-            io::ErrorKind::PermissionDenied,
-            "user-agent blocked",
-        ));
+        return Err(RequestSanitizeError::UserAgentBlocked);
     }
     if let Some(allowed) = &policy.user_agents {
         if user_agent.is_none_or(|value| !allowed.iter().any(|entry| value == entry)) {
-            return Err(invalid(
-                io::ErrorKind::PermissionDenied,
-                "user-agent not allowed",
-            ));
+            return Err(RequestSanitizeError::UserAgentBlocked);
         }
     }
 
@@ -192,34 +231,44 @@ pub async fn read_and_sanitize_request<R: AsyncBufRead + Unpin>(
             && split_tokens(&header.value).iter().any(|token| token == "upgrade")
     }) || headers.iter().any(|header| eq(&header.name, "upgrade"))
     {
-        return Err(invalid(
-            io::ErrorKind::Unsupported,
-            "HTTP upgrade is unsupported",
-        ));
+        return Err(RequestSanitizeError::UpgradeUnsupported);
+    }
+
+    // The accepted-stream flow forwards the sanitized request head, then
+    // copies the remote body before reading the local response. A client
+    // sending `Expect: 100-continue` may legitimately pause until it sees
+    // a 100 interim response from the local backend, which the backend
+    // may emit immediately while we are still blocked on the body.
+    // Without a relay implementation that request can pin the accepted
+    // handler slot until BODY_TIMEOUT.
+    //
+    // Reject every request that carries any Expect header (single,
+    // duplicate, mixed-case `100-Continue`, or unknown expectation
+    // tokens) before TcpStream::connect with a fixed 417 close response.
+    if headers.iter().any(|header| eq(&header.name, "expect")) {
+        return Err(RequestSanitizeError::ExpectUnsupported);
     }
 
     let content_lengths = headers
         .iter()
         .filter(|header| eq(&header.name, "content-length"))
         .map(|header| parse_content_length(&header.value))
-        .collect::<io::Result<Vec<_>>>()?;
+        .collect::<io::Result<Vec<_>>>()
+        .map_err(|_| RequestSanitizeError::Malformed)?;
     if content_lengths.windows(2).any(|values| values[0] != values[1]) {
-        return Err(invalid(
-            io::ErrorKind::InvalidData,
-            "conflicting content length",
-        ));
+        return Err(RequestSanitizeError::Malformed);
     }
     let content_length = content_lengths.first().copied().unwrap_or(0);
 
     if headers.iter().any(|header| eq(&header.name, "transfer-encoding")) {
-        return Err(invalid(
-            io::ErrorKind::Unsupported,
-            "transfer encoding is unsupported",
-        ));
+        return Err(RequestSanitizeError::UpgradeUnsupported);
     }
 
     let mut output = Vec::with_capacity(request_line.len() + headers.len() * 32 + 4);
-    output.extend_from_slice(&normalize_request_line(&method, &target, &version)?);
+    output.extend_from_slice(
+        &normalize_request_line(&method, &target, &version)
+            .map_err(|_| RequestSanitizeError::BadRequest)?,
+    );
     let nominated = connection_nominated_headers(&headers);
     for header in headers {
         let name = header.name.to_ascii_lowercase();
@@ -369,21 +418,6 @@ fn peer_allowed(peer: &str, policy: &HttpServerPolicy) -> bool {
         AccessOption::Allow => matches,
         AccessOption::Deny => !matches,
     }
-}
-
-fn validate_trusted_destination(destination: &str) -> io::Result<()> {
-    if destination.is_empty()
-        || destination.len() > MAX_TRUSTED_DESTINATION_TEXT
-        || destination
-            .chars()
-            .any(|character| character.is_control() || character.is_whitespace())
-    {
-        return Err(invalid(
-            io::ErrorKind::InvalidData,
-            "trusted peer identity is too large or malformed",
-        ));
-    }
-    Ok(())
 }
 
 fn parse_request_line(line: &[u8]) -> io::Result<(String, String, String)> {
@@ -626,9 +660,21 @@ fn invalid(kind: io::ErrorKind, message: &'static str) -> io::Error {
     io::Error::new(kind, message)
 }
 
+fn map_read_error(error: io::Error) -> RequestSanitizeError {
+    match error.kind() {
+        io::ErrorKind::TimedOut => RequestSanitizeError::TimedOut,
+        _ => RequestSanitizeError::Malformed,
+    }
+}
+
+fn map_request_line_error(_error: io::Error) -> RequestSanitizeError {
+    RequestSanitizeError::BadRequest
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::i2pcontrol::backends::runtime::peer_identity::test_fixtures::distinct_peer;
     use tokio::io::{duplex, AsyncWriteExt, BufReader};
 
     fn policy() -> HttpServerPolicy {
@@ -645,18 +691,25 @@ mod tests {
         }
     }
 
-    async fn request(input: &[u8], policy: &HttpServerPolicy) -> io::Result<SanitizedRequest> {
+    async fn request(
+        input: &[u8],
+        peer: &TrustedPeerIdentity,
+        policy: &HttpServerPolicy,
+    ) -> Result<SanitizedRequest, RequestSanitizeError> {
         let (mut writer, reader) = duplex(64 * 1024);
         writer.write_all(input).await.unwrap();
         writer.shutdown().await.unwrap();
         let mut reader = BufReader::new(reader);
-        read_and_sanitize_request(&mut reader, "peer-destination", policy).await
+        read_and_sanitize_request(&mut reader, peer, policy).await
     }
 
     #[tokio::test]
     async fn normalizes_absolute_target_and_removes_spoofed_identity() {
+        let peer = distinct_peer(1);
+        let expected_b64 = peer.destination().to_owned();
         let result = request(
             b"GET http://evil.example/path?q=1 HTTP/1.1\r\nHost: evil.example\r\nx-i2p-destb64: attacker\r\nX-Forwarded-For: 10.0.0.1\r\n\r\n",
+            &peer,
             &policy(),
         )
         .await
@@ -667,11 +720,12 @@ mod tests {
         assert!(!output.contains("attacker"));
         assert!(!output.contains("10.0.0.1"));
         assert!(output.contains("Host: example.i2p\r\n"));
-        assert!(output.contains("X-I2P-DestB64: peer-destination\r\n"));
+        assert!(output.contains(&format!("X-I2P-DestB64: {expected_b64}\r\n")));
     }
 
     #[tokio::test]
     async fn rejects_smuggling_and_malformed_headers() {
+        let peer = distinct_peer(2);
         for input in [
             b"POST / HTTP/1.1\r\nContent-Length: 1\r\nContent-Length: 2\r\n\r\n".as_slice(),
             b"POST / HTTP/1.1\r\nContent-Length: 1\r\nTransfer-Encoding: chunked\r\n\r\n"
@@ -679,16 +733,18 @@ mod tests {
             b"GET / HTTP/1.1\r\n Folded: yes\r\n\r\n".as_slice(),
             b"GET / HTTP/1.1\r\nMissing\r\n\r\n".as_slice(),
         ] {
-            assert!(request(input, &policy()).await.is_err());
+            assert!(request(input, &peer, &policy()).await.is_err());
         }
     }
 
     #[tokio::test]
     async fn applies_proxy_referer_user_agent_and_access_policy() {
+        let peer = distinct_peer(3);
         let mut configured = policy();
         configured.block_access_in_proxies = true;
         assert!(request(
             b"GET / HTTP/1.1\r\nForwarded: for=10.0.0.1\r\n\r\n",
+            &peer,
             &configured,
         )
         .await
@@ -698,6 +754,7 @@ mod tests {
         configured.block_referers = true;
         assert!(request(
             b"GET / HTTP/1.1\r\nReferer: https://clear.example/\r\n\r\n",
+            &peer,
             &configured
         )
         .await
@@ -705,21 +762,24 @@ mod tests {
 
         configured = policy();
         configured.user_agents = Some(vec!["safe-agent".to_owned()]);
-        assert!(
-            request(b"GET / HTTP/1.1\r\nUser-Agent: unsafe\r\n\r\n", &configured)
-                .await
-                .is_err()
-        );
+        assert!(request(
+            b"GET / HTTP/1.1\r\nUser-Agent: unsafe\r\n\r\n",
+            &peer,
+            &configured
+        )
+        .await
+        .is_err());
 
         configured = policy();
         configured.access_list = Some(vec!["other-peer".to_owned()]);
-        assert!(request(b"GET / HTTP/1.1\r\n\r\n", &configured).await.is_err());
+        assert!(request(b"GET / HTTP/1.1\r\n\r\n", &peer, &configured).await.is_err());
     }
 
     #[tokio::test]
     async fn preserves_allowed_end_to_end_headers() {
         let result = request(
             b"GET / HTTP/1.1\r\nReferer: https://example.i2p/\r\nUser-Agent: safe\r\n\r\n",
+            &distinct_peer(4),
             &policy(),
         )
         .await
@@ -776,6 +836,7 @@ mod tests {
     async fn removes_proxy_identity_and_adopted_request_privacy_headers() {
         let result = request(
             b"GET / HTTP/1.1\r\nForwarded: for=10.0.0.1\r\nVia: proxy\r\nX-Forwarded-For: 10.0.0.2\r\nX-Forwarded-Host: evil\r\nX-Forwarded-Server: evil\r\nProxy: evil\r\nX-Real-IP: 10.0.0.3\r\nx-client-ip: 10.0.0.4\r\nTrue-Client-IP: 10.0.0.5\r\nCF-Connecting-IP: 10.0.0.6\r\nFastly-Client-IP: 10.0.0.7\r\nX-Cluster-Client-IP: 10.0.0.8\r\nPriority: u=1\r\nSec-GPC: 1\r\n\r\n",
+            &distinct_peer(5),
             &policy(),
         )
         .await
@@ -826,13 +887,114 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_over_bound_trusted_identity_before_building_request() {
-        let (mut writer, reader) = duplex(64 * 1024);
-        writer.write_all(b"GET / HTTP/1.1\r\n\r\n").await.unwrap();
-        writer.shutdown().await.unwrap();
-        let mut reader = BufReader::new(reader);
-        let identity = "a".repeat(MAX_TRUSTED_DESTINATION_TEXT + 1);
-        let error = read_and_sanitize_request(&mut reader, &identity, &policy()).await.unwrap_err();
-        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    async fn accepts_canonical_trusted_peer_from_stream_helper() {
+        let peer = distinct_peer(6);
+        let result = request(b"GET / HTTP/1.1\r\n\r\n", &peer, &policy()).await.unwrap();
+        let output = String::from_utf8(result.head).unwrap();
+        assert!(output.contains(&format!("X-I2P-DestB64: {}\r\n", peer.destination())));
+    }
+
+    #[tokio::test]
+    async fn accepts_largest_supported_key_certificate_destination() {
+        use crate::i2pcontrol::backends::runtime::peer_identity::test_fixtures::distinct_key_cert_peer;
+        let peer = distinct_key_cert_peer(0x10);
+        // 391-byte Destination encodes to 524 characters of I2P Base64.
+        assert_eq!(peer.destination().len(), 524);
+        let result = request(b"GET /largest HTTP/1.1\r\n\r\n", &peer, &policy()).await.unwrap();
+        let output = String::from_utf8(result.head).unwrap();
+        assert!(output.contains(&format!("X-I2P-DestB64: {}\r\n", peer.destination())));
+        assert!(output.contains("X-I2P-DestB32: "));
+    }
+
+    #[tokio::test]
+    async fn rejects_over_bound_destination_text_before_request_construction() {
+        // A structurally valid Destination text longer than the M080
+        // ingress bound must be rejected by the upstream peer-identity
+        // validator, never reaching this filter as a `TrustedPeerIdentity`.
+        assert!(super::super::super::runtime::TrustedPeerIdentity::from_destination_text(
+            &"A".repeat(super::super::super::runtime::MAX_TRUSTED_DESTINATION_B64_TEXT + 1)
+        )
+        .is_none());
+    }
+
+    #[tokio::test]
+    async fn rejects_malformed_destination_text_before_request_construction() {
+        // Empty, control-char, whitespace, and non-base64 inputs all fail
+        // the structural validation upstream.
+        assert!(super::super::super::runtime::TrustedPeerIdentity::from_destination_text("")
+            .is_none());
+        assert!(super::super::super::runtime::TrustedPeerIdentity::from_destination_text(
+            "peer-destination"
+        )
+        .is_none());
+        assert!(super::super::super::runtime::TrustedPeerIdentity::from_destination_text(
+            "not valid base64!@#"
+        )
+        .is_none());
+    }
+
+    #[tokio::test]
+    async fn rejects_expect_100_continue_before_local_allocation() {
+        let error = request(
+            b"POST /upload HTTP/1.1\r\nExpect: 100-continue\r\nContent-Length: 0\r\n\r\n",
+            &distinct_peer(7),
+            &policy(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error, RequestSanitizeError::ExpectUnsupported);
+        assert_eq!(error.status_line(), "417 Expectation Failed");
+    }
+
+    #[tokio::test]
+    async fn rejects_mixed_case_expect_continuation_token() {
+        let error = request(
+            b"POST /upload HTTP/1.1\r\nExpect: 100-Continue\r\nContent-Length: 0\r\n\r\n",
+            &distinct_peer(8),
+            &policy(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error, RequestSanitizeError::ExpectUnsupported);
+        assert_eq!(error.status_line(), "417 Expectation Failed");
+    }
+
+    #[tokio::test]
+    async fn rejects_unknown_expectation_token() {
+        let error = request(
+            b"POST /upload HTTP/1.1\r\nExpect: 102-processing\r\nContent-Length: 0\r\n\r\n",
+            &distinct_peer(9),
+            &policy(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error, RequestSanitizeError::ExpectUnsupported);
+        assert_eq!(error.status_line(), "417 Expectation Failed");
+    }
+
+    #[tokio::test]
+    async fn rejects_duplicate_expect_headers() {
+        let error = request(
+            b"POST /upload HTTP/1.1\r\nExpect: 100-continue\r\nExpect: 100-continue\r\nContent-Length: 0\r\n\r\n",
+            &distinct_peer(10),
+            &policy(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error, RequestSanitizeError::ExpectUnsupported);
+        assert_eq!(error.status_line(), "417 Expectation Failed");
+    }
+
+    #[tokio::test]
+    async fn plain_post_without_expect_still_forwards() {
+        let result = request(
+            b"POST /upload HTTP/1.1\r\nContent-Length: 0\r\n\r\n",
+            &distinct_peer(11),
+            &policy(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(result.method, "POST");
+        assert_eq!(result.content_length, 0);
     }
 }

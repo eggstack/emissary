@@ -1,6 +1,6 @@
 # I2PControl Tunnel Backends
 
-Status: M080 server admission transactionality/cardinality corrective closed; M081-M082/M077-M079 corrective work remains
+Status: M080-M082 server security corrective sequence closed; M077-M079 corrective work remains
 
 All twelve tunnel families have bounded production backends. The integrated
 runtime/security phase remains open for the ordered M077-M079 corrective work.

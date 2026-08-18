@@ -47,9 +47,9 @@ The implementation target remains:
 
 Exactly one plan is dependency-ready:
 
-- `080-server-admission-transactionality-and-cardinality-corrective.md` — **ready**.
+- `077-irc-server-lifetime-and-exhaustion-hardening.md` — **ready**.
 
-The independent post-M076 review reopened the current security disposition for M074-M076. M077 is no longer ready until the corrective prerequisites close.
+The independent post-M076 review reopened the current security disposition for M074-M076. M077 is now ready after the M080-M082 corrective sequence closed.
 
 ## Historical runtime/security sequence
 
@@ -64,21 +64,21 @@ The independent post-M076 review reopened the current security disposition for M
 | M070 | closed | HTTP bidirectional server composition |
 | M071 | closed | Streamr client/server |
 | M072 | historical runtime reclosure accepted after M073 | integrated twelve-type runtime audit |
-| M073 | historical closure valid for pinned commit; current invariant regressed by M075 | generic client/server option truthfulness |
-| M074 | corrective pass required | shared server admission/rate hardening; M080 owns discovered defects |
-| M075 | corrective pass required for current option truthfulness; architecture retained | generic server accepted-stream migration; M081 owns LeaseSet regression |
-| M076 | corrective pass required; anonymity/filter work retained | HTTP fingerprint/POST hardening; M082 owns follow-up defects |
+| M073 | closed; corrective history | generic client/server option truthfulness; M081 closes the M075 accepted-but-ignored regression |
+| M074 | closed; corrective history | shared server admission/rate hardening; M080 owns discovered defects |
+| M075 | closed | generic server accepted-stream migration; M081 closes LeaseSet regression |
+| M076 | closed | HTTP fingerprint/POST hardening; M082 closes follow-up defects |
 
 ## Corrective sequence required before final closure
 
 | Handoff | Status | Scope | Dependency |
 |---|---|---|---|
-| M080 | ready | transactional/bounded admission state, canonical peer keys, capacity/retention coherence | independent review findings |
-| M081 | blocked | generic `leaseSetEncType` apply-or-reject after accepted-stream migration | sequencing behind M080 |
-| M082 | blocked | structural HTTP peer identity, `Expect` rejection, canonical POST peer key | M080 identity boundary; sequencing behind M081 |
-| M077 | blocked | IRC post-registration idle lifetime/connect bound | M080-M082 closed |
-| M078 | blocked | Streamr loopback-only local UDP + reference-aligned fanout | M080-M082 + M077 closed |
-| M079 | blocked | independent integrated tunnel-security reclosure | M080-M082 + M077-M078 closed |
+| M080 | closed | transactional/bounded admission state, canonical peer keys, capacity/retention coherence | independent review findings |
+| M081 | closed | generic `leaseSetEncType` apply-or-reject after accepted-stream migration | sequencing behind M080 |
+| M082 | closed | structural HTTP peer identity, `Expect` rejection, canonical POST peer key | M080 identity boundary; sequencing behind M081 |
+| M077 | ready | IRC post-registration idle lifetime/connect bound | M080-M082 closed |
+| M078 | blocked | Streamr loopback-only local UDP + reference-aligned fanout | M077 closed |
+| M079 | blocked | independent integrated tunnel-security reclosure | M077-M078 closed |
 
 Per `plans/003-planning-process.md`, future handoffs are prewritten for continuity but only the next dependency-ready plan is registered `ready`.
 

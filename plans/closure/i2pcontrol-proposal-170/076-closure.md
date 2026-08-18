@@ -1,6 +1,6 @@
 # M076 Closure — HTTP Server Anonymity and POST-Throttle Hardening
 
-Status: corrective pass required — retained anonymity/filter work remains accepted; M082 owns the independent follow-up findings
+Status: closed; corrective history — retained anonymity/filter work remains accepted; M082 closed every follow-up defect
 
 Source implementation plan:
 
@@ -9,6 +9,7 @@ Source implementation plan:
 Corrective successor:
 
 - `plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md`
+- `plans/closure/i2pcontrol-proposal-170/082-closure.md`
 
 Implementation commit:
 
@@ -91,6 +92,9 @@ Do not add full `100 Continue` support, a second HTTP parser, body rewriting, HT
 
 ## 6. Current disposition
 
-M076 is `corrective pass required` at current head even though its fingerprint and POST-state architecture should be retained. M082 must close the independent identity/Expect/accounting-key findings before M077 can become ready and before M079 final reclosure.
+M076's fingerprint and POST-state architecture is retained; the independent identity/Expect/accounting-key findings are closed by M082
+(`plans/closure/i2pcontrol-proposal-170/082-closure.md`). M077 is now
+dependency-ready, M079 remains the final independent reclosure
+authority.
 
 External I2P/I2P+ source material remains read-only behavioral evidence. No upstream review, issue/PR mutation, merge, or submission is authorized.

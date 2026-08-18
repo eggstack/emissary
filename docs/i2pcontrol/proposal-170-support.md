@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M080 closed; M081-M082/M077-M079 corrective work remains
+Status: partial Proposal 170 support; M080-M082 closed; M077-M079 corrective work remains
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -263,8 +263,9 @@ blocked exactly as they are for `ircclient`.
 `httpserver` is operational only through the I2PControl-owned accepted-stream
 runtime. It reads and bounds the request line/header block before opening the
 loopback target, rejects ambiguous Content-Length/Transfer-Encoding framing,
-obs-fold, upgrades, proxy identity/privacy headers, and spoofed `X-I2P-*`
-headers, then injects
+obs-fold, upgrades, `Expect` headers (single, duplicate, mixed-case
+`100-Continue`, or unknown expectation tokens), proxy identity/privacy
+headers, and spoofed `X-I2P-*` headers, then injects
 peer identity derived from the accepted SAM stream. Configured Host rewriting,
 access lists, proxy/referer/User-Agent policy, peer-aware admission (30 global
 connections by default, 8 per peer, and bounded peer/aggregate minute/hour/day
@@ -274,7 +275,7 @@ Local response headers are parsed and identifying server/proxy/provider/cache/
 trace headers are removed before the bounded response body is streamed back;
 validated Content-Length and chunked framing remain intact, while application
 headers are preserved. Trusted peer identity injection is bounded to the
-reference-valid destination representation. TLS, compression, custom
+structurally validated I2P Destination representation. TLS, compression, custom
 options, arbitrary target hosts, and unsupported Proposal 170 modes reject
 before destination/session allocation.
 
@@ -282,9 +283,13 @@ before destination/session allocation.
 boundary: only base64 I2P Destination text that parses through
 `emissary_core::primitives::Destination::parse` enters the shared admission
 state. The 32-byte SHA-256 Destination hash derived from that parsed
-Destination is the only key used by security accounting. The validated
-textual representation remains available for protocol handlers that need it
-for header injection.
+Destination is the only key used by security accounting and by the HTTP
+write-throttle limiter. The validated textual representation remains available
+for protocol handlers that need it for header injection, and is bounded by
+`MAX_TRUSTED_DESTINATION_B64_TEXT` (1024) at the ingress. `Expect` rejections
+emit a fixed `417 Expectation Failed` response with `Connection: close` and
+no local target connection, so a client that waits for a `100 Continue`
+cannot pin a handler until body timeout.
 
 ### IRC tunnel runtime boundary
 
@@ -426,7 +431,8 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M075 | closed | generic server accepted-stream raw relay hardening |
 | M076 | closed | HTTP anonymity/POST-throttle hardening |
 | M081 | closed | generic server `leaseSetEncType` apply-or-reject corrective; accepted-stream `SESSION CREATE` now carries the validated value |
-| M077 | blocked; behind M082 | IRC lifetime and exhaustion hardening |
+| M082 | closed | HTTP peer identity, `Expect` rejection, and POST cryptographic peer-key corrective |
+| M077 | blocked; M082 closed; awaiting final tunnel-security reclosure sequence | IRC lifetime and exhaustion hardening |
 
 ## Final-status rule
 

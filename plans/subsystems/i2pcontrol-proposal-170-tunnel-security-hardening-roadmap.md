@@ -1,8 +1,10 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: planned corrective security work; M076 closed; M077 next; M078-M079 blocked
+Status: corrective pass required; M080 next; M081-M082 and M077-M079 blocked
 
-Planning production baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
+Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
+
+Current corrective baseline: `1618de172e7a78a193fc1bb117af269f31174030`.
 
 Source runtime roadmap:
 
@@ -17,238 +19,288 @@ Canonical/internal authority:
 - `plans/adrs/ADR-0002-control-plane-tunnel-runtime-ownership.md`;
 - `plans/adrs/ADR-0003-proposal-170-tunnel-runtime-completion-and-filter-boundary.md`;
 - M061 source-containment and M062/M063 dependency-containment authorities;
-- M072 closure and M073 generic option-truthfulness corrective.
+- M072 runtime reclosure and M073 option-truthfulness history.
 
 Pinned external contract:
 
 - I2P Proposal 170, `I2PControl Expansion`, Open revision created/updated `2026-05-20`.
 
-Read-only reference snapshots inspected on `2026-08-15`:
+Read-only reference snapshots used by this workstream:
 
-- Java I2P `i2p/i2p.i2p` at `498488b0d01d9f59efe906424e56ff5e25f58a4d`;
-- I2P+ `I2PPlus/i2pplus` at `5cd400e7f6d3b4432450d2f401d131897ac6998b`.
+- Java I2P `i2p/i2p.i2p`;
+- I2P+ `I2PPlus/i2pplus`;
+- the Yosemite version pinned by this repository.
 
-Reference source is evidence only. No copying, upstream mutation, review request, submission, or contribution preparation is authorized.
+External sources are behavioral/security evidence only. No upstream mutation, review request, submission, contribution preparation, or maintainer contact is authorized.
 
 ## 1. Purpose
 
-The M066-M071 sequence made the ten previously deferred Proposal 170 tunnel families operational. A subsequent security/anonymity review found that the implementation is bounded in several important ways but is not yet equivalent to the mature server-side abuse and fingerprint defenses present in Java I2PTunnel and I2P+.
+M066-M071 made the ten previously deferred Proposal 170 tunnel families operational. M074-M076 then added substantial server-side hardening: peer-aware admission, generic accepted-stream handling, HTTP response-fingerprint suppression, proxy-identity stripping, and churn-safe POST accounting.
 
-This roadmap hardens the newly introduced tunnel data planes against attacker-controlled resource exhaustion, load-state/timing correlation, backend fingerprint leakage, long-lived idle occupancy, limiter-state churn, and unsafe local UDP exposure. It does not expand Proposal 170, add tunnel types, redesign router protocols, or turn I2PControl into a general WAF.
+An independent review of current head `1618de1` found that this line of work is not yet security-closed. The architecture is directionally correct and remains well-contained, but several implementation invariants were either missed during closure or regressed during later migration.
 
-The principal anonymity threat is not that any one observable immediately reveals the host IP. The threat is that an I2P peer can deliberately create a stable externally observable condition — saturation, backend-specific response metadata, application clock information, or injected local traffic — and correlate that condition with a candidate host/service outside I2P.
+This roadmap therefore inserts three narrow corrective milestones before the previously planned IRC/Streamr completion sequence:
 
-## 2. Research findings that control this roadmap
+- M080 — shared server admission transactionality/cardinality;
+- M081 — generic server `leaseSetEncType` option truthfulness;
+- M082 — HTTP valid-Destination/`Expect`/peer-key correctness.
 
-### 2.1 Java I2P server admission is layered
+After those close, the original M077 -> M078 -> M079 sequence resumes.
 
-Current Java I2P retains server defaults in `TunnelController` for:
+The workstream remains bounded to Proposal 170 tunnel security/correctness. It does not add tunnel types, redesign router protocols, introduce a general WAF, implement arbitrary I2CP pass-through, or broaden startup-service ownership.
 
-- per-peer connections: 30/minute, 80/hour, 200/day;
-- aggregate connections: 50/minute, unlimited hour/day by default;
-- concurrent streams: 30.
+## 2. Security/anonymity model
 
-When no server limits are explicitly configured, those defaults are installed. The streaming `ConnectionManager` enforces global concurrent streams plus peer-keyed and aggregate minute/hour/day throttlers against the authenticated remote `Destination`/hash. The base I2PTunnel server also uses bounded handler execution and resets/drops work when its executor cannot accept more.
+The primary concern is not that one timing observable directly reveals the host IP. The concern is that a remote I2P peer can deliberately create a stable condition — saturation, long-lived occupancy, backend/provider metadata, or injected/local traffic — and correlate that condition with a candidate service or host outside I2P.
 
-Security conclusion: a single global semaphore is necessary but not sufficient. Emissary needs peer-keyed and aggregate admission state before a remote peer can consume application handler/local-target resources.
+The target defenses are therefore:
 
-### 2.2 Java HTTP throttling keeps peer and total state separate
+- prevent one peer from monopolizing accepted-server capacity;
+- prevent rejected traffic from poisoning persistent in-memory accounting state;
+- keep every attacker-influenced state structure hard bounded;
+- make bounded capacity coherent with configured rate windows rather than creating an unnecessarily small long-lived choke point;
+- prevent indefinite protocol-idle occupancy where the reference implementation has an established idle bound;
+- strip backend clock/provider/cache/trace fingerprints;
+- validate trusted peer identity structurally rather than using brittle magic lengths;
+- avoid client/server protocol wait cycles such as unsupported `Expect: 100-continue`;
+- preserve truthful apply-or-reject semantics for runtime configuration.
 
-`I2PTunnelHTTPServer` uses `ConnThrottler`, which separately tracks per-peer and aggregate POST/PUT activity and has distinct peer/total throttle periods. `ConnThrottler` explicitly describes itself as basic DoS protection rather than a complete solution.
+Random jitter, fixed overload delays, artificial response padding, and public-network deanonymization experiments remain non-goals.
 
-Security conclusion: bounded state must not evict an active abusive peer merely to admit a new attacker-controlled identity. Eviction-based limiter churn converts a memory bound into a bypass.
+## 3. Reference findings retained from the original hardening roadmap
 
-### 2.3 HTTP response metadata is an anonymity boundary
+### 3.1 Java I2P server admission is layered
 
-Java I2P removes at least `Date`, `Server`, `X-Powered-By`, `X-Runtime`, `Proxy`, and `Proxy-Connection` from hidden-service HTTP responses.
+Reference server behavior includes finite global concurrency plus peer-keyed and aggregate connection throttles. Reference-scale defaults used by this workstream are 30 global concurrent streams, 30/80/200 per peer per minute/hour/day, and 50/0/0 aggregate per minute/hour/day.
 
-Current I2P+ goes further and removes headers including `Age`, `Alt-Svc`, `Date`, `Expires`, `Pragma`, `Server`, `Strict-Transport-Security`, `Via`, cache headers, cloud/hosting trace identifiers, `X-Powered-By`, `X-Runtime`, `X-Served-By`, and related provider-specific identifiers. It also strips additional request-side proxy/privacy metadata including `X-Real-IP`.
+Security conclusion: a global semaphore alone is not sufficient; authenticated peer identity and aggregate rate state must participate before application/local-target work.
 
-Security conclusion: Emissary must at minimum achieve Java parity, and should adopt the stronger I2P+ anonymity-oriented denylist where it does not break HTTP framing semantics. `Date` is a required correction because local clock/time behavior is a correlation signal.
+### 3.2 Java/I2P+ HTTP filtering treats metadata as an anonymity boundary
 
-### 2.4 Java IRC bounds both registration and the later connection
+Java I2P removes at least `Date`, `Server`, `X-Powered-By`, `X-Runtime`, and proxy headers. I2P+ additionally strips provider/cache/trace metadata such as `Via`, cache headers, cloud trace values, and hosting identifiers.
 
-Java I2P applies a bounded registration phase and then sets a 10-minute IRC read timeout, with the expectation that the IRC application itself will keep live users active through PING/PONG.
+Security conclusion: the M076 fingerprint denylist remains required and is not reopened by M082 except for regression verification.
 
-Security conclusion: Emissary's current bounded registration followed by unbounded `io::copy` lifetime permits registered-idle connections to pin accepted-server capacity indefinitely. The correction must be an inactivity deadline that resets on traffic, not a fixed total session lifetime.
+### 3.3 Java IRC bounds registration and later idle lifetime
 
-### 2.5 Streamr is intentionally small and bounded
+Reference IRC server behavior bounds registration and then applies a 10-minute read/inactivity timeout.
 
-Java Streamr keeps at most 10 subscriptions and expires them after 60 seconds. Emissary already has stronger packet-size bounds, exact one-byte control parsing, fixed subscription expiry, and no unbounded send-task fanout, but currently permits administrator-selected non-loopback UDP ingress/egress.
+Security conclusion: M077 remains required after the corrective prerequisites close.
 
-Security conclusion: the remaining anonymity/integrity issue is the local UDP trust boundary. Without an authenticated publisher protocol in Proposal 170, non-loopback UDP exposure should fail closed rather than allow unauthenticated LAN/external traffic to become an I2P-correlatable stream.
+### 3.4 Streamr remains intentionally small
 
-## 3. Current Emissary risk inventory
+Reference Streamr behavior uses a finite subscriber set with 60-second expiry. Emissary's M071 implementation is already bounded but still permits non-loopback local UDP configuration.
 
-At baseline `04e0c2e`:
+Security conclusion: M078 remains required after M077.
 
-1. `run_accepted_server` has a global bounded task group but no peer-keyed admission/fairness layer.
-2. `httpserver`, `ircserver`, and inbound `httpbidirserver` can therefore expose a remotely manipulable saturation state.
-3. generic `server` still uses SAM `STREAM FORWARD`, bypassing the accepted-stream peer/admission seam entirely.
-4. `httpserver` response filtering does not remove `Date` and is substantially narrower than I2P+.
-5. the HTTP POST limiter evicts the oldest entry after its map bound, so identity churn can reset active limiter state.
-6. `ircserver` has strict registration bounds but no post-registration inactivity limit.
-7. Streamr producer/client local UDP endpoints may be configured non-loopback despite no local publisher authentication model.
-8. M073 independently owns generic option apply-or-reject truthfulness and remains a hard predecessor. This roadmap must not duplicate or race that correction.
+## 4. Independent post-M076 findings
 
-## 4. Security invariants
+### 4.1 M074: aggregate-rejected new peers can poison admission state — HIGH
 
-All M074-M079 work MUST preserve:
+Current `ServerAdmissionState::try_acquire` may insert a new peer before aggregate-rate eligibility is known. If the aggregate check rejects the attempt, the new zero-active peer receives no successful counter record and no expiry registration. Since `reap()` only visits queued expirations, those records can persist for the lifetime of the runtime generation.
 
-- exact Proposal 170 wire fields/actions/types; no security-only public extensions;
-- authenticated remote identity from SAM/Yosemite only, never application headers;
-- security policy decisions before local target connection where technically possible;
-- bounded tasks, peer state, counters, buffers, and shutdown waits;
-- no lock held across network I/O, sleeps, target connection, or task joins;
-- no active abusive identity may be evicted solely to make room for an untrusted new identity;
+A remote attacker can first exhaust aggregate rate and then submit fresh authenticated Destinations to fill the peer table, denying all unseen peers until restart.
+
+### 4.2 M074: auxiliary expiry state is not independently bounded — MEDIUM-HIGH
+
+The primary peer map is bounded, but append-only expiry entries may accumulate independently. Security closure requires every attacker-influenced collection to be bounded, not only the main map.
+
+### 4.3 M074: 4096 fixed peers is incoherent with long retained windows — MEDIUM-HIGH
+
+Default peer-day accounting retains identities substantially longer than the time needed for aggregate-admissible fresh identities to fill a 4096-entry table. Fail-closed capacity protects memory but creates a predictable deny-new-peer condition well before retained state naturally expires.
+
+The corrective target is not unbounded state. Capacity must instead be derived from the maximum distinct arrivals permitted by the configured aggregate policy over the longest enabled peer window, subject to a documented hard memory ceiling; unsafe configurations fail before allocation.
+
+### 4.4 M074/M076: accounting keys use 64-bit `DefaultHasher` — LOW-MEDIUM
+
+Authenticated I2P Destinations have a canonical cryptographic Destination ID/hash. Admission and HTTP POST accounting should use that fixed identity instead of an unspecified 64-bit general-purpose hash.
+
+### 4.5 M075 regressed generic-server `leaseSetEncType` truthfulness — MEDIUM
+
+M073 historically closed while generic server accepted `leaseSetEncType` and mapped it into the old Yosemite session configuration. M075 migrated control-plane generic server to accepted streams but did not carry the option into `AcceptedServerRuntimeConfig`/`SessionOptions`, while the backend still accepts it.
+
+M081 must apply it in accepted-stream session setup or reject it before allocation. Restoring control-plane `STREAM FORWARD` is prohibited.
+
+### 4.6 M076's 524-character peer bound rejects valid current Destinations — MEDIUM
+
+The HTTP filter's bound was derived from a legacy-sized Destination representation. Current I2P key-certificate/signature forms can be larger. The repository already has structural full-Destination parsing and canonical ID derivation.
+
+M082 replaces the magic validity ceiling with structural validation plus a bound derived from all currently supported Destination forms.
+
+### 4.7 M076 allows unsupported `Expect: 100-continue` wait cycles — MEDIUM
+
+The HTTP handler forwards request headers, then waits for the remote body before reading the local backend response. A client using `Expect: 100-continue` may wait for an interim response while the local backend has already emitted it, causing both sides to wait until body timeout.
+
+M082 rejects all `Expect` requests before local target allocation instead of adding a broader informational-response state machine.
+
+## 5. Security invariants
+
+All remaining M080-M082/M077-M079 work MUST preserve:
+
+- exact Proposal 170 wire fields/actions/types; no security-only wire extensions;
+- authenticated remote identity from SAM/Yosemite only;
+- structural trusted-Destination validation and canonical cryptographic identity;
+- policy/admission decisions before local target work where technically possible;
+- side-effect-free denial apart from bounded reclamation of already-expired state;
+- bounded tasks, peer state, expiry indexes, counters, buffers, and shutdown waits;
+- no active/throttled state evicted merely to admit a new attacker-controlled identity;
+- no lock across network I/O, sleeps, target connect, handler execution, joins, or shutdown waits;
 - monotonic time for rate/idle state;
-- no private destination material in logs/errors/Debug/API output;
-- no artificial response jitter or sleep-based pseudo-constant-time defense;
-- no local DNS/direct LAN routing expansion;
+- no private destination material/full raw config values in diagnostics;
+- no random/fixed timing-jitter defenses;
+- no local DNS/LAN routing expansion;
 - no new `emissary-core/**` production path;
 - no startup-service ownership refactor;
-- no hosted CI/fuzz/soak/release machinery added for this work;
-- no upstream or third-party write activity.
+- no hosted CI/fuzz/soak/release machinery for this workstream;
+- no upstream write/review/submission activity.
 
-## 5. Target architecture
-
-The accepted-stream server boundary should become:
+## 6. Target accepted-server architecture
 
 ```text
 SAM/Yosemite accepted stream
-    -> validated TrustedPeerIdentity
-    -> shared I2PControl-owned ServerAdmissionState
-       - global concurrent permits
-       - peer concurrent permits
-       - peer minute/hour/day counters
-       - aggregate minute/hour/day counters
-       - bounded deny/expiry state
+    -> structurally validated TrustedPeerIdentity
+       - bounded canonical Destination text if protocol handler needs it
+       - canonical fixed-size Destination ID/hash for accounting
+    -> I2PControl-owned ServerAdmissionState
+       - transactional denial
+       - global + peer concurrent limits
+       - peer + aggregate minute/hour/day counters
+       - capacity derived from retained semantics within hard memory ceiling
+       - bounded one-authoritative-expiry-per-peer index
     -> protocol-specific pre-local validation
     -> fixed administrator-selected loopback target
     -> bounded protocol relay/filter
 ```
 
-The shared admission component is infrastructure, not a general router service. It belongs under `emissary-cli/src/i2pcontrol/backends/**` and is consumed only by Proposal 170 control-plane tunnel backends.
+Generic server stays raw after admission. HTTP/IRC remain protocol-filter owners. Streamr remains its own bounded datagram family.
 
-For generic `server`, M075 replaces blind `STREAM FORWARD` with application-visible accepted streams followed by an otherwise raw relay. The generic server does not gain HTTP/IRC parsing; it gains only peer-aware admission and fixed local-target ownership.
+## 7. Option truthfulness policy
 
-## 6. Timing/correlation policy
+Every runtime-relevant field has exactly one disposition:
 
-This roadmap does not attempt to make interactive network protocols constant-time. Application response time, congestion, and I2P path latency remain observable.
+- applied and verified in runtime/session configuration;
+- invalid/irrelevant for that tunnel type and rejected;
+- recognized but unsupported and rejected before allocation.
 
-The target is narrower and actionable:
+Persist-and-ignore is forbidden.
 
-- prevent one peer from deterministically driving global handler saturation;
-- prevent indefinite idle pinning where the protocol has an established inactivity bound;
-- avoid exposing backend clock/provider/cache identity in HTTP metadata;
-- avoid creating distinguishable local-error details;
-- reject overload promptly rather than adding attacker-amplifiable sleeps;
-- test fairness and saturation behavior directly.
+M081 specifically re-audits generic server `leaseSetEncType`. `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `FilterFilePath`, `UniqueLocalAddressPerClient`, and `MultiHoming` remain fail-before-allocation unless a separately authoritative implementation plan establishes exact supported semantics.
 
-Random jitter, fixed rejection delays, and padding schemes are explicit non-goals unless a later separately researched anonymity design demonstrates measurable benefit.
+No arbitrary I2CP/custom pass-through is introduced.
 
-## 7. Proposal 170 option policy
-
-M074/M075 must apply or reject the existing server controls before allocation. The named minute/hour/day fields have direct Java streaming analogues and should be implemented:
-
-- `MaxConcurrentConns`;
-- `ClientPerMinute`;
-- `ClientPerHour`;
-- `ClientPerDay`;
-- `TotalInPerMinute`;
-- `TotalInPerHour`;
-- `TotalInPerDay`.
-
-Reference-scale defaults should be 30 global concurrent streams, 30/80/200 per peer, and 50/0/0 aggregate minute/hour/day when no explicit values are supplied, unless current persisted semantics require a compatibility-preserving distinction. The hard maximum may remain the existing Emissary 128 ceiling; increasing it is out of scope.
-
-Proposal 170 currently lists `PerClientPeriod`, `TotalPeriod`, and `TotalBanTime` without enough normative unit/precedence detail to justify inventing behavior. Implementation MUST search the pinned reference/config sources again. If exact semantics remain unavailable, these fields MUST stay explicit fail-before-allocation unsupported options rather than receive guessed semantics.
-
-`FilterFilePath`, `UniqueLocalAddressPerClient`, and `MultiHoming` likewise remain apply-or-reject fields. This roadmap does not implement a new filter-file language, network namespace/address allocator, or multi-home router feature merely for checkbox parity.
-
-## 8. Milestones and dependency graph
+## 8. Corrective dependency graph
 
 ```text
-M073 generic option truthfulness corrective
-    |
-    v
-M074 shared accepted-server admission/rate hardening
-    |\
-    | +--------------------+
-    v                      v
-M075 generic server     M076 HTTP anonymity/POST hardening
-accepted-stream            |
-hardening                  +------------------+
-    |                                         |
-    +------------------+                      v
-                       |                  M077 IRC lifetime hardening
-                       |
-                       +--------------------------+
-                                                  \
-M073 ----------------------------------------------> M078 Streamr local-boundary hardening
-
-M074 + M075 + M076 + M077 + M078
-    |
-    v
+current head 1618de1
+      |
+      v
+M080 admission transactionality/cardinality
+      |
+      v
+M081 generic server LeaseSet truthfulness
+      |
+      v
+M082 HTTP peer identity / Expect corrective
+      |
+      v
+M077 IRC lifetime/exhaustion hardening
+      |
+      v
+M078 Streamr local-boundary hardening
+      |
+      v
 M079 integrated tunnel-security reclosure
 ```
 
-Dependency classes:
+Dependency classification:
 
-- M073 -> M074: hard. Do not add new server-option semantics while generic option truthfulness is still unresolved.
-- M074 -> M075: hard. Generic accepted-stream migration must reuse the accepted admission component rather than create a second limiter.
-- M074 -> M076/M077: hard for shared admission behavior; HTTP/IRC protocol-specific hardening remains locally owned.
-- M073 -> M078: hard for current registry sequencing; technically Streamr is independent, but only one dependency-ready handoff is registered at a time.
-- M074-M078 -> M079: hard.
+- current review -> M080: corrective hard gate;
+- M080 -> M081: registry sequencing; M081 also must preserve corrected admission behavior;
+- M080 -> M082: hard interface dependency for canonical trusted-peer identity/accounting representation;
+- M081 -> M082: registry sequencing to preserve one ready handoff;
+- M080-M082 -> M077: hard corrective gate because M077 consumes the M074 accepted-server boundary and final security work must not proceed on invalidated prerequisites;
+- M077 -> M078: registry sequencing from the original roadmap;
+- M080-M082 + M077-M078 -> M079: hard final closure dependencies.
 
 ## 9. Milestone summary
 
-### M074 — Shared server admission and rate-limit hardening
+### M074 — historical shared admission hardening
 
-Implement the common peer-aware admission layer and integrate it into `httpserver`, `ircserver`, and inbound `httpbidirserver`. Introduce a finite per-peer concurrent ceiling in addition to the configured global ceiling; default no higher than 8 per peer, with no new public field. Apply the supported Proposal 170 connection-rate controls and safe reference-scale defaults. Denied streams must not reach protocol handlers/local targets.
+Status: corrective pass required at current head. M080 owns the discovered defects. Retain its reference defaults, per-peer fairness, common accepted-stream integration, and RAII lease design unless M080 proves a narrower correction is impossible.
 
-### M075 — Generic server accepted-stream hardening
+### M075 — historical generic accepted-stream migration
 
-Replace control-plane generic server blind `STREAM FORWARD` with accepted-stream raw relay so generic servers participate in peer-aware admission. Preserve fixed loopback target and byte transparency after admission. No router-core API change.
+Status: corrective pass required for current option-truthfulness invariant. Retain accepted-stream raw relay and loopback target. M081 owns `leaseSetEncType` apply-or-reject repair.
 
-Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/075-closure.md`.
+### M076 — historical HTTP anonymity/POST hardening
 
-### M076 — HTTP server anonymity and POST-throttle hardening
+Status: corrective pass required. Retain fingerprint/proxy stripping, framing checks, and fail-closed POST table behavior. M082 owns peer identity, Expect, and cryptographic throttle key corrections.
 
-Bring response filtering to Java parity and adopt the non-framing I2P+ fingerprint denylist; include `Date` and request-side `X-Real-IP`/equivalent proxy identity handling. Replace eviction-bypassable POST limiter state with bounded fail-closed state.
+### M080 — Server admission transactionality/cardinality corrective
 
-Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/076-closure.md`.
+Make all denial paths side-effect free; prevent aggregate-rejection peer leaks; bound expiry/index state; use canonical Destination IDs; make capacity/retention coherent with configured windows and hard memory budget; recheck Tokio test-util containment.
 
-### M077 — IRC server lifetime/exhaustion hardening
+### M081 — Generic server LeaseSet option truthfulness corrective
 
-Add a 10-minute post-registration inactivity deadline that resets on successful traffic, target-connect timeout, and cancellation-safe relay behavior. Preserve the accepted registration filter and raw post-registration IRC semantics.
+Apply `leaseSetEncType` to accepted-stream Yosemite session configuration or reject before allocation. Do not restore `STREAM FORWARD` or add adjacent I2CP features.
+
+### M082 — HTTP peer identity and Expect-framing corrective
+
+Use structurally valid current Destination semantics instead of a legacy magic bound; reject unsupported `Expect` before local connect; use canonical Destination IDs in POST accounting; retain M076 anonymity/filter/framing work.
+
+### M077 — IRC lifetime/exhaustion hardening
+
+After M080-M082 close, add a 10-minute activity-resetting post-registration inactivity deadline and bounded target connect while preserving M066 registration filtering/raw post-registration semantics.
 
 ### M078 — Streamr local-boundary hardening
 
-Make local UDP producer/client targets loopback-only for this Proposal 170 implementation, reduce maximum subscribers to the Java reference ceiling of 10, preserve 60-second expiry/15-second refresh/1200-byte payload bound, and revalidate destination/control bounds.
+After M077, make local UDP producer/client targets loopback-only, align subscriber maximum to 10, and preserve existing expiry/refresh/payload/task bounds.
 
 ### M079 — Integrated tunnel-security reclosure
 
-Independently re-audit all newly introduced tunnel families and the generic server after the corrective sequence. The workstream may not close with a high/medium anonymity, resource-exhaustion, option-truthfulness, containment, or lifecycle finding.
+Independently re-audit the final actual head. Rebuild option-capability truthfulness, threat-model resource/timing/fingerprint behavior, verify containment/lifecycle, and refuse closure with any high/medium finding.
 
-## 10. Verification discipline
+## 10. M079 final evidence requirements
 
-Use focused deterministic tests, fake/local SAM endpoints, local TCP/UDP capture services, Tokio paused-time tests, package-scoped `cargo test`/`cargo check`, existing M061/M062/M063 containment suites, feature-disabled checks, Clippy, scoped nightly rustfmt where the repository already requires it, and `git diff --check`.
+M079 must explicitly prove at final head:
 
-Do not create public-network certification, load-test farms, hosted CI jobs, generalized fuzz infrastructure, or benchmark gates. Small deterministic stress tests such as 31 concurrent streams, peer-cap exhaustion, limiter-map saturation, and paused-time expiry are sufficient for these correctness/security contracts.
+- aggregate-rejected/new-peer attempts cannot grow peer accounting;
+- every admission/POST auxiliary expiry structure is hard bounded;
+- default/configured retained-rate state and memory capacity are coherent;
+- canonical Destination hashes key security accounting;
+- generic `leaseSetEncType` is applied or rejected, never ignored;
+- valid currently supported large Destinations pass trusted identity validation;
+- malformed Destinations fail before local work;
+- `Expect` cannot create a body/backend wait cycle;
+- one peer cannot monopolize accepted-server capacity;
+- HTTP fingerprint/proxy identity stripping remains effective;
+- IRC idle occupancy is finite and activity-resetting;
+- Streamr local UDP exposure is loopback-only and fanout bounded;
+- lifecycle/stop/restart clears ephemeral security state and cannot cross generations;
+- M061/M062/M063 containment remains intact;
+- no current high/medium security/anonymity/correctness finding remains.
 
-## 11. Stop conditions
+## 11. Verification discipline
 
-Stop the affected milestone and record a corrective/architecture blocker if:
+Use focused deterministic tests, structurally valid I2P Destination fixtures, fake/local SAM endpoints, local TCP/UDP capture services, Tokio paused-time tests, package-scoped `cargo test`/`cargo check`, M061/M062/M063 containment suites, Clippy, scoped nightly rustfmt for touched files, and `git diff --check`.
 
-- peer-aware accepted streaming requires a new `emissary-core/**` API;
-- a required Proposal 170 field cannot be given authoritative semantics and cannot be rejected truthfully;
-- generic server accepted-stream relay changes wire payload semantics;
-- response filtering would require body inspection/content rewriting;
-- IRC idle timeout cannot be implemented as inactivity rather than total lifetime;
-- Streamr non-loopback exposure is required for compatibility but cannot be authenticated safely within the pinned schema;
-- a dependency addition breaks M062/M063 feature ownership;
-- a high/medium finding remains after M079.
+Do not create public-network certification, deanonymization experiments, load-test farms, hosted CI jobs, generalized fuzz infrastructure, benchmark gates, or release/upstream machinery.
 
-## 12. Final closure rule
+## 12. Stop conditions
 
-M073 alone is no longer sufficient to declare the tunnel-runtime security phase complete. The post-M072 security review establishes additional corrective work. The tunnel runtime/security workstream remains corrective until M079 closes with explicit evidence that the new server types no longer expose the identified controllable saturation, idle-pinning, HTTP fingerprint, limiter-churn, or local-UDP trust-boundary defects.
+Stop the affected milestone and create separate architecture/corrective planning if:
+
+- canonical peer identity requires a new `emissary-core/**` or SAM API;
+- exact configured rate semantics cannot be represented within a defensible hard memory ceiling and cannot be rejected before allocation;
+- applying `leaseSetEncType` requires restoring control-plane `STREAM FORWARD` or a Yosemite/protocol fork;
+- HTTP `100 Continue` must be fully supported rather than explicitly rejected;
+- IRC inactivity cannot be implemented without parsing/reframing post-registration traffic;
+- Streamr compatibility is proven to require unauthenticated non-loopback exposure;
+- a new I2PControl-only dependency violates M062/M063 ownership;
+- M079 finds any remaining high/medium issue.
+
+## 13. Final closure rule
+
+The tunnel security workstream remains `corrective pass required` until M080, M081, M082, M077, and M078 are independently closed and M079 accepts the actual final head.
+
+Historical M073-M076 closure evidence remains useful for what those pinned commits demonstrated, but it does not override later regressions or independent findings. M079 is the final authority for closing this line of work.

@@ -1,6 +1,6 @@
 # M078 — Streamr Local Boundary Hardening
 
-Status: blocked — sequencing successor; M075-M077 must close before registration advances
+Status: blocked — M080-M082 and M077 must close before registration advances
 
 Source roadmap:
 
@@ -10,14 +10,20 @@ Inherited implementation:
 
 - M071 Streamr client/server runtime.
 
-Planning production baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
+Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
+
+Current corrective baseline: `1618de172e7a78a193fc1bb117af269f31174030`.
 
 Read-only reference evidence:
 
-- Java I2P `streamr/StreamrProducer.java`;
-- Java I2P `streamr/Subscriber.java` at `i2p/i2p.i2p@498488b0` (10 subscriptions, 60-second expiry);
-- Java UDP source behavior;
-- current Emissary M071 bounds (16 subscribers, 60-second expiry, 15-second refresh, 1200-byte payload, 4095-byte receive buffer).
+- Java I2P Streamr producer/subscriber behavior, including 10 subscriptions and 60-second expiry;
+- current Emissary M071 bounds.
+
+## 0. Corrective readiness gate
+
+M078 remains technically separate from the server-admission/HTTP findings, but the planning process registers one dependency-ready handoff at a time and the tunnel-security workstream must reconcile M080-M082 before advancing to later family hardening.
+
+M078 becomes eligible only after M080, M081, M082, and M077 close.
 
 ## 1. Objective
 
@@ -32,7 +38,7 @@ M071 already provides:
 - exact one-byte `0` subscribe/refresh and `1` unsubscribe controls;
 - malformed/unknown control rejection;
 - trusted remote destination identity from Yosemite;
-- finite subscription set;
+- finite subscription state;
 - 60-second expiry;
 - 15-second refresh;
 - 1200-byte application payload cap;
@@ -47,49 +53,48 @@ Do not replace these with a generalized UDP framework.
 
 ### Non-loopback producer ingress
 
-`streamrserver` currently allows an administrator-selected IP bind. If configured to `0.0.0.0`, a LAN address, or another reachable interface, any host capable of sending UDP to that port can publish attacker-selected traffic to all current I2P subscribers.
-
-That is an integrity/abuse problem and can provide a distinctive traffic marker for correlation.
+`streamrserver` currently allows an administrator-selected IP bind. If configured to `0.0.0.0`, a LAN address, or another reachable interface, another host can publish attacker-selected traffic to current I2P subscribers. This is an integrity/abuse issue and can provide a distinctive correlation marker.
 
 ### Non-loopback client target
 
-`streamrclient` forwards remote I2P payloads to a fixed administrator-selected local UDP target. The target is not remotely selected, which is good, but a non-loopback target still turns a remote I2P peer into a trigger for traffic toward a LAN/external UDP service.
+`streamrclient` forwards remote I2P payloads to a fixed administrator-selected local UDP target. The target is not remotely selected, but a non-loopback target still lets a remote I2P peer trigger traffic toward a LAN/external UDP service.
 
 ### Fanout ceiling
 
-Java's reference Streamr subscriber ceiling is 10. Emissary currently permits 16. Both are bounded, but aligning downward reduces worst-case fanout/amplification without reducing the declared Proposal 170 feature.
+Java's reference Streamr subscriber ceiling is 10; Emissary currently permits 16. Aligning downward reduces worst-case fanout without reducing the declared Proposal 170 feature.
 
 ## 4. Hard invariants
 
-- Streamr remains under `emissary-cli/src/i2pcontrol/backends/streamr.rs` or an equivalently local I2PControl module;
+- Streamr production logic remains under I2PControl;
 - no core/router UDP API change;
 - no public auth/ACL field is invented;
-- local producer bind must be loopback;
-- local client output target must be loopback;
+- local producer bind is loopback-only;
+- local client output target is loopback-only;
 - remote payload never selects/rewrites the local target;
-- subscriber identity remains authenticated remote destination plus the fixed configured session-port context available through Yosemite;
-- subscription set is finite and no active entry is evicted to admit overflow;
+- subscriber identity remains authenticated remote Destination/session context;
+- subscription set is finite and overflow does not evict active entries;
 - expiry/refresh use monotonic time;
 - packet/body buffers remain hard bounded;
 - no per-packet task spawn/fanout queue;
 - cancellation/restart discards ephemeral subscriber state;
-- persistent server destination identity remains stable/secret-safe.
+- persistent server destination identity remains stable/secret-safe;
+- trusted peer identity validation must remain compatible with the canonical Destination boundary established by M080.
 
 ## 5. Loopback-only policy
 
 For both Streamr roles:
 
 - absent local host/interface defaults to loopback;
-- `127.0.0.1` and `::1` are accepted;
-- any non-loopback `TargetHost`, `Host`, `ReachableBy`, or typed listen-interface value that would expose/target UDP outside loopback rejects start before SAM session or UDP socket allocation;
-- do not silently coerce a requested non-loopback address back to loopback;
-- error reports the option name/policy, not a secret/value dump.
+- `127.0.0.1` and `::1` are accepted where platform support exists;
+- any non-loopback `TargetHost`, `Host`, `ReachableBy`, or typed listen-interface value that would expose/target UDP outside loopback rejects before SAM session or UDP socket allocation;
+- do not silently coerce non-loopback requests to loopback;
+- error identifies the option/policy, not secret/raw values.
 
-This deliberately chooses safe truthful rejection over unauthenticated network exposure. If later maintainers require LAN Streamr, that needs a separately authorized authentication/source-ACL design rather than an exception in M078.
+If later maintainers require LAN Streamr, that needs separate authentication/source-policy planning.
 
 ## 6. Subscriber/fanout bounds
 
-Reduce `MAX_SUBSCRIBERS` from 16 to 10 to match the Java reference ceiling unless a compatibility fixture demonstrates a Proposal 170 requirement for a larger count. No such requirement is currently identified.
+Reduce `MAX_SUBSCRIBERS` from 16 to 10 unless a direct Proposal 170 compatibility requirement proves a larger value necessary.
 
 Keep:
 
@@ -98,32 +103,28 @@ Keep:
 - 1200-byte application payload cap;
 - 4095-byte receive buffer ceiling.
 
-Do not increase packet size or subscriber count in this milestone.
-
-At subscription capacity, a new destination is rejected; existing subscriber state is not evicted.
+At capacity, a new Destination is rejected; refresh of an existing subscriber remains possible; active state is not evicted.
 
 ## 7. Destination/control validation
 
-Revisit the current 64 KiB textual destination acceptance bound. Establish a bound from the actual Yosemite/I2P destination representation where possible rather than retaining an arbitrary large string solely for convenience.
+Do not introduce another arbitrary small textual Destination ceiling. Reuse the M080 trusted peer/canonical Destination validation where the Streamr API path permits it.
 
 Requirements:
 
-- ordinary valid reference destinations must remain accepted;
-- malformed/control/whitespace-containing identities reject;
+- all structurally valid current Destinations accepted by the accepted-stream/datagram layer remain usable;
+- malformed/control/whitespace/non-Destination identity rejects;
 - memory worst case for all 10 subscribers is documented;
-- control packet must remain exactly one byte;
-- unknown control does not create/refresh state;
-- unsubscribe of an absent subscriber is harmless and creates no state.
+- control packet remains exactly one byte;
+- unknown control creates/refreshes no state;
+- unsubscribe of absent subscriber is harmless.
 
-Do not hash away the only copy of the destination required for reply sends; fixed-size hashes may be used as map/accounting helpers only if the full destination remains bounded and necessary for Yosemite send operations.
+Where full Destination text is required for Yosemite send operations, retain one bounded validated copy; use canonical fixed-size identity for lookup/accounting where practical.
 
 ## 8. Local UDP source semantics
 
-Because the socket is loopback-only after this plan, ignore/drop any packet whose observed source address is unexpectedly non-loopback as defense in depth.
+Because producer ingress becomes loopback-only, ignore/drop any unexpectedly observed non-loopback source as defense in depth.
 
-No local-publisher authentication handshake is added. Local processes remain within the host trust boundary; protecting against malicious same-host processes is outside this tunnel protocol's scope.
-
-No arbitrary rate limiter is added unless deterministic tests demonstrate an unbounded queue/task/memory path. The existing receive loop and sequential maximum-10 fanout already provide backpressure/drop behavior at the UDP/socket boundary. Avoid inventing throughput limits absent a contract or demonstrated resource defect.
+No local publisher authentication handshake or arbitrary rate limiter is added. Same-host process trust remains outside this protocol's scope unless a concrete unbounded queue/task defect is discovered.
 
 ## 9. Ordered work packages
 
@@ -133,11 +134,11 @@ Centralize Streamr local address validation for server bind and client target; f
 
 ### WP2 — Fanout/reference alignment
 
-Reduce subscriber ceiling to 10 and retain existing expiry/refresh/payload constants.
+Reduce subscriber ceiling to 10 and retain expiry/refresh/payload constants.
 
 ### WP3 — Identity/control bounds
 
-Derive/document a realistic destination-text bound and keep exact one-byte control semantics.
+Consume the corrected trusted Destination boundary from M080 and keep exact one-byte controls.
 
 ### WP4 — Lifecycle/adversarial tests
 
@@ -145,35 +146,39 @@ Test non-loopback rejection, capacity, expiry, restart, malformed controls, over
 
 ### WP5 — Documentation
 
-Update Streamr runtime boundary documentation to state loopback-only local UDP policy and reference-aligned subscriber ceiling.
+Update runtime/support docs with loopback-only policy and reference-aligned subscriber ceiling.
 
 ## 10. Required tests
 
 At minimum:
 
 - default server bind is loopback;
-- explicit `127.0.0.1` and `::1` accepted where platform/test fixture permits;
+- explicit loopback IPv4/IPv6 accepted where supported;
 - `0.0.0.0`, LAN, public, and non-loopback IPv6 addresses reject before session/socket allocation;
-- client non-loopback local target rejects before session allocation;
+- client non-loopback target rejects before session allocation;
 - remote payload cannot change target address/port;
 - 10 subscribers accepted, 11th rejected without eviction;
-- refresh of existing subscriber at capacity succeeds;
+- refresh at capacity succeeds for an existing subscriber;
 - expiry at 60 seconds removes stale entry;
 - 15-second client refresh remains;
 - exact one-byte controls enforced;
 - oversized >1200-byte payload not forwarded;
-- unexpected non-loopback local UDP source is ignored if directly testable;
-- restart starts with empty subscriber state while reusing persistent server identity;
-- private destination remains absent from logs/errors/Debug.
+- unexpected non-loopback UDP source is ignored if directly testable;
+- restart begins with empty subscriber state while persistent server identity is reused;
+- valid current trusted Destinations larger than legacy assumptions are not rejected solely by text length;
+- private destination remains absent from diagnostics.
 
 ## 11. Verification
 
 ```text
 cargo test -p emissary-cli --no-default-features --features i2pcontrol
+cargo test -p emissary-cli --no-default-features --features i2pcontrol streamr
 cargo check -p emissary-cli --no-default-features
 cargo check -p emissary-cli --no-default-features --features i2pcontrol
 cargo check -p emissary-core
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
+cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m061_containment
+cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m062_dependency_containment
 git diff --check
 ```
 
@@ -183,14 +188,15 @@ Use focused paused-time Streamr tests for expiry/refresh closure evidence.
 
 M078 may close only when:
 
-1. Streamr local UDP ingress and output target are loopback-only;
-2. non-loopback requests fail before allocation and are not silently rewritten;
-3. subscriber maximum is 10 and overflow never evicts active state;
-4. 60s expiry, 15s refresh, 1200-byte payload, and bounded transport buffer remain intact;
-5. destination/control memory/input bounds are explicit and tested;
-6. no unbounded task/queue/state path is introduced;
-7. all production changes remain under `i2pcontrol`;
-8. no high/medium Streamr anonymity/integrity/resource finding remains.
+1. M080-M082 and M077 are independently closed;
+2. Streamr local UDP ingress and output target are loopback-only;
+3. non-loopback requests fail before allocation and are not silently rewritten;
+4. subscriber maximum is 10 and overflow never evicts active state;
+5. 60s expiry, 15s refresh, 1200-byte payload, and bounded transport buffer remain intact;
+6. trusted identity/control memory bounds are explicit and compatible with M080;
+7. no unbounded task/queue/state path is introduced;
+8. production changes remain under I2PControl;
+9. no high/medium Streamr anonymity/integrity/resource finding remains.
 
 ## 13. Stop conditions
 

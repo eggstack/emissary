@@ -1,113 +1,96 @@
 # M076 Closure — HTTP Server Anonymity and POST-Throttle Hardening
 
-Status: closed
+Status: corrective pass required — retained anonymity/filter work remains accepted; M082 owns the independent follow-up findings
 
 Source implementation plan:
 
-- plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md
+- `plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md`
 
-Source roadmap:
+Corrective successor:
 
-- plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md
+- `plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md`
 
 Implementation commit:
 
-- 3cf082e — feat(i2pcontrol): harden HTTP anonymity and POST throttling
+- `3cf082ef19efd490db6e5c602bebd5e0e95207cb`.
 
-## 1. Disposition
+## 1. Retained implementation evidence
 
-M076 is closed. The shared accepted-stream HTTP server filter now removes
-attacker-controlled proxy/privacy identity and backend/provider/cache/trace
-fingerprints, preserves validated response framing, bounds trusted peer
-identity injection, and uses bounded fail-closed POST/PUT/PATCH accounting.
-The inbound httpbidirserver path continues to compose the same
-make_accepted_handler, filter, and PostLimiter objects; no second HTTP parser
-or filter was introduced.
+M076 delivered substantial security/anonymity improvements that remain required:
 
-## 2. Requirement-to-evidence matrix
+- Java-parity response filtering including `Date`, `Server`, `X-Powered-By`, `X-Runtime`, proxy headers;
+- broader I2P+-style provider/cache/trace fingerprint stripping;
+- request-side proxy identity stripping including `Forwarded`, `Via`, `X-Forwarded-*`, `X-Real-IP`, and related fields;
+- spoofed `X-I2P-*` removal and trusted identity reinjection;
+- preserved validated response framing;
+- no application-body rewriting;
+- POST/PUT/PATCH rejection before local target allocation;
+- fixed-size fail-closed POST table without eviction of active/unexpired state;
+- shared inbound handler/filter path for `httpserver` and `httpbidirserver`;
+- fixed bounded error responses;
+- I2PControl source containment.
 
-| Requirement | Evidence | Result |
-|---|---|---|
-| Java parity response filtering | filters/http.rs::RESPONSE_FINGERPRINTS includes Date, Server, X-Powered-By, X-Runtime, Proxy, and Proxy-Connection; mixed-case table test | pass |
-| I2P+ non-framing anonymity denylist | Explicit lowercase table includes age/cache/provider/trace/HSTS and related fields; table-driven mixed-case test covers every entry | pass |
-| Common request proxy identity cannot reach backend | Expanded PROXY_IDENTITY and capture test cover Forwarded, Via, X-Forwarded-*, X-Real-IP, X-Client-IP, True-Client-IP, Cloudflare/Fastly/cluster names, and proxy names | pass |
-| Deliberate privacy header decision | Priority and Sec-GPC are adopted in REQUEST_PRIVACY; request capture test and docs record their stripping as anonymity/fingerprinting policy | pass |
-| Spoofed I2P identity is replaced | Existing end-to-end local capture test verifies attacker X-I2P-* values do not survive and trusted Host/identity headers are rebuilt | pass |
-| Trusted identity output is bounded | MAX_TRUSTED_DESTINATION_TEXT = 524, derived from the 391-byte reference destination key-certificate form and padded I2P Base64; over-bound identity test fails before request construction/local connect | pass |
-| Response framing remains valid | Content-Length is normalized and retained; chunked Transfer-Encoding is normalized and retained; content type/cookies remain; content and chunked capture tests pass | pass |
-| No application-body rewriting | Filtering is restricted to bounded request/response heads; body copy remains byte-for-byte and no body test data is rewritten | pass |
-| POST limiter is fixed-size and monotonic | PostPeerKey([u8; 8]), Tokio monotonic Instant, FIFO expiry queue, and bounded HashMap; no raw peer strings or retain()/oldest eviction remain | pass |
-| Limiter full-table behavior is fail-closed | Paused-time test fills all 1024 entries, denies an unseen peer, and confirms an existing peer remains throttled | pass |
-| Expiry is reclaimable without full-map cleanup | Paused-time test advances the window and confirms the expiry queue reclaims entries before admitting a new peer; active-table state remains unchanged on denial | pass |
-| Write rejection precedes local allocation | handle_http_stream checks the limiter before TcpStream::connect; rejected POST capture test observes 429 and no local accept | pass |
-| Non-write methods do not consume POST quota | Method gate remains limited to POST/PUT/PATCH; limiter unit coverage retains independent per-peer semantics | pass |
-| httpbidirserver inherits the hardened path | http_bidir.rs imports make_accepted_handler and PostLimiter from http_server.rs; existing shared-policy composition test remains green | pass |
-| Error responses remain bounded and detail-free | Existing fixed status heads remain unchanged and contain no target/OS/backend detail; rejection capture tests pass | pass |
-| Scope and containment | Production changes are in emissary-cli/src/i2pcontrol/**; M062 allowlist now authorizes the M075/M076 closure records; no core/router/SAM/public Proposal 170 change | pass |
+The original package/focused HTTP/containment verification remains useful evidence for these retained properties.
 
-## 3. Verification
+## 2. Independent findings invalidating full closure
 
-Passed:
+### MEDIUM — hard-coded 524-character trusted Destination ceiling is not valid for all current I2P Destination forms
 
-    cargo test -p emissary-cli --no-default-features --features i2pcontrol
-    cargo test -p emissary-cli --no-default-features --features i2pcontrol http
-    cargo check -p emissary-cli --no-default-features
-    cargo check -p emissary-cli --no-default-features --features i2pcontrol
-    cargo check -p emissary-core
-    cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
-    cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m061_containment
-    cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m062_dependency_containment
-    rustfmt +nightly --check --edition 2021 --config-path rustfmt.toml emissary-cli/src/i2pcontrol/backends/filters/http.rs emissary-cli/src/i2pcontrol/backends/http_server.rs emissary-cli/tests/m062_dependency_containment.rs
-    git diff --check
+M076 treated `MAX_TRUSTED_DESTINATION_TEXT = 524` as a safe maximum based on a 391-byte reference Destination assumption. Current I2P key-certificate/signature types include forms whose valid serialized Destination representation is larger than that legacy assumption.
 
-The full feature-enabled package suite passed 1,560 tests across 24 suites.
-The focused HTTP filter/server run passed 95 tests. The containment suites
-passed 7 and 19 tests respectively. The required stable
-cargo fmt --all -- --check was also run; it remains red on inherited
-repository-wide formatting drift because this repository's rustfmt.toml uses
-nightly-only options and unrelated files are not formatted by stable rustfmt.
-The touched Rust files pass the repository's nightly rustfmt check.
+The HTTP filter can therefore reject a structurally valid authenticated peer solely because its Destination uses a larger supported key form.
 
-## 4. Invariant, compatibility, and security review
+The repository already has I2PControl helpers based on:
 
-- Request framing remains fail-closed: conflicting Content-Length and
-  transfer-encoding are rejected, and request transfer encoding is not
-  accepted.
-- Response framing is selected before filtering; only validated
-  Content-Length or normalized chunked framing is emitted, with close-delimited
-  bodies preserved where no framing header exists.
-- Set-Cookie, Content-Type, Content-Disposition, ETag/cache-control, and
-  Location remain application semantics and are not in the denylist.
-- Remote headers never select a local target. The fixed loopback target and
-  pre-connect limiter ordering remain unchanged.
-- No lock is held across request body copy, local connection, response parsing,
-  or network I/O; the limiter lock covers only bounded accounting operations.
-- Limiter state is ephemeral and therefore clears on process/runtime restart.
-- No sleeps, jitter, aggregate Proposal 170 fields, application-body rewrite,
-  public wire field, router algorithm, or deferred tunnel data plane was added.
-- No high/medium finding remains in the M076 HTTP anonymity/resource scope.
+```text
+base64_decode -> emissary_core::primitives::Destination::parse -> Destination::id()
+```
 
-## 5. Documentation and future-plan disposition
+M082 must use structural validity/canonical identity and a bound derived from all currently supported Destination forms rather than the obsolete magic ceiling.
 
-Updated:
+### MEDIUM — unsupported `Expect: 100-continue` can hold a handler until body timeout
 
-- docs/i2pcontrol/proposal-170-support.md
-- docs/i2pcontrol/tunnel-manager.md
-- docs/i2pcontrol/tunnel-backends.md
-- the security-hardening roadmap and active registry
-- the M076 implementation plan
-- the M062 dependency-containment allowlist for authorized closure metadata
+The HTTP flow forwards sanitized request headers to the loopback backend and then waits for the remote request body before reading the backend response. `Expect` is not currently rejected.
 
-M077 is now unblocked by M076, marked ready in its handoff, and registered as
-the next dependency-ready plan. M078 remains blocked by the sequencing rule
-until M077 closes. M079 remains blocked until M074-M078 close. Independent
-source milestone M051 remains blocked by its accepted absence of substantive
-news/ban owners and is unaffected by M076.
+A client sending `Expect: 100-continue` may wait for the interim response while the backend has already emitted it. Emissary waits for the body and does not read that interim response, creating a client/backend wait cycle until the body timeout.
 
-## 6. Internal-only external interaction attestation
+M082 must reject all `Expect` requests before local target allocation with fixed bounded close semantics rather than expanding the HTTP state machine to support informational responses.
 
-Java I2P/I2P+ reference material and the pinned Proposal 170 source were used
-as read-only behavioral evidence. No upstream repository, maintainer channel,
-issue, pull request, review, merge, adoption, or submission was mutated or
-requested. No upstream contribution artifact was prepared under M076. The
-requested push is limited to the internal eggstack/emissary repository remote.
+### LOW-MEDIUM — POST peer accounting still uses an eight-byte `DefaultHasher` key
+
+As with shared admission, HTTP write throttling should use the canonical cryptographic Destination ID/hash from the trusted accepted peer. M082 owns this correction and must revalidate that its auxiliary expiry metadata is itself bounded.
+
+## 3. Why original verification missed these findings
+
+The original identity test treated a string longer than 524 as invalid without including structurally valid large current Destination fixtures. It therefore verified the constant, not the full I2P identity domain.
+
+HTTP framing tests covered Content-Length/Transfer-Encoding, upgrades, parser bounds, proxy identity, response framing, and fingerprints, but did not exercise `Expect` semantics or prove that an expectation-waiting client cannot pin the request-body phase.
+
+POST limiter tests verified table cardinality/churn behavior, not canonical cryptographic peer-key identity.
+
+## 4. Inherited M074 corrective dependency
+
+HTTP accepted streams also consume the shared server admission state. M080 owns independent M074 defects involving aggregate-rejection state poisoning, expiry-index bounds, capacity/retention coherence, and canonical peer accounting.
+
+M082 must consume the corrected M080 trusted-peer identity boundary where practical rather than creating a separate identity model.
+
+## 5. Corrective requirements retained for M082
+
+M082 must:
+
+- accept every structurally valid current I2P Destination supported by the repository parser, including large valid key-certificate/signature forms;
+- reject malformed/non-Destination peer text before request construction/local target;
+- retain an explicit defensible bound derived from actual supported representation rather than arbitrary 64 KiB/524-byte values;
+- derive B32/B64 injected identity from the authenticated structurally valid peer;
+- reject any `Expect` header before local connect, preferably with fixed `417 Expectation Failed` + `Connection: close` semantics;
+- move POST peer keys to canonical Destination ID/hash;
+- preserve M076 fingerprint/proxy/framing/limiter protections;
+- prove inbound `httpbidirserver` inherits the same corrections.
+
+Do not add full `100 Continue` support, a second HTTP parser, body rewriting, HTTP/2, TLS termination, or adjacent protocol features inside this corrective.
+
+## 6. Current disposition
+
+M076 is `corrective pass required` at current head even though its fingerprint and POST-state architecture should be retained. M082 must close the independent identity/Expect/accounting-key findings before M077 can become ready and before M079 final reclosure.
+
+External I2P/I2P+ source material remains read-only behavioral evidence. No upstream review, issue/PR mutation, merge, or submission is authorized.

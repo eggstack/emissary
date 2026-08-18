@@ -1,126 +1,93 @@
 # M075 Closure — Generic Server Accepted-Stream Hardening
 
-Status: closed against implementation commit `20db126`
+Status: corrective pass required for current option-truthfulness invariant — accepted-stream architecture retained; M081 owns the regression
 
 Source implementation plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/075-generic-server-accepted-stream-hardening.md`
 
-Source roadmap:
+Corrective successor:
 
-- `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md`
+- `plans/implementation/i2pcontrol-proposal-170/081-generic-server-leaseset-option-truthfulness-corrective.md`
 
-## 1. Disposition
+Implementation commit:
 
-M075 is closed. The control-plane generic `server` backend no longer uses
-blind SAM `STREAM FORWARD`. It now owns an application-visible accepted-stream
-session, reuses M074's peer-aware admission state, and performs a raw relay
-only after admission to the fixed loopback target.
+- `20db126325c858b6a240d49f4bdbe436ab184a50`.
 
-## 2. Requirement-to-evidence matrix
+## 1. Retained implementation evidence
 
-| Requirement | Evidence | Result |
-|---|---|---|
-| Generic control-plane server uses accepted-stream operations | `backends/server.rs::ServerRuntimeSupervisor::start`; `run_accepted_server` composition | pass |
-| Generic control-plane path does not issue `STREAM FORWARD` | `generic_server_uses_accepted_stream_and_relays_bytes_without_forwarding` fake-SAM test | pass |
-| M074 admission is reused before handler/target work | `AcceptedServerRuntimeConfig` receives `ServerAdmissionPolicy`; shared `run_accepted_server` ordering | pass |
-| Raw bytes reach the fixed local target in both directions | fake-SAM/TCP fixture relays `from-i2p` and `to-i2p` byte-for-byte | pass |
-| Loopback target confinement and bounded connect | `runtime_config` accepts only `127.0.0.1`/`localhost`; relay uses a five-second timeout and normalized `127.0.0.1` | pass |
-| Denied/failed streams do not allocate a target through the generic handler | shared accepted-server admission precedes handler; relay returns before target connect failure can affect the session | pass |
-| Generic admission controls are applied before store/session allocation | raw allowlist plus `ServerAdmissionPolicy::from_raw_options`; admission/loopback regression test | pass |
-| Unsupported generic options remain explicit rejects | existing typed/raw option tests remain green; `AccessList`, filter, TLS, multi-home, and underspecified period fields remain rejected | pass |
-| Persistent destination/public identity is stable across restart | generic lifecycle test stops and starts the same definition and compares published destination | pass |
-| Exact-generation cancellation and bounded child draining | existing per-name supervisor generation/cancellation plus shared accepted-server `BoundedTaskGroup`; lifecycle test remains green | pass |
-| Child relay errors cannot kill unrelated accepted streams | shared accepted-server task panic/error isolation and M074 runtime tests | pass |
-| Private destination material is secret-safe | `StoredDestination` redaction plus `generic_server_debug_is_secret_safe`; sanitized runtime errors | pass |
-| Startup-managed server ownership/path is unchanged | implementation diff is confined to `emissary-cli/src/i2pcontrol/**`; startup forwarding remains in `emissary-cli/src/tunnel/server.rs` | pass |
-| M061/M062/M063 containment remains intact | `m061_containment`: 7 passed; `m062_dependency_containment`: 19 passed | pass |
+M075 made a security-relevant architectural improvement that remains accepted and should not be rolled back:
 
-## 3. Implementation details
+- control-plane generic `server` no longer uses blind SAM `STREAM FORWARD`;
+- it owns an application-visible accepted-stream session;
+- it reuses shared accepted-server admission before local-target work;
+- after admission, payload is relayed byte-for-byte to a fixed loopback target;
+- persistent server Destination/public identity remains stable across restart;
+- startup-managed server forwarding remains separately owned in `emissary-cli/src/tunnel/server.rs`;
+- local target connect is bounded;
+- private destination material remains redacted;
+- no `emissary-core/**` production path or SAM protocol extension was added.
 
-The generic supervisor now starts `AcceptedServerRuntimeConfig` with the
-backend-owned `StoredDestination`, configured admission policy, and a handler
-that connects only to `127.0.0.1:<target-port>`. The accepted runtime reports
-the actual public destination after Yosemite session creation; the supervisor
-publishes it only for the matching generation.
+The fake-SAM/raw-relay/lifecycle/containment evidence for those properties remains useful.
 
-The seven M074 connection/admission fields are accepted only in the generic
-backend's bounded raw allowlist and are parsed into the shared policy. Access
-lists, protocol filters, TLS termination, arbitrary target routing,
-`UniqueLocalAddressPerClient`, `MultiHoming`, and guessed period/ban semantics
-remain explicit unsupported options.
+## 2. Independent finding invalidating current closure
 
-No `emissary-core/**` production code, SAM protocol extension, startup server
-path, durable identity format, public Proposal 170 field, or application
-protocol parser changed.
+### MEDIUM — `leaseSetEncType` is accepted but no longer applied
 
-## 4. Verification
+M073 historically closed while generic server accepted exactly one I2CP session-shaping option, `leaseSetEncType`, and the then-current server runtime passed it into Yosemite `SessionOptions`.
 
-Passed:
+M075 migrated the control-plane generic server to:
 
 ```text
-cargo test -p emissary-cli --no-default-features --features i2pcontrol
-cargo check -p emissary-cli --no-default-features
-cargo check -p emissary-cli --no-default-features --features i2pcontrol
-cargo check -p emissary-core
-cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m061_containment
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m062_dependency_containment
-rustfmt +nightly --check --edition 2021 --config-path rustfmt.toml emissary-cli/src/i2pcontrol/backends/server.rs
-git diff --check
+GenericServerRuntimeConfig
+  -> AcceptedServerRuntimeConfig
+  -> run_accepted_server
 ```
 
-The package suite passed 1,546 tests across 24 suites. The focused generic
-server suite, including accepted-SAM, relay, restart, admission, startup
-ownership, and secret-redaction coverage, is included in that package result.
+At current head:
 
-The repository-wide stable `cargo fmt --all -- --check` remains red because
-the repository's nightly-only rustfmt configuration and inherited formatting
-drift affect unrelated files. The plan-scoped nightly check passed.
+- `validate_i2cp_options` still accepts `leaseSetEncType` and rejects other generic-server I2CP keys;
+- neither generic nor accepted-server runtime configuration carries the accepted value;
+- `run_accepted_server` creates `SessionOptions` without setting `lease_set_enc_type`.
 
-The requested feature-disabled core check,
-`cargo check -p emissary-core --no-default-features`, remains blocked by the
-pre-existing missing `RwLock` imports in unrelated core modules (`destination`,
-`inspection`, `profile`, `subsystem`, `tunnel`, and `router` paths). The
-required default core check passed, and M075 made no core change.
+The option is therefore recognized/accepted but ignored by the actual running accepted-stream session. This is a direct regression of the apply-or-reject invariant and invalidates the original M075 claim that no high/medium option-truthfulness finding remained.
 
-## 5. Invariant, compatibility, and security review
+## 3. Why M075 verification missed it
 
-- Destination identity remains backend-owned, persistent, and absent from
-  diagnostics.
-- Remote identity is accepted only from Yosemite's accepted stream and is
-  passed to M074 admission before handler execution.
-- Local target selection is administrator-configured, fixed at start, and
-  loopback-only; remote data never selects it.
-- No lock is held across local target connection or relay.
-- Generic payloads remain uninterpreted after admission; no HTTP, IRC, SOCKS,
-  or other application semantics were introduced.
-- Cancellation drains accepted child tasks through the existing bounded
-  accepted-server runtime and cannot let an old generation update a new one.
-- Startup-managed server forwarding remains outside TunnelManager ownership.
-- No high/medium finding remains in the M075 generic-server scope.
+M075 tests strongly covered the migration shape:
 
-## 6. Documentation and future-plan disposition
+- accepted-stream session rather than `STREAM FORWARD`;
+- raw bidirectional relay;
+- admission reuse;
+- loopback target;
+- restart/public Destination stability;
+- unsupported-option rejection;
+- secret safety and containment.
 
-Updated:
+They did not include a positive session-configuration fixture proving that every still-supported generic-server I2CP option reaches Yosemite/SAM after the migration. The rejection matrix remained green while the one positive capability silently disappeared.
 
-- `docs/i2pcontrol/tunnel-backends.md`;
-- `docs/i2pcontrol/tunnel-manager.md`;
-- `docs/i2pcontrol/proposal-170-support.md`;
-- the M075 handoff, implementation README, registries, and security/runtime
-  roadmaps.
+## 4. Corrective requirement
 
-M072 is now recorded as closed after M073. M075 is closed. M076 is unblocked,
-marked ready, and registered as the next dependency-ready handoff. M077 is
-also hard-dependency ready but remains unregistered under the one-ready-plan
-sequencing rule. M078 remains blocked by the ordered M075-M077 sequence, and
-M079 remains blocked until M074-M078 close.
+M081 must inspect the pinned Yosemite `SessionOptions` behavior and do exactly one of:
 
-## 7. Internal-only external interaction attestation
+1. thread the validated optional `leaseSetEncType` value through the accepted-stream runtime into `SessionOptions::lease_set_enc_type`; or
+2. if accepted-stream Yosemite cannot apply it without a broader core/protocol change, reject the field before destination-store/session/task allocation and update support/capability documentation.
 
-External specifications and reference material were accessed read-only.
-No upstream repository, maintainer channel, issue, pull request, review,
-merge, adoption, or submission was mutated or requested. No upstream
-contribution artifact was prepared under M075. The only push authorized for
-this handoff is the internal repository remote `eggstack/emissary` requested
-by the maintainer.
+The following are prohibited corrective shortcuts:
+
+- restoring control-plane `STREAM FORWARD`;
+- adding arbitrary I2CP pass-through;
+- implementing adjacent LeaseSet/privacy features;
+- widening `emissary-core/**` merely for this option.
+
+## 5. Inherited M074 corrective dependency
+
+M075 also consumes the shared server admission state. Independent review found defects in that state which are owned by M080. The generic accepted-stream migration remains structurally correct, but the current generic server must consume M080's corrected admission implementation before final security closure.
+
+## 6. Current disposition
+
+Treat M075 as `corrective pass required` for current security/option-truthfulness purposes while retaining its accepted-stream migration as the required architecture.
+
+M081 closes the direct M075 option regression after M080. M079 later independently re-audits generic server payload transparency, admission, identity stability, and apply-or-reject option truthfulness at final head.
+
+External sources remain read-only. No upstream review, issue, pull request, merge, or submission is authorized.

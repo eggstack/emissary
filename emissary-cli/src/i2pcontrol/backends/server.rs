@@ -48,6 +48,7 @@ struct GenericServerRuntimeConfig {
     destination: StoredDestination,
     sam_tcp_port: u16,
     admission: ServerAdmissionPolicy,
+    lease_set_enc_type: Option<String>,
 }
 
 /// Bounded, per-name runtime supervisor for control-plane server tunnels.
@@ -221,6 +222,7 @@ impl ServerRuntimeSupervisor {
                     sam_tcp_port: config.sam_tcp_port,
                     destination: config.destination,
                     admission: config.admission,
+                    lease_set_enc_type: config.lease_set_enc_type,
                     handler,
                 },
                 ready_cancellation.clone(),
@@ -326,7 +328,7 @@ impl ServerTunnelBackend {
     fn runtime_config(
         &self,
         definition: &TunnelDefinition,
-    ) -> BackendResult<(u16, ServerAdmissionPolicy)> {
+    ) -> BackendResult<(u16, ServerAdmissionPolicy, Option<String>)> {
         if definition.ownership != TunnelOwnership::ControlPlane {
             return Err(BackendError::InvalidState {
                 tunnel_type: TunnelType::Server,
@@ -359,7 +361,8 @@ impl ServerTunnelBackend {
         }
         let admission = ServerAdmissionPolicy::from_raw_options(&definition.raw_config)
             .map_err(invalid_option)?;
-        Ok((port, admission))
+        let lease_set_enc_type = lease_set_enc_type(definition)?;
+        Ok((port, admission, lease_set_enc_type))
     }
 }
 
@@ -378,10 +381,10 @@ impl TunnelBackend for ServerTunnelBackend {
             });
         }
         validate_raw_options(definition)?;
+        validate_i2cp_options(definition)?;
         validate_options(TunnelType::Server, &definition.options, SERVER_OPTIONS)
             .map_err(option_error)?;
-        validate_i2cp_options(definition)?;
-        let (target_port, admission) = self.runtime_config(definition)?;
+        let (target_port, admission, lease_set_enc_type) = self.runtime_config(definition)?;
         let store = self.destinations.as_ref().ok_or_else(|| BackendError::Internal {
             message: "server destination store is not composed".to_string(),
         })?;
@@ -402,6 +405,7 @@ impl TunnelBackend for ServerTunnelBackend {
                 destination,
                 sam_tcp_port: self.supervisor.sam_tcp_port,
                 admission,
+                lease_set_enc_type,
             })
             .await
     }
@@ -496,6 +500,19 @@ fn validate_i2cp_options(definition: &TunnelDefinition) -> BackendResult<()> {
     Ok(())
 }
 
+/// Extract the validated `leaseSetEncType` value from I2CP options.
+///
+/// The `i2cp_options` map is typed as `BTreeMap<String, String>`, so the
+/// existing tunnel-manager parsing contract already rejects non-string values
+/// at the setter. An empty string is treated as the absence of the option so
+/// we never emit an empty `i2cp.leaseSetEncType=` key on the SAM wire.
+fn lease_set_enc_type(definition: &TunnelDefinition) -> BackendResult<Option<String>> {
+    match definition.options.i2cp_options.get("leaseSetEncType") {
+        Some(value) if !value.is_empty() => Ok(Some(value.clone())),
+        _ => Ok(None),
+    }
+}
+
 fn option_error(error: OptionValidationError) -> BackendError {
     match error {
         OptionValidationError::Missing {
@@ -575,8 +592,9 @@ mod tests {
         let mut def = definition("admission-options", "identity");
         def.raw_config.insert("MaxConcurrentConns".to_owned(), serde_json::json!(7));
         def.raw_config.insert("ClientPerMinute".to_owned(), serde_json::json!(11));
-        let (_, policy) = backend.runtime_config(&def).unwrap();
+        let (_, policy, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
         assert_eq!(policy.max_concurrent_connections(), 7);
+        assert!(lease_set_enc_type.is_none());
 
         def.raw_config.insert("TargetHost".to_owned(), serde_json::json!("192.0.2.1"));
         assert!(matches!(
@@ -584,6 +602,23 @@ mod tests {
             Err(BackendError::Internal { message })
                 if message.contains("target host")
         ));
+    }
+
+    #[test]
+    fn lease_set_enc_type_is_threaded_when_present_and_absent_otherwise() {
+        let backend = ServerTunnelBackend::without_store(1);
+        let mut def = definition("lcse-enc-type", "identity");
+        def.options.i2cp_options.insert("leaseSetEncType".to_owned(), "4,0".to_owned());
+        let (_, _, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
+        assert_eq!(lease_set_enc_type.as_deref(), Some("4,0"));
+
+        def.options.i2cp_options.insert("leaseSetEncType".to_owned(), String::new());
+        let (_, _, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
+        assert!(lease_set_enc_type.is_none());
+
+        def.options.i2cp_options.remove("leaseSetEncType");
+        let (_, _, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
+        assert!(lease_set_enc_type.is_none());
     }
 
     #[tokio::test]
@@ -830,5 +865,186 @@ mod tests {
         definition.ownership = TunnelOwnership::StartupManaged;
         let result = backend.start(&definition).await;
         assert!(matches!(result, Err(BackendError::InvalidState { .. })));
+    }
+
+    async fn lease_set_enc_type_fixture(
+        _lease_set_enc_type: Option<&'static str>,
+    ) -> (
+        u16,
+        tokio::task::JoinHandle<()>,
+        Arc<parking_lot::Mutex<Vec<String>>>,
+    ) {
+        let sam_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let sam_port = sam_listener.local_addr().unwrap().port();
+        let commands = Arc::new(parking_lot::Mutex::new(Vec::new()));
+        let observed_commands = Arc::clone(&commands);
+        let sam_task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = sam_listener.accept().await else {
+                    return;
+                };
+                let observed_commands = Arc::clone(&observed_commands);
+                tokio::spawn(async move {
+                    let (read_half, mut write_half) = stream.into_split();
+                    let mut reader = BufReader::new(read_half);
+                    let mut line = String::new();
+                    loop {
+                        line.clear();
+                        if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                            return;
+                        }
+                        observed_commands.lock().push(line.trim().to_owned());
+                        if line.starts_with("HELLO") {
+                            write_half
+                                .write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n")
+                                .await
+                                .unwrap();
+                        } else if line.starts_with("SESSION CREATE") {
+                            write_half
+                                .write_all(
+                                    b"SESSION STATUS RESULT=OK DESTINATION=server-destination\n",
+                                )
+                                .await
+                                .unwrap();
+                        } else {
+                            write_half.write_all(b"STREAM STATUS RESULT=OK\n").await.unwrap();
+                        }
+                    }
+                });
+            }
+        });
+        (sam_port, sam_task, commands)
+    }
+
+    async fn persisted_server_identity(_name: &str) -> (ServerDestinationStore, String) {
+        let root = tempfile::tempdir().unwrap();
+        let store = ServerDestinationStore::new(root.path());
+        store.load().await.unwrap();
+        let identity = ServerDestinationStore::new_identity();
+        store
+            .put(
+                &identity,
+                StoredDestination::from_private(base64_encode([9u8; 128])),
+            )
+            .await
+            .unwrap();
+        (store, identity)
+    }
+
+    fn session_create_command(commands: &[String]) -> Option<&String> {
+        commands.iter().find(|command| command.starts_with("SESSION CREATE"))
+    }
+
+    #[tokio::test]
+    async fn generic_server_threades_lease_set_enc_type_into_session_create() {
+        let target_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_port = target_listener.local_addr().unwrap().port();
+        let _ = Arc::new(target_listener);
+        let (sam_port, sam_task, commands) = lease_set_enc_type_fixture(Some("4,0")).await;
+        let (store, identity) = persisted_server_identity("lcse-applied").await;
+        let backend = ServerTunnelBackend::new(sam_port, store);
+        let mut def = definition("lcse-applied", &identity);
+        def.options.listen_port = Some(target_port);
+        def.options.i2cp_options.insert("leaseSetEncType".to_owned(), "4,0".to_owned());
+
+        backend.start(&def).await.unwrap();
+        backend.stop(&def).await.unwrap();
+        sam_task.abort();
+        let _ = sam_task.await;
+
+        let session = session_create_command(&commands.lock())
+            .cloned()
+            .expect("SESSION CREATE must be issued");
+        assert!(
+            session.contains("leaseSetEncType=4,0"),
+            "SESSION CREATE must carry leaseSetEncType=4,0; got: {session}"
+        );
+        assert!(
+            session.contains("STREAM"),
+            "SESSION CREATE must use STREAM style"
+        );
+    }
+
+    #[tokio::test]
+    async fn generic_server_omits_lease_set_enc_type_when_unset() {
+        let target_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_port = target_listener.local_addr().unwrap().port();
+        let _ = Arc::new(target_listener);
+        let (sam_port, sam_task, commands) = lease_set_enc_type_fixture(None).await;
+        let (store, identity) = persisted_server_identity("lcse-default").await;
+        let backend = ServerTunnelBackend::new(sam_port, store);
+        let mut def = definition("lcse-default", &identity);
+        def.options.listen_port = Some(target_port);
+
+        backend.start(&def).await.unwrap();
+        backend.stop(&def).await.unwrap();
+        sam_task.abort();
+        let _ = sam_task.await;
+
+        let session = session_create_command(&commands.lock())
+            .cloned()
+            .expect("SESSION CREATE must be issued");
+        // Yosemite always emits a leaseSetEncType, defaulting to 6,4 when
+        // the caller does not override it. The regression we are guarding
+        // against is the option being silently dropped by the I2PControl
+        // accepted-server path; the absence of the raw 4,0 value confirms
+        // that the I2PControl layer did not incorrectly inject it.
+        assert!(
+            !session.contains("leaseSetEncType=4,0"),
+            "SESSION CREATE must not carry the operator's old value; got: {session}"
+        );
+    }
+
+    #[tokio::test]
+    async fn lease_set_enc_type_survives_restart_with_new_session_generation() {
+        let target_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_port = target_listener.local_addr().unwrap().port();
+        let _ = Arc::new(target_listener);
+        let (sam_port, sam_task, commands) = lease_set_enc_type_fixture(Some("4,0")).await;
+        let (store, identity) = persisted_server_identity("lcse-restart").await;
+        let backend = ServerTunnelBackend::new(sam_port, store);
+        let mut def = definition("lcse-restart", &identity);
+        def.options.listen_port = Some(target_port);
+        def.options.i2cp_options.insert("leaseSetEncType".to_owned(), "4,0".to_owned());
+
+        backend.start(&def).await.unwrap();
+        backend.stop(&def).await.unwrap();
+        backend.start(&def).await.unwrap();
+        backend.stop(&def).await.unwrap();
+        sam_task.abort();
+        let _ = sam_task.await;
+
+        let session_count = commands
+            .lock()
+            .iter()
+            .filter(|command| command.starts_with("SESSION CREATE"))
+            .count();
+        assert_eq!(
+            session_count, 2,
+            "both generations must issue their own SESSION CREATE"
+        );
+        for session in
+            commands.lock().iter().filter(|command| command.starts_with("SESSION CREATE"))
+        {
+            assert!(
+                session.contains("leaseSetEncType=4,0"),
+                "every restart generation must carry leaseSetEncType=4,0; got: {session}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn unknown_generic_server_i2cp_keys_still_fail_before_allocation() {
+        let backend = ServerTunnelBackend::without_store(1);
+        let mut def = definition("lcse-unknown", "identity");
+        def.options.i2cp_options.insert("SignatureType".to_owned(), "7".to_owned());
+        let result = backend.start(&def).await;
+        assert!(matches!(
+            result,
+            Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::Server,
+                option
+            }) if option == "I2CPOptions"
+        ));
     }
 }

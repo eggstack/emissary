@@ -1,6 +1,6 @@
 # M082 — HTTP Peer Identity and Expect-Framing Corrective
 
-Status: blocked — registry sequencing successor; M080 and M081 must close before registration advances
+Status: ready — M080 and M081 closed; current registered handoff
 
 Source roadmap:
 

@@ -177,6 +177,17 @@ rename. Running server rename is rejected, and delete awaits the exact runtime
 task before removing durable definition and identity state. Startup-managed
 server forwarding remains owned by the startup server manager and is unchanged.
 
+The generic server is the only accepted-server family that accepts an I2CP
+session-shaping option. `i2cp.leaseSetEncType` is the sole supported key
+(M081). Its validated value is threaded into the accepted-stream
+`SESSION CREATE` command via `SessionOptions::lease_set_enc_type`; any other
+I2CP key, or a non-`leaseSetEncType` raw option, is rejected before
+destination-store/session/task allocation. The startup-managed server
+forwards `leaseSetEncType` through its separate path and remains unchanged.
+The `httpserver`, `httpbidirserver`, and `ircserver` families explicitly pass
+`None` for the new shared field so they do not silently gain a capability
+their own option contracts do not document.
+
 The production manager serializes start, stop, restart, edit, rename, and
 delete per exact tunnel name. Post-load reconciliation starts only eligible
 control-plane client/server definitions with `StartOnLoad`; failures are

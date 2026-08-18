@@ -357,6 +357,7 @@ async fn run_composite(
             sam_tcp_port: config.sam_tcp_port,
             destination: config.destination,
             admission: config.admission,
+            lease_set_enc_type: None,
             handler: server_handler,
         },
         child_receiver.clone(),

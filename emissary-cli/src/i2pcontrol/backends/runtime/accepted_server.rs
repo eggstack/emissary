@@ -39,6 +39,13 @@ pub struct AcceptedServerRuntimeConfig {
     pub sam_tcp_port: u16,
     pub destination: StoredDestination,
     pub admission: ServerAdmissionPolicy,
+    /// Optional I2CP lease-set encryption type for the accepted-stream session.
+    ///
+    /// `None` keeps the Yosemite default. M081 reserves this field for the
+    /// generic `server` backend's validated `leaseSetEncType`; other accepted
+    /// server families must explicitly set `None` so they do not silently
+    /// gain capabilities their own option contracts do not document.
+    pub lease_set_enc_type: Option<String>,
     pub handler: AcceptedServerHandler,
 }
 
@@ -49,6 +56,7 @@ impl fmt::Debug for AcceptedServerRuntimeConfig {
             .field("sam_tcp_port", &self.sam_tcp_port)
             .field("destination", &self.destination)
             .field("admission", &self.admission)
+            .field("lease_set_enc_type", &self.lease_set_enc_type)
             .finish_non_exhaustive()
     }
 }
@@ -82,6 +90,7 @@ pub async fn run_accepted_server(
             destination: DestinationKind::Persistent {
                 private_key: config.destination.as_str().to_owned(),
             },
+            lease_set_enc_type: config.lease_set_enc_type.clone(),
             ..Default::default()
         }) => match result {
             Ok(session) => session,
@@ -210,6 +219,7 @@ mod tests {
             sam_tcp_port: sam_port,
             destination: StoredDestination::from_private(base64_encode([7u8; 128])),
             admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
+            lease_set_enc_type: None,
             handler,
         };
         let (cancel_tx, cancel_rx) = watch::channel(false);
@@ -250,6 +260,7 @@ mod tests {
             sam_tcp_port: sam_port,
             destination: StoredDestination::from_private(base64_encode([7u8; 128])),
             admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
+            lease_set_enc_type: None,
             handler,
         };
         let (cancel_tx, cancel_rx) = watch::channel(false);
@@ -276,6 +287,7 @@ mod tests {
                 sam_tcp_port: 1,
                 destination: StoredDestination::from_private("private".to_owned()),
                 admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
+                lease_set_enc_type: None,
                 handler: Arc::new(|_| Box::pin(async {})),
             },
             cancel_rx,

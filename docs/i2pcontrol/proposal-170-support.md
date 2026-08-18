@@ -420,12 +420,13 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M056 | closed | integrated reclosure; final 37 available / 1 neutral / 5 unavailable audit |
 | M066–M071 | closed | real IRC, HTTP, CONNECT, SOCKS, bidirectional HTTP, and Streamr tunnel families |
 | M072 | closed after M073 | integrated twelve-type runtime reclosure |
-| M073 | closed | generic client/server option apply-or-reject corrective |
+| M073 | closed; corrective history | generic client/server option apply-or-reject corrective; M081 closes the M075-accepted-stream regression that re-introduced the accepted-but-ignored `leaseSetEncType` |
 | M074 | closed; corrective history | shared peer-aware server admission and rate-limit hardening; M080 closes the discovered transactional/cardinality defects |
 | M080 | closed | server admission transactionality and cardinality corrective; canonical cryptographic peer identity; bounded expiry index; retention-aware peer capacity derivation |
 | M075 | closed | generic server accepted-stream raw relay hardening |
 | M076 | closed | HTTP anonymity/POST-throttle hardening |
-| M077 | blocked; behind M081-M082 | IRC lifetime and exhaustion hardening |
+| M081 | closed | generic server `leaseSetEncType` apply-or-reject corrective; accepted-stream `SESSION CREATE` now carries the validated value |
+| M077 | blocked; behind M082 | IRC lifetime and exhaustion hardening |
 
 ## Final-status rule
 

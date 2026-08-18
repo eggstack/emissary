@@ -1,6 +1,6 @@
 # M073 Closure — Generic Tunnel Option Truthfulness Corrective
 
-Status: historical closure accepted against implementation commit `3d1d8f1`; invariant later regressed by M075 and requires M081 at current head
+Status: closed; corrective history — M081 re-establishes the M073 invariant at the current head (`leaseSetEncType` is carried into the accepted-stream `SESSION CREATE`)
 
 Source implementation plan:
 

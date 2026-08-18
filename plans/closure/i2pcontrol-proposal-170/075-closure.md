@@ -1,6 +1,6 @@
 # M075 Closure — Generic Server Accepted-Stream Hardening
 
-Status: corrective pass required for current option-truthfulness invariant — accepted-stream architecture retained; M081 owns the regression
+Status: closed; M081 closed the option-truthfulness corrective on the accepted-stream architecture
 
 Source implementation plan:
 
@@ -8,7 +8,7 @@ Source implementation plan:
 
 Corrective successor:
 
-- `plans/implementation/i2pcontrol-proposal-170/081-generic-server-leaseset-option-truthfulness-corrective.md`
+- `plans/implementation/i2pcontrol-proposal-170/081-generic-server-leaseset-option-truthfulness-corrective.md` (closed; closure: `plans/closure/i2pcontrol-proposal-170/081-closure.md`)
 
 Implementation commit:
 

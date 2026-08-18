@@ -420,6 +420,8 @@ fn is_authorized_tunnel_runtime_path(path: &str) -> bool {
             | "emissary-cli/src/i2pcontrol/backends/irc_client.rs"
             | "emissary-cli/src/i2pcontrol/backends/runtime/accepted_server.rs"
             | "emissary-cli/src/i2pcontrol/backends/runtime/admission.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/peer_identity.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/peer_identity_impl.rs"
             | "emissary-cli/src/i2pcontrol/server.rs"
             | "plans/closure/i2pcontrol-proposal-170/067-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/068-closure.md"
@@ -512,6 +514,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/074-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/075-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/076-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/080-closure.md"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }

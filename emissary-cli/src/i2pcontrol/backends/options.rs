@@ -147,11 +147,16 @@ pub const CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
 );
 
 /// Runtime fields supported by the existing generic server backend.
+///
+/// `i2cp` is `Accept` so the backend-specific `ServerTunnelBackend::validate_i2cp_options`
+/// can be the authoritative allowlist (currently `leaseSetEncType` only). The
+/// generic `validate_options` check stays coarse-grained; the runtime decides
+/// which I2CP keys it can actually apply.
 pub const SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &[],
     &["TargetPort", "ListenPort"],
     &["TargetHost", "Host"],
-    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Accept,
     CustomOptionPolicy::Reject,
 );
 

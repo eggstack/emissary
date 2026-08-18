@@ -1,6 +1,8 @@
 # M080 — Server Admission Transactionality and Cardinality Corrective
 
-Status: ready — corrective pass required by independent post-M076 security review; next registered handoff
+Status: closed
+
+Closure: `plans/closure/i2pcontrol-proposal-170/080-closure.md`.
 
 Source roadmap:
 

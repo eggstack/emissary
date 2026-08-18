@@ -1,6 +1,6 @@
 # M074 Closure — Shared Server Admission and Rate-Limit Hardening
 
-Status: corrective pass required — independent post-M076 review invalidated the original closure; M080 owns the defects
+Status: closed; corrective history — M080 closes the original defects and the M074 architecture is retained
 
 Source implementation plan:
 
@@ -74,8 +74,16 @@ It also tested that the main peer map had a bound, not that every auxiliary expi
 
 ## 5. Current closure disposition
 
-M074 is not currently closed for security purposes. M080 must add transactional denial, bounded expiry/index state, canonical peer identity, and coherent capacity/retention semantics with regression tests that would have caught these findings.
+M074 is closed; the original defects are owned by M080 and closed by
+`plans/closure/i2pcontrol-proposal-170/080-closure.md`. M074's
+accepted-stream architecture, RAII lease design, reference defaults, and
+I2PControl containment are retained; M080 adds transactional denial,
+bounded expiry/index state, canonical cryptographic peer identity, and
+retention-aware peer capacity derivation on top of M074.
 
-M077 must not treat M074 as a satisfied hard dependency until M080 closes.
+M077 may now treat M074 as a satisfied hard dependency behind the M080
+closure; M077 remains blocked behind M081-M082 per the current
+`plans/registry.md` sequencing.
 
-No upstream interaction is authorized. External I2P/I2P+ references remain read-only evidence only.
+No upstream interaction is authorized. External I2P/I2P+ references remain
+read-only evidence only.

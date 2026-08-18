@@ -1,6 +1,6 @@
 # M081 — Generic Server LeaseSet Option Truthfulness Corrective
 
-Status: blocked — registry sequencing successor; M080 must close before registration advances
+Status: ready — M080 closed; current registered handoff
 
 Source roadmap:
 

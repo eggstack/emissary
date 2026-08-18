@@ -20,6 +20,8 @@ Corrective predecessor closures:
 
 Planning production baseline: `1618de172e7a78a193fc1bb117af269f31174030`.
 
+Implementation commit: `cd41d28`.
+
 ## 1. Retained implementation evidence
 
 M075 established the accepted-stream architecture that remains accepted and

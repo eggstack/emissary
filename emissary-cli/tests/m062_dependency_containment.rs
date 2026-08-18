@@ -498,6 +498,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/080-server-admission-transactionality-and-cardinality-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/081-generic-server-leaseset-option-truthfulness-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md"
+            | "plans/implementation/i2pcontrol-proposal-170/083-admission-capacity-and-trusted-destination-exactness-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md"

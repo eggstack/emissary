@@ -6,53 +6,14 @@ use yosemite::{style, DestinationKind, Session, SessionOptions, Stream};
 
 use crate::i2pcontrol::server_secret_store::StoredDestination;
 
+pub(super) use super::peer_identity_impl::TrustedPeerIdentity;
+
 use super::{
     admission::{AdmissionDecision, ServerAdmissionPolicy, ServerAdmissionState},
     task_group::BoundedTaskGroup,
 };
 
 const STOP_TIMEOUT: Duration = Duration::from_secs(5);
-
-/// Immutable public identity obtained from the accepted I2P stream.
-#[derive(Clone, PartialEq, Eq)]
-pub struct TrustedPeerIdentity {
-    destination: Arc<str>,
-}
-
-impl fmt::Debug for TrustedPeerIdentity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TrustedPeerIdentity")
-            .field("destination", &"<redacted>")
-            .finish()
-    }
-}
-
-impl TrustedPeerIdentity {
-    fn from_stream(stream: &Stream) -> Option<Self> {
-        let destination = stream.remote_destination();
-        if destination.is_empty()
-            || destination.len() > 64 * 1024
-            || destination.chars().any(char::is_control)
-        {
-            return None;
-        }
-        Some(Self {
-            destination: Arc::from(destination),
-        })
-    }
-
-    /// Return the public destination reported by SAM for this connection.
-    pub fn destination(&self) -> &str {
-        &self.destination
-    }
-
-    #[cfg(test)]
-    pub(crate) fn for_test(destination: &str) -> Self {
-        Self {
-            destination: Arc::from(destination),
-        }
-    }
-}
 
 /// One accepted I2P stream and the public identity authenticated by SAM.
 pub struct AcceptedServerConnection {
@@ -181,14 +142,18 @@ mod tests {
     use emissary_core::crypto::base64_encode;
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
-    async fn fake_sam() -> (u16, tokio::task::JoinHandle<()>) {
+    use super::super::peer_identity::test_fixtures::NULL_CERT_DESTINATION_BYTES;
+
+    async fn fake_sam(peer_destination: Arc<String>) -> (u16, tokio::task::JoinHandle<()>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
+        let peer_text = peer_destination.clone();
         let task = tokio::spawn(async move {
             loop {
                 let Ok((stream, _)) = listener.accept().await else {
                     break;
                 };
+                let peer_text = Arc::clone(&peer_text);
                 tokio::spawn(async move {
                     let (read_half, mut write_half) = stream.into_split();
                     let mut reader = BufReader::new(read_half);
@@ -203,7 +168,7 @@ mod tests {
                         } else if line.starts_with("SESSION CREATE") {
                             "SESSION STATUS RESULT=OK DESTINATION=server-destination\n".to_owned()
                         } else if line.starts_with("STREAM ACCEPT") {
-                            "STREAM STATUS RESULT=OK\npeer-destination\n".to_owned()
+                            format!("STREAM STATUS RESULT=OK\n{}\n", peer_text.as_str())
                         } else {
                             "STREAM STATUS RESULT=OK\n".to_owned()
                         };
@@ -219,16 +184,20 @@ mod tests {
 
     #[tokio::test]
     async fn accepted_peer_identity_reaches_handler_before_local_target() {
-        let (sam_port, sam_task) = fake_sam().await;
+        let peer_text: Arc<String> =
+            Arc::new(base64_encode(NULL_CERT_DESTINATION_BYTES.as_slice()));
+        let (sam_port, sam_task) = fake_sam(peer_text.clone()).await;
         let observed = Arc::new(AtomicBool::new(false));
         let target_connected = Arc::new(AtomicBool::new(false));
         let observed_handler = Arc::clone(&observed);
         let target_for_handler = Arc::clone(&target_connected);
+        let expected_destination = Arc::clone(&peer_text);
         let handler: AcceptedServerHandler = Arc::new(move |connection| {
             let observed = Arc::clone(&observed_handler);
             let target_connected = Arc::clone(&target_for_handler);
+            let expected = Arc::clone(&expected_destination);
             Box::pin(async move {
-                assert_eq!(connection.peer.destination(), "peer-destination");
+                assert_eq!(connection.peer.destination(), expected.as_str());
                 observed.store(true, Ordering::Release);
                 // A real HTTP/IRC handler would inspect bytes here. It must
                 // connect a local target only after that decision.
@@ -255,6 +224,42 @@ mod tests {
         })
         .await
         .unwrap();
+
+        cancel_tx.send(true).unwrap();
+        assert!(runtime.await.unwrap().is_ok());
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn malformed_remote_destination_is_rejected_before_handler_invocation() {
+        // "peer-destination" is not a structurally valid I2P Destination. The
+        // accepted-server boundary must drop it without invoking the handler
+        // or admitting a peer record.
+        let peer_text: Arc<String> = Arc::new("peer-destination".to_owned());
+        let (sam_port, sam_task) = fake_sam(peer_text).await;
+        let invoked = Arc::new(AtomicBool::new(false));
+        let invoked_handler = Arc::clone(&invoked);
+        let handler: AcceptedServerHandler = Arc::new(move |_connection| {
+            let invoked = Arc::clone(&invoked_handler);
+            Box::pin(async move {
+                invoked.store(true, Ordering::Release);
+            })
+        });
+        let config = AcceptedServerRuntimeConfig {
+            name: "rejected".to_owned(),
+            sam_tcp_port: sam_port,
+            destination: StoredDestination::from_private(base64_encode([7u8; 128])),
+            admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
+            handler,
+        };
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (ready_tx, ready_rx) = oneshot::channel();
+        let runtime = tokio::spawn(run_accepted_server(config, cancel_rx, ready_tx));
+        assert_eq!(ready_rx.await.unwrap().unwrap(), "server-destination");
+
+        // Give the fake SAM a moment to deliver the malformed destination.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(!invoked.load(Ordering::Acquire));
 
         cancel_tx.send(true).unwrap();
         assert!(runtime.await.unwrap().is_ok());

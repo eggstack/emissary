@@ -8,6 +8,9 @@
 mod accepted_server;
 mod admission;
 mod client_listener;
+#[cfg(test)]
+pub mod peer_identity;
+mod peer_identity_impl;
 mod task_group;
 
 pub use admission::{
@@ -17,9 +20,10 @@ pub use admission::{
 
 pub use accepted_server::{
     run_accepted_server, AcceptedServerConnection, AcceptedServerHandler,
-    AcceptedServerRuntimeConfig, AcceptedServerRuntimeError, TrustedPeerIdentity,
+    AcceptedServerRuntimeConfig, AcceptedServerRuntimeError,
 };
 pub use client_listener::{
     run_client_listener, ClientConnectionHandler, ClientListenerRuntimeConfig,
     ClientListenerRuntimeError, ClientStreamConnector,
 };
+pub use peer_identity_impl::{TrustedPeerIdentity, MAX_TRUSTED_DESTINATION_B64_TEXT};

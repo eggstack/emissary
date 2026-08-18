@@ -692,6 +692,13 @@ mod tests {
         let sam_port = sam_listener.local_addr().unwrap().port();
         let (done_tx, done_rx) = tokio::sync::oneshot::channel();
         let done_tx = Arc::new(tokio::sync::Mutex::new(Some(done_tx)));
+        // M080: relay fixtures must report a structurally valid I2P
+        // Destination so the accepted-server boundary admits the peer.
+        // `peer-destination` is a placeholder and would be rejected.
+        let peer_destination = std::sync::Arc::new(emissary_core::crypto::base64_encode(
+            super::super::runtime::peer_identity::test_fixtures::NULL_CERT_DESTINATION_BYTES
+                .as_slice(),
+        ));
         let commands = Arc::new(parking_lot::Mutex::new(Vec::new()));
         let observed_done = Arc::clone(&done_tx);
         let observed_listener = Arc::clone(&target_listener);
@@ -704,6 +711,7 @@ mod tests {
                 let observed_commands = Arc::clone(&observed_commands);
                 let observed_done = Arc::clone(&observed_done);
                 let observed_listener = Arc::clone(&observed_listener);
+                let peer_destination = std::sync::Arc::clone(&peer_destination);
                 tokio::spawn(async move {
                     let (read_half, mut write_half) = stream.into_split();
                     let mut reader = BufReader::new(read_half);
@@ -727,10 +735,11 @@ mod tests {
                                 .await
                                 .unwrap();
                         } else if line.starts_with("STREAM ACCEPT") {
-                            write_half
-                                .write_all(b"STREAM STATUS RESULT=OK\npeer-destination\nfrom-i2p")
-                                .await
-                                .unwrap();
+                            let response = format!(
+                                "STREAM STATUS RESULT=OK\n{}\nfrom-i2p",
+                                peer_destination.as_str()
+                            );
+                            write_half.write_all(response.as_bytes()).await.unwrap();
                             let (mut target, _) = match tokio::time::timeout(
                                 Duration::from_secs(1),
                                 observed_listener.accept(),

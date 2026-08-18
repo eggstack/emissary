@@ -1,7 +1,8 @@
 # I2PControl TunnelManager
 
-Status: M076 HTTP anonymity/POST-throttle hardening closed; M077 ready;
-lifecycle reconciliation remains closed against the pinned Proposal 170 revision
+Status: M080 server admission transactionality/cardinality corrective closed;
+M081-M082/M077-M079 corrective work remains; lifecycle reconciliation remains
+closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.
 Wire/CRUD/persistence evidence is distinct from runtime data-plane support.

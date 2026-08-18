@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M076 closed; M077-M079 corrective work remains
+Status: partial Proposal 170 support; M080 closed; M081-M082/M077-M079 corrective work remains
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -278,6 +278,14 @@ reference-valid destination representation. TLS, compression, custom
 options, arbitrary target hosts, and unsupported Proposal 170 modes reject
 before destination/session allocation.
 
+`TrustedPeerIdentity` is structurally validated at the accepted-stream
+boundary: only base64 I2P Destination text that parses through
+`emissary_core::primitives::Destination::parse` enters the shared admission
+state. The 32-byte SHA-256 Destination hash derived from that parsed
+Destination is the only key used by security accounting. The validated
+textual representation remains available for protocol handlers that need it
+for header injection.
+
 ### IRC tunnel runtime boundary
 
 `ircclient` and `ircserver` are operational only through the I2PControl-owned
@@ -413,10 +421,11 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M066–M071 | closed | real IRC, HTTP, CONNECT, SOCKS, bidirectional HTTP, and Streamr tunnel families |
 | M072 | closed after M073 | integrated twelve-type runtime reclosure |
 | M073 | closed | generic client/server option apply-or-reject corrective |
-| M074 | closed | shared peer-aware server admission and rate-limit hardening |
+| M074 | closed; corrective history | shared peer-aware server admission and rate-limit hardening; M080 closes the discovered transactional/cardinality defects |
+| M080 | closed | server admission transactionality and cardinality corrective; canonical cryptographic peer identity; bounded expiry index; retention-aware peer capacity derivation |
 | M075 | closed | generic server accepted-stream raw relay hardening |
 | M076 | closed | HTTP anonymity/POST-throttle hardening |
-| M077 | ready | IRC lifetime and exhaustion hardening |
+| M077 | blocked; behind M081-M082 | IRC lifetime and exhaustion hardening |
 
 ## Final-status rule
 

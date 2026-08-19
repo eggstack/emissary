@@ -1,7 +1,9 @@
 # I2PControl TunnelManager
 
-Status: M080-M084 server security corrective sequence closed;
-M085 final reclosure pending;
+Status: M080-M085 server security corrective sequence closed;
+M085 merged-head independent reclosure accepted;
+tunnel runtime/security line complete against the pinned Proposal 170 revision
+and current internal fork head;
 lifecycle reconciliation remains closed against the pinned Proposal 170 revision
 
 This document describes the Proposal 170 TunnelManager API handler in Emissary.

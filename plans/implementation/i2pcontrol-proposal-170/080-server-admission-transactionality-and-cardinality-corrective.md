@@ -1,6 +1,6 @@
 # M080 — Server Admission Transactionality and Cardinality Corrective
 
-Status: closed
+Status: closed; corrective history — M083 closes remaining current-head capacity and expiry-index defects
 
 Closure: `plans/closure/i2pcontrol-proposal-170/080-closure.md`.
 

@@ -1,12 +1,13 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: corrective pass required; M083 next; M077-M079 blocked
+Status: active; M083 closed; M077 ready; M078-M079 blocked
 
 Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
 Post-M076 corrective baseline: `1618de172e7a78a193fc1bb117af269f31174030`.
 
-Current corrective baseline: `a35d2bc333ff0e8b9889cd133d8ef75a98faa049`.
+Current corrective baseline: `3eaea53` (M083 implementation); closure accepted in
+`plans/closure/i2pcontrol-proposal-170/083-closure.md`.
 
 Source runtime roadmap:
 
@@ -40,7 +41,8 @@ A second independent review of head `a35d2bc` found that the shared accepted-ser
 - expired active peers can lose the expiry-index representation claimed by M080;
 - trusted Destination parsing does not require zero unconsumed bytes and preserves attacker-selected textual representation downstream.
 
-These are localized defects in otherwise-correct seams. M083 corrects them before the original IRC/Streamr/final-reclosure sequence resumes.
+These were localized defects in otherwise-correct seams. M083 corrects them and
+the original IRC/Streamr/final-reclosure sequence now resumes with M077.
 
 The workstream remains bounded to Proposal 170 tunnel security/correctness. It does not add tunnel types, redesign router protocols, add HTTP features, implement arbitrary I2CP pass-through, or broaden startup-service ownership.
 
@@ -95,11 +97,11 @@ M082 correctly:
 
 M083 only corrects exact/canonical full-Destination semantics inherited from the shared identity boundary.
 
-## 4. Post-M082 findings
+## 4. Post-M082 findings resolved by M083
 
 ### 4.1 Minute/no-history representability — MEDIUM
 
-`MINUTE` and `SHORT_RETENTION` are both 60 seconds, while the M080 capacity check is gated by `retention > SHORT_RETENTION`. Minute-only peer-rate history therefore skips the check that rejects fully unlimited aggregate arrival when retained cardinality cannot be bounded by policy.
+`MINUTE` and `SHORT_RETENTION` were both 60 seconds, while the M080 capacity check was gated by `retention > SHORT_RETENTION`. Minute-only peer-rate history therefore skipped the check that rejected fully unlimited aggregate arrival when retained cardinality could not be bounded by policy.
 
 Additionally, when every per-peer rate is unlimited, inactive records currently remain for a short retention despite no historical peer-rate semantics being needed. Under unlimited aggregate churn, that creates avoidable table pressure.
 
@@ -107,17 +109,17 @@ M083 separates peer-history requirement from cleanup duration. No-history inacti
 
 ### 4.2 Aggregate bound selection — MEDIUM-LOW
 
-The current helper selects the first non-zero aggregate field rather than evaluating all enabled minute/hour/day fields. This can falsely reject a representable policy when a tighter hour/day bound exists.
+The former helper selected the first non-zero aggregate field rather than evaluating all enabled minute/hour/day fields. This could falsely reject a representable policy when a tighter hour/day bound existed.
 
 M083 computes a safe retained-event upper bound for each enabled aggregate window, includes fixed-window boundary overlap, and takes the minimum because the runtime enforces all enabled aggregate fields conjunctively.
 
 ### 4.3 Active-peer expiry-index consistency — LOW-MEDIUM
 
-M080's `reap` path can remove an active peer's expiry-index entry while leaving the peer record active. M083 must make the intended invariant explicit and preserve it across acquire/reap/drop.
+M080's `reap` path could remove an active peer's expiry-index entry while leaving the peer record active. M083 makes the intended inactive-peer-only invariant explicit and preserves it across acquire/reap/drop.
 
 ### 4.4 Trusted Destination exactness/canonical text — LOW-MEDIUM
 
-The shared helper uses the core convenience `Destination::parse`, which does not require `parse_frame` remainder to be empty. A valid Destination plus trailing bytes can therefore produce a trusted 32-byte ID while preserving the original textual representation for HTTP metadata/access matching.
+The shared helper used the core convenience `Destination::parse`, which did not require `parse_frame` remainder to be empty. A valid Destination plus trailing bytes could therefore produce a trusted 32-byte ID while preserving the original textual representation for HTTP metadata/access matching.
 
 M083 requires exactly one parsed Destination with no remainder and derives downstream full-Destination text from canonical Base64 encoding of the parsed serialized bytes. No core parser change is authorized.
 
@@ -235,7 +237,9 @@ Closed with corrective history. M082 repaired its direct identity-length/`Expect
 
 ### M080 — Admission transactionality/cardinality corrective
 
-Historical closure accepted for its pinned implementation evidence, but current security disposition is `corrective pass required` until M083 closes minute/no-history capacity semantics, true aggregate-bound derivation, and active-peer expiry consistency.
+Closed with corrective history. M083 closes the remaining minute/no-history
+capacity semantics, true aggregate-bound derivation, and active-peer
+expiry-index consistency defects at the current head.
 
 ### M081 — Generic server LeaseSet option truthfulness corrective
 
@@ -243,11 +247,13 @@ Closed and not reopened by M083.
 
 ### M082 — HTTP peer identity and Expect-framing corrective
 
-Direct `Expect` and POST-key fixes are retained. Current trusted-Destination exactness remains corrective through M083.
+Closed with corrective history. Direct `Expect` and POST-key fixes remain
+accepted; M083 closes the inherited trusted-Destination exactness defect.
 
 ### M083 — Admission capacity semantics and trusted Destination exactness corrective
 
-Sole ready handoff. Correct the shared boundary without expanding architecture.
+Closed. The shared boundary is corrected without expanding architecture, and
+M077 is the next dependency-ready handoff.
 
 ### M077 — IRC lifetime/exhaustion hardening
 

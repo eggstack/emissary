@@ -19,7 +19,7 @@ Canonical direction:
 - **closed** — closure record accepted for the pinned implementation head.
 - **closed internally against pinned revision** — internal closure accepted against an explicitly named revision of an open external specification; does not imply upstream review or acceptance.
 - **partial Proposal 170 support** — exact supported dimensions are closed, but one or more pinned source/runtime capabilities remain truthfully unavailable.
-- **corrective pass required** — a prior disposition or closure was invalidated by a material implementation, compatibility, scope, or evidence defect.
+- **corrective pass required** — a prior disposition or closure was invalidated by a material implementation, compatibility, scope, merge-integration, or evidence defect.
 - **superseded** — replaced by another document and not executable.
 - **archived** — inactive and retained for traceability.
 
@@ -28,129 +28,129 @@ Canonical direction:
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
-| I2PControl Proposal 170 containment | closed | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | no containment corrective handoff | M061 source containment and M062/M063 dependency containment remain accepted authorities |
-| I2PControl Proposal 170 tunnel runtime completion | historical runtime completion accepted; current security closure reopened | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no separate runtime handoff | M072 historical runtime closure remains; M081 restored the M073 generic-server option truthfulness invariant |
-| I2PControl Proposal 170 tunnel security hardening | active; M083 closed; M077 ready | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M077 — IRC lifetime/exhaustion hardening | M083 closed the shared admission/trusted-Destination corrective; M078/M079 remain sequenced behind M077 |
+| I2PControl Proposal 170 containment | accepted authority; current merged-head bookkeeping corrective pending | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | consumed by M084 | M061/M062/M063 semantics remain authoritative; M084 repairs exact merged planning-path bookkeeping without broadening production scope |
+| I2PControl Proposal 170 tunnel runtime completion | historical runtime completion accepted; security reclosure reopened by merge composition | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no separate runtime feature handoff | M072 historical runtime closure remains; M081/M083 retain current option/identity/admission corrections |
+| I2PControl Proposal 170 tunnel security hardening | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M084 — merged-head integration/planning corrective | M079 closed an older branch lineage; current `master` later merged M083 and requires M084 then independent M085 reclosure |
 
 ## Canonical scope amendment for tunnel runtimes
 
-ADR-0003 remains the controlling scope amendment for the ten Proposal 170 tunnel data planes. ADR-0001/ADR-0002 remain historical/controlling for contract spelling, startup/control-plane separation, server secret ownership, and internal-only scope except where ADR-0003 explicitly superseded the earlier deferment of those data planes.
+ADR-0003 remains the controlling scope amendment for the ten Proposal 170 tunnel data planes. ADR-0001/ADR-0002 remain controlling for contract spelling, startup/control-plane separation, server secret ownership, and internal-only scope except where ADR-0003 explicitly superseded earlier data-plane deferment.
 
-The preferred production boundary is `emissary-cli/src/i2pcontrol/**`. M065-M083 do not authorize a new `emissary-core/**` production path. M064 remains the narrow historical exception for an already accepted event-observation setter repair.
+The preferred production boundary remains `emissary-cli/src/i2pcontrol/**`. M084-M085 do not authorize a new `emissary-core/**` production path, new dependency, router/startup refactor, or Proposal 170 wire expansion.
 
-No upstream review, merge, submission, contribution preparation, issue/PR mutation, or maintainer contact is authorized. External I2P/I2P+ repositories and specifications are read-only evidence only. Repository writes remain internal to `eggstack/emissary`.
+No upstream review, merge, submission, contribution preparation, issue/PR mutation, or maintainer contact is authorized. External I2P/I2P+/Yosemite repositories and specifications are read-only evidence only. Repository writes remain internal to `eggstack/emissary`.
+
+## Current merged-head evidence problem
+
+Current planning baseline: `e8feb9a3240a5a7b9dd5cc22a4ada47a0d9991ae`.
+
+That head merges:
+
+- the older M077/M078/M079 tunnel-security lineage, where M079 independently closed its then-final head; and
+- the later M083 admission/trusted-Destination corrective lineage.
+
+The merge created a repository state that no final closure independently audited. It also retained two concrete integration defects:
+
+- M077's IRC admission-release test still references the removed arbitrary-string `TrustedPeerIdentity::for_test` helper instead of an M083 structurally valid fixture;
+- M062's exact planning-path allowlist contains M083 closure bookkeeping but not the merged M077/M078/M079 closure paths.
+
+Planning/status documents also disagree about whether M083, M077, M078, and M079 are ready/blocked/closed.
+
+Historical M079 evidence is retained, but it is not current-head certification.
 
 ## Dependency-ready implementation plan
 
-No implementation plan is currently registered as dependency-ready:
+Exactly one plan is currently registered as dependency-ready:
 
 | Handoff | Status | Plan | Objective |
 |---|---|---|---|
-| M077 — IRC server lifetime/exhaustion hardening | ready | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | add activity-resetting post-registration idle expiry and bounded IRC lifetime/exhaustion ownership on the now-closed shared admission/trusted-peer boundary |
+| M084 — merged-head integration and planning corrective | ready | `plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md` | repair stale IRC test fixture integration, exact M062 planning-path bookkeeping, and contradictory status documents without changing runtime semantics |
 
 Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered `ready`.
 
 ## Current tunnel-security sequence
 
-| Handoff | Status | Plan | Dependency / blocker |
+| Handoff | Current disposition | Plan | Dependency / note |
 |---|---|---|---|
-| M074 — shared server admission/rate hardening | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/074-server-admission-and-rate-limit-hardening.md` | M080 corrected its original transactionality/cardinality defects; M083 addresses remaining M080 capacity semantics |
-| M075 — generic server accepted-stream hardening | closed | `plans/implementation/i2pcontrol-proposal-170/075-generic-server-accepted-stream-hardening.md` | M081 closed the `leaseSetEncType` regression |
-| M076 — HTTP anonymity/POST hardening | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md` | M082 closed the original valid-Destination-bound/`Expect`/POST-key defects; M083 revalidates exact canonical trusted identity inherited by HTTP |
-| M080 — admission transactionality/cardinality corrective | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/080-server-admission-transactionality-and-cardinality-corrective.md` | M083 closed the remaining minute/no-history capacity, tightest aggregate-bound, and active-peer expiry-index defects |
-| M081 — generic server LeaseSet option truthfulness corrective | closed | `plans/implementation/i2pcontrol-proposal-170/081-generic-server-leaseset-option-truthfulness-corrective.md` | closure accepted; no M083 finding reopens this invariant |
-| M082 — HTTP peer identity and Expect-framing corrective | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md` | M083 corrected the inherited zero-remainder/canonical full-Destination defect; M082's fixed 417 and 32-byte POST key remain accepted |
-| M083 — admission capacity and trusted Destination exactness corrective | closed | `plans/implementation/i2pcontrol-proposal-170/083-admission-capacity-and-trusted-destination-exactness-corrective.md` | closure accepted in `plans/closure/i2pcontrol-proposal-170/083-closure.md`; M077 is now dependency-ready |
-| M077 — IRC server lifetime/exhaustion hardening | ready | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | M083 closed; M077 is the next hard-gated handoff |
-| M078 — Streamr local-boundary hardening | blocked | `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md` | M077 must close first |
-| M079 — integrated tunnel-security reclosure | blocked | `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md` | M077 and M078 must close first; M079 independently re-audits the final head |
+| M074 | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/074-server-admission-and-rate-limit-hardening.md` | M080/M083 own later admission corrections |
+| M075 | closed | `plans/implementation/i2pcontrol-proposal-170/075-generic-server-accepted-stream-hardening.md` | M081 repaired `leaseSetEncType` truthfulness |
+| M076 | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md` | M082/M083 own later peer-identity/Expect corrections |
+| M080 | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/080-server-admission-transactionality-and-cardinality-corrective.md` | M083 closes remaining current-head capacity/expiry semantics |
+| M081 | closed | `plans/implementation/i2pcontrol-proposal-170/081-generic-server-leaseset-option-truthfulness-corrective.md` | retained at current head |
+| M082 | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md` | M083 closes inherited exact-Destination gap |
+| M083 | closed | `plans/implementation/i2pcontrol-proposal-170/083-admission-capacity-and-trusted-destination-exactness-corrective.md` | accepted for its own implementation lineage and present in current `master` |
+| M077 | implementation/closure present; merged-head integration pending | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | runtime behavior present, but stale test helper must be reconciled by M084 |
+| M078 | implementation/closure present; merged-head integration pending | `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md` | runtime behavior present; closure-path containment bookkeeping repaired by M084 |
+| M079 | historical closure only; current-head certification invalidated by later merge | `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md` | historical evidence retained; M085 supersedes it as current-head final reclosure authority |
+| M084 | ready | `plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md` | current sole ready handoff |
+| M085 | blocked | `plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md` | hard dependency: M084 closed; then independently audit actual post-M084 merged head |
 
-## Post-M082 corrective findings resolved by M083
+## Durable tunnel-security invariants
 
-### Admission history/representability
+The remaining M084-M085 work must preserve:
 
-M080 correctly made denial transactional, bounded the primary peer/expiry state, moved accounting to the 32-byte Destination ID, and replaced the original 4096-entry table with a documented hard memory ceiling. Those mechanisms are retained.
-
-The remaining defect was semantic: `MINUTE` and `SHORT_RETENTION` were both 60 seconds, while capacity validation ran only for `retention > SHORT_RETENTION`. A minute-only peer-rate policy therefore skipped the unrepresentable-unlimited-aggregate check. The same duration comparison also conflated real peer history with no-history cleanup.
-
-M083 separates these concepts explicitly. When peer-rate history is required, an unbounded aggregate policy now fails unless exact bounded representation is otherwise proven. When no peer-rate history is required, inactive peer records are removed on final lease drop.
-
-### Aggregate capacity solver
-
-All enabled aggregate minute/hour/day counters are enforced conjunctively, but the former capacity helper selected the first non-zero field. M083 now computes a conservative retained-event bound for every enabled aggregate window, includes fixed-window boundary overlap, and selects the smallest safe bound. This prevents both under-budgeting and false rejection of configurations where hour/day is tighter than minute.
-
-### Expiry-index invariant
-
-M080's `BTreeMap<(Instant, PeerKey), ()>` remains the correct bounded direction. M083 documents and enforces the inactive-peer-only invariant: active peers are intentionally unindexed and bounded by concurrency; inactive historical peers have exactly one authoritative entry.
-
-### Trusted Destination exactness
-
-The shared peer-identity helper formerly called the core convenience `Destination::parse`, which discarded `parse_frame` remainder. A valid Destination followed by trailing bytes could therefore yield a trusted identity while the original textual representation survived into HTTP full-Destination metadata/access matching.
-
-M083 stays I2PControl-local: it requires exactly one parsed Destination with no remainder, keeps the 32-byte canonical ID, and derives downstream full-Destination text by canonical Base64 encoding of the parsed serialized Destination.
-
-## Durable tunnel security boundary
-
-- accepted server families use authenticated Yosemite peer identity before application handler/local-target work;
-- trusted identity must decode to exactly one supported Destination; downstream text is canonical and accounting uses the 32-byte Destination ID;
-- global and per-peer concurrency plus peer/aggregate rate state must be bounded and denial must not leave attacker-owned state;
-- historical peer-rate state exists only as long as enabled semantics require it;
-- no-history inactive peers do not accumulate attacker-controlled table occupancy;
-- capacity proof considers all enabled aggregate windows and fixed-window boundary overlap;
-- every attacker-influenced auxiliary collection, including expiry indexes, is hard bounded with an explicit state invariant;
-- generic control-plane `server` remains accepted-stream/raw-relay, not blind `STREAM FORWARD`;
-- every runtime-relevant option is applied or rejected before allocation;
-- HTTP spoofed identity/proxy metadata is stripped; response clock/server/provider/cache/trace fingerprints remain stripped;
-- unsupported HTTP expectations fail before local allocation;
-- IRC registration filtering remains before local connect; M077 adds activity-resetting post-registration idle expiry only after M083;
-- Streamr remains bounded; M078 later makes local UDP ingress/output loopback-only with reference-aligned fanout;
-- no timing-jitter theater, local-routing expansion, private secret leakage, core production widening, or upstream interaction.
+- exact Proposal 170 contract spelling/types/actions;
+- authenticated SAM/Yosemite accepted-peer identity;
+- exactly one parsed supported Destination with zero remainder and canonical downstream B64 text;
+- 32-byte cryptographic Destination ID for admission/POST accounting;
+- transactional, bounded admission with explicit peer-history semantics and tightest safe aggregate capacity proof;
+- no-history inactive peer reclamation and coherent inactive-only expiry index;
+- generic accepted-stream raw relay and `leaseSetEncType` apply-or-reject;
+- HTTP spoof/fingerprint/framing/Expect/POST protections;
+- IRC bounded registration, five-second target connect, ten-minute activity-resetting idle expiry, raw post-registration relay;
+- Streamr loopback-only local boundary, ten subscribers, bounded expiry/refresh/control/payload/fanout;
+- generation-local ephemeral state and bounded stop/restart ownership;
+- no core/router/startup/frontend scope expansion;
+- no timing-jitter theater or public-network deanonymization testing;
+- no upstream interaction.
 
 ## Containment authority
 
-Accepted containment authorities remain:
+Accepted authorities remain:
 
-- `plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml` plus `m061_containment.rs` for source paths;
-- `plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml` plus the M063-strengthened `m062_dependency_containment.rs` for direct dependency ownership and transitive local-feature activation.
+- `plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml` plus `m061_containment.rs`;
+- `plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml` plus the M063-strengthened `m062_dependency_containment.rs`.
 
-M083 requires no new dependency and authorizes no new `emissary-core/**` production path.
+M084 may update only exact planning-path bookkeeping in M062. It may not broaden production globs or ownership. M085 must independently verify the final containment state.
 
 ## Accepted unrelated Proposal 170 state
 
-The RouterInfo source matrix remains exactly:
+Tunnel-security work does not reopen the accepted RouterInfo matrix:
 
-- 43 canonical Proposal 170 additions;
+- 43 canonical additions;
 - 37 available;
 - 1 protocol-permitted neutral;
-- 5 unavailable: transit 15s, news, banned peers, and both v4/v6 network-error rows.
+- 5 unavailable.
 
-M051 remains blocked by absent substantive news/ban owners. Tunnel security work does not create those owners or reopen unrelated AddressBook/base-I2PControl limitations.
+M051 remains blocked by absent substantive news/banned-peer owners. AddressBook and unrelated base-I2PControl limitations remain separate and must be documented truthfully.
 
 ## Verification policy
 
 Keep verification local/package-scoped and proportional:
 
-- focused admission/trusted-peer/HTTP tests;
-- structurally valid I2P Destination fixtures including trailing-byte negative cases;
-- Tokio paused-time fixed-window/capacity/reap tests;
-- fake/local SAM and local TCP capture services where needed;
-- feature-disabled and feature-enabled `cargo check`;
-- M061/M062/M063 containment suites;
-- Clippy and scoped repository-accepted nightly rustfmt for touched files;
+- focused admission/trusted-peer/generic-server/HTTP/IRC/Streamr tests;
+- structurally valid I2P Destination fixtures and trailing-byte negatives;
+- Tokio paused-time capacity/expiry/idle tests;
+- fake/local SAM, TCP, and UDP fixtures;
+- full feature-enabled I2PControl package tests;
+- feature-disabled/enabled checks;
+- M061/M062 containment;
+- strict package Clippy;
+- scoped nightly rustfmt for touched files;
 - `git diff --check`.
 
-Do not add hosted CI jobs, release machinery, generalized fuzz infrastructure, soak farms, broad platform matrices, public-network deanonymization experiments, or upstream contribution machinery.
+Do not add hosted CI, release machinery, generalized fuzz/soak infrastructure, benchmark gates, or public-network certification/deanonymization tests.
 
 ## Registry maintenance rules
 
-1. M077 is the sole dependency-ready handoff after M083 closure.
-2. M080 and M082 are closed with corrective history; their current-head dispositions are reconciled by M083.
-3. M078 remains behind M077.
-4. M079 remains behind M077 and M078 and is the final independent security reclosure authority.
-5. Any high/medium finding discovered before or during M079 creates another narrow corrective; it may not be hidden inside closure.
-6. Preserve ADR-0003 scope and the preferred `emissary-cli/src/i2pcontrol/**` production boundary.
-7. Preserve RouterInfo 37/1/5 and the M051 blocker unless separate source-owner work changes them.
-8. Unsupported/underspecified runtime options fail before allocation; persist-and-ignore is forbidden.
-9. No artificial response jitter/fixed delays substitute for bounded resource ownership.
-10. External sources are read-only only; no upstream interaction is authorized.
-11. All repository writes remain internal to `eggstack/emissary`.
+1. M084 is the sole ready handoff now.
+2. M085 remains blocked until M084 independently closes.
+3. M079 remains historical evidence and must not be rewritten to claim it audited M083/current merged head.
+4. After M084 closure, M085 becomes the sole ready handoff.
+5. M085 must audit the actual post-M084 head and may not trust branch-local closure assertions without current-head evidence.
+6. Any high/medium finding in M084 outside integration scope or in M085 requires a new narrow corrective; do not hide it in closure.
+7. Preserve ADR-0003 and the preferred `emissary-cli/src/i2pcontrol/**` production boundary.
+8. Preserve RouterInfo 37/1/5 and M051 unless separate source-owner work changes them.
+9. Unsupported/underspecified runtime options fail before allocation; persist-and-ignore is forbidden.
+10. External sources remain read-only; no upstream interaction is authorized.
+11. All writes remain internal to `eggstack/emissary`.

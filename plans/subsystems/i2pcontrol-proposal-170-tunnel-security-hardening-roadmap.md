@@ -1,13 +1,12 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: active; M083 closed; M077 ready; M078-M079 blocked
+Status: corrective pass required; M084 ready; M085 blocked
 
 Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
 Post-M076 corrective baseline: `1618de172e7a78a193fc1bb117af269f31174030`.
 
-Current corrective baseline: `3eaea53` (M083 implementation); closure accepted in
-`plans/closure/i2pcontrol-proposal-170/083-closure.md`.
+Merged-head corrective baseline: `e8feb9a3240a5a7b9dd5cc22a4ada47a0d9991ae`.
 
 Source runtime roadmap:
 
@@ -18,300 +17,293 @@ Canonical/internal authority:
 - `plans/000-long-term-specification.md`;
 - `plans/002-long-term-roadmap.md`;
 - `plans/003-planning-process.md`;
-- `plans/adrs/ADR-0001-proposal-170-contract-and-stub-boundary.md`;
-- `plans/adrs/ADR-0002-control-plane-tunnel-runtime-ownership.md`;
-- `plans/adrs/ADR-0003-proposal-170-tunnel-runtime-completion-and-filter-boundary.md`;
+- ADR-0001, ADR-0002, ADR-0003;
 - M061 source-containment and M062/M063 dependency-containment authorities;
-- M072 runtime reclosure and M073 option-truthfulness history.
+- M072 runtime-reclosure history;
+- M073-M083 tunnel-security implementation/closure history.
 
 Pinned external contract:
 
-- I2P Proposal 170, `I2PControl Expansion`, Open revision created/updated `2026-05-20`.
+- I2P Proposal 170, `I2PControl Expansion`, open revision created/updated `2026-05-20`.
 
-External I2P/I2P+/Yosemite sources remain read-only behavioral/security evidence. No upstream mutation, review request, issue/PR submission, contribution preparation, merge request, or maintainer contact is authorized.
+External I2P/I2P+/Yosemite sources remain read-only behavioral/security evidence. No upstream issue, PR, review, submission, merge request, contribution preparation, repository write, or maintainer contact is authorized.
 
 ## 1. Purpose
 
-M066-M071 made the previously deferred Proposal 170 tunnel families operational. M074-M076 then added server admission, generic accepted-stream handling, and HTTP anonymity/POST hardening. The first independent security review inserted M080-M082, which successfully corrected the original aggregate-rejection state leak, 64-bit peer keys, stale expiry-queue growth, generic-server `leaseSetEncType` regression, brittle HTTP peer-length assumption, and `Expect: 100-continue` wait cycle.
+The substantive Proposal 170 tunnel-runtime/security implementation is now largely present:
 
-A second independent review of head `a35d2bc` found that the shared accepted-server boundary still has four narrow correctness gaps:
+- M080/M083 provide transactional, bounded accepted-server admission and exact canonical trusted Destination identity;
+- M081 preserves generic-server `leaseSetEncType` truthfulness;
+- M082 preserves HTTP `Expect` rejection and canonical POST accounting;
+- M077 provides bounded IRC target connect plus activity-resetting post-registration idle expiry;
+- M078 provides loopback-only Streamr local UDP boundaries and reference-aligned fanout bounds.
 
-- minute-scale historical peer state is conflated with no-history cleanup, so an unlimited aggregate policy can remain accepted where retained peer cardinality is unrepresentable;
-- the capacity solver uses aggregate-field precedence rather than the tightest bound implied by all enabled aggregate windows;
-- expired active peers can lose the expiry-index representation claimed by M080;
-- trusted Destination parsing does not require zero unconsumed bytes and preserves attacker-selected textual representation downstream.
+However, current `master` was formed by merging two separately verified lineages:
 
-These were localized defects in otherwise-correct seams. M083 corrects them and
-the original IRC/Streamr/final-reclosure sequence now resumes with M077.
+1. an older M077/M078/M079 security lineage; and
+2. a later M083 admission/trusted-identity corrective lineage.
 
-The workstream remains bounded to Proposal 170 tunnel security/correctness. It does not add tunnel types, redesign router protocols, add HTTP features, implement arbitrary I2CP pass-through, or broaden startup-service ownership.
+The historical M079 closure did not audit that merged composition. The merge also retained a stale IRC test helper call and lost exact M062 closure-path bookkeeping. Planning/status documents disagree about which milestone is current.
 
-## 2. Security/anonymity model
+This roadmap therefore adds two final bounded milestones:
 
-The main concern is controllable remote state: a peer should not be able to create a stable saturation, long-lived occupancy, metadata fingerprint, or textual-identity alias that becomes externally correlatable or denies unrelated peers.
+- **M084** — merged-head integration/planning corrective;
+- **M085** — independent merged-head tunnel-security reclosure.
 
-Target defenses:
+No new tunnel feature work is authorized by this final sequence.
 
-- rejected traffic never poisons durable in-memory accounting;
-- attacker-influenced state is finite and its capacity proof matches actual rate-window semantics;
-- historical peer state exists only while configured peer-rate semantics require it;
-- no-history inactive peers do not accumulate merely because of cleanup implementation details;
-- trusted peer identity is exactly one supported Destination and downstream text is canonical;
-- accepted-server protocol handlers receive a single shared trusted identity model;
-- HTTP/IRC/Streamr resource occupancy remains bounded;
-- backend/provider/cache/trace fingerprints remain suppressed;
-- runtime configuration remains apply-or-reject truthful.
+## 2. Current repository findings
 
-Random jitter, fixed overload delays, artificial response padding, and public-network deanonymization experiments remain non-goals.
+### 2.1 M083 runtime correction is present
 
-## 3. Retained accepted results
+Current admission separates peer history from active-only state, removes no-history inactive peers, derives historical capacity from the tightest safe enabled aggregate bound with fixed-window overlap, and keeps an inactive-only authoritative expiry index.
 
-### 3.1 M080 mechanisms to retain
+Current trusted peer identity parses with `Destination::parse_frame`, requires zero remainder, canonicalizes full Destination text from parsed bytes, and uses the 32-byte cryptographic Destination ID for accounting.
 
-M080 correctly established:
+These mechanisms are retained.
 
-- transactional admission checks before peer/counter/expiry mutation;
-- 32-byte cryptographic Destination ID accounting;
-- bounded peer state under a documented hard memory ceiling;
-- a one-authoritative-entry expiry-index design direction using `BTreeMap`;
-- retention based on enabled peer windows rather than unconditional day retention;
-- Tokio `test-util` moved back to dev-only activation;
-- structurally parsed trusted identity before handler/local-target work.
+### 2.2 M077 runtime correction is present
 
-M083 repairs semantic edges without reverting these mechanisms.
+Current IRC server behavior includes:
 
-### 3.2 M081 is accepted
+- bounded registration;
+- trusted peer-derived hostname rewrite;
+- loopback local target;
+- five-second target connection timeout;
+- byte-transparent post-registration relay;
+- ten-minute inactivity timeout reset by successful traffic in either direction.
 
-Generic control-plane `server` remains accepted-stream/raw-relay. Validated `leaseSetEncType` reaches Yosemite `SessionOptions::lease_set_enc_type`; other accepted-server families explicitly do not gain that option.
+The merge retained a test-only incompatibility: an admission-release test still calls the removed arbitrary-string `TrustedPeerIdentity::for_test` helper instead of an M083-valid structured fixture.
 
-M083 does not reopen M081.
+### 2.3 M078 runtime correction is present
 
-### 3.3 M082 mechanisms to retain
+Current Streamr behavior includes:
 
-M082 correctly:
+- loopback-only local client/server address policy;
+- observed-loopback UDP source check;
+- ten subscribers;
+- 60-second expiry;
+- 15-second refresh;
+- one-byte control packets;
+- 1200-byte application payload and 4095-byte transport receive bound;
+- sequential bounded fanout.
 
-- routes HTTP through the common `TrustedPeerIdentity` boundary;
-- rejects every `Expect` header with fixed 417 semantics before local target allocation;
-- keys POST throttling on the 32-byte Destination ID;
-- retains M076 request/proxy-spoof stripping, response fingerprint suppression, and framing checks.
+These mechanisms are retained.
 
-M083 only corrects exact/canonical full-Destination semantics inherited from the shared identity boundary.
+### 2.4 M079 is historical, not current-head authority
 
-## 4. Post-M082 findings resolved by M083
+M079 independently reviewed and closed the older M077/M078 lineage. It did not review M083 or the later merge commit that combined M083 with that lineage.
 
-### 4.1 Minute/no-history representability — MEDIUM
+Therefore M079 remains useful historical evidence but is insufficient as final current-head certification. M085 supersedes M079 only for final current-head reclosure authority.
 
-`MINUTE` and `SHORT_RETENTION` were both 60 seconds, while the M080 capacity check was gated by `retention > SHORT_RETENTION`. Minute-only peer-rate history therefore skipped the check that rejected fully unlimited aggregate arrival when retained cardinality could not be bounded by policy.
+### 2.5 M062/planning state is merge-inconsistent
 
-Additionally, when every per-peer rate is unlimited, inactive records currently remain for a short retention despite no historical peer-rate semantics being needed. Under unlimited aggregate churn, that creates avoidable table pressure.
+Current M062 planning-path bookkeeping includes M083 closure evidence but not the merged M077/M078/M079 closure paths. Current planning/status documents also disagree about whether M083/M077/M078/M079 are ready, blocked, or closed.
 
-M083 separates peer-history requirement from cleanup duration. No-history inactive peers are reclaimed promptly; minute/hour/day historical policies are capacity-checked regardless of duration equality.
+M084 owns these integration/status defects.
 
-### 4.2 Aggregate bound selection — MEDIUM-LOW
+## 3. Security/anonymity invariants
 
-The former helper selected the first non-zero aggregate field rather than evaluating all enabled minute/hour/day fields. This could falsely reject a representable policy when a tighter hour/day bound existed.
+M084-M085 MUST preserve:
 
-M083 computes a safe retained-event upper bound for each enabled aggregate window, includes fixed-window boundary overlap, and takes the minimum because the runtime enforces all enabled aggregate fields conjunctively.
-
-### 4.3 Active-peer expiry-index consistency — LOW-MEDIUM
-
-M080's `reap` path could remove an active peer's expiry-index entry while leaving the peer record active. M083 makes the intended inactive-peer-only invariant explicit and preserves it across acquire/reap/drop.
-
-### 4.4 Trusted Destination exactness/canonical text — LOW-MEDIUM
-
-The shared helper used the core convenience `Destination::parse`, which did not require `parse_frame` remainder to be empty. A valid Destination plus trailing bytes could therefore produce a trusted 32-byte ID while preserving the original textual representation for HTTP metadata/access matching.
-
-M083 requires exactly one parsed Destination with no remainder and derives downstream full-Destination text from canonical Base64 encoding of the parsed serialized bytes. No core parser change is authorized.
-
-## 5. Security invariants
-
-All M083/M077-M079 work MUST preserve:
-
-- exact Proposal 170 wire fields/actions/types; no security-only wire extensions;
+- exact Proposal 170 wire fields/actions/types/statuses;
 - authenticated remote identity from SAM/Yosemite only;
-- exactly-one-Destination trusted identity validation with canonical downstream text and a fixed 32-byte cryptographic accounting ID;
-- policy/admission decisions before local target work where technically possible;
-- side-effect-free denial apart from bounded reclamation of already-expired state;
-- bounded tasks, peer state, expiry indexes, counters, buffers, and shutdown waits;
-- no active/throttled state evicted merely to admit a new attacker-controlled identity;
-- peer-rate history retained only as long as enabled semantics require it;
-- capacity math that cannot understate actual fixed-window accepted cardinality;
-- no lock across network I/O, sleeps, target connect, handler execution, joins, or shutdown waits;
-- monotonic time for rate/idle state;
-- no private destination material/full raw config values in diagnostics;
-- no random/fixed timing-jitter defenses;
+- exactly one supported Destination with zero parser remainder;
+- canonical downstream Destination text and 32-byte cryptographic accounting ID;
+- transactional denial before attacker-owned peer-state mutation;
+- finite global/per-peer concurrency and minute/hour/day peer/aggregate counters;
+- peer-rate historical state only when enabled semantics require it;
+- no-history inactive peer reclamation;
+- capacity math across all enabled aggregate windows with fixed-window overlap and checked arithmetic;
+- bounded peer map, expiry index, POST limiter, task groups, buffers, Streamr subscribers, and stop waits;
+- generic accepted-stream raw relay and `leaseSetEncType` apply-or-reject;
+- HTTP identity/proxy spoof stripping, response fingerprint stripping, unambiguous framing, fixed `Expect` rejection, and bounded POST accounting;
+- IRC bounded registration/connect/idle occupancy with raw post-registration relay;
+- Streamr loopback-only local boundary and bounded fanout;
+- generation-local ephemeral state and stable backend-owned persistent server identity;
+- no lock across network I/O/sleeps/joins;
+- no private destination material in diagnostics;
+- no timing-jitter/padding theater;
 - no local DNS/LAN routing expansion;
 - no new `emissary-core/**` production path;
-- no startup-service ownership refactor;
-- no hosted CI/fuzz/soak/release machinery for this workstream;
-- no upstream write/review/submission activity.
+- no startup/router/frontend ownership refactor;
+- no new dependency or default feature widening;
+- no hosted CI/fuzz/soak/release machinery for this bounded workstream;
+- no upstream interaction.
 
-## 6. Target accepted-server architecture
+## 4. Explicit non-goals
+
+The final M084-M085 sequence does not authorize:
+
+- new tunnel types or Proposal 170 API fields;
+- new server admission algorithms;
+- new HTTP features or informational-response state machines;
+- new IRC protocol parsing after registration;
+- generalized UDP/auth machinery;
+- arbitrary I2CP/custom option pass-through;
+- RouterInfo source-owner work;
+- AddressBook/base-I2PControl expansion;
+- core/router algorithm changes;
+- public-network deanonymization experiments;
+- upstream contribution preparation or review requests.
+
+## 5. Dependency graph
 
 ```text
-SAM/Yosemite accepted stream
-    -> I2PControl TrustedPeerIdentity
-       - bounded input text
-       - decoded payload is exactly one supported Destination
-       - canonical full-Destination text for handlers
-       - canonical fixed-size Destination ID for accounting
-    -> I2PControl ServerAdmissionState
-       - transactional denial
-       - global + peer concurrent limits
-       - peer + aggregate minute/hour/day counters
-       - explicit peer-history horizon
-       - capacity from tightest safe enabled aggregate bound
-       - fixed-window boundary overlap included
-       - bounded expiry index with a documented active/inactive invariant
-    -> protocol-specific pre-local validation
-    -> fixed administrator-selected safe local target policy
-    -> bounded protocol relay/filter
+current merged head e8feb9a
+        |
+        v
+M084 merged-head integration/planning corrective
+        |
+        v
+M085 independent merged-head tunnel-security reclosure
+        |
+        v
+security line closed only if M085 finds no high/medium issue
 ```
 
-Generic server remains raw after admission. HTTP/IRC remain protocol-filter owners. Streamr remains its own bounded datagram family.
-
-## 7. Capacity model required by M083
-
-Do not use duration comparison to infer whether historical peer state exists.
-
-For historical minute/hour/day peer-rate state:
-
-1. identify the longest enabled peer-history horizon;
-2. for each enabled aggregate `(limit, window)`, derive a safe maximum accepted count over that horizon under the current fixed-window counter semantics;
-3. account for a retained interval crossing aggregate-window boundaries — `limit * (ceil(history/window) + 1)` is an acceptable conservative starting point, or use a tighter proven equivalent;
-4. take the smallest safe bound across all enabled aggregate fields;
-5. add a documented finite concurrency/edge margin;
-6. reject when every aggregate field is unlimited or the resulting requirement exceeds the hard peer-state ceiling.
-
-For no-history policy, active peer records are needed only for concurrency. Once a peer has no active lease, no historical peer record should remain solely due to an arbitrary short cleanup retention.
-
-Do not silently weaken configured rate values or evict live historical state.
-
-## 8. Corrective dependency graph
+Historical sequence retained for traceability:
 
 ```text
-current head a35d2bc
-      |
-      v
-M083 admission capacity / expiry / exact trusted identity
-      |
-      v
-M077 IRC lifetime/exhaustion hardening
-      |
-      v
-M078 Streamr local-boundary hardening
-      |
-      v
-M079 integrated tunnel-security reclosure
-```
-
-Historical corrective sequence retained for traceability:
-
-```text
-M080 admission transactionality/cardinality
-  -> M081 generic server LeaseSet truthfulness
-  -> M082 HTTP peer identity / Expect / POST key
-  -> M083 post-M082 shared-boundary corrective
+M080 -> M081 -> M082 -> M083
+                    \
+                     +-- merged into current head
+M077 -> M078 -> M079/
 ```
 
 Dependency classification:
 
-- post-M082 review -> M083: corrective hard gate;
-- M083 -> M077: hard gate because IRC consumes the shared admission/trusted-peer boundary;
-- M077 -> M078: registry sequencing;
-- M083 + M077 + M078 -> M079: hard final closure dependencies.
+- merged-head review -> M084: corrective hard gate;
+- M084 -> M085: hard gate;
+- M085 final disposition: independent closure authority.
 
-## 9. Milestone summary
-
-### M074 — Shared admission hardening
-
-Historical architecture retained. Original defects were corrected by M080; M083 closes remaining capacity-state semantics discovered after M080 closure.
-
-### M075 — Generic accepted-stream migration
-
-Closed. M081 repaired its option-truthfulness regression.
-
-### M076 — HTTP anonymity/POST hardening
-
-Closed with corrective history. M082 repaired its direct identity-length/`Expect`/POST-key defects; M083 revalidates exact canonical full-Destination semantics inherited from the shared identity layer.
+## 6. Milestone summary
 
 ### M080 — Admission transactionality/cardinality corrective
 
-Closed with corrective history. M083 closes the remaining minute/no-history
-capacity semantics, true aggregate-bound derivation, and active-peer
-expiry-index consistency defects at the current head.
+Closed with corrective history. Retain transactional denial, canonical peer keys, bounded state direction.
 
-### M081 — Generic server LeaseSet option truthfulness corrective
+### M081 — Generic server LeaseSet option truthfulness
 
-Closed and not reopened by M083.
+Closed. Retain accepted-stream `leaseSetEncType` application.
 
-### M082 — HTTP peer identity and Expect-framing corrective
+### M082 — HTTP peer identity / Expect / POST corrective
 
-Closed with corrective history. Direct `Expect` and POST-key fixes remain
-accepted; M083 closes the inherited trusted-Destination exactness defect.
+Closed with corrective history. Retain fixed-417 rejection and canonical POST key.
 
-### M083 — Admission capacity semantics and trusted Destination exactness corrective
+### M083 — Admission capacity and trusted Destination exactness
 
-Closed. The shared boundary is corrected without expanding architecture, and
-M077 is the next dependency-ready handoff.
+Closed for its implementation lineage and present in current `master`. Retain explicit peer history, tightest aggregate capacity proof, inactive-only expiry index, exact parse-frame consumption, and canonical text.
 
 ### M077 — IRC lifetime/exhaustion hardening
 
-Blocked until M083. Then add a 10-minute activity-resetting post-registration inactivity deadline and bounded target connect while preserving registration filtering/raw post-registration semantics.
-
-Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/077-closure.md`.
+Implementation and closure are present. Runtime behavior is retained. Current merged-head test integration is not clean until M084 replaces the stale arbitrary-string trusted-peer fixture.
 
 ### M078 — Streamr local-boundary hardening
 
-After M077, make local UDP producer/client targets loopback-only, align subscriber maximum to 10, and preserve existing expiry/refresh/payload/task bounds.
+Implementation and closure are present. Runtime behavior is retained. Current merged-head containment bookkeeping is reconciled by M084.
 
-Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/078-closure.md`.
+### M079 — Historical integrated reclosure
 
-### M079 — Integrated tunnel-security reclosure
+Historical closure only. It certified the older M077/M078 lineage at its pinned head but did not audit M083 or current merge composition. It is not deleted or rewritten to claim otherwise.
 
-Independently re-audit the actual final head. Rebuild option-capability truthfulness and threat-model resource/timing/fingerprint behavior, verify containment/lifecycle, and refuse closure with any high/medium finding.
+### M084 — Merged-head integration and planning corrective
 
-## 10. M079 final evidence requirements
+Status: **ready**.
 
-M079 must explicitly prove at final head:
+Required scope:
 
-- aggregate-/peer-/global-denied attempts cannot grow accounting state;
-- no-history inactive peer churn cannot create table-sized occupancy;
-- minute/hour/day historical peer policies are representable or rejected before allocation;
-- capacity uses the tightest safe bound across enabled aggregate windows and includes boundary overlap;
-- every admission/POST auxiliary expiry structure is hard bounded with a coherent active/inactive invariant;
-- canonical 32-byte Destination hashes key security accounting;
-- trusted peer input contains exactly one supported Destination and downstream text is canonical;
-- generic `leaseSetEncType` is applied or rejected, never ignored;
-- `Expect` cannot create a body/backend wait cycle;
-- one peer cannot monopolize accepted-server capacity;
-- HTTP fingerprint/proxy identity stripping remains effective;
-- IRC idle occupancy is finite and activity-resetting;
-- Streamr local UDP exposure is loopback-only and fanout bounded;
-- lifecycle/stop/restart clears ephemeral security state and cannot cross generations;
+- replace stale IRC test fixture with an existing M083 structurally valid peer fixture;
+- restore exact M062 planning/closure path bookkeeping without broadening production scope;
+- reconcile registry, roadmap, implementation README, and support/status docs;
+- verify current merged integration compiles/tests cleanly;
+- make no runtime behavior change;
+- close with M085 as sole ready successor.
+
+If M084 discovers a material production defect, create a separate narrow runtime corrective and keep M085 blocked.
+
+### M085 — Merged-head tunnel-security reclosure
+
+Status: **blocked on M084**.
+
+Independently audit the actual post-M084 head. Rebuild current-head evidence for M083 admission/identity composed with M077 IRC, M078 Streamr, generic server, HTTP/httpbidir, lifecycle, option truthfulness, and containment.
+
+Do not copy M079 assertions forward without current-head verification. Any high/medium finding creates a new corrective; M085 does not self-fix and self-certify material runtime defects.
+
+## 7. M084 exit conditions
+
+M084 may close only when:
+
+- current I2PControl tests compile;
+- stale `TrustedPeerIdentity::for_test` usage is removed from the IRC regression and replaced by a structurally valid M083 fixture;
+- M061/M062 pass with exact-path bookkeeping and no widened production authority;
+- M077/M078/M079 historical closure paths are represented by containment bookkeeping;
+- planning/support status documents agree that final security closure is pending M085;
+- full feature-enabled tests, feature-on/off checks, strict Clippy, scoped formatting, and diff checks pass;
+- no runtime semantics changed;
+- no new dependency/core/startup scope was introduced;
+- no upstream interaction occurred.
+
+## 8. M085 final evidence requirements
+
+M085 must prove at the exact final head:
+
+- both merge lineages plus M084 are present;
+- trusted peer input is bounded, exact, canonical, and redacted;
+- admission denial/state/capacity/expiry invariants hold under current code;
+- no-history churn cannot fill peer state;
+- historical policies with unbounded aggregate arrival reject before allocation;
+- all enabled aggregate limits participate safely in capacity proof;
+- generic server remains accepted-stream/raw and `leaseSetEncType` truthful;
+- HTTP spoof/fingerprint/framing/Expect/POST behavior remains correct on the M083 identity boundary;
+- IRC five-second connect and ten-minute activity-resetting idle expiry compose correctly with M083 admission leases;
+- Streamr remains loopback-only and fanout/control/payload state is bounded;
+- persistent identity/ephemeral runtime generation behavior remains correct;
+- option-capability matrix has no accepted-but-ignored runtime field;
 - M061/M062/M063 containment remains intact;
-- no current high/medium security/anonymity/correctness finding remains.
+- no current high/medium security, anonymity, correctness, lifecycle, option-truthfulness, or containment finding remains.
 
-## 11. Verification discipline
+## 9. Verification discipline
 
-Use focused deterministic tests, structurally valid I2P Destination fixtures plus trailing-byte negatives, fake/local SAM endpoints, local TCP/UDP capture services, Tokio paused-time tests, package-scoped `cargo test`/`cargo check`, M061/M062/M063 containment suites, Clippy, scoped nightly rustfmt for touched files, and `git diff --check`.
+Use focused deterministic local tests and the full package suite:
 
-Do not create public-network certification/deanonymization tests, load-test farms, hosted CI jobs, generalized fuzz infrastructure, benchmark gates, or release/upstream machinery.
+- admission/trusted identity;
+- generic server;
+- HTTP/httpbidir;
+- IRC server;
+- Streamr;
+- lifecycle/restart fixtures;
+- M061/M062 containment;
+- feature-disabled/enabled checks;
+- core check;
+- strict package Clippy;
+- repository-accepted scoped nightly rustfmt;
+- `git diff --check`.
 
-## 12. Stop conditions
+Use fake/local SAM, TCP, and UDP fixtures only. No public-network test or hosted CI requirement is introduced.
 
-Stop the affected milestone and create separate architecture/corrective planning if:
+## 10. Stop conditions
 
-- exact trusted identity requires a new `emissary-core/**` or SAM API instead of composing existing parser primitives;
-- exact configured rate semantics cannot be represented within the existing defensible hard memory ceiling and cannot be rejected before allocation;
-- a correction requires silently weakening configured Proposal 170 rates;
-- IRC inactivity cannot be implemented without parsing/reframing post-registration traffic;
-- Streamr compatibility is proven to require unauthenticated non-loopback exposure;
-- a new I2PControl-only dependency violates M062/M063 ownership;
-- M079 finds any remaining high/medium issue.
+Stop and create a separate corrective plan if:
 
-## 13. Final closure rule
+- a production runtime high/medium defect is found;
+- trusted identity correctness would require weakening exact Destination validation;
+- containment can pass only through broad production-glob expansion;
+- a new core/Yosemite API or dependency is required;
+- exact configured rate semantics cannot be represented within the existing hard bound and cannot reject before allocation;
+- IRC/Streamr compatibility is claimed to require broader local exposure;
+- any Proposal 170 wire/API expansion appears necessary;
+- any upstream interaction would be required.
 
-The tunnel-security workstream remains `corrective pass required` until M083, M077, and M078 are independently closed and M079 accepts the actual final head.
+## 11. Final closure rule
 
-Historical M073-M082 closure evidence remains useful for what the pinned commits demonstrated, but it does not override later independent findings. M079 is the final authority for closing this line of work.
+The Proposal 170 **tunnel runtime/security line** remains `corrective pass required` until:
+
+1. M084 independently closes the merged-head integration defects; and
+2. M085 independently accepts the actual post-M084 head with no high/medium finding.
+
+If M085 closes, the tunnel runtime/security line is complete against the pinned Proposal 170 revision and current internal fork head.
+
+That does not close the separately documented partial Proposal 170 source/truthfulness state, RouterInfo 37/1/5 disposition, M051 blocker, or unrelated AddressBook/base-I2PControl limitations.
+
+No upstream review, acceptance, merge, adoption, or submission is implied or authorized.

@@ -30,7 +30,7 @@ Canonical direction:
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | accepted authority; current merged-head bookkeeping corrective pending | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | consumed by M084 | M061/M062/M063 semantics remain authoritative; M084 repairs exact merged planning-path bookkeeping without broadening production scope |
 | I2PControl Proposal 170 tunnel runtime completion | historical runtime completion accepted; security reclosure reopened by merge composition | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no separate runtime feature handoff | M072 historical runtime closure remains; M081/M083 retain current option/identity/admission corrections |
-| I2PControl Proposal 170 tunnel security hardening | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M085 — merged-head independent reclosure | M079 closed an older branch lineage; current `master` later merged M083 and required M084 integration/planning corrective (now closed); M085 must independently audit actual post-M084 head |
+| I2PControl Proposal 170 tunnel security hardening | closed | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | none — M085 closed the workstream | M079 closed an older branch lineage; current `master` later merged M083 and required M084 integration/planning corrective; M085 independently audited the post-M084 head and closed the workstream with no high/medium finding remaining |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -49,23 +49,17 @@ That head merges:
 - the older M077/M078/M079 tunnel-security lineage, where M079 independently closed its then-final head; and
 - the later M083 admission/trusted-Destination corrective lineage.
 
-The merge created a repository state that no final closure independently audited. M084 has now closed against the post-fix head and repaired the integration/planning defects; see `plans/closure/i2pcontrol-proposal-170/084-closure.md` for the evidence matrix.
+The merge created a repository state that no final closure independently audited. M084 closed against the post-fix head and repaired the integration/planning defects; see `plans/closure/i2pcontrol-proposal-170/084-closure.md` for the evidence matrix. M085 then independently audited the actual post-M084 merged head and closed the workstream; see `plans/closure/i2pcontrol-proposal-170/085-closure.md`.
 
 Planning/status documents now agree that:
 
 - M077 and M078 implementations/closures are present and merged-head integration is reconciled by M084;
 - M079 is retained as historical older-lineage evidence superseded by M085 for current-head certification;
-- M084 is closed and M085 is the sole dependency-ready handoff.
+- M084 and M085 are both closed; the tunnel-security reclosure workstream is complete against the pinned Proposal 170 revision and the current internal fork head.
 
 ## Dependency-ready implementation plan
 
-Exactly one plan is currently registered as dependency-ready:
-
-| Handoff | Status | Plan | Objective |
-|---|---|---|---|
-| M085 — merged-head tunnel-security reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md` | independently re-audit actual post-M084 merged head and close only with no high/medium finding |
-
-Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered `ready`.
+No plan is currently registered as dependency-ready. The most recent dependency-ready plan (M085) is closed. Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered `ready`, and the tunnel-security subsystem no longer has a successor plan to register.
 
 ## Current tunnel-security sequence
 
@@ -78,15 +72,15 @@ Per `plans/003-planning-process.md`, only the next dependency-ready implementati
 | M081 | closed | `plans/implementation/i2pcontrol-proposal-170/081-generic-server-leaseset-option-truthfulness-corrective.md` | retained at current head |
 | M082 | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md` | M083 closes inherited exact-Destination gap |
 | M083 | closed | `plans/implementation/i2pcontrol-proposal-170/083-admission-capacity-and-trusted-destination-exactness-corrective.md` | accepted for its own implementation lineage and present in current `master` |
-| M077 | implementation/closure present; merged-head integration pending | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | runtime behavior present, but stale test helper must be reconciled by M084 |
-| M078 | implementation/closure present; merged-head integration pending | `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md` | runtime behavior present; closure-path containment bookkeeping repaired by M084 |
-| M079 | historical closure only; current-head certification invalidated by later merge | `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md` | historical evidence retained; M085 supersedes it as current-head final reclosure authority |
+| M077 | implementation/closure present; merged-head integration reconciled | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | runtime behavior present; merged-head test fixture reconciled by M084 |
+| M078 | implementation/closure present; merged-head integration reconciled | `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md` | runtime behavior present; closure-path containment bookkeeping repaired by M084 |
+| M079 | historical closure only; current-head certification superseded by M085 | `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md` | historical evidence retained; M085 supersedes it as current-head final reclosure authority |
 | M084 | closed | `plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md` | merged-head integration/planning corrective closed; see `plans/closure/i2pcontrol-proposal-170/084-closure.md` |
-| M085 | ready | `plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md` | current sole ready handoff; independently audit actual post-M084 merged head |
+| M085 | closed | `plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md` | independently audited post-M084 merged head; tunnel runtime/security line complete; see `plans/closure/i2pcontrol-proposal-170/085-closure.md` |
 
 ## Durable tunnel-security invariants
 
-The remaining M084-M085 work must preserve:
+The closed M074-M085 workstream establishes and preserves:
 
 - exact Proposal 170 contract spelling/types/actions;
 - authenticated SAM/Yosemite accepted-peer identity;
@@ -110,7 +104,7 @@ Accepted authorities remain:
 - `plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml` plus `m061_containment.rs`;
 - `plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml` plus the M063-strengthened `m062_dependency_containment.rs`.
 
-M084 may update only exact planning-path bookkeeping in M062. It may not broaden production globs or ownership. M085 must independently verify the final containment state.
+M084 may update only exact planning-path bookkeeping in M062. It may not broaden production globs or ownership. M085 independently verified the final containment state against the merged head.
 
 ## Accepted unrelated Proposal 170 state
 
@@ -142,11 +136,11 @@ Do not add hosted CI, release machinery, generalized fuzz/soak infrastructure, b
 
 ## Registry maintenance rules
 
-1. M085 is the sole ready handoff now.
+1. The tunnel-security hardening subsystem roadmap is closed; no active handoff remains registered dependency-ready under it.
 2. M084 is closed; its evidence is in `plans/closure/i2pcontrol-proposal-170/084-closure.md`.
-3. M079 remains historical evidence and must not be rewritten to claim it audited M083/current merged head.
-4. M085 must audit the actual post-M084 head and may not trust branch-local closure assertions without current-head evidence.
-5. Any high/medium finding in M085 requires a new narrow corrective; do not hide it in closure.
+3. M085 is closed; its evidence is in `plans/closure/i2pcontrol-proposal-170/085-closure.md`.
+4. M079 remains historical evidence and must not be rewritten to claim it audited M083/current merged head.
+5. Any future tunnel-security finding must be registered as a new corrective plan; do not silently reopen M085.
 6. Preserve ADR-0003 and the preferred `emissary-cli/src/i2pcontrol/**` production boundary.
 7. Preserve RouterInfo 37/1/5 and M051 unless separate source-owner work changes them.
 8. Unsupported/underspecified runtime options fail before allocation; persist-and-ignore is forbidden.

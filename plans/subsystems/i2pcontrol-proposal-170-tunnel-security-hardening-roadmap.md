@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: corrective pass required; M084 closed; M085 ready
+Status: closed; M084 closed; M085 closed
 
 Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
@@ -9,6 +9,9 @@ Post-M076 corrective baseline: `1618de172e7a78a193fc1bb117af269f31174030`.
 Merged-head corrective baseline: `e8feb9a3240a5a7b9dd5cc22a4ada47a0d9991ae`.
 
 M084 post-fix baseline: `1196a4d85cecb4f9676a8d87d27c69322816d7a8`.
+
+M085 post-fix head: `a6f18268b8d8724ed826f69614161b5b8d293ef5`
+(merged-head independent reclosure complete; no production change).
 
 Source runtime roadmap:
 
@@ -158,10 +161,11 @@ current merged head e8feb9a
 M084 merged-head integration/planning corrective (closed)
         |
         v
-M085 independent merged-head tunnel-security reclosure (ready)
+M085 independent merged-head tunnel-security reclosure (closed)
         |
         v
-security line closed only if M085 finds no high/medium issue
+security line closed against the pinned Proposal 170 revision
+and the current internal fork head
 ```
 
 Historical sequence retained for traceability:
@@ -177,7 +181,8 @@ Dependency classification:
 
 - merged-head review -> M084: corrective hard gate;
 - M084 -> M085: hard gate;
-- M085 final disposition: independent closure authority.
+- M085 final disposition: independent closure authority, accepted with no
+  high/medium finding remaining.
 
 ## 6. Milestone summary
 
@@ -229,11 +234,34 @@ Closed scope:
 
 ### M085 — Merged-head tunnel-security reclosure
 
-Status: **ready** (sole dependency-ready handoff).
+Status: **closed** (`plans/closure/i2pcontrol-proposal-170/085-closure.md`).
 
-Independently audit the actual post-M084 head. Rebuild current-head evidence for M083 admission/identity composed with M077 IRC, streamr, generic server, HTTP/httpbidir, lifecycle, option truthfulness, and containment.
+Closed scope:
 
-Do not copy M079 assertions forward without current-head verification. Any high/medium finding creates a new corrective; M085 does not self-fix and self-certify material runtime defects.
+- independently audited the actual post-M084 head (`a6f1826`) against the
+  full I2PControl test suite and the focused admission / trusted-peer /
+  generic-server / HTTP / IRC / Streamr tests;
+- rebuilt current-head evidence for M083 admission/identity composed with
+  M077 IRC, M078 Streamr, M081 generic-server `leaseSetEncType`, M082 HTTP
+  identity / framing / POST, lifecycle, option truthfulness, and M061/M062
+  containment, without copying M079 assertions forward;
+- reconciled M062 exact-path bookkeeping to include the new M085 closure
+  record (`plans/closure/i2pcontrol-proposal-170/085-closure.md`) without
+  broadening any production glob;
+- reconciled `plans/registry.md`, the implementation README, and the four
+  support/status documents so the tunnel-security reclosure is recorded as
+  complete against the pinned contract and current internal fork head;
+- no production runtime change was introduced by M085 itself; it is a
+  closure-only milestone.
+
+The Proposal 170 tunnel runtime/security line is complete against the
+pinned Proposal 170 `2026-05-20` revision and the current internal fork
+head. No future implementation plan in this workstream remains blocked by
+the merged-head audit. M085 does **not** reopen the unrelated base-I2PControl,
+AddressBook, M051, or RouterInfo 37/1/5 limitations.
+
+No upstream review, acceptance, merge, adoption, or submission is implied
+or authorized by this closure.
 
 ## 7. M084 exit conditions
 
@@ -241,7 +269,7 @@ M084 has closed against the actual post-fix head. All exit conditions were
 verified; see `plans/closure/i2pcontrol-proposal-170/084-closure.md` for the
 evidence matrix.
 
-## 8. M085 final evidence requirements
+## 8. M085 final evidence requirements and outcome
 
 M085 must prove at the exact final head:
 
@@ -259,6 +287,10 @@ M085 must prove at the exact final head:
 - option-capability matrix has no accepted-but-ignored runtime field;
 - M061/M062/M063 containment remains intact;
 - no current high/medium security, anonymity, correctness, lifecycle, option-truthfulness, or containment finding remains.
+
+All of the above requirements passed at the M085 reviewed head. The full
+evidence matrix and exact verification outcomes are recorded in
+`plans/closure/i2pcontrol-proposal-170/085-closure.md` sections 4, 5, and 7.
 
 ## 9. Verification discipline
 
@@ -294,15 +326,17 @@ Stop and create a separate corrective plan if:
 
 ## 11. Final closure rule
 
-The Proposal 170 **tunnel runtime/security line** remains `corrective pass required` until:
+The Proposal 170 **tunnel runtime/security line** is now **closed** against
+the pinned Proposal 170 `2026-05-20` revision and the current internal fork
+head. Both gate conditions were satisfied:
 
-1. M084 independently closes the merged-head integration defects; and
-2. M085 independently accepts the actual post-M084 head with no high/medium finding.
-
-M084 is closed. The workstream therefore transitions to M085's independent
-post-M084 reclosure authority. If M085 closes, the tunnel runtime/security
-line is complete against the pinned Proposal 170 revision and current
-internal fork head.
+1. M084 independently closed the merged-head integration/planning defects
+   against the post-fix head; see
+   `plans/closure/i2pcontrol-proposal-170/084-closure.md`.
+2. M085 independently accepted the actual post-M084 head with no high or
+   medium security, anonymity, correctness, lifecycle, option-truthfulness,
+   or containment finding remaining; see
+   `plans/closure/i2pcontrol-proposal-170/085-closure.md`.
 
 That does not close the separately documented partial Proposal 170
 source/truthfulness state, RouterInfo 37/1/5 disposition, M051 blocker, or

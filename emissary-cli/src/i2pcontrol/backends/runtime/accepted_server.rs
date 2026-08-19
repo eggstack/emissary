@@ -14,6 +14,7 @@ use super::{
 };
 
 const STOP_TIMEOUT: Duration = Duration::from_secs(5);
+pub const MAX_TRUSTED_PEER_DESTINATION_TEXT: usize = 524;
 
 /// One accepted I2P stream and the public identity authenticated by SAM.
 pub struct AcceptedServerConnection {

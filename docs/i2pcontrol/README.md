@@ -234,10 +234,11 @@ false, empty, or semantically adjacent values.
 
 M071 provides bounded `streamrclient` and `streamrserver` runtimes. The server
 keeps a persistent Yosemite repliable-datagram identity, receives administrator-
-bound local UDP payloads, and fans them out to at most 16 subscribed destinations.
+bound loopback UDP payloads, and fans them out to at most 10 subscribed destinations.
 The client sends a one-byte subscribe/refresh (`0`) every 15 seconds, attempts a
 best-effort unsubscribe (`1`) during bounded shutdown, and forwards received
-payloads only to its configured local IP/UDP target. Subscriptions expire after
+payloads only to its configured loopback UDP target. Non-loopback local UDP
+addresses are rejected before allocation. Subscriptions expire after
 60 seconds without refresh and payloads are capped at 1200 bytes (Yosemite's
 4095-byte receive ceiling is retained as the transport buffer bound).
 

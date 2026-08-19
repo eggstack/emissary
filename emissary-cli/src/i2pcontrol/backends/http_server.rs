@@ -556,9 +556,8 @@ impl HttpServerTunnelBackend {
                 tunnel_type: TunnelType::HttpServer,
                 option: "TargetPort".to_owned(),
             })?;
-        let target_host = raw_string(definition, "TargetHost")
-            .or_else(|| raw_string(definition, "Host"))
-            .or_else(|| definition.options.hosting_destination.clone())
+        let target_host = raw_string(definition, "TargetHost")?
+            .or(raw_string(definition, "Host")?)
             .unwrap_or_else(|| "127.0.0.1".to_owned());
         if !matches!(target_host.as_str(), "127.0.0.1" | "localhost" | "::1") {
             return Err(BackendError::UnsupportedOption {
@@ -567,7 +566,7 @@ impl HttpServerTunnelBackend {
             });
         }
         let website_host = configured_host(definition)?;
-        let access_list = raw_string(definition, "AccessList")
+        let access_list = raw_string(definition, "AccessList")?
             .or_else(|| definition.options.access_list.clone())
             .map(|value| {
                 value
@@ -577,7 +576,7 @@ impl HttpServerTunnelBackend {
                     .collect::<Vec<_>>()
             })
             .filter(|entries| !entries.is_empty());
-        let access_option = match raw_string(definition, "AccessOption").as_deref() {
+        let access_option = match raw_string(definition, "AccessOption")?.as_deref() {
             None | Some("allow") => AccessOption::Allow,
             Some("deny") => AccessOption::Deny,
             Some(_) => {
@@ -614,7 +613,7 @@ impl HttpServerTunnelBackend {
                 allow_referer: raw_bool(definition, "AllowReferer")?.unwrap_or(true),
                 block_user_agents: raw_bool(definition, "BlockUserAgents")?.unwrap_or(false),
                 allow_user_agent: raw_bool(definition, "AllowUserAgent")?.unwrap_or(true),
-                user_agents: raw_string(definition, "UserAgents").map(|value| {
+                user_agents: raw_string(definition, "UserAgents")?.map(|value| {
                     value
                         .split(',')
                         .map(|entry| entry.trim().to_owned())
@@ -675,8 +674,8 @@ impl TunnelBackend for HttpServerTunnelBackend {
 
 fn configured_host(definition: &TunnelDefinition) -> BackendResult<String> {
     let website =
-        raw_string(definition, "WebsiteHostname").or_else(|| definition.options.http_host.clone());
-    let spoofed = raw_string(definition, "SpoofedHost");
+        raw_string(definition, "WebsiteHostname")?.or_else(|| definition.options.http_host.clone());
+    let spoofed = raw_string(definition, "SpoofedHost")?;
     if website.is_some() && spoofed.is_some() && website != spoofed {
         return Err(invalid_option("WebsiteHostname/SpoofedHost"));
     }
@@ -692,12 +691,12 @@ fn configured_host(definition: &TunnelDefinition) -> BackendResult<String> {
     Ok(host)
 }
 
-fn raw_string(definition: &TunnelDefinition, key: &str) -> Option<String> {
+fn raw_string(definition: &TunnelDefinition, key: &str) -> BackendResult<Option<String>> {
     definition
         .raw_config
         .get(key)
-        .and_then(|value| value.as_str())
-        .map(str::to_owned)
+        .map(|value| value.as_str().map(str::to_owned).ok_or_else(|| invalid_option(key)))
+        .transpose()
 }
 
 fn raw_bool(definition: &TunnelDefinition, key: &str) -> Result<Option<bool>, BackendError> {
@@ -887,6 +886,29 @@ mod tests {
         assert!(matches!(
             result,
             Err(BackendError::UnsupportedOption { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn persisted_public_destination_does_not_select_local_target() {
+        let root = tempfile::tempdir().unwrap();
+        let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
+        let mut definition = definition(&[]);
+        definition.options.hosting_destination = Some("published-server-destination".to_owned());
+        let config = backend.config_without_destination(&definition).await.unwrap();
+        assert_eq!(config.target_host, "127.0.0.1");
+    }
+
+    #[tokio::test]
+    async fn malformed_raw_string_option_fails_before_allocation() {
+        let root = tempfile::tempdir().unwrap();
+        let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
+        let result = backend
+            .config_without_destination(&definition(&[("TargetHost", serde_json::json!(true))]))
+            .await;
+        assert!(matches!(
+            result,
+            Err(BackendError::Internal { message }) if message.contains("TargetHost")
         ));
     }
 

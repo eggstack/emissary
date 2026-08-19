@@ -42,7 +42,7 @@ No upstream review, merge, submission, contribution preparation, issue/PR mutati
 
 ## Dependency-ready implementation plan
 
-Exactly one plan is currently registered as dependency-ready:
+No implementation plan is currently registered as dependency-ready:
 
 | Handoff | Status | Plan | Objective |
 |---|---|---|---|

@@ -253,9 +253,13 @@ Sole ready handoff. Correct the shared boundary without expanding architecture.
 
 Blocked until M083. Then add a 10-minute activity-resetting post-registration inactivity deadline and bounded target connect while preserving registration filtering/raw post-registration semantics.
 
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/077-closure.md`.
+
 ### M078 — Streamr local-boundary hardening
 
 After M077, make local UDP producer/client targets loopback-only, align subscriber maximum to 10, and preserve existing expiry/refresh/payload/task bounds.
+
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/078-closure.md`.
 
 ### M079 — Integrated tunnel-security reclosure
 

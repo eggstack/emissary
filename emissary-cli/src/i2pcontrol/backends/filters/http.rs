@@ -197,9 +197,7 @@ pub async fn read_and_sanitize_request<R: AsyncBufRead + Unpin>(
         return Err(RequestSanitizeError::Malformed);
     }
 
-    let proxy_seen = headers
-        .iter()
-        .any(|header| PROXY_IDENTITY.contains(&header.name.to_ascii_lowercase().as_str()));
+    let proxy_seen = headers.iter().any(|header| is_proxy_identity_header(&header.name));
     if policy.block_access_in_proxies && proxy_seen {
         return Err(RequestSanitizeError::ProxyBlocked);
     }
@@ -274,9 +272,9 @@ pub async fn read_and_sanitize_request<R: AsyncBufRead + Unpin>(
         let name = header.name.to_ascii_lowercase();
         if HOP_BY_HOP.contains(&name.as_str())
             || nominated.contains(name.as_str())
-            || PROXY_IDENTITY.contains(&name.as_str())
+            || is_proxy_identity_header(&name)
             || REQUEST_PRIVACY.contains(&name.as_str())
-            || I2P_IDENTITY.contains(&name.as_str())
+            || is_i2p_identity_header(&name)
             || (eq(&name, "referer") && (policy.block_referers || !policy.allow_referer))
             || (eq(&name, "user-agent") && (policy.block_user_agents || !policy.allow_user_agent))
             || eq(&name, "host")
@@ -852,6 +850,10 @@ mod tests {
             "x-forwarded-for",
             "x-forwarded-host",
             "x-forwarded-server",
+            "x-forwarded-proto",
+            "x-forwarded-port",
+            "x-forwarded-prefix",
+            "x-i2p-fake",
             "forwarded",
             "via",
             "proxy",

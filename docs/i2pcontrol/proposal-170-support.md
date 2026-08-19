@@ -22,7 +22,9 @@ Tunnel-runtime reclosure:
 - M074: `plans/closure/i2pcontrol-proposal-170/074-closure.md` — closed;
 - M075: `plans/closure/i2pcontrol-proposal-170/075-closure.md` — closed;
 - M076: `plans/closure/i2pcontrol-proposal-170/076-closure.md` — closed;
-- M077: next registered ready security-hardening handoff.
+- M077: `plans/closure/i2pcontrol-proposal-170/077-closure.md` — closed;
+- M078: `plans/closure/i2pcontrol-proposal-170/078-closure.md` — closed;
+- M079: `plans/closure/i2pcontrol-proposal-170/079-closure.md` — closed.
 
 Closed handoffs:
 
@@ -90,8 +92,9 @@ The repository remains partial Proposal 170 support. M044 reviewed the earlier
 corrected final head and accepted that source/method disposition; the later
 tunnel-runtime security sequence added bounded admission, generic accepted
 server relay, HTTP anonymity, IRC lifetime, and Streamr local-boundary
-correctives. M077-M079 remain open, so the security-hardening phase is not yet
-closed.
+correctives. M079 independently reclosed the integrated final head, so the
+security-hardening phase is closed while the unrelated RouterInfo limitations
+remain.
 M039 remains a historical invalidated closure.
 
 M028 owns the status/feature-boundary correction. M030 owns the destination
@@ -231,14 +234,16 @@ server definitions remain externally managed and reject administrative
 lifecycle operations.
 
 `streamrserver` owns a persistent repliable-datagram identity and a
-administrator-bound local UDP source. `streamrclient` refreshes a bounded
-subscription every 15 seconds and forwards payloads only to its configured
-local IP/UDP target. The producer caps subscribers at 16, expires entries after
-60 seconds, and caps payloads at 1200 bytes. Control packets are exactly one
-byte (`0` subscribe/refresh, `1` unsubscribe); malformed or unknown controls do
-not create state. Yosemite exposes trusted peer destination identity but not
-inbound port metadata, so Emissary uses the trusted destination plus the fixed
-configured session port tuple and makes no core API change.
+loopback-only local UDP source. `streamrclient` refreshes a bounded subscription
+every 15 seconds and forwards payloads only to its configured loopback UDP
+target. The producer caps subscribers at 10, expires entries after 60 seconds,
+and caps payloads at 1200 bytes; destination text is bounded at 524 bytes.
+Control packets are exactly one byte (`0` subscribe/refresh, `1` unsubscribe);
+malformed or unknown controls do not create state. Non-loopback local-address
+configuration is rejected before allocation, and unexpected non-loopback local
+UDP sources are ignored. Yosemite exposes trusted peer destination identity but
+not inbound port metadata, so Emissary uses the trusted destination plus the
+fixed configured session port tuple and makes no core API change.
 
 ### SOCKS and SOCKS-IRC runtime boundary
 
@@ -307,7 +312,10 @@ M066 does not synthesize registration or channel behavior.
 HTTP/Binary protocol probes, rewrites `USER` using the trusted accepted I2P
 peer identity, and connects only to loopback. It does not forward registration
 to the local IRCd until NICK and sanitized USER have been accepted. The
-post-registration path is a raw IRC stream as specified by M066; accepted
+post-registration path is a raw IRC stream as specified by M066. Its local IRCd
+connect is bounded to five seconds, and the accepted stream expires after ten
+minutes of inactivity; successful traffic in either direction resets that
+deadline, so active IRC sessions are not capped by total lifetime. Accepted
 streams use the same bounded peer-aware admission policy as `httpserver`, and
 the client side remains filtered for the future `socksirc` composition.
 

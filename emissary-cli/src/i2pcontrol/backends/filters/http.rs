@@ -418,6 +418,16 @@ fn peer_allowed(peer: &str, policy: &HttpServerPolicy) -> bool {
     }
 }
 
+fn is_proxy_identity_header(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    PROXY_IDENTITY.contains(&name.as_str()) || name.starts_with("x-forwarded-")
+}
+
+fn is_i2p_identity_header(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    I2P_IDENTITY.contains(&name.as_str()) || name.starts_with("x-i2p-")
+}
+
 fn parse_request_line(line: &[u8]) -> io::Result<(String, String, String)> {
     let line = trim_crlf(line)?;
     if line.iter().any(|byte| *byte < 0x20 || *byte == 0x7f) {

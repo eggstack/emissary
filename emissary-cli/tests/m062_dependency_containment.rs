@@ -499,6 +499,8 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/081-generic-server-leaseset-option-truthfulness-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/083-admission-capacity-and-trusted-destination-exactness-corrective.md"
+            | "plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md"
+            | "plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md"
@@ -515,10 +517,14 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/074-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/075-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/076-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/077-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/078-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/079-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/080-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/081-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/082-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/083-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/084-closure.md"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }

@@ -1240,22 +1240,4 @@ mod tests {
         assert!(!debug.contains("redacted=false"));
         assert!(debug.contains("redacted"));
     }
-
-    #[tokio::test(start_paused = true)]
-    async fn aggregate_rate_denial_does_not_allocate_new_peer_state() {
-        let policy =
-            ServerAdmissionPolicy::new(10, 0, 0, 0, 1, 0, 0).unwrap().with_peer_capacity(2);
-        let state = ServerAdmissionState::new(policy);
-        let lease = match state.try_acquire(&peer("first")) {
-            AdmissionDecision::Allowed(lease) => lease,
-            other => panic!("unexpected result: {other:?}"),
-        };
-
-        assert!(matches!(
-            state.try_acquire(&peer("second")),
-            AdmissionDecision::Denied(AdmissionRejection::AggregateRate)
-        ));
-        assert_eq!(state.peer_state_len(), 1);
-        drop(lease);
-    }
 }

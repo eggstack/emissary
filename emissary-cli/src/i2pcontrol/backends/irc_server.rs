@@ -740,7 +740,8 @@ mod tests {
         let (local_read, local_write) = io::split(local_stream);
         let admission =
             ServerAdmissionState::new(ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap());
-        let peer = TrustedPeerIdentity::for_test("peer-destination");
+        let peer =
+            crate::i2pcontrol::backends::runtime::peer_identity::test_fixtures::distinct_peer(7);
         let lease = match admission.try_acquire(&peer) {
             AdmissionDecision::Allowed(lease) => lease,
             other => panic!("unexpected admission result: {other:?}"),

@@ -3,9 +3,9 @@
 //! The trusted remote destination reported by SAM is structurally validated
 //! against the repository's `Destination` parser. The canonical cryptographic
 //! 32-byte Destination hash derived from the parsed Destination is the only
-//! identity used by the shared admission/POST accounting layers. The original
-//! textual representation remains available to protocol handlers that need
-//! the validated full Destination for forwarding, but never to security
+//! identity used by the shared admission/POST accounting layers. The canonical
+//! textual representation remains available to protocol handlers that need the
+//! validated full Destination for forwarding, but never to security
 //! accounting that would otherwise be vulnerable to long textual representations
 //! or unspecified general-purpose hashes.
 //!
@@ -15,7 +15,10 @@
 
 use std::{fmt, sync::Arc};
 
-use emissary_core::{crypto::base64_decode, primitives::Destination};
+use emissary_core::{
+    crypto::{base64_decode, base64_encode},
+    primitives::Destination,
+};
 use yosemite::Stream;
 
 /// Hard upper bound on the textual base64 representation that may be accepted
@@ -29,10 +32,9 @@ pub const MAX_TRUSTED_DESTINATION_B64_TEXT: usize = 1024;
 
 /// Result of structurally validating a remote I2P Destination reported by SAM.
 ///
-/// The textual representation is the exact `Stream::remote_destination`
-/// string SAM returned; the canonical 32-byte hash is the SHA-256 of the
-/// serialized Destination bytes and is the only key used by security
-/// accounting.
+/// The stored textual representation is the canonical I2P Base64 encoding of
+/// the parsed serialized Destination. The canonical 32-byte hash is the
+/// SHA-256 of those same bytes and is the only key used by security accounting.
 #[derive(Clone, PartialEq, Eq)]
 pub struct TrustedPeerIdentity {
     destination: Arc<str>,
@@ -42,8 +44,8 @@ pub struct TrustedPeerIdentity {
 impl TrustedPeerIdentity {
     /// Structurally validate `stream.remote_destination()` and return the
     /// canonical peer identity, or `None` if the text is missing, oversized,
-    /// contains control characters, is not valid base64, or does not parse as
-    /// an I2P `Destination`.
+    /// contains control characters, is not valid base64, does not contain
+    /// exactly one supported I2P `Destination`, or has trailing bytes.
     ///
     /// This is the sole ingress for remote identity into the accepted-server
     /// runtime. Callers must not insert, store, or key any accounting
@@ -61,15 +63,25 @@ impl TrustedPeerIdentity {
     }
 
     /// Parse a base64-encoded I2P `Destination` text and return the
-    /// canonical peer identity, or `None` if the bytes do not parse as a
-    /// structurally valid I2P `Destination`.
+    /// canonical peer identity, or `None` if the bytes do not contain exactly
+    /// one structurally valid I2P `Destination`.
     ///
     /// This helper exists for trusted internal callers (fake SAM fixtures,
     /// restart restoration, test scaffolding). Production ingress remains
     /// [`Self::from_stream`].
     pub(crate) fn from_destination_text(destination: &str) -> Option<Self> {
+        if destination.is_empty()
+            || destination.len() > MAX_TRUSTED_DESTINATION_B64_TEXT
+            || destination.chars().any(char::is_control)
+            || destination.chars().any(|ch| ch.is_whitespace())
+        {
+            return None;
+        }
         let decoded = base64_decode(destination)?;
-        let parsed = Destination::parse(&decoded).ok()?;
+        let (rest, parsed) = Destination::parse_frame(&decoded).ok()?;
+        if !rest.is_empty() {
+            return None;
+        }
         let id_bytes = parsed.id().to_vec();
         if id_bytes.len() != 32 {
             return None;
@@ -77,7 +89,7 @@ impl TrustedPeerIdentity {
         let mut canonical_id = [0u8; 32];
         canonical_id.copy_from_slice(&id_bytes);
         Some(Self {
-            destination: Arc::from(destination),
+            destination: Arc::from(base64_encode(parsed.serialize())),
             canonical_id,
         })
     }
@@ -167,12 +179,12 @@ pub(crate) mod test_fixtures {
         237, 8, 232, 227, 1, 168, 159, 119, 35, 41, 43, 67, 241, 91, 87, 213, 118, 129, 172, 192,
         92, 176, 79, 63, 80, 251, 160, 212, 50, 194, 46, 229, 59, 15, 48, 93, 62, 80, 237, 86, 159,
         203, 194, 165, 80, 22, 108, 18, 64, 58, 210, 130, 124, 26, 198, 206, 159, 132, 252, 96,
-        155, 124, 35, 108, 231, 22, 53, 246, 114, 232, 108, 192, 249, 122, 24, 236, 5, 210, 53, 149,
-        124, 6, 12, 36, 59, 144, 19, 176, 11, 159, 46, 184, 45, 193, 58, 134, 179, 130, 176, 122,
-        34, 177, 172, 147, 35, 19, 123, 22, 176, 182, 216, 78, 246, 104, 110, 62, 111, 117, 110,
-        174, 49, 132, 214, 130, 96, 112, 30, 211, 159, 113, 131, 151, 166, 156, 206, 227, 20, 21,
-        115, 66, 8, 218, 103, 153, 78, 46, 127, 199, 169, 197, 168, 124, 158, 232, 115, 71, 104,
-        19, 165, 200, 234, 67, 168, 253, 137, 220, 5, 0, 4, 0, 7, 0, 0,
+        155, 124, 35, 108, 231, 22, 53, 246, 114, 232, 108, 192, 249, 122, 24, 236, 5, 210, 53,
+        149, 124, 6, 12, 36, 59, 144, 19, 176, 11, 159, 46, 184, 45, 193, 58, 134, 179, 130, 176,
+        122, 34, 177, 172, 147, 35, 19, 123, 22, 176, 182, 216, 78, 246, 104, 110, 62, 111, 117,
+        110, 174, 49, 132, 214, 130, 96, 112, 30, 211, 159, 113, 131, 151, 166, 156, 206, 227, 20,
+        21, 115, 66, 8, 218, 103, 153, 78, 46, 127, 199, 169, 197, 168, 124, 158, 232, 115, 71,
+        104, 19, 165, 200, 234, 67, 168, 253, 137, 220, 5, 0, 4, 0, 7, 0, 0,
     ];
 
     /// Build a distinct, structurally valid peer identity from the null-cert
@@ -210,5 +222,46 @@ pub(crate) mod test_fixtures {
         bytes[3] = seed.wrapping_add(3);
         bytes[4] = seed.wrapping_add(4);
         TrustedPeerIdentity::from_bytes_for_test(&bytes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TrustedPeerIdentity, test_fixtures::*};
+    use emissary_core::crypto::base64_encode;
+
+    #[test]
+    fn accepts_supported_destinations_and_stores_canonical_text() {
+        for bytes in [
+            NULL_CERT_DESTINATION_BYTES.as_slice(),
+            KEY_CERT_DESTINATION_BYTES.as_slice(),
+        ] {
+            let text = base64_encode(bytes);
+            let identity = TrustedPeerIdentity::from_destination_text(&text)
+                .expect("supported Destination fixture must be accepted");
+            assert_eq!(identity.destination(), text);
+            assert_eq!(identity.canonical_id().len(), 32);
+        }
+    }
+
+    #[test]
+    fn rejects_one_or_many_trailing_destination_bytes() {
+        for trailing in [vec![0u8], vec![0xde, 0xad, 0xbe, 0xef]] {
+            let mut bytes = NULL_CERT_DESTINATION_BYTES.to_vec();
+            bytes.extend_from_slice(&trailing);
+            assert!(
+                TrustedPeerIdentity::from_destination_text(&base64_encode(bytes)).is_none(),
+                "trailing payload must not be accepted as a trusted Destination"
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_id_is_stable_for_the_same_exact_destination() {
+        let text = base64_encode(NULL_CERT_DESTINATION_BYTES);
+        let first = TrustedPeerIdentity::from_destination_text(&text).unwrap();
+        let second = TrustedPeerIdentity::from_destination_text(&text).unwrap();
+        assert_eq!(first.canonical_id(), second.canonical_id());
+        assert_eq!(first.destination(), second.destination());
     }
 }

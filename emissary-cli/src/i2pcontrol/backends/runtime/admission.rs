@@ -9,9 +9,9 @@
 //!   digest;
 //! - every attacker-influenced collection is hard bounded: the primary peer map, the expiry index
 //!   (one authoritative registration per peer), and the active counters;
-//! - configured peer capacity is derived from enabled retention windows and the strongest available
-//!   aggregate arrival bound, with a documented hard memory ceiling; unsafe configurations reject
-//!   before allocation.
+//! - configured peer capacity is derived from explicit peer-history semantics and the tightest safe
+//!   bound across all enabled aggregate windows, with a documented hard memory ceiling; unsafe
+//!   configurations reject before allocation.
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -33,9 +33,6 @@ pub const MAX_RATE: u64 = 1_000_000;
 const MINUTE: Duration = Duration::from_secs(60);
 const HOUR: Duration = Duration::from_secs(60 * 60);
 const DAY: Duration = Duration::from_secs(60 * 60 * 24);
-
-/// Short inactivity retention used when no per-peer rate window is enabled.
-const SHORT_RETENTION: Duration = MINUTE;
 
 /// Hard memory budget for the admission peer map and its auxiliary expiry
 /// index. This is the upper bound on attacker-influenced admission-state
@@ -71,10 +68,11 @@ pub struct ServerAdmissionPolicy {
     total_in_per_minute: u64,
     total_in_per_hour: u64,
     total_in_per_day: u64,
-    retention: Duration,
-    /// Maximum distinct peer entries the policy requires to keep within the
-    /// configured retention. Computed from enabled rate windows and the
-    /// strongest available aggregate arrival bound.
+    /// Longest historical peer-rate window, or `None` when inactive peers do
+    /// not need to be retained after their final active lease drops.
+    peer_history: Option<Duration>,
+    /// Maximum distinct peer entries the policy requires to keep within its
+    /// configured peer-history horizon and active-concurrency margin.
     required_peer_entries: usize,
 }
 
@@ -88,8 +86,8 @@ pub enum AdmissionPolicyError {
 impl ServerAdmissionPolicy {
     pub fn defaults() -> Self {
         // Reference-scale defaults established by M074. The total/minute
-        // arrival bound combined with day retention implies 72,000 distinct
-        // identities per generation plus a 30-entry concurrency margin,
+        // arrival bound combined with day history uses the conservative
+        // fixed-window boundary bound plus a 30-entry concurrency margin,
         // fitting comfortably inside `MAX_PEER_ENTRIES`.
         Self {
             max_concurrent_connections: DEFAULT_MAX_CONCURRENT_CONNECTIONS,
@@ -100,8 +98,15 @@ impl ServerAdmissionPolicy {
             total_in_per_minute: 50,
             total_in_per_hour: 0,
             total_in_per_day: 0,
-            retention: DAY,
-            required_peer_entries: 50 * 1440 + DEFAULT_MAX_CONCURRENT_CONNECTIONS,
+            peer_history: Some(DAY),
+            required_peer_entries: required_entries_for_history(
+                DAY,
+                DEFAULT_MAX_CONCURRENT_CONNECTIONS,
+                50,
+                0,
+                0,
+            )
+            .expect("reference admission policy must have representable capacity"),
         }
     }
 
@@ -131,53 +136,33 @@ impl ServerAdmissionPolicy {
             return Err(AdmissionPolicyError::InvalidRate);
         }
 
-        let (retention, retention_minutes) = if client_per_day != 0 {
-            (DAY, 1440u64)
+        let peer_history = if client_per_day != 0 {
+            Some(DAY)
         } else if client_per_hour != 0 {
-            (HOUR, 60u64)
+            Some(HOUR)
         } else if client_per_minute != 0 {
-            (MINUTE, 1u64)
+            Some(MINUTE)
         } else {
-            (SHORT_RETENTION, 0u64)
+            None
         };
 
         let max_concurrent = max_concurrent_connections as usize;
-
-        if retention > SHORT_RETENTION {
-            let strongest = strongest_aggregate_per_minute(
+        let required_peer_entries = match peer_history {
+            Some(history) => required_entries_for_history(
+                history,
+                max_concurrent,
                 total_in_per_minute,
                 total_in_per_hour,
                 total_in_per_day,
-            );
-            match strongest {
-                StrongestAggregate::Unlimited => {
-                    return Err(AdmissionPolicyError::IncoherentCapacity);
-                }
-                StrongestAggregate::Bounded(per_minute) => {
-                    let max_identities = per_minute.saturating_mul(retention_minutes.max(1));
-                    let concurrency_margin = max_concurrent as u64;
-                    let required = max_identities.saturating_add(concurrency_margin);
-                    if required > MAX_PEER_ENTRIES as u64 {
-                        return Err(AdmissionPolicyError::IncoherentCapacity);
-                    }
-                    let mut policy = Self::defaults();
-                    policy.max_concurrent_connections = max_concurrent;
-                    policy.client_per_minute = client_per_minute;
-                    policy.client_per_hour = client_per_hour;
-                    policy.client_per_day = client_per_day;
-                    policy.total_in_per_minute = total_in_per_minute;
-                    policy.total_in_per_hour = total_in_per_hour;
-                    policy.total_in_per_day = total_in_per_day;
-                    policy.retention = retention;
-                    policy.required_peer_entries = required as usize;
-                    return Ok(policy);
-                }
-            }
-        }
+            )
+            .filter(|required| *required <= MAX_PEER_ENTRIES)
+            .ok_or(AdmissionPolicyError::IncoherentCapacity)?,
+            // With no peer-rate history, inactive records have no semantic
+            // reason to remain after their final lease drops. Only active
+            // records consume peer-map capacity.
+            None => max_concurrent,
+        };
 
-        // Short retention: no identity-counting budget; only short
-        // inactivity/concurrency retention is necessary for active-state
-        // cleanup.
         let mut policy = Self::defaults();
         policy.max_concurrent_connections = max_concurrent;
         policy.client_per_minute = client_per_minute;
@@ -186,8 +171,8 @@ impl ServerAdmissionPolicy {
         policy.total_in_per_minute = total_in_per_minute;
         policy.total_in_per_hour = total_in_per_hour;
         policy.total_in_per_day = total_in_per_day;
-        policy.retention = retention;
-        policy.required_peer_entries = max_concurrent;
+        policy.peer_history = peer_history;
+        policy.required_peer_entries = required_peer_entries;
         Ok(policy)
     }
 
@@ -229,12 +214,13 @@ impl ServerAdmissionPolicy {
         self.max_concurrent_connections
     }
 
-    pub fn retention(&self) -> Duration {
-        self.retention
+    pub fn peer_history(&self) -> Option<Duration> {
+        self.peer_history
     }
 
     /// Maximum distinct peer entries the exact policy semantics require
-    /// inside the retention window. Used for closure evidence and tests;
+    /// inside the peer-history horizon plus active-concurrency margin. Used for
+    /// closure evidence and tests;
     /// admission state itself enforces the hard [`MAX_PEER_ENTRIES`]
     /// ceiling.
     pub fn required_peer_entries(&self) -> usize {
@@ -242,29 +228,51 @@ impl ServerAdmissionPolicy {
     }
 }
 
-/// Resolve the strongest enabled aggregate arrival bound to a per-minute
-/// rate. Returns `Unlimited` only when every aggregate field is zero
-/// (`0` in Proposal 170 means unlimited).
-fn strongest_aggregate_per_minute(
+/// Return a conservative maximum number of accepted events for one aggregate
+/// fixed window over the peer-history horizon. The extra window accounts for
+/// traffic immediately before and after a fixed-window reset.
+fn aggregate_event_bound(history: Duration, limit: u64, window: Duration) -> Option<u64> {
+    let windows = history.as_secs().div_ceil(window.as_secs()).checked_add(1)?;
+    limit.checked_mul(windows)
+}
+
+/// Select the tightest safe cardinality bound implied by every enabled
+/// aggregate window. `None` means all aggregate fields are unlimited or a
+/// checked calculation overflowed; both cases are unrepresentable for a
+/// historical peer-rate policy.
+fn tightest_aggregate_bound(
+    history: Duration,
     total_per_minute: u64,
     total_per_hour: u64,
     total_per_day: u64,
-) -> StrongestAggregate {
-    if total_per_minute != 0 {
-        StrongestAggregate::Bounded(total_per_minute)
-    } else if total_per_hour != 0 {
-        // Round up so the bound covers a partial minute in the worst case.
-        StrongestAggregate::Bounded(total_per_hour.div_ceil(60))
-    } else if total_per_day != 0 {
-        StrongestAggregate::Bounded(total_per_day.div_ceil(1440))
-    } else {
-        StrongestAggregate::Unlimited
+) -> Option<u64> {
+    let mut tightest = None;
+    for (limit, window) in [
+        (total_per_minute, MINUTE),
+        (total_per_hour, HOUR),
+        (total_per_day, DAY),
+    ] {
+        if limit == 0 {
+            continue;
+        }
+        let bound = aggregate_event_bound(history, limit, window)?;
+        tightest = Some(tightest.map_or(bound, |current: u64| current.min(bound)));
     }
+    tightest
 }
 
-enum StrongestAggregate {
-    Bounded(u64),
-    Unlimited,
+fn required_entries_for_history(
+    history: Duration,
+    max_concurrent: usize,
+    total_per_minute: u64,
+    total_per_hour: u64,
+    total_per_day: u64,
+) -> Option<usize> {
+    let aggregate =
+        tightest_aggregate_bound(history, total_per_minute, total_per_hour, total_per_day)?;
+    aggregate
+        .checked_add(max_concurrent as u64)
+        .and_then(|required| usize::try_from(required).ok())
 }
 
 /// Fixed-size cryptographic peer identity derived from the canonical I2P
@@ -370,12 +378,12 @@ impl Counters {
     fn expires_at(
         &self,
         now: Instant,
-        retention: Duration,
+        history: Duration,
         minute: u64,
         hour: u64,
         day: u64,
     ) -> Instant {
-        let mut expiry = now + retention;
+        let mut expiry = now + history;
         if minute != 0 {
             expiry = expiry.max(self.minute.expires_at(MINUTE));
         }
@@ -399,12 +407,14 @@ struct State {
     active: usize,
     aggregate: Counters,
     peers: HashMap<PeerKey, PeerRecord>,
-    /// One authoritative expiry registration per peer, keyed by the
-    /// composite `(expires_at, peer_key)` so two peers may share an instant
-    /// without colliding and stale entries cannot accumulate beyond the
-    /// peer-map cardinality.
+    /// Exactly one authoritative expiry registration per inactive historical
+    /// peer. Active peers are intentionally unindexed and bounded by the
+    /// global/per-peer concurrency limits.
     expiry_queue: BTreeMap<(Instant, PeerKey), ()>,
-    retention: Duration,
+    peer_history: Option<Duration>,
+    client_per_minute: u64,
+    client_per_hour: u64,
+    client_per_day: u64,
 }
 
 impl State {
@@ -415,57 +425,68 @@ impl State {
             aggregate: Counters::new(now),
             peers: HashMap::new(),
             expiry_queue: BTreeMap::new(),
-            retention: policy.retention,
+            peer_history: policy.peer_history,
+            client_per_minute: policy.client_per_minute,
+            client_per_hour: policy.client_per_hour,
+            client_per_day: policy.client_per_day,
         }
     }
 
     fn reap(&mut self, now: Instant) {
-        let expired_keys: Vec<PeerKey> = self
-            .expiry_queue
-            .range(..=(now, PeerKey([u8::MAX; 32])))
-            .map(|((_, key), ())| *key)
-            .collect();
-        for key in expired_keys {
-            // Only remove the peer if the entry is still expired and the
-            // peer has no active connections. A fresh accepted event may
-            // have updated `expires_at` to a later instant; if so, the
-            // corresponding `(newer_expires_at, key)` entry remains in the
-            // queue and the reap loop will visit it in a later pass.
+        while let Some((&(deadline, key), ())) = self.expiry_queue.first_key_value() {
+            if deadline > now {
+                break;
+            }
+
+            // Remove the actual authoritative entry that was observed at the
+            // head of the queue. Never reconstruct a different composite key
+            // from peer state while repairing the index.
+            self.expiry_queue.remove(&(deadline, key));
             let remove = self
                 .peers
                 .get(&key)
-                .is_some_and(|peer| peer.active == 0 && peer.expires_at <= now);
-            self.expiry_queue.remove(&(now, key));
-            // The map range bound above was `..=now`, but `expires_at` may
-            // sit exactly at `now`; remove the exact composite instead.
-            if let Some(peer) = self.peers.get(&key) {
-                self.expiry_queue.remove(&(peer.expires_at, key));
-            }
+                .is_some_and(|peer| peer.active == 0 && peer.expires_at == deadline);
+            debug_assert!(
+                self.peers
+                    .get(&key)
+                    .is_none_or(|peer| peer.active == 0 && peer.expires_at == deadline),
+                "expiry entry must identify its inactive peer record"
+            );
             if remove {
                 self.peers.remove(&key);
             }
         }
     }
 
-    fn replace_peer_expiry(&mut self, key: PeerKey, old: Instant, new: Instant) {
-        self.expiry_queue.remove(&(old, key));
-        self.expiry_queue.insert((new, key), ());
-    }
-
-    /// Test-only introspection that asserts the structural invariants:
-    /// peer-map cardinality equals the authoritative expiry-index
-    /// cardinality, and every expiry queue entry points to an existing peer
-    /// with the matching `expires_at`.
+    /// Test-only introspection for the documented inactive-peer expiry
+    /// invariant. Active peers are intentionally absent from the index;
+    /// inactive peers are indexed exactly when peer history is enabled.
     #[cfg(test)]
     fn assert_invariants(&self) {
-        debug_assert_eq!(
-            self.peers.len(),
-            self.expiry_queue.len(),
-            "expiry queue cardinality must equal peer-map cardinality"
-        );
+        let expected_inactive = self.peers.values().filter(|peer| peer.active == 0).count();
+        if self.peer_history.is_some() {
+            debug_assert_eq!(
+                expected_inactive,
+                self.expiry_queue.len(),
+                "every inactive historical peer must have one expiry entry"
+            );
+        } else {
+            debug_assert_eq!(
+                expected_inactive, 0,
+                "no-history peers must be removed after their final lease"
+            );
+            debug_assert!(
+                self.expiry_queue.is_empty(),
+                "no-history state must not retain expiry entries"
+            );
+        }
         for ((at, key), ()) in &self.expiry_queue {
             let peer =
                 self.peers.get(key).expect("expiry queue entry must point to an existing peer");
+            debug_assert_eq!(
+                peer.active, 0,
+                "expiry queue must contain inactive peers only"
+            );
             debug_assert_eq!(
                 *at, peer.expires_at,
                 "expiry queue entry instant must match peer's expires_at"
@@ -553,39 +574,26 @@ impl ServerAdmissionState {
             return AdmissionDecision::Denied(AdmissionRejection::PeerStateCapacity);
         }
 
-        // 8. Commit atomically under the lock.
-        let retention = state.retention;
+        // 8. Commit atomically under the lock. An inactive historical peer
+        // becomes active again and therefore leaves the expiry index; active
+        // peers are intentionally unindexed until their final lease drops.
+        if !is_new {
+            let expires_at = state.peers.get(&key).expect("peer checked above").expires_at;
+            state.expiry_queue.remove(&(expires_at, key));
+        }
         if is_new {
-            let initial_expires_at = now + retention;
             state.peers.insert(
                 key,
                 PeerRecord {
                     active: 0,
                     counters: Counters::new(now),
-                    expires_at: initial_expires_at,
+                    expires_at: now,
                 },
             );
-            state.expiry_queue.insert((initial_expires_at, key), ());
         }
-        let new_expires_at = {
-            let peer_record = state.peers.get_mut(&key).expect("peer inserted above");
-            peer_record.active += 1;
-            peer_record.counters.record(now);
-            peer_record.counters.expires_at(
-                now,
-                retention,
-                policy.client_per_minute,
-                policy.client_per_hour,
-                policy.client_per_day,
-            )
-        };
-        let old_expires_at = state.peers.get(&key).expect("peer exists").expires_at;
-        if new_expires_at != old_expires_at {
-            state.replace_peer_expiry(key, old_expires_at, new_expires_at);
-            if let Some(peer_record) = state.peers.get_mut(&key) {
-                peer_record.expires_at = new_expires_at;
-            }
-        }
+        let peer_record = state.peers.get_mut(&key).expect("peer inserted above");
+        peer_record.active += 1;
+        peer_record.counters.record(now);
         state.aggregate.record(now);
         state.active += 1;
 
@@ -626,20 +634,34 @@ impl Drop for AdmissionLease {
             return;
         };
         let now = Instant::now();
+        let peer_history = inner.policy.peer_history;
+        let client_per_minute = inner.policy.client_per_minute;
+        let client_per_hour = inner.policy.client_per_hour;
+        let client_per_day = inner.policy.client_per_day;
         let mut state = inner.state.lock();
         state.active = state.active.saturating_sub(1);
         if let Some(peer) = state.peers.get_mut(&self.key) {
             peer.active = peer.active.saturating_sub(1);
             if peer.active == 0 {
-                // No counters changed; expires_at either stays the same or
-                // must be raised to at least `now`. The queue entry remains
-                // valid when the deadline is unchanged, so only swap when
-                // the deadline moves.
-                let new_expires_at = peer.expires_at.max(now);
-                if new_expires_at != peer.expires_at {
-                    let old_expires_at = peer.expires_at;
-                    peer.expires_at = new_expires_at;
-                    state.replace_peer_expiry(self.key, old_expires_at, new_expires_at);
+                match peer_history {
+                    Some(history) => {
+                        let expires_at = peer.counters.expires_at(
+                            now,
+                            history,
+                            client_per_minute,
+                            client_per_hour,
+                            client_per_day,
+                        );
+                        peer.expires_at = expires_at;
+                        state.expiry_queue.insert((expires_at, self.key), ());
+                    }
+                    None => {
+                        // No peer-rate counter has semantic value after the
+                        // final active lease closes. Remove the record now so
+                        // sequential fresh identities cannot build a cleanup
+                        // backlog.
+                        state.peers.remove(&self.key);
+                    }
                 }
             }
         }
@@ -660,10 +682,10 @@ mod tests {
     async fn defaults_and_global_limit_are_finite() {
         let policy = ServerAdmissionPolicy::defaults();
         assert_eq!(policy.max_concurrent_connections(), 30);
-        assert_eq!(policy.retention(), DAY);
+        assert_eq!(policy.peer_history(), Some(DAY));
         assert_eq!(
             policy.required_peer_entries(),
-            50 * 1440 + DEFAULT_MAX_CONCURRENT_CONNECTIONS
+            50 * 1441 + DEFAULT_MAX_CONCURRENT_CONNECTIONS
         );
         assert!(
             policy.required_peer_entries() <= MAX_PEER_ENTRIES,
@@ -795,7 +817,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn full_peer_table_does_not_evict_active_state_and_reclaims_expired_state() {
-        let policy = ServerAdmissionPolicy::new(10, 0, 0, 0, 0, 0, 0).unwrap();
+        let policy = ServerAdmissionPolicy::new(10, 1, 0, 0, 1000, 0, 0).unwrap();
         // Reduce the hard ceiling for this test by saturating the table
         // directly via a synthetic state. We exercise the production cap
         // through the public try_acquire path below.
@@ -814,15 +836,19 @@ mod tests {
         ));
         let (peer_count, queue_count) = state.state_sizes();
         assert_eq!(peer_count, 2);
-        assert_eq!(queue_count, 2);
+        assert_eq!(queue_count, 1, "only the inactive peer is indexed");
         drop(lease);
         // Expire both peers and trigger a reap via a fresh try_acquire.
-        tokio::time::advance(SHORT_RETENTION + MINUTE).await;
+        tokio::time::advance(MINUTE * 2).await;
         let _probe = match state.try_acquire(&peer(12)) {
             AdmissionDecision::Allowed(lease) => lease,
             other => panic!("unexpected result: {other:?}"),
         };
-        assert_eq!(state.state_sizes(), (1, 1));
+        assert_eq!(
+            state.state_sizes(),
+            (1, 0),
+            "active peers are intentionally unindexed"
+        );
     }
 
     // === M080 corrective regression tests ===
@@ -840,7 +866,7 @@ mod tests {
         };
         let (peer_count_before, queue_count_before) = state.state_sizes();
         assert_eq!(peer_count_before, 1);
-        assert_eq!(queue_count_before, 1);
+        assert_eq!(queue_count_before, 0);
 
         assert!(matches!(
             state.try_acquire(&peer(21)),
@@ -867,7 +893,7 @@ mod tests {
         };
         let (peer_count_before, queue_count_before) = state.state_sizes();
         assert_eq!(peer_count_before, 1);
-        assert_eq!(queue_count_before, 1);
+        assert_eq!(queue_count_before, 0);
         assert!(matches!(
             state.try_acquire(&peer(31)),
             AdmissionDecision::Denied(AdmissionRejection::GlobalConcurrency)
@@ -877,7 +903,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn existing_peer_rate_rejection_does_not_extend_counters_or_expiry() {
-        let policy = ServerAdmissionPolicy::new(10, 1, 0, 0, 0, 0, 0).unwrap();
+        let policy = ServerAdmissionPolicy::new(10, 1, 0, 0, 1000, 0, 0).unwrap();
         let state = ServerAdmissionState::new(policy);
         let first = peer(40);
         let _first_lease = match state.try_acquire(&first) {
@@ -915,7 +941,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn expiry_index_live_entries_remain_bounded_under_repeated_acquire_drop() {
-        let policy = ServerAdmissionPolicy::new(64, 1_000_000, 0, 0, 1_000_000, 0, 0).unwrap();
+        let policy = ServerAdmissionPolicy::new(64, 1_000_000, 0, 0, 1000, 0, 0).unwrap();
         let state = ServerAdmissionState::new(policy);
         for round in 0..128u8 {
             let p = peer(round);
@@ -926,7 +952,7 @@ mod tests {
             drop(lease);
         }
         // Expire every peer and trigger a single reap on the next call.
-        tokio::time::advance(SHORT_RETENTION + MINUTE).await;
+        tokio::time::advance(MINUTE * 2).await;
         let _probe = match state.try_acquire(&peer(200)) {
             AdmissionDecision::Allowed(lease) => lease,
             other => panic!("unexpected result: {other:?}"),
@@ -934,8 +960,8 @@ mod tests {
         let (peer_count, queue_count) = state.state_sizes();
         assert_eq!(peer_count, 1, "expired peers must be reaped");
         assert_eq!(
-            queue_count, 1,
-            "expiry index must not retain stale entries after a successful reap"
+            queue_count, 0,
+            "active probe must remain intentionally unindexed after reap"
         );
     }
 
@@ -953,12 +979,12 @@ mod tests {
         }
         let (peer_count, queue_count) = state.state_sizes();
         assert_eq!(
-            peer_count, 1,
-            "a single peer should occupy exactly one map entry"
+            peer_count, 0,
+            "no-history peers should be removed after their final lease"
         );
         assert_eq!(
-            queue_count, 1,
-            "expiry index must have exactly one entry per peer"
+            queue_count, 0,
+            "no-history peers should not occupy the expiry index"
         );
     }
 
@@ -991,24 +1017,77 @@ mod tests {
             "default policy required_peer_entries must fit within the hard ceiling"
         );
 
-        // All-unlimited peer rates with non-zero aggregate: short retention,
-        // no identity-counting required.
+        // All-unlimited peer rates with non-zero aggregate require only active
+        // peer state; no historical identity-counting is required.
         let all_unlimited = ServerAdmissionPolicy::new(30, 0, 0, 0, 1000, 0, 0).unwrap();
-        assert_eq!(all_unlimited.retention(), SHORT_RETENTION);
+        assert_eq!(all_unlimited.peer_history(), None);
 
-        // Day retention with unlimited aggregate is incoherent.
+        // Day peer history with unlimited aggregate is incoherent.
         let incoherent = ServerAdmissionPolicy::new(30, 0, 0, 1, 0, 0, 0).unwrap_err();
         assert_eq!(incoherent, AdmissionPolicyError::IncoherentCapacity);
 
-        // High aggregate arrival rate over day retention exceeds budget.
+        // High aggregate arrival rate over day peer history exceeds budget.
         let huge = ServerAdmissionPolicy::new(30, 0, 0, 1, 100_000, 0, 0).unwrap_err();
         assert_eq!(huge, AdmissionPolicyError::IncoherentCapacity);
     }
 
     #[test]
+    fn every_historical_peer_window_requires_a_finite_aggregate_bound() {
+        for (client_per_minute, client_per_hour, client_per_day) in
+            [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
+        {
+            assert_eq!(
+                ServerAdmissionPolicy::new(
+                    10,
+                    client_per_minute,
+                    client_per_hour,
+                    client_per_day,
+                    0,
+                    0,
+                    0,
+                ),
+                Err(AdmissionPolicyError::IncoherentCapacity),
+                "peer history must not be representable with unlimited aggregate arrivals"
+            );
+        }
+    }
+
+    #[test]
+    fn tightest_aggregate_window_not_field_precedence_controls_capacity() {
+        // A permissive minute limit and a tighter hour limit must select the
+        // hour bound for an hour-history policy.
+        let hour = ServerAdmissionPolicy::new(10, 0, 1, 0, 1_000_000, 100, 0).unwrap();
+        assert_eq!(hour.required_peer_entries(), 210);
+
+        // A permissive minute/hour pair and a tighter day limit must select
+        // the day bound for a day-history policy.
+        let day = ServerAdmissionPolicy::new(10, 0, 0, 1, 1_000_000, 1_000_000, 100).unwrap();
+        assert_eq!(day.required_peer_entries(), 210);
+
+        // The minute bound remains authoritative when it is the true
+        // intersection minimum.
+        let minute = ServerAdmissionPolicy::new(10, 1, 0, 0, 100, 1_000_000, 0).unwrap();
+        assert_eq!(minute.required_peer_entries(), 210);
+    }
+
+    #[test]
+    fn checked_capacity_math_never_wraps_downward() {
+        assert_eq!(
+            aggregate_event_bound(MINUTE, u64::MAX, MINUTE),
+            None,
+            "aggregate multiplication overflow must be unrepresentable"
+        );
+        assert_eq!(
+            required_entries_for_history(MINUTE, 1, u64::MAX, 0, 0),
+            None,
+            "capacity overflow must not wrap into a small accepted value"
+        );
+    }
+
+    #[test]
     fn minute_only_policy_uses_minute_retention() {
-        let minute = ServerAdmissionPolicy::new(10, 10, 0, 0, 0, 0, 0).unwrap();
-        assert_eq!(minute.retention(), MINUTE);
+        let minute = ServerAdmissionPolicy::new(10, 10, 0, 0, 1000, 0, 0).unwrap();
+        assert_eq!(minute.peer_history(), Some(MINUTE));
     }
 
     #[test]
@@ -1016,13 +1095,108 @@ mod tests {
         // Non-zero aggregate keeps the configuration representable inside
         // the hard memory ceiling while still exercising hour retention.
         let hour = ServerAdmissionPolicy::new(10, 0, 10, 0, 1000, 0, 0).unwrap();
-        assert_eq!(hour.retention(), HOUR);
+        assert_eq!(hour.peer_history(), Some(HOUR));
     }
 
     #[test]
-    fn all_unlimited_peer_rates_use_short_retention_only() {
+    fn all_unlimited_peer_rates_have_no_history() {
         let all_unlimited = ServerAdmissionPolicy::new(10, 0, 0, 0, 0, 0, 0).unwrap();
-        assert_eq!(all_unlimited.retention(), SHORT_RETENTION);
+        assert_eq!(all_unlimited.peer_history(), None);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn no_history_fresh_peer_churn_does_not_accumulate_inactive_state() {
+        let policy = ServerAdmissionPolicy::new(8, 0, 0, 0, 0, 0, 0).unwrap();
+        let state = ServerAdmissionState::new(policy);
+        for seed in 0..256u32 {
+            let lease = match state
+                .try_acquire(&super::super::peer_identity::test_fixtures::distinct_peer_u32(seed))
+            {
+                AdmissionDecision::Allowed(lease) => lease,
+                other => panic!("unexpected result: {other:?}"),
+            };
+            drop(lease);
+            assert_eq!(state.state_sizes(), (0, 0));
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn fixed_window_boundary_overlap_is_included_in_capacity_bound() {
+        let policy = ServerAdmissionPolicy::new(4, 1, 0, 0, 2, 0, 0).unwrap();
+        let state = ServerAdmissionState::new(policy.clone());
+        assert_eq!(policy.required_peer_entries(), 8);
+
+        tokio::time::advance(MINUTE - Duration::from_nanos(1)).await;
+        let first = peer(120);
+        let second = peer(121);
+        let _first = match state.try_acquire(&first) {
+            AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected result: {other:?}"),
+        };
+        let _second = match state.try_acquire(&second) {
+            AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected result: {other:?}"),
+        };
+        tokio::time::advance(Duration::from_nanos(1)).await;
+
+        // The two events immediately before and after the fixed-window reset
+        // coexist in active state. The calculated bound includes both windows
+        // plus the concurrency margin and therefore cannot understate them.
+        let third = peer(122);
+        let fourth = peer(123);
+        let _third = match state.try_acquire(&third) {
+            AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected result: {other:?}"),
+        };
+        let _fourth = match state.try_acquire(&fourth) {
+            AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected result: {other:?}"),
+        };
+        assert!(4 <= policy.required_peer_entries());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn active_peer_past_expiry_remains_bounded_and_is_reindexed_on_final_drop() {
+        let policy = ServerAdmissionPolicy::new(4, 1, 0, 0, 100, 0, 0).unwrap();
+        let state = ServerAdmissionState::new(policy);
+        let active = peer(130);
+        let lease = match state.try_acquire(&active) {
+            AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected result: {other:?}"),
+        };
+
+        tokio::time::advance(MINUTE + Duration::from_secs(1)).await;
+        let unrelated = match state.try_acquire(&peer(131)) {
+            AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected result: {other:?}"),
+        };
+        assert_eq!(state.state_sizes(), (2, 0));
+
+        drop(unrelated);
+        assert_eq!(state.state_sizes(), (2, 1));
+        drop(lease);
+        assert_eq!(state.state_sizes(), (2, 2));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn repeated_reap_is_idempotent_for_inactive_history() {
+        let policy = ServerAdmissionPolicy::new(4, 1, 0, 0, 100, 0, 0).unwrap();
+        let state = ServerAdmissionState::new(policy);
+        let lease = match state.try_acquire(&peer(140)) {
+            AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected result: {other:?}"),
+        };
+        drop(lease);
+        tokio::time::advance(MINUTE * 2).await;
+
+        {
+            let mut inner = state.inner.state.lock();
+            let now = Instant::now();
+            inner.reap(now);
+            inner.reap(now);
+            inner.assert_invariants();
+        }
+        assert_eq!(state.state_sizes(), (0, 0));
     }
 
     #[tokio::test(start_paused = true)]
@@ -1035,7 +1209,7 @@ mod tests {
         };
         let (peer_count, queue_count) = first.state_sizes();
         assert_eq!(peer_count, 1);
-        assert_eq!(queue_count, 1);
+        assert_eq!(queue_count, 0);
 
         let second = ServerAdmissionState::new(policy);
         assert_eq!(second.state_sizes(), (0, 0));

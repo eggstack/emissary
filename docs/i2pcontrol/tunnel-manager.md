@@ -1,6 +1,6 @@
 # I2PControl TunnelManager
 
-Status: M080-M082 server security corrective sequence closed;
+Status: M080-M083 server security corrective sequence closed;
 M077-M079 corrective work remains; lifecycle reconciliation remains
 closed against the pinned Proposal 170 revision
 

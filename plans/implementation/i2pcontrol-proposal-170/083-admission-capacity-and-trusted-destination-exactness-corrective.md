@@ -1,6 +1,7 @@
 # M083 — Admission Capacity Semantics and Trusted Destination Exactness Corrective
 
-Status: ready — post-M082 independent corrective; sole dependency-ready handoff; blocks M077
+Status: closed — implementation commit `3eaea53`; closure accepted in
+`plans/closure/i2pcontrol-proposal-170/083-closure.md`; M077 is now ready
 
 Source roadmap:
 

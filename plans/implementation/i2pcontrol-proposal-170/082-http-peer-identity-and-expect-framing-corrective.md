@@ -1,6 +1,6 @@
 # M082 — HTTP Peer Identity and Expect-Framing Corrective
 
-Status: closed — implementation and closure accepted at the pinned head
+Status: closed; corrective history — M083 closes the inherited trusted-Destination exactness defect; direct HTTP fixes remain accepted
 
 Closure:
 

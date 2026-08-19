@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M080-M082 closed; M077-M079 corrective work remains
+Status: partial Proposal 170 support; M080-M083 closed; M077-M079 corrective work remains
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -435,12 +435,13 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M072 | closed after M073 | integrated twelve-type runtime reclosure |
 | M073 | closed; corrective history | generic client/server option apply-or-reject corrective; M081 closes the M075-accepted-stream regression that re-introduced the accepted-but-ignored `leaseSetEncType` |
 | M074 | closed; corrective history | shared peer-aware server admission and rate-limit hardening; M080 closes the discovered transactional/cardinality defects |
-| M080 | closed | server admission transactionality and cardinality corrective; canonical cryptographic peer identity; bounded expiry index; retention-aware peer capacity derivation |
+| M080 | closed; corrective history | server admission transactionality and cardinality corrective; canonical cryptographic peer identity; bounded expiry index; remaining current-head capacity/expiry defects closed by M083 |
 | M075 | closed | generic server accepted-stream raw relay hardening |
 | M076 | closed | HTTP anonymity/POST-throttle hardening |
 | M081 | closed | generic server `leaseSetEncType` apply-or-reject corrective; accepted-stream `SESSION CREATE` now carries the validated value |
-| M082 | closed | HTTP peer identity, `Expect` rejection, and POST cryptographic peer-key corrective |
-| M077 | blocked; M082 closed; awaiting final tunnel-security reclosure sequence | IRC lifetime and exhaustion hardening |
+| M082 | closed; corrective history | HTTP peer identity, `Expect` rejection, and POST cryptographic peer-key corrective; inherited trusted-Destination exactness closed by M083 |
+| M083 | closed | admission capacity semantics, inactive-peer expiry-index invariant, and exact/canonical trusted Destination corrective |
+| M077 | ready | IRC lifetime and exhaustion hardening; consumes the now-closed shared admission/trusted-peer boundary |
 
 ## Final-status rule
 

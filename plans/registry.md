@@ -49,14 +49,13 @@ That head merges:
 - the older M077/M078/M079 tunnel-security lineage, where M079 independently closed its then-final head; and
 - the later M083 admission/trusted-Destination corrective lineage.
 
-The merge created a repository state that no final closure independently audited. It also retained two concrete integration defects:
+The merge created a repository state that no final closure independently audited. M084 has now closed against the post-fix head and repaired the integration/planning defects; see `plans/closure/i2pcontrol-proposal-170/084-closure.md` for the evidence matrix.
 
-- M077's IRC admission-release test still references the removed arbitrary-string `TrustedPeerIdentity::for_test` helper instead of an M083 structurally valid fixture;
-- M062's exact planning-path allowlist contains M083 closure bookkeeping but not the merged M077/M078/M079 closure paths.
+Planning/status documents now agree that:
 
-Planning/status documents also disagree about whether M083, M077, M078, and M079 are ready/blocked/closed.
-
-Historical M079 evidence is retained, but it is not current-head certification.
+- M077 and M078 implementations/closures are present and merged-head integration is reconciled by M084;
+- M079 is retained as historical older-lineage evidence superseded by M085 for current-head certification;
+- M084 is closed and M085 is the sole dependency-ready handoff.
 
 ## Dependency-ready implementation plan
 

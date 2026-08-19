@@ -20,8 +20,10 @@ Corrective predecessors:
 
 Planning baseline (pre-fix): `650291bd9b890b5ee395f383141b55fefa5bb0eb`.
 
-Post-fix implementation head: recorded in the registry as the post-M084
-`master` HEAD that contains M084's commits.
+Post-fix implementation head: `1196a4d85cecb4f9676a8d87d27c69322816d7a8`
+(the `master` HEAD containing M084's three commits: the source-code
+corrective, the closure/registry/roadmap updates, and the user-facing
+support status reconciliation).
 
 ## 1. Disposition
 

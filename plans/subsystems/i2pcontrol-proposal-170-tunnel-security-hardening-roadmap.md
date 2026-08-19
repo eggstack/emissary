@@ -8,6 +8,8 @@ Post-M076 corrective baseline: `1618de172e7a78a193fc1bb117af269f31174030`.
 
 Merged-head corrective baseline: `e8feb9a3240a5a7b9dd5cc22a4ada47a0d9991ae`.
 
+M084 post-fix baseline: `1196a4d85cecb4f9676a8d87d27c69322816d7a8`.
+
 Source runtime roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`.

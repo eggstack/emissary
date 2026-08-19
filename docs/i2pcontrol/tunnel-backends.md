@@ -1,10 +1,11 @@
 # I2PControl Tunnel Backends
 
-Status: M080-M083 server security corrective sequence closed; M077-M079 corrective work remains
+Status: M080-M084 server security corrective sequence closed; M085 final reclosure pending
 
 All twelve tunnel families have bounded production backends. The integrated
-runtime/security phase is closed by the M079 final-head reclosure; Proposal 170
-still has the separately documented RouterInfo/source limitations.
+runtime/security phase awaits M085's independent current-head reclosure after
+M084's merged-head integration/planning corrective; Proposal 170 still has
+the separately documented RouterInfo/source limitations.
 
 This document describes the tunnel backend interface and registry in Emissary.
 

@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M080-M083 closed; M077-M079 corrective work remains
+Status: partial Proposal 170 support; M080-M084 closed; M085 final reclosure pending
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -22,9 +22,13 @@ Tunnel-runtime reclosure:
 - M074: `plans/closure/i2pcontrol-proposal-170/074-closure.md` — closed;
 - M075: `plans/closure/i2pcontrol-proposal-170/075-closure.md` — closed;
 - M076: `plans/closure/i2pcontrol-proposal-170/076-closure.md` — closed;
-- M077: `plans/closure/i2pcontrol-proposal-170/077-closure.md` — closed;
-- M078: `plans/closure/i2pcontrol-proposal-170/078-closure.md` — closed;
-- M079: `plans/closure/i2pcontrol-proposal-170/079-closure.md` — closed.
+- M077: `plans/closure/i2pcontrol-proposal-170/077-closure.md` — implementation
+  and closure present; merged-head integration reconciled by M084;
+- M078: `plans/closure/i2pcontrol-proposal-170/078-closure.md` — implementation
+  and closure present; merged-head containment bookkeeping reconciled by M084;
+- M079: `plans/closure/i2pcontrol-proposal-170/079-closure.md` — historical
+  closure of the older M077/M078 branch lineage; not current-head certification
+  and superseded by M085 for the merged head.
 
 Closed handoffs:
 
@@ -92,9 +96,11 @@ The repository remains partial Proposal 170 support. M044 reviewed the earlier
 corrected final head and accepted that source/method disposition; the later
 tunnel-runtime security sequence added bounded admission, generic accepted
 server relay, HTTP anonymity, IRC lifetime, and Streamr local-boundary
-correctives. M079 independently reclosed the integrated final head, so the
-security-hardening phase is closed while the unrelated RouterInfo limitations
-remain.
+correctives. M079 independently reclosed the older M077/M078 branch lineage at
+its pinned head but did not audit M083 or the later merge composition, so the
+security-hardening phase awaits M085's independent current-head reclosure after
+M084's merged-head integration/planning corrective; the unrelated RouterInfo
+limitations remain.
 M039 remains a historical invalidated closure.
 
 M028 owns the status/feature-boundary correction. M030 owns the destination
@@ -441,7 +447,11 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M081 | closed | generic server `leaseSetEncType` apply-or-reject corrective; accepted-stream `SESSION CREATE` now carries the validated value |
 | M082 | closed; corrective history | HTTP peer identity, `Expect` rejection, and POST cryptographic peer-key corrective; inherited trusted-Destination exactness closed by M083 |
 | M083 | closed | admission capacity semantics, inactive-peer expiry-index invariant, and exact/canonical trusted Destination corrective |
-| M077 | ready | IRC lifetime and exhaustion hardening; consumes the now-closed shared admission/trusted-peer boundary |
+| M077 | implementation/closure present; merged-head integration reconciled by M084 | IRC lifetime and exhaustion hardening; consumes the now-closed shared admission/trusted-peer boundary |
+| M078 | implementation/closure present; merged-head containment bookkeeping reconciled by M084 | Streamr loopback-only local-boundary hardening |
+| M079 | historical closure only; current-head certification superseded by M085 | integrated tunnel-security reclosure before the later M083 merge |
+| M084 | closed | merged-head integration/planning corrective (test fixture, M062 bookkeeping, status reconciliation); see `plans/closure/i2pcontrol-proposal-170/084-closure.md` |
+| M085 | ready (sole final-reclosure handoff) | independently audit actual post-M084 merged head |
 
 ## Final-status rule
 

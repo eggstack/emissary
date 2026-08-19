@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel-security merge corrective active; M084 next
+Status: partial Proposal 170 support; M084 merged-head integration corrective closed; M085 final reclosure ready
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -44,11 +44,12 @@ The implementation target remains:
 
 Exactly one plan is dependency-ready:
 
-- `084-merged-head-integration-and-planning-corrective.md` — **ready**.
+- `085-merged-head-tunnel-security-reclosure.md` — **ready** (sole handoff; independently audit actual post-M084 merged head).
 
-The final independent reclosure plan is prewritten but blocked:
+The preceding merged-head integration/planning corrective is closed:
 
-- `085-merged-head-tunnel-security-reclosure.md` — **blocked on M084**.
+- `084-merged-head-integration-and-planning-corrective.md` — **closed**
+  (`plans/closure/i2pcontrol-proposal-170/084-closure.md`).
 
 ## Why the final corrective sequence exists
 
@@ -94,8 +95,8 @@ M084 repairs only those integration/status defects. M085 then independently audi
 
 | Handoff | Status | Scope | Dependency |
 |---|---|---|---|
-| M084 | ready | repair stale IRC test API usage, exact M062 planning/closure bookkeeping, and contradictory status docs; no runtime semantic changes | current merged-head findings |
-| M085 | blocked | independently re-audit actual post-M084 merged head and close only with no high/medium finding | M084 closed |
+| M084 | closed | repair stale IRC test API usage, exact M062 planning/closure bookkeeping, and contradictory status docs; no runtime semantic changes | current merged-head findings |
+| M085 | ready (sole dependency-ready handoff) | independently re-audit actual post-M084 merged head and close only with no high/medium finding | M084 closed |
 
 Per `plans/003-planning-process.md`, only the next dependency-ready plan is registered `ready`.
 
@@ -153,6 +154,8 @@ The tunnel runtime/security line is not closed until:
 1. M084 closes the current merged-head integration/planning defects; and
 2. M085 independently accepts the actual post-M084 repository head with no high/medium security, anonymity, correctness, lifecycle, option-truthfulness, or containment finding.
 
-If M085 closes, the tunnel runtime/security line is complete. Proposal 170 remains separately partial for the accepted source/truthfulness limitations.
+M084 is closed. The line therefore transitions to M085's independent
+post-M084 reclosure. Proposal 170 remains separately partial for the accepted
+source/truthfulness limitations.
 
 No upstream review or acceptance is implied or authorized.

@@ -1,6 +1,6 @@
 # M085 — Merged-Head Proposal 170 Tunnel Security Reclosure
 
-Status: blocked — hard dependency M084 merged-head integration corrective
+Status: ready — sole dependency-ready handoff after M084 closure
 
 Source roadmap:
 
@@ -9,7 +9,8 @@ Source roadmap:
 Historical reclosure evidence:
 
 - M079: `plans/closure/i2pcontrol-proposal-170/079-closure.md` — historical older-lineage closure only;
-- M083: `plans/closure/i2pcontrol-proposal-170/083-closure.md` — accepted shared admission/trusted-Destination corrective.
+- M083: `plans/closure/i2pcontrol-proposal-170/083-closure.md` — accepted shared admission/trusted-Destination corrective;
+- M084: `plans/closure/i2pcontrol-proposal-170/084-closure.md` — merged-head integration/planning corrective closed.
 
 Planning baseline: `e8feb9a3240a5a7b9dd5cc22a4ada47a0d9991ae` before M084.
 
@@ -25,19 +26,24 @@ M085 is primarily evidence and reconciliation work. It must not become a feature
 
 ## 2. Readiness
 
-M085 is not dependency-ready until M084 closes.
-
-Before starting M085, confirm all of the following:
+M084 has closed (`plans/closure/i2pcontrol-proposal-170/084-closure.md`) and the
+M085 readiness prerequisites have been verified:
 
 - M084 closure exists and records a post-M084 commit SHA;
-- the current head includes M083 admission/trusted-identity corrections;
-- the current head includes M077 IRC lifetime hardening;
-- the current head includes M078 Streamr local-boundary hardening;
-- the stale IRC test API mismatch is gone;
-- M061/M062 containment passes at the post-M084 head;
-- active planning/status documents identify M085 as the sole final reclosure handoff.
+- the current head includes M083 admission/trusted-identity corrections
+  (`3eaea53`);
+- the current head includes M077 IRC lifetime hardening (`0660ca6`);
+- the current head includes M078 Streamr local-boundary hardening
+  (`0ff8b22`);
+- the stale IRC `TrustedPeerIdentity::for_test("peer-destination")` mismatch
+  is replaced by `test_fixtures::distinct_peer(7)`;
+- M061 and M062 containment pass at the post-M084 head with no broadened
+  production-path authority;
+- active planning/status documents identify M085 as the sole final reclosure
+  handoff.
 
-If any prerequisite is false, M085 remains blocked.
+If any prerequisite regresses during M085, M085 must re-establish it before
+closing.
 
 ## 3. Why a new independent reclosure is required
 

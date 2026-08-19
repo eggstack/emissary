@@ -30,7 +30,7 @@ Canonical direction:
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | accepted authority; current merged-head bookkeeping corrective pending | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | consumed by M084 | M061/M062/M063 semantics remain authoritative; M084 repairs exact merged planning-path bookkeeping without broadening production scope |
 | I2PControl Proposal 170 tunnel runtime completion | historical runtime completion accepted; security reclosure reopened by merge composition | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no separate runtime feature handoff | M072 historical runtime closure remains; M081/M083 retain current option/identity/admission corrections |
-| I2PControl Proposal 170 tunnel security hardening | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M084 — merged-head integration/planning corrective | M079 closed an older branch lineage; current `master` later merged M083 and requires M084 then independent M085 reclosure |
+| I2PControl Proposal 170 tunnel security hardening | corrective pass required | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M085 — merged-head independent reclosure | M079 closed an older branch lineage; current `master` later merged M083 and required M084 integration/planning corrective (now closed); M085 must independently audit actual post-M084 head |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -64,7 +64,7 @@ Exactly one plan is currently registered as dependency-ready:
 
 | Handoff | Status | Plan | Objective |
 |---|---|---|---|
-| M084 — merged-head integration and planning corrective | ready | `plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md` | repair stale IRC test fixture integration, exact M062 planning-path bookkeeping, and contradictory status documents without changing runtime semantics |
+| M085 — merged-head tunnel-security reclosure | ready | `plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md` | independently re-audit actual post-M084 merged head and close only with no high/medium finding |
 
 Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered `ready`.
 
@@ -82,8 +82,8 @@ Per `plans/003-planning-process.md`, only the next dependency-ready implementati
 | M077 | implementation/closure present; merged-head integration pending | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | runtime behavior present, but stale test helper must be reconciled by M084 |
 | M078 | implementation/closure present; merged-head integration pending | `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md` | runtime behavior present; closure-path containment bookkeeping repaired by M084 |
 | M079 | historical closure only; current-head certification invalidated by later merge | `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md` | historical evidence retained; M085 supersedes it as current-head final reclosure authority |
-| M084 | ready | `plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md` | current sole ready handoff |
-| M085 | blocked | `plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md` | hard dependency: M084 closed; then independently audit actual post-M084 merged head |
+| M084 | closed | `plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md` | merged-head integration/planning corrective closed; see `plans/closure/i2pcontrol-proposal-170/084-closure.md` |
+| M085 | ready | `plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md` | current sole ready handoff; independently audit actual post-M084 merged head |
 
 ## Durable tunnel-security invariants
 
@@ -143,14 +143,13 @@ Do not add hosted CI, release machinery, generalized fuzz/soak infrastructure, b
 
 ## Registry maintenance rules
 
-1. M084 is the sole ready handoff now.
-2. M085 remains blocked until M084 independently closes.
+1. M085 is the sole ready handoff now.
+2. M084 is closed; its evidence is in `plans/closure/i2pcontrol-proposal-170/084-closure.md`.
 3. M079 remains historical evidence and must not be rewritten to claim it audited M083/current merged head.
-4. After M084 closure, M085 becomes the sole ready handoff.
-5. M085 must audit the actual post-M084 head and may not trust branch-local closure assertions without current-head evidence.
-6. Any high/medium finding in M084 outside integration scope or in M085 requires a new narrow corrective; do not hide it in closure.
-7. Preserve ADR-0003 and the preferred `emissary-cli/src/i2pcontrol/**` production boundary.
-8. Preserve RouterInfo 37/1/5 and M051 unless separate source-owner work changes them.
-9. Unsupported/underspecified runtime options fail before allocation; persist-and-ignore is forbidden.
-10. External sources remain read-only; no upstream interaction is authorized.
-11. All writes remain internal to `eggstack/emissary`.
+4. M085 must audit the actual post-M084 head and may not trust branch-local closure assertions without current-head evidence.
+5. Any high/medium finding in M085 requires a new narrow corrective; do not hide it in closure.
+6. Preserve ADR-0003 and the preferred `emissary-cli/src/i2pcontrol/**` production boundary.
+7. Preserve RouterInfo 37/1/5 and M051 unless separate source-owner work changes them.
+8. Unsupported/underspecified runtime options fail before allocation; persist-and-ignore is forbidden.
+9. External sources remain read-only; no upstream interaction is authorized.
+10. All writes remain internal to `eggstack/emissary`.

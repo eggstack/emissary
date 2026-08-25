@@ -502,6 +502,9 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md"
             | "plans/implementation/i2pcontrol-proposal-170/086-post-m085-documentation-and-evidence-reconciliation-corrective.md"
+            | "plans/implementation/i2pcontrol-proposal-170/087-generic-server-inactivity-timeout-corrective.md"
+            | "plans/implementation/i2pcontrol-proposal-170/088-pre-accept-server-admission-boundary-corrective.md"
+            | "plans/implementation/i2pcontrol-proposal-170/089-post-corrective-tunnel-security-reclosure.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md"
@@ -528,6 +531,9 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/084-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/085-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/086-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/087-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/088-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/089-closure.md"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }

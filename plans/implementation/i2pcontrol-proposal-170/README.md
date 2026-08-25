@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel runtime/security closed by M085; M086 documentation/evidence reconciliation closed
+Status: partial Proposal 170 support; tunnel runtime functionally complete; tunnel-security corrective sequence M087-M089 open; M087 ready
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -21,7 +21,7 @@ Authoritative planning references:
 
 Pinned Proposal 170 revision: `2026-05-20`.
 
-Current M086 planning baseline: `185d43174c491a57c217c39e45555d136f40a406`.
+Current M087-M089 planning baseline: `2b01bfd11ebcd768fcd5488f18b063ac336931a2`.
 
 ## Internal-only rule
 
@@ -40,19 +40,31 @@ The implementation target remains:
 - keep startup-managed tunnel behavior separate from Proposal 170 TunnelManager ownership;
 - avoid hosted CI/fuzz/soak/release machinery for this bounded workstream.
 
-M086 is stricter: it authorizes no production-source or Cargo/dependency change at all.
+M087-M089 do not authorize a Proposal 170 wire expansion, broad router/core refactor, parallel SAM implementation, Yosemite fork/vendor/patch, or dependency widening. If M088 proves a dependency-boundary change is genuinely required, it must stop and produce a separate explicit plan.
 
 ## Current handoff
 
-No implementation plan is currently dependency-ready under this closed
-tunnel-security cleanup line:
+Exactly one implementation plan is dependency-ready:
 
-- `086-post-m085-documentation-and-evidence-reconciliation-corrective.md` —
-  **closed**; see `plans/closure/i2pcontrol-proposal-170/086-closure.md`.
+- `087-generic-server-inactivity-timeout-corrective.md` — **ready**.
 
-M086 corrects stale current-state planning/support text and closure-record errata after M085. It does **not** reopen M085 or authorize another runtime/security pass.
+Future/dependency-gated handoffs:
 
-After M086 closes, no tunnel-security successor should be registered unless new production evidence appears.
+- `088-pre-accept-server-admission-boundary-corrective.md` — **future**, administratively gated on M087 closure and feasibility-gated on the actual Emissary/Yosemite/SAM lower-layer capability;
+- `089-post-corrective-tunnel-security-reclosure.md` — **future/blocked**, requires accepted M087 and M088 closure and is verification-only.
+
+Per `plans/003-planning-process.md`, only the next executable handoff is registered `ready`.
+
+## Why the security line reopened after M086
+
+M085 remains valid runtime/security closure evidence for its pinned post-M084 head, and M086 remains valid documentation/evidence reconciliation. A later active-adversary review found two additional server-side hardening concerns:
+
+1. generic `server` uses a bounded five-second target connect but then an unbounded raw relay, so several Sybil Destinations can hold all finite shared admission slots indefinitely without useful byte progress;
+2. shared accepted-server admission is evaluated only after Yosemite/SAM `session.accept()` returns, leaving lower-layer stream-establishment work outside the application admission gate.
+
+These findings do not imply a direct clearnet-address leak, but they are relevant to availability and active load/timing correlation resistance.
+
+The same review found no current reason to add speculative HTTP or Streamr production semantics. HTTP already has bounded request/header/body handling and bounded fail-closed POST state; Streamr's ten-subscriber/60-second expiry model matches Java I2P and I2P+ reference behavior. M089 will recheck and record those residual risks.
 
 ## Historical runtime/security sequence
 
@@ -68,52 +80,95 @@ After M086 closes, no tunnel-security successor should be registered unless new 
 | M071 | closed | Streamr client/server |
 | M072 | historical runtime reclosure | integrated twelve-type runtime audit |
 | M073 | closed; corrective history | generic option truthfulness |
-| M074 | closed; corrective history | shared server admission/rate hardening |
-| M075 | closed | generic accepted-stream migration |
+| M074 | closed; corrective history | shared application server admission/rate hardening |
+| M075 | closed; later lifetime corrective opened as M087 | generic accepted-stream migration |
 | M076 | closed; corrective history | HTTP anonymity/POST hardening |
-| M077 | closed; merged-head integration reconciled by M084/M085 | IRC connect/idle hardening |
-| M078 | closed; merged-head integration reconciled by M084/M085 | Streamr loopback/fanout hardening |
-| M079 | closed historical older-lineage record; superseded for current-head certification by M085 | integrated tunnel-security reclosure before later M083 merge |
+| M077 | closed | IRC connect/idle hardening |
+| M078 | closed | Streamr loopback/fanout hardening |
+| M079 | closed historical record | pre-M083 integrated tunnel-security reclosure |
 | M080 | closed; corrective history | admission transactionality/cardinality |
 | M081 | closed | generic `leaseSetEncType` apply-or-reject |
 | M082 | closed; corrective history | HTTP peer identity / `Expect` / POST key |
 | M083 | closed | admission capacity semantics + exact/canonical trusted Destination |
 | M084 | closed | merged-head integration/planning corrective |
-| M085 | closed; current-head final runtime/security authority | independent merged-head tunnel-security reclosure |
+| M085 | closed; valid for pinned head | independent merged-head tunnel-security reclosure |
 | M086 | closed; documentation/evidence only | post-M085 record reconciliation; no production runtime change |
-
-## Why M084-M086 exist
-
-The repository merged two independently verified histories: the M077/M078/M079 line and the later M080-M083 admission/identity line.
-
-M084 repaired the actual merge-composition failures, including stale test integration, dropped HTTP identity-header helper definitions, and exact M062 planning-path bookkeeping. M085 then independently audited the post-M084 head and closed the runtime/security workstream with no high/medium finding.
-
-A later documentation audit found only residual record-quality defects:
-
-- stale pending/reopened status wording in active planning documents;
-- stale trusted-peer parser/canonicalization wording in user-facing support documentation;
-- a closure-document arithmetic error for `MAX_PEER_ENTRIES`;
-- a need to clarify that M084's HTTP helper restoration changed a production source file only to restore the already-intended merged behavior.
-
-M086 owns those record-quality defects. It does not reopen runtime/security closure.
+| M087 | **ready** | progress-based generic-server inactivity timeout |
+| M088 | future | lower-layer/pre-accept admission boundary mapping and narrow hardening if supported |
+| M089 | future/blocked | independent post-corrective tunnel-security reclosure |
 
 ## Current corrective sequence
 
-| Handoff | Status | Scope | Dependency |
-|---|---|---|---|
-| M084 | closed | repair merged-head integration/planning failures | merged-head findings |
-| M085 | closed | independent actual post-M084 runtime/security reclosure | M084 closed |
-| M086 | closed | reconciled stale planning/support text and transparent closure errata; exact M062 planning-path bookkeeping only | M085 closed; no successor handoff |
+```text
+M086 closed historical baseline
+             |
+             v
+M087 generic server inactivity timeout   [READY]
+             |
+             v
+M088 pre-accept/lower-layer admission    [FUTURE]
+             |
+             v
+M089 independent security reclosure      [FUTURE/BLOCKED]
+```
 
-Per `plans/003-planning-process.md`, only the next dependency-ready plan is registered `ready`.
+M087 -> M088 is an administrative sequencing dependency only. M088 is technically independent but held so there is one executable security handoff.
+
+## M087 handoff summary
+
+Plan: `087-generic-server-inactivity-timeout-corrective.md`.
+
+Required result:
+
+- replace indefinite zero-progress generic relay occupancy with a finite inactivity/progress timeout;
+- do not impose a maximum absolute connection lifetime;
+- successful byte progress in either direction resets the deadline;
+- preserve useful half-close behavior and active long-lived raw streams;
+- retain loopback target confinement, five-second target connect, trusted peer identity, and shared admission ownership;
+- stay in `emissary-cli/src/i2pcontrol/**` plus focused tests/planning bookkeeping;
+- no dependency/core/router/startup/frontend/Proposal-170-wire changes.
+
+## M088 handoff summary
+
+Plan: `088-pre-accept-server-admission-boundary-corrective.md`.
+
+Required result:
+
+- source-map the full inbound stream path from Emissary streaming/SAM through Yosemite `Session<style::Stream>::accept()` to `ServerAdmissionState`;
+- establish from actual code whether Emissary supports Java-style lower-layer streaming connection limits;
+- if already supported through the current boundary, wire only the smallest useful bound from existing admission policy;
+- keep post-accept application admission as defense in depth;
+- do not treat Java option names as supported merely because they can be serialized;
+- if progress requires Yosemite vendoring/forking/patching, a new git dependency, broad `emissary-core/**`/router changes, or a parallel SAM stack, stop and create a separate explicit plan or record the capability as out of current scope.
+
+An evidence-only M088 closure is valid if it precisely proves that the meaningful pre-accept semantic is unavailable within the approved containment boundary. It must not falsely claim equivalent protection from another post-accept counter.
+
+## M089 handoff summary
+
+Plan: `089-post-corrective-tunnel-security-reclosure.md`.
+
+Required result:
+
+- independent current-head audit of all twelve Proposal 170 tunnel types;
+- verify M087 generic lifetime behavior;
+- verify M088 lower-layer disposition without overstatement;
+- recheck HTTP bounded parsing/body/POST state and identity filtering;
+- explicitly document that no HTTP byte cap/fairness replacement is added absent a concrete high/medium defect;
+- recheck Streamr ten-subscriber/60-second reference parity and document its Sybil-monopolization limitation;
+- audit containment of M087/M088 changes;
+- make no production code changes itself.
+
+Any high/medium production finding opens a new numbered corrective and keeps M089 blocked.
 
 ## Security-critical family rules retained
 
 ### Accepted server admission
 
-Accepted-stream server families derive trusted identity from Yosemite, require exactly one canonicalizable supported Destination, apply bounded transactional admission before handler/local-target work, and keep peer/rate/expiry structures hard bounded.
+Accepted-stream server families derive trusted identity from Yosemite, require exactly one canonicalizable supported Destination, apply bounded transactional application admission before handler/local-target work, and keep peer/rate/expiry structures hard bounded.
 
 Historical peer-rate state exists only when configured semantics require it. Capacity is proven against all enabled aggregate windows with fixed-window overlap. No-history inactive peers are removed on final lease drop.
+
+M088 investigates whether an additional lower-layer bound can act before `session.accept()` returns. Until and unless that is proven, documentation must call the current admission boundary post-accept/application-level.
 
 ### Trusted peer identity
 
@@ -126,15 +181,17 @@ The current M083/M085 boundary is:
 - 32-byte `parsed.id()` for accounting;
 - canonical full-Destination text from Base64-encoding `parsed.serialize()`.
 
-M086 updates user-facing documentation to state this exact behavior; it does not change implementation.
-
 ### Generic server
 
 Control-plane generic `server` remains accepted-stream/raw-relay. `leaseSetEncType` is applied when accepted; other runtime-relevant fields are applied or rejected before allocation.
 
+M087 adds only a finite inactivity/progress lifetime bound; it must not change raw protocol semantics into a parsed application protocol.
+
 ### HTTP server
 
 `httpserver` and inbound `httpbidirserver` use the shared accepted-stream identity/admission path. Request framing stays fail-closed, spoofed I2P/proxy identity is stripped, trusted full-Destination text is canonical, response fingerprints are stripped, POST accounting uses the canonical Destination ID, and unsupported `Expect` requests fail before local target allocation.
+
+M089 rechecks the existing finite request-body relay deadline and bounded POST limiter. No speculative body byte cap or replacement fairness algorithm is currently authorized.
 
 ### IRC
 
@@ -144,11 +201,13 @@ Control-plane generic `server` remains accepted-stream/raw-relay. `leaseSetEncTy
 
 Streamr remains a bounded datagram subsystem with loopback-only local endpoints, ten subscribers, 60-second expiry, 15-second refresh, one-byte controls, 1200-byte application payload cap, 4095-byte receive bound, and bounded sequential fanout.
 
+The finite subscriber set is not Sybil-resistant. M089 records this as a reference-aligned specialized availability limitation unless new evidence justifies separate corrective planning.
+
 ## Containment authority
 
 M061 remains the source-path authority. M062 plus M063 remain the dependency/feature-ownership authority.
 
-M086 may add only its exact implementation/closure paths to the M062 test allowlist. It may not broaden production path globs or dependency/feature ownership.
+The M062 exact planning allowlist is updated only for the M087-M089 implementation/closure document pairs. This planning registration does not broaden production path globs or dependency/feature ownership.
 
 ## Accepted unrelated Proposal 170 state
 
@@ -161,26 +220,12 @@ Tunnel-security work does not reopen the accepted RouterInfo matrix:
 
 M051 remains blocked by absent substantive news/banned-peer owners. AddressBook and unrelated base-I2PControl limitations remain separate.
 
-## Verification discipline for M086
-
-Use only proportional evidence:
-
-```text
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m062_dependency_containment
-git diff --check
-git diff --name-only <M086-baseline>..HEAD
-```
-
-No full runtime/security rerun is required if M086 obeys its no-production-change scope. If a production change becomes necessary, stop M086 and create separate corrective planning.
-
 ## Final status rule
 
-M085 remains the final runtime/security closure authority throughout M086.
+M087 is the current executable tunnel-security handoff.
 
-M086 closed the residual documentation/evidence-integrity corrective. The
-tunnel runtime/security line remains closed by M085 and no active
-tunnel-security handoff remains.
+M085 remains valid historical reclosure authority for its pinned head while M087-M089 are open. If M089 later closes without a new high/medium finding, M089 becomes the current-head runtime/security reclosure authority; M085 remains historical evidence rather than being erased.
 
-Proposal 170 remains separately partial for the accepted source/truthfulness limitations, RouterInfo 37/1/5, M051, and unrelated AddressBook/base-I2PControl gaps.
+Proposal 170 remains separately partial for accepted source/truthfulness limitations, RouterInfo 37/1/5, M051, and unrelated AddressBook/base-I2PControl gaps.
 
 No upstream review or acceptance is implied or authorized.

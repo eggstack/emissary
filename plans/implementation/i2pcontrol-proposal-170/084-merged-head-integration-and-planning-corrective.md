@@ -1,6 +1,6 @@
 # M084 — Merged-Head Integration and Planning Corrective
 
-Status: ready — sole dependency-ready Proposal 170 tunnel-security handoff
+Status: closed — implementation and closure accepted; M085 independently reclosed the post-M084 head
 
 Source roadmap:
 

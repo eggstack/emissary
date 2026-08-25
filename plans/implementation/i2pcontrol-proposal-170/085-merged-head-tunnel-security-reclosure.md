@@ -1,6 +1,6 @@
 # M085 — Merged-Head Proposal 170 Tunnel Security Reclosure
 
-Status: ready — sole dependency-ready handoff after M084 closure
+Status: closed — implementation and closure accepted; current-head final runtime/security authority
 
 Source roadmap:
 

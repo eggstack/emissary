@@ -71,9 +71,9 @@ After M086 closes, no tunnel-security successor should be registered unless new 
 | M074 | closed; corrective history | shared server admission/rate hardening |
 | M075 | closed | generic accepted-stream migration |
 | M076 | closed; corrective history | HTTP anonymity/POST hardening |
-| M077 | implementation/closure present; merged-head integration reconciled by M084 | IRC connect/idle hardening |
-| M078 | implementation/closure present; merged-head integration reconciled by M084 | Streamr loopback/fanout hardening |
-| M079 | historical closure only for older branch lineage | integrated tunnel-security reclosure before later M083 merge |
+| M077 | closed; merged-head integration reconciled by M084/M085 | IRC connect/idle hardening |
+| M078 | closed; merged-head integration reconciled by M084/M085 | Streamr loopback/fanout hardening |
+| M079 | closed historical older-lineage record; superseded for current-head certification by M085 | integrated tunnel-security reclosure before later M083 merge |
 | M080 | closed; corrective history | admission transactionality/cardinality |
 | M081 | closed | generic `leaseSetEncType` apply-or-reject |
 | M082 | closed; corrective history | HTTP peer identity / `Expect` / POST key |

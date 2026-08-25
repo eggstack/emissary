@@ -1,6 +1,6 @@
 # M077 — IRC Server Lifetime and Exhaustion Hardening
 
-Status: blocked — M083 shared admission/trusted-identity corrective must close before M077 becomes dependency-ready
+Status: closed — implementation and closure accepted; merged-head integration reconciled by M084 and M085
 
 Source roadmap:
 

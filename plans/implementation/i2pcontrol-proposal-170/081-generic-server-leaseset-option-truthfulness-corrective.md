@@ -1,6 +1,6 @@
 # M081 — Generic Server LeaseSet Option Truthfulness Corrective
 
-Status: ready — M080 closed; current registered handoff
+Status: closed — implementation and closure accepted; retained at current head
 
 Source roadmap:
 

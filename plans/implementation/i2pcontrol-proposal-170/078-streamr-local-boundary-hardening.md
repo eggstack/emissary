@@ -1,6 +1,6 @@
 # M078 — Streamr Local Boundary Hardening
 
-Status: blocked — M080-M082 and M077 must close before registration advances
+Status: closed — implementation and closure accepted; merged-head integration reconciled by M084 and M085
 
 Source roadmap:
 

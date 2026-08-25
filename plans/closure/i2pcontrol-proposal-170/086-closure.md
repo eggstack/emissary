@@ -41,7 +41,7 @@ blocker, and unrelated AddressBook/base-I2PControl gaps.
 
 | Document or guard | Reconciliation/evidence | Result |
 |---|---|---|
-| `plans/registry.md` | M084/M085 remain closed; M086 is closed; no dependency-ready or successor tunnel-security handoff remains | pass |
+| `plans/registry.md` | M077/M078/M079/M081/M084/M085 are closed; M086 is closed; no dependency-ready or successor tunnel-security handoff remains | pass |
 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M077/M078 merge defects are resolved history; M085 remains runtime/security authority; M086 is documentation/evidence-only and closed | pass |
 | `plans/implementation/i2pcontrol-proposal-170/README.md` | Historical M084/M085 sequence is past tense; M086 is closed and no active handoff remains | pass |
 | `docs/i2pcontrol/proposal-170-support.md` | Trusted-peer text now documents the exact bounded decode, `parse_frame`, empty remainder, `parsed.id()`, and canonical `parsed.serialize()` boundary; M086 is listed closed | pass |
@@ -97,6 +97,12 @@ contains only these paths:
 - `plans/closure/i2pcontrol-proposal-170/084-closure.md`
 - `plans/closure/i2pcontrol-proposal-170/085-closure.md`
 - `plans/closure/i2pcontrol-proposal-170/086-closure.md`
+- `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md`
+- `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md`
+- `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md`
+- `plans/implementation/i2pcontrol-proposal-170/081-generic-server-leaseset-option-truthfulness-corrective.md`
+- `plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md`
+- `plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md`
 - `plans/implementation/i2pcontrol-proposal-170/086-post-m085-documentation-and-evidence-reconciliation-corrective.md`
 - `plans/implementation/i2pcontrol-proposal-170/README.md`
 - `plans/registry.md`

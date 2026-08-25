@@ -69,9 +69,9 @@ Per `plans/003-planning-process.md`, only the next dependency-ready implementati
 | M074 | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/074-server-admission-and-rate-limit-hardening.md` | M080/M083 own later admission corrections |
 | M075 | closed | `plans/implementation/i2pcontrol-proposal-170/075-generic-server-accepted-stream-hardening.md` | M081 repaired `leaseSetEncType` truthfulness |
 | M076 | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/076-http-server-anonymity-and-post-throttle-hardening.md` | M082/M083 own later peer-identity/Expect corrections |
-| M077 | implementation/closure present; merged-head integration reconciled | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | M084 repaired stale merged test integration |
-| M078 | implementation/closure present; merged-head integration reconciled | `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md` | M084 repaired merged containment bookkeeping |
-| M079 | historical closure only; superseded for current-head certification | `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md` | retained historical evidence; M085 is current-head authority |
+| M077 | closed; merged-head integration reconciled | `plans/implementation/i2pcontrol-proposal-170/077-irc-server-lifetime-and-exhaustion-hardening.md` | M084 repaired stale merged test integration; M085 accepted current-head behavior |
+| M078 | closed; merged-head integration reconciled | `plans/implementation/i2pcontrol-proposal-170/078-streamr-local-boundary-hardening.md` | M084 repaired merged containment bookkeeping; M085 accepted current-head behavior |
+| M079 | closed historical record; superseded for current-head certification | `plans/implementation/i2pcontrol-proposal-170/079-tunnel-security-reclosure.md` | retained historical evidence; M085 is current-head authority |
 | M080 | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/080-server-admission-transactionality-and-cardinality-corrective.md` | M083 closes remaining capacity/expiry semantics |
 | M081 | closed | `plans/implementation/i2pcontrol-proposal-170/081-generic-server-leaseset-option-truthfulness-corrective.md` | retained at current head |
 | M082 | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md` | M083 closes inherited exact-Destination gap |

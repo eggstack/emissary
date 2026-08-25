@@ -30,7 +30,7 @@ Canonical direction:
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | accepted/closed authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | exact-path bookkeeping only as later plans are registered | M061/M062/M063 semantics remain authoritative; no production containment corrective is open |
 | I2PControl Proposal 170 tunnel runtime completion | runtime complete; security corrective line reopened | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no runtime-feature handoff | M072 historical runtime evidence remains; M087-M089 are security/lifetime corrections, not new tunnel-type work |
-| I2PControl Proposal 170 tunnel security hardening | corrective pass required after post-M086 active-adversary review | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | **M087 ready** | M087 -> M088 -> M089 administrative sequence; M089 requires accepted M087/M088 closure |
+| I2PControl Proposal 170 tunnel security hardening | corrective pass in progress after post-M086 active-adversary review | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | **M088 ready** | M087 closed; M089 requires accepted M088 closure |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -58,9 +58,9 @@ Those families are therefore rechecked in M089 rather than changed preemptively.
 
 Exactly one tunnel-security implementation handoff is registered ready:
 
-- **M087 — Generic Server Inactivity Timeout Corrective**: `plans/implementation/i2pcontrol-proposal-170/087-generic-server-inactivity-timeout-corrective.md`.
+- **M088 — Pre-Accept Server Admission Boundary Corrective**: `plans/implementation/i2pcontrol-proposal-170/088-pre-accept-server-admission-boundary-corrective.md`.
 
-M088 and M089 exist as future/dependency-gated plans so the repository does not expose multiple competing executable handoffs.
+M089 remains future/blocked until M088 closes so the repository does not expose multiple competing executable handoffs.
 
 ## Current tunnel-security sequence
 
@@ -79,9 +79,9 @@ M088 and M089 exist as future/dependency-gated plans so the repository does not 
 | M084 | closed | `plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md` | merged-head integration corrective accepted |
 | M085 | closed; historical current-head authority for its pinned head | `plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md` | superseded as current-head authority only if M089 later closes |
 | M086 | closed; documentation/evidence only | `plans/implementation/i2pcontrol-proposal-170/086-post-m085-documentation-and-evidence-reconciliation-corrective.md` | record reconciliation; no runtime change |
-| M087 | **ready** | `plans/implementation/i2pcontrol-proposal-170/087-generic-server-inactivity-timeout-corrective.md` | implement progress-based inactivity bound entirely inside `i2pcontrol` if possible |
-| M088 | future | `plans/implementation/i2pcontrol-proposal-170/088-pre-accept-server-admission-boundary-corrective.md` | administratively gated on M087; feasibility-gated lower-layer admission mapping/hardening |
-| M089 | future | `plans/implementation/i2pcontrol-proposal-170/089-post-corrective-tunnel-security-reclosure.md` | requires accepted M087 and M088 closure; verification only |
+| M087 | closed | `plans/implementation/i2pcontrol-proposal-170/087-generic-server-inactivity-timeout-corrective.md` | progress-based inactivity bound implemented and independently tested; see M087 closure |
+| M088 | **ready** | `plans/implementation/i2pcontrol-proposal-170/088-pre-accept-server-admission-boundary-corrective.md` | M087 administrative gate satisfied; feasibility-gated lower-layer admission mapping/hardening |
+| M089 | future/blocked | `plans/implementation/i2pcontrol-proposal-170/089-post-corrective-tunnel-security-reclosure.md` | requires accepted M088 closure; verification only |
 
 Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered `ready`.
 

@@ -1,6 +1,6 @@
 # M087 — Generic Server Inactivity Timeout Corrective
 
-Status: ready
+Status: closed — implementation complete; see `plans/closure/i2pcontrol-proposal-170/087-closure.md`
 
 Source roadmaps:
 

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: corrective pass reopened after post-M086 active-adversary review; M087 ready
+Status: corrective pass in progress after post-M086 active-adversary review; M087 closed, M088 ready
 
 Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
@@ -53,7 +53,7 @@ The corrective sequence is deliberately narrow:
 - **M088** — map and, only if narrowly supported, harden the lower-layer/pre-accept stream admission boundary;
 - **M089** — independently reclose the complete tunnel-security line and disposition HTTP/Streamr residual questions.
 
-Only M087 is currently `ready`.
+M087 is closed. M088 is currently `ready`; M089 remains future/blocked pending M088 closure.
 
 ## 2. Corrective threat model
 
@@ -161,19 +161,16 @@ M077 -> M078 -> M079/
 New corrective sequence:
 
 ```text
-M086 closed historical baseline
+M087 closed implementation baseline
              |
              v
-M087 generic server inactivity timeout   [READY]
-             |
-             v
-M088 pre-accept/lower-layer admission    [FUTURE; feasibility-gated]
+M088 pre-accept/lower-layer admission    [READY]
              |
              v
 M089 independent security reclosure      [FUTURE/BLOCKED]
 ```
 
-M087 -> M088 is administrative sequencing to maintain one executable handoff; M088 is technically independent.
+M087 -> M088 was administrative sequencing and is now satisfied; M088 remains feasibility-gated by the actual lower-layer capability.
 
 M089 requires accepted M087 and M088 closure. If M088 discovers that a separate dependency-boundary plan is required, M089 remains blocked until that plan is resolved or the residual limitation is explicitly accepted as out of scope.
 
@@ -233,7 +230,7 @@ Closed. Documentation/evidence-only; no runtime change.
 
 ### M087 — Generic Server Inactivity Timeout Corrective
 
-Status: **ready**.
+Status: **closed**. See `plans/closure/i2pcontrol-proposal-170/087-closure.md`.
 
 Required outcome:
 
@@ -246,7 +243,7 @@ Plan: `plans/implementation/i2pcontrol-proposal-170/087-generic-server-inactivit
 
 ### M088 — Pre-Accept Server Admission Boundary Corrective
 
-Status: **future**, dependency-gated on M087 closure.
+Status: **ready**; the M087 dependency is closed.
 
 Required outcome:
 

@@ -1,6 +1,6 @@
 # M088 — Pre-Accept Server Admission Boundary Corrective
 
-Status: future — dependency-gated on M087 closure
+Status: ready — M087 closed; lower-layer capability mapping is now executable
 
 Source roadmaps:
 

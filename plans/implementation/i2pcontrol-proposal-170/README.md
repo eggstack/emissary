@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel runtime functionally complete; tunnel-security corrective sequence M087-M089 open; M087 ready
+Status: partial Proposal 170 support; tunnel runtime functionally complete; tunnel-security corrective sequence M087-M089 open; M087 closed, M088 ready
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -46,12 +46,11 @@ M087-M089 do not authorize a Proposal 170 wire expansion, broad router/core refa
 
 Exactly one implementation plan is dependency-ready:
 
-- `087-generic-server-inactivity-timeout-corrective.md` — **ready**.
+- `088-pre-accept-server-admission-boundary-corrective.md` — **ready**.
 
 Future/dependency-gated handoffs:
 
-- `088-pre-accept-server-admission-boundary-corrective.md` — **future**, administratively gated on M087 closure and feasibility-gated on the actual Emissary/Yosemite/SAM lower-layer capability;
-- `089-post-corrective-tunnel-security-reclosure.md` — **future/blocked**, requires accepted M087 and M088 closure and is verification-only.
+- `089-post-corrective-tunnel-security-reclosure.md` — **future/blocked**, requires accepted M088 closure and is verification-only.
 
 Per `plans/003-planning-process.md`, only the next executable handoff is registered `ready`.
 
@@ -93,26 +92,23 @@ The same review found no current reason to add speculative HTTP or Streamr produ
 | M084 | closed | merged-head integration/planning corrective |
 | M085 | closed; valid for pinned head | independent merged-head tunnel-security reclosure |
 | M086 | closed; documentation/evidence only | post-M085 record reconciliation; no production runtime change |
-| M087 | **ready** | progress-based generic-server inactivity timeout |
-| M088 | future | lower-layer/pre-accept admission boundary mapping and narrow hardening if supported |
+| M087 | closed | progress-based generic-server inactivity timeout |
+| M088 | **ready** | lower-layer/pre-accept admission boundary mapping and narrow hardening if supported |
 | M089 | future/blocked | independent post-corrective tunnel-security reclosure |
 
 ## Current corrective sequence
 
 ```text
-M086 closed historical baseline
+M087 closed implementation baseline
              |
              v
-M087 generic server inactivity timeout   [READY]
-             |
-             v
-M088 pre-accept/lower-layer admission    [FUTURE]
+M088 pre-accept/lower-layer admission    [READY]
              |
              v
 M089 independent security reclosure      [FUTURE/BLOCKED]
 ```
 
-M087 -> M088 is an administrative sequencing dependency only. M088 is technically independent but held so there is one executable security handoff.
+M087 -> M088 was an administrative sequencing dependency and is now satisfied. M089 remains blocked until M088 closes.
 
 ## M087 handoff summary
 

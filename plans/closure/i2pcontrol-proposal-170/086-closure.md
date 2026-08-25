@@ -21,10 +21,10 @@ M086 baseline: `a1b26987a203796465c5f7c43279adf3006bca28`.
 Final reviewed M086 implementation head:
 `aeec3e02ba5a7a13669852252ff81643d41c7529`.
 
-The closure record is added immediately after that reviewed implementation
-head as a separate planning-only commit. The reviewed head contains all
-substantive M086 reconciliation changes; the closure commit adds only this
-record.
+The closure record was added immediately after that reviewed implementation
+head as a separate planning-only commit. A final planning-only status pass
+also closed the historical M077/M078/M079/M081/M084/M085 handoff headers and
+updated this matrix; no production behavior was involved.
 
 ## 1. Disposition
 

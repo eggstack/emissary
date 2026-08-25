@@ -1,6 +1,6 @@
 # M089 — Post-Corrective Tunnel Security Reclosure
 
-Status: ready — M087 and M088 closed; lower-layer limitation accepted as out of scope
+Status: closed — see `plans/closure/i2pcontrol-proposal-170/089-closure.md`
 
 Source roadmaps:
 

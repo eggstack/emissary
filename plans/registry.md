@@ -29,8 +29,8 @@ Canonical direction:
 |---|---|---|---|---|
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | accepted/closed authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | exact-path bookkeeping only as later plans are registered | M061/M062/M063 semantics remain authoritative; no production containment corrective is open |
-| I2PControl Proposal 170 tunnel runtime completion | runtime complete; security corrective line reopened | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no runtime-feature handoff | M072 historical runtime evidence remains; M087-M089 are security/lifetime corrections, not new tunnel-type work |
-| I2PControl Proposal 170 tunnel security hardening | corrective pass in progress after post-M086 active-adversary review | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | **M089 ready** | M087/M088 closed; M089 is verification-only |
+| I2PControl Proposal 170 tunnel runtime completion | runtime complete; security reclosure accepted | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no runtime-feature handoff | M072 historical runtime evidence remains; M087-M089 are closed security/lifetime corrections |
+| I2PControl Proposal 170 tunnel security hardening | closed; M089 current-head reclosure accepted | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | no security handoff | M089 closure accepted; M088 lower-layer limitation remains explicitly out of scope |
 
 ## Canonical scope amendment for tunnel runtimes
 
@@ -56,9 +56,8 @@ Those families are therefore rechecked in M089 rather than changed preemptively.
 
 ## Dependency-ready implementation plan
 
-Exactly one tunnel-security handoff is registered ready:
-
-- **M089 — Post-Corrective Tunnel Security Reclosure**: `plans/implementation/i2pcontrol-proposal-170/089-post-corrective-tunnel-security-reclosure.md`.
+No tunnel-security implementation handoff is currently registered ready. M089
+is closed by `plans/closure/i2pcontrol-proposal-170/089-closure.md`.
 
 M088 is closed by `plans/closure/i2pcontrol-proposal-170/088-closure.md`. No separately approved Yosemite dependency-boundary plan is required: the unsupported lower-layer semantic is explicitly accepted as out of scope for M089.
 
@@ -77,13 +76,15 @@ M088 is closed by `plans/closure/i2pcontrol-proposal-170/088-closure.md`. No sep
 | M082 | closed; corrective history | `plans/implementation/i2pcontrol-proposal-170/082-http-peer-identity-and-expect-framing-corrective.md` | retained by M083/M085 |
 | M083 | closed | `plans/implementation/i2pcontrol-proposal-170/083-admission-capacity-and-trusted-destination-exactness-corrective.md` | current application-admission and trusted-Destination authority |
 | M084 | closed | `plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md` | merged-head integration corrective accepted |
-| M085 | closed; historical current-head authority for its pinned head | `plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md` | superseded as current-head authority only if M089 later closes |
+| M085 | closed; historical current-head authority for its pinned head | `plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md` | superseded as current-head authority by M089 only; historical evidence retained |
 | M086 | closed; documentation/evidence only | `plans/implementation/i2pcontrol-proposal-170/086-post-m085-documentation-and-evidence-reconciliation-corrective.md` | record reconciliation; no runtime change |
 | M087 | closed | `plans/implementation/i2pcontrol-proposal-170/087-generic-server-inactivity-timeout-corrective.md` | progress-based inactivity bound implemented and independently tested; see M087 closure |
 | M088 | closed; Tier 3 unsupported lower-layer semantic | `plans/implementation/i2pcontrol-proposal-170/088-pre-accept-server-admission-boundary-corrective.md` | evidence-only closure; application post-accept admission remains the earliest in-scope bound |
-| M089 | **ready** | `plans/implementation/i2pcontrol-proposal-170/089-post-corrective-tunnel-security-reclosure.md` | M087/M088 closure accepted; verification only |
+| M089 | **closed** | `plans/implementation/i2pcontrol-proposal-170/089-post-corrective-tunnel-security-reclosure.md` | current-head authority; closure `plans/closure/i2pcontrol-proposal-170/089-closure.md` |
 
-Per `plans/003-planning-process.md`, only the next dependency-ready implementation plan is registered `ready`.
+Per `plans/003-planning-process.md`, no future tunnel-security plan is
+dependency-ready or registered after M089. The unrelated M051 blocker remains
+unchanged.
 
 ## M087 scope guard
 
@@ -110,6 +111,9 @@ M089 is an independent reclosure and authorizes no production code changes. It r
 - containment of all corrective changes.
 
 Any new high/medium production defect creates another numbered plan and keeps M089 blocked.
+
+M089 is now closed. Any future high/medium production defect must open a new
+numbered corrective plan rather than reopening this closure.
 
 ## Durable tunnel-security invariants retained
 
@@ -153,10 +157,10 @@ M051 remains blocked by absent substantive news/banned-peer owners. AddressBook 
 
 ## Registry maintenance rules
 
-1. M089 is the sole ready tunnel-security handoff.
+1. M089 is the current-head tunnel-security reclosure authority and is closed.
 2. M088 is closed with an evidence-backed Tier 3 unsupported-capability disposition.
-3. M089 is unblocked because M087 and M088 have accepted closure records and no separate dependency-boundary plan is required.
-4. M085 remains valid historical reclosure evidence for its pinned head until M089 closes.
+3. No future tunnel-security handoff is currently dependency-ready; the M088 lower-layer limitation remains accepted out of scope.
+4. M085 remains valid historical reclosure evidence for its pinned head and is superseded only as current-head authority by M089.
 5. Preserve RouterInfo 37/1/5 and M051 unless separate source-owner work changes them.
 6. Preserve ADR-0003 and the preferred `emissary-cli/src/i2pcontrol/**` production boundary.
 7. Unsupported/underspecified runtime options fail before allocation; persist-and-ignore is forbidden.

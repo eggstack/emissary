@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: corrective pass in progress after post-M086 active-adversary review; M087/M088 closed, M089 ready
+Status: closed; M089 current-head tunnel runtime/security reclosure accepted
 
 Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
@@ -53,7 +53,9 @@ The corrective sequence is deliberately narrow:
 - **M088** — map and, only if narrowly supported, harden the lower-layer/pre-accept stream admission boundary;
 - **M089** — independently reclose the complete tunnel-security line and disposition HTTP/Streamr residual questions.
 
-M087 and M088 are closed. M088's evidence-only Tier 3 disposition accepts the lower-layer limitation as out of scope; M089 is now the sole ready handoff.
+M087 and M088 are closed. M088's evidence-only Tier 3 disposition accepts the
+lower-layer limitation as out of scope; M089 is now the accepted current-head
+reclosure authority.
 
 ## 2. Corrective threat model
 
@@ -167,7 +169,7 @@ M087 closed implementation baseline
 M088 pre-accept/lower-layer admission    [CLOSED / TIER 3]
              |
              v
-M089 independent security reclosure      [READY]
+M089 independent security reclosure      [CLOSED]
 ```
 
 M087 -> M088 was administrative sequencing and is now satisfied; M088 closed with the actual lower-layer capability recorded as unsupported.
@@ -222,7 +224,9 @@ Closed. Historical merged-head repair authority.
 
 ### M085 — Merged-head tunnel-security reclosure
 
-Closed and valid for its pinned head. It remains the latest accepted full runtime/security reclosure until M089 closes, but its threat analysis is no longer the final word on the two newly identified server-side corrective findings.
+Closed and valid for its pinned head. M089 supersedes it only as current-head
+authority; its threat analysis remains historical evidence for the earlier
+head and does not claim to evaluate the later server-side corrective findings.
 
 ### M086 — Post-M085 documentation/evidence reconciliation
 
@@ -258,7 +262,9 @@ Plan: `plans/implementation/i2pcontrol-proposal-170/088-pre-accept-server-admiss
 
 ### M089 — Post-Corrective Tunnel Security Reclosure
 
-Status: **ready**; M087 and M088 are closed, and M088's lower-layer limitation is explicitly accepted as out of scope.
+Status: **closed**; M087 and M088 are closed, M088's lower-layer limitation is
+explicitly accepted as out of scope, and the current-head reclosure is accepted
+in `plans/closure/i2pcontrol-proposal-170/089-closure.md`.
 
 Required outcome:
 
@@ -270,6 +276,8 @@ Required outcome:
 - make no production change itself.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/089-post-corrective-tunnel-security-reclosure.md`.
+
+Closure: `plans/closure/i2pcontrol-proposal-170/089-closure.md`.
 
 ## 8. Containment policy for the corrective sequence
 
@@ -323,11 +331,16 @@ Stop the corrective sequence and create separate planning rather than widen the 
 
 ## 11. Final closure rule
 
-The tunnel-security line is now **open for the bounded M087-M089 corrective sequence**.
+The tunnel-security line is now **closed for the bounded M087-M089 corrective
+sequence**. M089 is the current-head tunnel runtime/security reclosure
+authority.
 
 M085 remains valid historical full reclosure evidence for its pinned head. M086 remains valid record-reconciliation evidence. Neither should be rewritten as though it had originally evaluated the later findings.
 
-If M087 and M088 close and M089 independently finds no remaining high/medium security/anonymity/resource-exhaustion defect inside the approved Proposal 170 boundary, M089 becomes the new current-head tunnel runtime/security reclosure authority.
+M087 and M088 closed, and M089 independently found no remaining high/medium
+security/anonymity/resource-exhaustion defect inside the approved Proposal 170
+boundary. The accepted lower-layer limitation and Streamr Sybil availability
+property remain explicit residual dispositions.
 
 Proposal 170 remains separately partial for the accepted source/truthfulness limitations, RouterInfo 37/1/5 disposition, M051 blocker, and unrelated AddressBook/base-I2PControl limitations.
 

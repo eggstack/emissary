@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel runtime functionally complete; tunnel-security corrective sequence M087-M089 open; M087/M088 closed, M089 ready
+Status: partial Proposal 170 support; tunnel runtime functionally complete; M087-M089 tunnel-security corrective sequence closed
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -44,9 +44,9 @@ M087-M089 do not authorize a Proposal 170 wire expansion, broad router/core refa
 
 ## Current handoff
 
-Exactly one implementation plan is dependency-ready:
-
-- `089-post-corrective-tunnel-security-reclosure.md` — **ready**.
+No implementation plan is currently dependency-ready in this tunnel-security
+sequence. M089 is closed with
+`plans/closure/i2pcontrol-proposal-170/089-closure.md`.
 
 Future/dependency-gated handoffs:
 
@@ -94,7 +94,7 @@ The same review found no current reason to add speculative HTTP or Streamr produ
 | M086 | closed; documentation/evidence only | post-M085 record reconciliation; no production runtime change |
 | M087 | closed | progress-based generic-server inactivity timeout |
 | M088 | closed; Tier 3 unsupported lower-layer semantic | lower-layer/pre-accept admission evidence and residual-risk disposition |
-| M089 | **ready** | independent post-corrective tunnel-security reclosure |
+| M089 | **closed** | independent post-corrective tunnel-security reclosure; current-head authority |
 
 ## Current corrective sequence
 
@@ -105,10 +105,12 @@ M087 closed implementation baseline
 M088 pre-accept/lower-layer admission    [CLOSED / TIER 3]
              |
              v
-M089 independent security reclosure      [READY]
+M089 independent security reclosure      [CLOSED]
 ```
 
-M087 -> M088 was an administrative sequencing dependency and is now satisfied. M088's unsupported lower-layer semantic is accepted as out of scope; M089 is unblocked.
+M087 -> M088 was an administrative sequencing dependency and is now satisfied.
+M088's unsupported lower-layer semantic is accepted as out of scope; M089 is
+closed and no future tunnel-security handoff is currently registered.
 
 ## M087 handoff summary
 
@@ -220,7 +222,9 @@ M051 remains blocked by absent substantive news/banned-peer owners. AddressBook 
 
 M087 is the current executable tunnel-security handoff.
 
-M085 remains valid historical reclosure authority for its pinned head while M087-M089 are open. If M089 later closes without a new high/medium finding, M089 becomes the current-head runtime/security reclosure authority; M085 remains historical evidence rather than being erased.
+M085 remains valid historical reclosure authority for its pinned head. M089 is
+now the current-head runtime/security reclosure authority; M085 remains
+historical evidence rather than being erased.
 
 Proposal 170 remains separately partial for accepted source/truthfulness limitations, RouterInfo 37/1/5, M051, and unrelated AddressBook/base-I2PControl gaps.
 

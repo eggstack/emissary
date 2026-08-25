@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: runtime/security closed by M085; M086 documentation/evidence reconciliation ready
+Status: runtime/security closed by M085; M086 documentation/evidence reconciliation closed
 
 Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
@@ -140,16 +140,16 @@ M077 -> M078 -> M079/
             M085 independent current-head reclosure
 ```
 
-Current remaining record-quality sequence:
+Record-quality corrective sequence (closed):
 
 ```text
 M085 runtime/security closure accepted
              |
              v
-M086 documentation/evidence reconciliation
+M086 documentation/evidence reconciliation (closed)
              |
              v
-no active tunnel-security handoff if M086 closes
+no active tunnel-security handoff
 ```
 
 Dependency classification:
@@ -210,14 +210,13 @@ Closed and controlling for current-head runtime/security certification. It indep
 
 ### M086 — Post-M085 documentation and evidence reconciliation
 
-Status: **ready**.
+Status: **closed**.
 
 Scope:
 
 - reconcile stale registry/roadmap/README current-state language;
 - correct trusted-peer support documentation to the M083/M085 exact parser/canonicalization boundary;
 - add a transparent M085 capacity-arithmetic erratum (`83,886`, not `81,920`);
-- clarify M084's bounded production HTTP-helper merge restoration without reopening runtime closure;
 - add exact M086 planning/closure paths to the M062 planning allowlist;
 - make no production-source, Cargo, dependency, feature, or lockfile change.
 
@@ -234,6 +233,8 @@ M086 may close only when:
 - changed-path review proves no production source/manifests/lockfile changed;
 - M062 test and `git diff --check` pass;
 - no upstream interaction occurred.
+
+M086 is closed by `plans/closure/i2pcontrol-proposal-170/086-closure.md`.
 
 ## 8. Verification discipline
 

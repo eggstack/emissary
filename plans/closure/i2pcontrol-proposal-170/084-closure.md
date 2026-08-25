@@ -367,3 +367,22 @@ repository writes remain internal to `eggstack/emissary`.
   post-M084 merged head.
 - No upstream review, acceptance, merge, adoption, or submission is implied
   or authorized.
+
+## M086 clarification — bounded HTTP-helper merge restoration
+
+M084's implementation commit `776407f51e75e0df245a304749b5981e639e9aab`
+modified production `emissary-cli/src/i2pcontrol/backends/filters/http.rs` by
+restoring the two helper definitions dropped by the merge. The restoration
+reinstated the already-intended M076/M079 exact-list plus `x-forwarded-*` /
+`x-i2p-*` prefix behavior. It did not add a new Proposal 170 wire feature or
+broaden policy.
+
+Accordingly, M084's statement that “no runtime semantics changed” means that
+no new intended runtime semantics were introduced; it does not mean that no
+production source file changed. This was a bounded deviation from M084's
+original expectation that only test/planning integration would be required.
+
+M085 subsequently independently audited the exact post-M084 head, including
+the restored HTTP filtering behavior, and accepted it with no high/medium
+finding. No additional runtime corrective or reclosure is required solely for
+this historical clarification.

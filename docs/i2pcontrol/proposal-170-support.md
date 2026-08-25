@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M080-M085 closed; tunnel runtime/security line complete against the pinned contract and current internal fork head
+Status: partial Proposal 170 support; M080-M086 closed; tunnel runtime/security line complete against the pinned contract and current internal fork head; M086 documentation/evidence reconciliation closed
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -32,6 +32,8 @@ Tunnel-runtime reclosure:
 - M084: `plans/closure/i2pcontrol-proposal-170/084-closure.md` — closed;
 - M085: `plans/closure/i2pcontrol-proposal-170/085-closure.md` — closed;
   current-head final reclosure authority.
+- M086: `plans/closure/i2pcontrol-proposal-170/086-closure.md` — closed;
+  documentation/evidence reconciliation only; it does not reopen M085.
 
 Closed handoffs:
 
@@ -292,16 +294,16 @@ options, arbitrary target hosts, and unsupported Proposal 170 modes reject
 before destination/session allocation.
 
 `TrustedPeerIdentity` is structurally validated at the accepted-stream
-boundary: only base64 I2P Destination text that parses through
-`emissary_core::primitives::Destination::parse` enters the shared admission
-state. The 32-byte SHA-256 Destination hash derived from that parsed
-Destination is the only key used by security accounting and by the HTTP
-write-throttle limiter. The validated textual representation remains available
-for protocol handlers that need it for header injection, and is bounded by
-`MAX_TRUSTED_DESTINATION_B64_TEXT` (1024) at the ingress. `Expect` rejections
-emit a fixed `417 Expectation Failed` response with `Connection: close` and
-no local target connection, so a client that waits for a `100 Continue`
-cannot pin a handler until body timeout.
+boundary. Trusted peer text is bounded to
+`MAX_TRUSTED_DESTINATION_B64_TEXT` (1024) before decoding, Base64-decoded once,
+and parsed with `emissary_core::primitives::Destination::parse_frame`. The
+parser remainder must be empty or the identity is rejected. The 32-byte
+accounting ID is derived from `parsed.id()`, and protocol handlers receive the
+canonical full-Destination text produced by Base64-encoding
+`parsed.serialize()` rather than attacker-selected input text. `Expect`
+rejections emit a fixed `417 Expectation Failed` response with
+`Connection: close` and no local target connection, so a client that waits for
+a `100 Continue` cannot pin a handler until body timeout.
 
 ### IRC tunnel runtime boundary
 
@@ -453,6 +455,7 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M079 | historical closure only; current-head certification superseded by M085 | integrated tunnel-security reclosure before the later M083 merge |
 | M084 | closed | merged-head integration/planning corrective (test fixture, M062 bookkeeping, status reconciliation); see `plans/closure/i2pcontrol-proposal-170/084-closure.md` |
 | M085 | closed | independently audited actual post-M084 merged head; tunnel runtime/security line complete against the pinned Proposal 170 revision and current internal fork head; see `plans/closure/i2pcontrol-proposal-170/085-closure.md` |
+| M086 | closed | documentation/evidence reconciliation only; trusted-peer documentation and closure errata corrected without reopening runtime/security; see `plans/closure/i2pcontrol-proposal-170/086-closure.md` |
 
 ## Final-status rule
 

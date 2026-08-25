@@ -501,6 +501,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/083-admission-capacity-and-trusted-destination-exactness-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/084-merged-head-integration-and-planning-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/085-merged-head-tunnel-security-reclosure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/086-post-m085-documentation-and-evidence-reconciliation-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md"
@@ -526,6 +527,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/083-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/084-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/085-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/086-closure.md"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }

@@ -1,6 +1,6 @@
 # M086 — Post-M085 Documentation and Evidence Reconciliation Corrective
 
-Status: ready — sole dependency-ready Proposal 170 handoff
+Status: closed — documentation/evidence reconciliation accepted; see `plans/closure/i2pcontrol-proposal-170/086-closure.md`
 
 Source roadmaps:
 

@@ -791,3 +791,21 @@ authorized internal `eggstack/emissary` repository.
   unchanged and explicitly out of M085 scope.
 - No upstream review, acceptance, merge, adoption, submission, or
   contribution artifact is implied or authorized.
+
+## M086 erratum — `MAX_PEER_ENTRIES` capacity arithmetic
+
+The M085 closure text above transcribed the capacity calculation as
+`16 MiB / 200 = 81,920`. That number is incorrect. M086 corrects the closure
+record without changing its chronology or disposition:
+
+```text
+HARD_PEER_STATE_MEMORY_BUDGET = 16 * 1024 * 1024 = 16,777,216 bytes
+WORST_CASE_BYTES_PER_PEER = 200
+MAX_PEER_ENTRIES = 16,777,216 / 200 = 83,886 (integer division)
+```
+
+The authoritative Rust constant/expression is `(16 * 1024 * 1024) / 200` and
+does not change. The former `81,920` text was a closure-document arithmetic
+error only; it did not affect policy construction, runtime behavior, or any
+test M085 executed. This explicit erratum is supplied by M086 rather than
+making the original M085 record appear to have contained the corrected value.

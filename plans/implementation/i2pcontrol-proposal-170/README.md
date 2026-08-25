@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel runtime/security closed by M085; M086 documentation/evidence reconciliation ready
+Status: partial Proposal 170 support; tunnel runtime/security closed by M085; M086 documentation/evidence reconciliation closed
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -44,9 +44,11 @@ M086 is stricter: it authorizes no production-source or Cargo/dependency change 
 
 ## Current handoff
 
-Exactly one implementation plan is dependency-ready:
+No implementation plan is currently dependency-ready under this closed
+tunnel-security cleanup line:
 
-- `086-post-m085-documentation-and-evidence-reconciliation-corrective.md` — **ready**.
+- `086-post-m085-documentation-and-evidence-reconciliation-corrective.md` —
+  **closed**; see `plans/closure/i2pcontrol-proposal-170/086-closure.md`.
 
 M086 corrects stale current-state planning/support text and closure-record errata after M085. It does **not** reopen M085 or authorize another runtime/security pass.
 
@@ -78,7 +80,7 @@ After M086 closes, no tunnel-security successor should be registered unless new 
 | M083 | closed | admission capacity semantics + exact/canonical trusted Destination |
 | M084 | closed | merged-head integration/planning corrective |
 | M085 | closed; current-head final runtime/security authority | independent merged-head tunnel-security reclosure |
-| M086 | ready; documentation/evidence only | post-M085 record reconciliation; no production runtime change |
+| M086 | closed; documentation/evidence only | post-M085 record reconciliation; no production runtime change |
 
 ## Why M084-M086 exist
 
@@ -101,7 +103,7 @@ M086 owns those record-quality defects. It does not reopen runtime/security clos
 |---|---|---|---|
 | M084 | closed | repair merged-head integration/planning failures | merged-head findings |
 | M085 | closed | independent actual post-M084 runtime/security reclosure | M084 closed |
-| M086 | ready | reconcile stale planning/support text and transparent closure errata; exact M062 planning-path bookkeeping only | M085 closed |
+| M086 | closed | reconciled stale planning/support text and transparent closure errata; exact M062 planning-path bookkeeping only | M085 closed; no successor handoff |
 
 Per `plans/003-planning-process.md`, only the next dependency-ready plan is registered `ready`.
 
@@ -175,7 +177,9 @@ No full runtime/security rerun is required if M086 obeys its no-production-chang
 
 M085 remains the final runtime/security closure authority throughout M086.
 
-M086 may close only the residual documentation/evidence-integrity corrective. After M086 closes, the tunnel runtime/security line remains closed and no active tunnel-security handoff should remain.
+M086 closed the residual documentation/evidence-integrity corrective. The
+tunnel runtime/security line remains closed by M085 and no active
+tunnel-security handoff remains.
 
 Proposal 170 remains separately partial for the accepted source/truthfulness limitations, RouterInfo 37/1/5, M051, and unrelated AddressBook/base-I2PControl gaps.
 

@@ -4,7 +4,11 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::FutureExt;
 use parking_lot::Mutex;
-use tokio::{io, net::TcpStream, task::JoinHandle};
+use tokio::{
+    io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    net::TcpStream,
+    task::JoinHandle,
+};
 
 use super::{
     options::{validate_options, OptionValidationError, SERVER_OPTIONS},
@@ -22,6 +26,13 @@ use crate::i2pcontrol::{
 const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
 const TARGET_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+/// Match the established IRC server's activity-resetting lifetime bound.
+///
+/// This is an inactivity interval, not an absolute connection lifetime:
+/// active raw protocols may remain connected as long as they keep making
+/// successful relay progress.
+pub(crate) const GENERIC_SERVER_INACTIVITY: Duration = Duration::from_secs(10 * 60);
+const RELAY_BUFFER_SIZE: usize = 8192;
 const MAX_RUNTIME_TASKS: usize = 1000;
 pub(crate) const SERVER_IDENTITY_KEY: &str = "__emissary_server_destination_identity";
 pub(crate) const SERVER_PUBLIC_DESTINATION_KEY: &str = "__emissary_server_public_destination";
@@ -477,17 +488,101 @@ fn make_accepted_handler(target_port: u16) -> AcceptedServerHandler {
     Arc::new(move |connection| Box::pin(relay_accepted_connection(connection, target_port)))
 }
 
-async fn relay_accepted_connection(mut connection: AcceptedServerConnection, target_port: u16) {
-    let Ok(Ok(mut target)) = tokio::time::timeout(
-        TARGET_CONNECT_TIMEOUT,
-        TcpStream::connect(("127.0.0.1", target_port)),
-    )
-    .await
+async fn relay_accepted_connection(connection: AcceptedServerConnection, target_port: u16) {
+    let Ok(target) = bounded_target_connect(TcpStream::connect(("127.0.0.1", target_port))).await
     else {
         return;
     };
 
-    let _ = io::copy_bidirectional(&mut connection.stream, &mut target).await;
+    let (remote_read, remote_write) = io::split(connection.stream);
+    let (target_read, target_write) = io::split(target);
+    let _ = relay_with_inactivity(remote_read, remote_write, target_read, target_write).await;
+}
+
+async fn bounded_target_connect<F>(connect: F) -> io::Result<TcpStream>
+where
+    F: std::future::Future<Output = io::Result<TcpStream>>,
+{
+    tokio::time::timeout(TARGET_CONNECT_TIMEOUT, connect)
+        .await
+        .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "server target connect timeout"))?
+}
+
+/// Relay a raw bidirectional stream while bounding only periods without
+/// successful byte-transfer progress.
+///
+/// Each direction shuts down its opposite write half on EOF, matching the
+/// useful half-close behavior of `copy_bidirectional`. The completed
+/// direction is then left inactive while the other direction drains or until
+/// the shared inactivity deadline expires.
+async fn relay_with_inactivity<RemoteRead, RemoteWrite, TargetRead, TargetWrite>(
+    remote_read: RemoteRead,
+    remote_write: RemoteWrite,
+    target_read: TargetRead,
+    target_write: TargetWrite,
+) -> io::Result<()>
+where
+    RemoteRead: AsyncRead + Unpin,
+    RemoteWrite: AsyncWrite + Unpin,
+    TargetRead: AsyncRead + Unpin,
+    TargetWrite: AsyncWrite + Unpin,
+{
+    let (activity_tx, mut activity_rx) = tokio::sync::watch::channel(0_u64);
+    let mut remote_to_target = Box::pin(relay_direction(
+        remote_read,
+        target_write,
+        activity_tx.clone(),
+    ));
+    let mut target_to_remote = Box::pin(relay_direction(target_read, remote_write, activity_tx));
+    let mut remote_to_target_active = true;
+    let mut target_to_remote_active = true;
+    let deadline = tokio::time::sleep(GENERIC_SERVER_INACTIVITY);
+    tokio::pin!(deadline);
+
+    loop {
+        if !remote_to_target_active && !target_to_remote_active {
+            return Ok(());
+        }
+
+        tokio::select! {
+            result = &mut remote_to_target, if remote_to_target_active => {
+                remote_to_target_active = false;
+                result?;
+            }
+            result = &mut target_to_remote, if target_to_remote_active => {
+                target_to_remote_active = false;
+                result?;
+            }
+            changed = activity_rx.changed() => {
+                if changed.is_err() {
+                    return Ok(());
+                }
+                deadline.as_mut().reset(tokio::time::Instant::now() + GENERIC_SERVER_INACTIVITY);
+            }
+            _ = &mut deadline => return Ok(()),
+        }
+    }
+}
+
+async fn relay_direction<ReadHalf, WriteHalf>(
+    mut reader: ReadHalf,
+    mut writer: WriteHalf,
+    activity: tokio::sync::watch::Sender<u64>,
+) -> io::Result<()>
+where
+    ReadHalf: AsyncRead + Unpin,
+    WriteHalf: AsyncWrite + Unpin,
+{
+    let mut buffer = [0_u8; RELAY_BUFFER_SIZE];
+    loop {
+        let length = reader.read(&mut buffer).await?;
+        if length == 0 {
+            writer.shutdown().await?;
+            return Ok(());
+        }
+        writer.write_all(&buffer[..length]).await?;
+        activity.send_modify(|sequence| *sequence = sequence.wrapping_add(1));
+    }
 }
 
 fn validate_i2cp_options(definition: &TunnelDefinition) -> BackendResult<()> {
@@ -534,7 +629,11 @@ fn option_error(error: OptionValidationError) -> BackendError {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{
+        pin::Pin,
+        sync::Arc,
+        task::{Context, Poll},
+    };
 
     use super::*;
     use crate::i2pcontrol::{
@@ -542,7 +641,7 @@ mod tests {
         server_secret_store::StoredDestination,
     };
     use emissary_core::crypto::base64_encode;
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader, ReadBuf};
 
     fn definition(name: &str, identity: &str) -> TunnelDefinition {
         TunnelDefinition {
@@ -856,6 +955,191 @@ mod tests {
         let commands = commands.lock();
         assert!(commands.iter().any(|command| command.starts_with("STREAM ACCEPT")));
         assert!(!commands.iter().any(|command| command.starts_with("STREAM FORWARD")));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn generic_server_idle_expiry_releases_admission_lease() {
+        let (remote_peer, remote_stream) = tokio::io::duplex(4096);
+        let (target_peer, target_stream) = tokio::io::duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (target_read, target_write) = io::split(target_stream);
+        let admission = super::super::runtime::ServerAdmissionState::new(
+            ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
+        );
+        let peer = super::super::runtime::peer_identity::test_fixtures::distinct_peer(17);
+        let lease = match admission.try_acquire(&peer) {
+            super::super::runtime::AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected admission result: {other:?}"),
+        };
+        let relay = tokio::spawn(async move {
+            let _lease = lease;
+            relay_with_inactivity(remote_read, remote_write, target_read, target_write).await
+        });
+
+        tokio::task::yield_now().await;
+        tokio::time::advance(GENERIC_SERVER_INACTIVITY).await;
+        assert!(relay.await.unwrap().is_ok());
+        assert!(matches!(
+            admission.try_acquire(&peer),
+            super::super::runtime::AdmissionDecision::Allowed(_)
+        ));
+        drop(remote_peer);
+        drop(target_peer);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn generic_server_progress_resets_deadline_without_fixed_lifetime() {
+        let (mut remote_peer, remote_stream) = tokio::io::duplex(4096);
+        let (mut target_peer, target_stream) = tokio::io::duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (target_read, target_write) = io::split(target_stream);
+        let relay = tokio::spawn(relay_with_inactivity(
+            remote_read,
+            remote_write,
+            target_read,
+            target_write,
+        ));
+
+        for sequence in 0..3 {
+            tokio::time::advance(GENERIC_SERVER_INACTIVITY - Duration::from_secs(1)).await;
+            let message = [b'0' + sequence, b'\n'];
+            remote_peer.write_all(&message).await.unwrap();
+            let mut received = [0_u8; 2];
+            target_peer.read_exact(&mut received).await.unwrap();
+            assert_eq!(received, message);
+            tokio::task::yield_now().await;
+        }
+        tokio::time::advance(Duration::from_secs(2)).await;
+        assert!(!relay.is_finished());
+
+        drop(remote_peer);
+        drop(target_peer);
+        relay.abort();
+        let _ = relay.await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn generic_server_unidirectional_progress_resets_deadline() {
+        let (mut remote_peer, remote_stream) = tokio::io::duplex(4096);
+        let (mut target_peer, target_stream) = tokio::io::duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (target_read, target_write) = io::split(target_stream);
+        let relay = tokio::spawn(relay_with_inactivity(
+            remote_read,
+            remote_write,
+            target_read,
+            target_write,
+        ));
+
+        for message in [b"one".as_slice(), b"two".as_slice()] {
+            tokio::time::advance(GENERIC_SERVER_INACTIVITY - Duration::from_secs(1)).await;
+            remote_peer.write_all(message).await.unwrap();
+            let mut received = vec![0_u8; message.len()];
+            target_peer.read_exact(&mut received).await.unwrap();
+            assert_eq!(received, message);
+            tokio::task::yield_now().await;
+        }
+        tokio::time::advance(Duration::from_secs(2)).await;
+        assert!(!relay.is_finished());
+
+        drop(remote_peer);
+        drop(target_peer);
+        relay.abort();
+        let _ = relay.await;
+    }
+
+    struct WakesOnce<R> {
+        reader: R,
+        woke: bool,
+    }
+
+    impl<R> AsyncRead for WakesOnce<R>
+    where
+        R: AsyncRead + Unpin,
+    {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            _buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            if !self.woke {
+                self.woke = true;
+                cx.waker().wake_by_ref();
+            }
+            let _ = &self.reader;
+            Poll::Pending
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn generic_server_readiness_wakeup_without_progress_does_not_extend_deadline() {
+        let (remote_peer, remote_stream) = tokio::io::duplex(4096);
+        let (target_peer, target_stream) = tokio::io::duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (target_read, target_write) = io::split(target_stream);
+        let relay = tokio::spawn(relay_with_inactivity(
+            WakesOnce {
+                reader: remote_read,
+                woke: false,
+            },
+            remote_write,
+            target_read,
+            target_write,
+        ));
+
+        tokio::task::yield_now().await;
+        tokio::time::advance(GENERIC_SERVER_INACTIVITY).await;
+        assert!(relay.await.unwrap().is_ok());
+        drop(remote_peer);
+        drop(target_peer);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn generic_server_half_close_drains_the_other_direction() {
+        let (mut remote_peer, remote_stream) = tokio::io::duplex(4096);
+        let (mut target_peer, target_stream) = tokio::io::duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (target_read, target_write) = io::split(target_stream);
+        let relay = tokio::spawn(relay_with_inactivity(
+            remote_read,
+            remote_write,
+            target_read,
+            target_write,
+        ));
+
+        remote_peer.write_all(b"request").await.unwrap();
+        let mut request = [0_u8; 7];
+        target_peer.read_exact(&mut request).await.unwrap();
+        assert_eq!(&request, b"request");
+        remote_peer.shutdown().await.unwrap();
+
+        target_peer.write_all(b"response").await.unwrap();
+        let mut response = [0_u8; 8];
+        remote_peer.read_exact(&mut response).await.unwrap();
+        assert_eq!(&response, b"response");
+        target_peer.shutdown().await.unwrap();
+
+        assert!(relay.await.unwrap().is_ok());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn generic_server_target_connect_timeout_remains_five_seconds() {
+        let connect = bounded_target_connect(std::future::pending());
+        let task = tokio::spawn(connect);
+        tokio::task::yield_now().await;
+        tokio::time::advance(TARGET_CONNECT_TIMEOUT).await;
+        let error = task.await.unwrap().unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        assert_eq!(TARGET_CONNECT_TIMEOUT, Duration::from_secs(5));
+    }
+
+    #[test]
+    fn generic_server_peer_diagnostics_are_redacted() {
+        let peer = super::super::runtime::peer_identity::test_fixtures::distinct_peer(23);
+        let destination = peer.destination().to_owned();
+        let diagnostics = format!("{peer:?}");
+        assert!(!diagnostics.contains(&destination));
+        assert!(diagnostics.contains("<redacted>"));
     }
 
     #[tokio::test]

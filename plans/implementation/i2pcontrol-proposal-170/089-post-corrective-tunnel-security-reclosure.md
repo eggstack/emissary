@@ -1,6 +1,6 @@
 # M089 — Post-Corrective Tunnel Security Reclosure
 
-Status: future — blocked on M087 and M088 closure
+Status: ready — M087 and M088 closed; lower-layer limitation accepted as out of scope
 
 Source roadmaps:
 

@@ -1,6 +1,6 @@
 # M088 — Pre-Accept Server Admission Boundary Corrective
 
-Status: ready — M087 closed; lower-layer capability mapping is now executable
+Status: closed — Tier 3 unsupported lower-layer semantic; see M088 closure
 
 Source roadmaps:
 

@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel runtime functionally complete; M087-M090 tunnel-security corrective sequence closed; M091 blocked
+Status: partial Proposal 170 support; tunnel runtime functionally complete; M087-M091 tunnel-security corrective sequence closed
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -21,7 +21,7 @@ Authoritative planning references:
 
 Pinned Proposal 170 revision: `2026-05-20`.
 
-Current M090 planning baseline: `f0f3fc2204318c2fac69817d347df2702c51287b`.
+Current M091 planning baseline: `f0f3fc2204318c2fac69817d347df2702c51287b`.
 
 ## Internal-only rule
 
@@ -34,23 +34,23 @@ ADR-0003 authorizes the bounded Proposal 170 tunnel data planes while preserving
 The implementation target remains:
 
 - keep runtime/filter/admission policy in `emissary-cli/src/i2pcontrol/**` wherever technically possible;
-- avoid new `emissary-core/**` production changes;
+- keep any lower-layer change narrowly scoped and explicitly contained;
 - apply or reject every runtime-relevant option before allocation;
 - keep persistent server secrets backend-owned and redacted;
 - keep startup-managed tunnel behavior separate from Proposal 170 TunnelManager ownership;
 - avoid hosted CI/fuzz/soak/release machinery for this bounded workstream.
 
-M087-M090 do not authorize a Proposal 170 wire expansion, broad router/core refactor, parallel SAM implementation, Yosemite fork/vendor/patch, or dependency widening. If M088 proves a dependency-boundary change is genuinely required, it must stop and produce a separate explicit plan.
+M087-M090 did not authorize a Proposal 170 wire expansion, broad router/core refactor, parallel SAM implementation, Yosemite fork/vendor/patch, or dependency widening. M091 is the separately authorized narrow exception: its vendored Yosemite maintenance copy carries one typed streaming-concurrency option into core.
 
 ## Current handoff
 
 No implementation plan is currently dependency-ready in this tunnel-security
-sequence. M090 is closed with
-`plans/closure/i2pcontrol-proposal-170/090-closure.md`.
+sequence. M090 and M091 are closed with dedicated closure records.
 
 Future/dependency-gated handoffs:
 
-- M091 remains blocked by the absent Yosemite/SAM transport for pre-accept streaming concurrency policy; its M090 dependency is now satisfied.
+- the independent current-head tunnel-security reclosure remains in the
+  roadmap and is not registered until the normal next-handoff review.
 
 Per `plans/003-planning-process.md`, only the next executable handoff is registered `ready`.
 
@@ -96,6 +96,7 @@ The same review found no current reason to add speculative HTTP or Streamr produ
 | M088 | closed; Tier 3 unsupported lower-layer semantic | lower-layer/pre-accept admission evidence and residual-risk disposition |
 | M089 | **closed** | independent post-corrective tunnel-security reclosure; current-head authority |
 | M090 | **closed** | resolver-free server targets and IRC half-close correction |
+| M091 | **closed** | pre-accept stream concurrency boundary hardening |
 
 ## Current corrective sequence
 
@@ -110,12 +111,14 @@ M089 independent security reclosure      [CLOSED]
              |
              v
 M090 resolver-free loopback + IRC half-close [CLOSED]
+             |
+             v
+M091 pre-accept stream concurrency       [CLOSED]
 ```
 
 M087 -> M088 was an administrative sequencing dependency and is now satisfied.
-M088's unsupported lower-layer semantic is accepted as out of scope; M089 and
-M090 are closed. M091 remains explicitly blocked on the lower-layer transport
-boundary.
+M088's unsupported lower-layer semantic is addressed by M091's narrow
+concurrency defense; M089, M090, and M091 are closed.
 
 ## M087 handoff summary
 
@@ -225,9 +228,9 @@ M051 remains blocked by absent substantive news/banned-peer owners. AddressBook 
 
 ## Final status rule
 
-M090 is closed. No tunnel-security implementation plan is currently executable;
-M091 remains blocked until its lower-layer transport/dependency boundary is
-resolved.
+M090 and M091 are closed. No tunnel-security implementation plan is currently
+registered; the future independent current-head reclosure remains in the
+roadmap pending the normal next-handoff review.
 
 M085 remains valid historical reclosure authority for its pinned head. M089 is
 the current-head runtime/security reclosure authority for its pinned head, and

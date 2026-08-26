@@ -276,6 +276,9 @@ impl<R: Runtime> SamSession<R> {
             format!("SESSION STATUS RESULT=OK DESTINATION={privkey}\n").as_bytes().to_vec(),
         );
 
+        let stream_manager =
+            StreamManager::new_with_session_options(dest.clone(), *signing_key.clone(), &options);
+
         Self {
             address_book,
             datagram_manager: DatagramManager::new(
@@ -311,7 +314,7 @@ impl<R: Runtime> SamSession<R> {
             },
             signing_key: *signing_key.clone(),
             socket: Some(socket),
-            stream_manager: StreamManager::new(dest, *signing_key),
+            stream_manager,
             sub_session_tx,
             waker: None,
             observation_hook,

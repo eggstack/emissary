@@ -34,6 +34,7 @@ core_inspection = [
   "emissary-core/src/tunnel/mod.rs",
 ]
 core_owner_hooks = [
+  "emissary-core/src/sam/protocol/streaming/config.rs",
   "emissary-core/src/sam/mod.rs",
   "emissary-core/src/transport/ntcp2/mod.rs",
   "emissary-core/src/transport/ntcp2/session/active.rs",
@@ -239,6 +240,16 @@ why_upstream_insufficient = "The listener owner alone observes authoritative lis
 sensitivity = "lifecycle hook"
 seam = "passive lifecycle hook"
 reference = "M058 ledger path; M060 SAM review"
+
+[[evidence]]
+path = "emissary-core/src/sam/protocol/streaming/config.rs"
+owner = "SAM streaming configuration owner"
+purpose = "Translates the explicitly authorized bounded STREAM concurrency option into core stream configuration."
+consumer = "StreamManager pre-accept concurrency boundary."
+why_upstream_insufficient = "The vendored Yosemite maintenance copy exposes the standard session option, while this owner validates and bounds its core representation."
+sensitivity = "bounded admission configuration"
+seam = "session option handoff"
+reference = "M091 closure; amended M062 containment authority"
 
 [[evidence]]
 path = "emissary-core/src/sam/protocol/streaming/mod.rs"

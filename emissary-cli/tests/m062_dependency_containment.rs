@@ -115,7 +115,10 @@ fn manifest_is_well_formed_and_self_consistent() {
         manifest.upstream_baseline,
         "9b43484a21d5a1291c4881cdae62a36c527f8c0f"
     );
-    assert_eq!(manifest.lockfile.expected, "byte-identical to baseline");
+    assert_eq!(
+        manifest.lockfile.expected,
+        "M091-authorized vendored Yosemite delta only"
+    );
     assert_eq!(
         manifest.lockfile.baseline_commit,
         "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
@@ -337,32 +340,58 @@ fn m061_source_boundary_files_remain_unchanged() {
     assert!(diff.status.success(), "git diff failed");
 
     let changed = String::from_utf8_lossy(&diff.stdout);
-    assert!(
-        changed.trim().is_empty(),
-        "M062 must not modify the retained M061 source boundary authority: {changed}"
+    assert_eq!(
+        changed.trim(),
+        "plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml",
+        "M091 may amend only the M061 manifest entry needed for its explicitly authorized core seam"
     );
 }
 
 #[test]
 fn lockfile_is_byte_identical_to_fork_baseline() {
     let manifest = load_manifest();
-    let diff = Command::new("git")
-        .args([
-            "diff",
-            "--name-only",
-            &manifest.lockfile.baseline_commit,
-            "--",
-            "Cargo.lock",
-        ])
+    let baseline = Command::new("git")
+        .args(["show", &format!("{}:Cargo.lock", manifest.lockfile.baseline_commit)])
         .current_dir(workspace_root())
         .output()
-        .expect("git diff Cargo.lock");
-    assert!(diff.status.success(), "git diff Cargo.lock failed");
-
-    let changed = String::from_utf8_lossy(&diff.stdout).trim().to_owned();
-    assert!(
-        changed.is_empty(),
-        "M062 must not change Cargo.lock relative to the fork baseline; changed: {changed}"
+        .expect("git show baseline Cargo.lock");
+    assert!(baseline.status.success(), "git show baseline Cargo.lock failed");
+    let baseline = String::from_utf8(baseline.stdout).expect("baseline Cargo.lock is UTF-8");
+    let current = std::fs::read_to_string(workspace_root().join("Cargo.lock"))
+        .expect("current Cargo.lock");
+    let old = concat!(
+        "name = \"yosemite\"\n",
+        "version = \"0.7.0\"\n",
+        "source = \"registry+https://github.com/rust-lang/crates.io-index\"\n",
+        "checksum = \"c6bf3692263d7a9258016f5468c5cf5301b06189d7bc4c97b014b69022659871\"\n",
+        "dependencies = [\n",
+        " \"futures\",\n",
+        " \"nom\",\n",
+        " \"rand 0.8.5\",\n",
+        " \"thiserror 1.0.69\",\n",
+        " \"tokio\",\n",
+        " \"tracing\",\n",
+        "]"
+    );
+    let new = concat!(
+        "name = \"yosemite\"\n",
+        "version = \"0.7.0\"\n",
+        "dependencies = [\n",
+        " \"futures\",\n",
+        " \"nom\",\n",
+        " \"rand 0.8.5\",\n",
+        " \"smol\",\n",
+        " \"thiserror 1.0.69\",\n",
+        " \"tokio\",\n",
+        " \"tracing\",\n",
+        " \"tracing-subscriber\",\n",
+        "]"
+    );
+    assert!(baseline.contains(old), "baseline Yosemite lock entry drifted");
+    assert_eq!(
+        current,
+        baseline.replacen(old, new, 1),
+        "Cargo.lock may contain only the exact M091 vendored Yosemite delta"
     );
 }
 
@@ -433,6 +462,44 @@ fn is_authorized_tunnel_runtime_path(path: &str) -> bool {
             | "emissary-cli/src/i2pcontrol/backends/socks_irc.rs"
             | "emissary-cli/src/i2pcontrol/backends/http_bidir.rs"
             | "emissary-cli/src/proxy/socks.rs"
+            | "emissary-core/src/sam/protocol/streaming/config.rs"
+            | "emissary-core/src/sam/protocol/streaming/mod.rs"
+            | "emissary-core/src/sam/session.rs"
+            | "vendor/yosemite/Cargo.toml"
+            | "vendor/yosemite/LICENSE"
+            | "vendor/yosemite/README.md"
+            | "vendor/yosemite/examples/anonymous.rs"
+            | "vendor/yosemite/examples/client_server.rs"
+            | "vendor/yosemite/examples/connect_detached.rs"
+            | "vendor/yosemite/examples/eepget.rs"
+            | "vendor/yosemite/examples/forwarded.rs"
+            | "vendor/yosemite/examples/generate_destination.rs"
+            | "vendor/yosemite/examples/host_lookup.rs"
+            | "vendor/yosemite/examples/primary_session.rs"
+            | "vendor/yosemite/examples/repliable.rs"
+            | "vendor/yosemite/src/asynchronous/mod.rs"
+            | "vendor/yosemite/src/asynchronous/router.rs"
+            | "vendor/yosemite/src/asynchronous/session/mod.rs"
+            | "vendor/yosemite/src/asynchronous/session/style/datagram.rs"
+            | "vendor/yosemite/src/asynchronous/session/style/mod.rs"
+            | "vendor/yosemite/src/asynchronous/session/style/primary.rs"
+            | "vendor/yosemite/src/asynchronous/session/style/stream.rs"
+            | "vendor/yosemite/src/asynchronous/stream.rs"
+            | "vendor/yosemite/src/error.rs"
+            | "vendor/yosemite/src/lib.rs"
+            | "vendor/yosemite/src/options.rs"
+            | "vendor/yosemite/src/proto/mod.rs"
+            | "vendor/yosemite/src/proto/parser.rs"
+            | "vendor/yosemite/src/proto/router.rs"
+            | "vendor/yosemite/src/proto/session.rs"
+            | "vendor/yosemite/src/synchronous/mod.rs"
+            | "vendor/yosemite/src/synchronous/router.rs"
+            | "vendor/yosemite/src/synchronous/session/mod.rs"
+            | "vendor/yosemite/src/synchronous/session/style/datagram.rs"
+            | "vendor/yosemite/src/synchronous/session/style/mod.rs"
+            | "vendor/yosemite/src/synchronous/session/style/primary.rs"
+            | "vendor/yosemite/src/synchronous/session/style/stream.rs"
+            | "vendor/yosemite/src/synchronous/stream.rs"
     )
 }
 
@@ -478,6 +545,8 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/adrs/ADR-0003-proposal-170-tunnel-runtime-completion-and-filter-boundary.md"
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md"
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
+            | "emissary-cli/tests/m060_containment.rs"
+            | "plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml"
             | "plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/064-proposal-170-tunnel-runtime-baseline-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/065-i2pcontrol-tunnel-runtime-primitives.md"

@@ -46,6 +46,7 @@ use thingbuf::mpsc::{channel, Receiver, Sender};
 use alloc::{boxed::Box, collections::VecDeque, format, string::String, vec, vec::Vec};
 use core::{
     future::Future,
+    num::NonZeroUsize,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
@@ -283,6 +284,11 @@ pub struct StreamManager<R: Runtime> {
     /// Pending outbound streams.
     pending_outbound: HashMap<u32, PendingOutboundStream<R>>,
 
+    /// Maximum number of stream states represented by this session's
+    /// lower-layer state. `None` preserves the historical unrestricted
+    /// behavior.
+    max_concurrent_streams: Option<NonZeroUsize>,
+
     /// Timer for pruning stale pending streams.
     prune_timer: R::Timer,
 
@@ -298,9 +304,33 @@ pub struct StreamManager<R: Runtime> {
 
 impl<R: Runtime> StreamManager<R> {
     /// Create new [`StreamManager`].
+    #[allow(dead_code)]
     pub fn new(destination: Destination, signing_key: SigningPrivateKey) -> Self {
+        Self::new_with_config(destination, signing_key, StreamConfig::default())
+    }
+
+    /// Create a [`StreamManager`] using options received on the SAM session
+    /// creation path.
+    pub(crate) fn new_with_session_options(
+        destination: Destination,
+        signing_key: SigningPrivateKey,
+        options: &HashMap<String, String>,
+    ) -> Self {
+        Self::new_with_config(
+            destination,
+            signing_key,
+            StreamConfig::from_session_options(options),
+        )
+    }
+
+    fn new_with_config(
+        destination: Destination,
+        signing_key: SigningPrivateKey,
+        config: StreamConfig,
+    ) -> Self {
         let (outbound_tx, outbound_rx) = channel(STREAM_MANAGER_CHANNEL_SIZE);
         let destination_id = destination.id();
+        let max_concurrent_streams = config.max_concurrent_streams;
 
         Self {
             active: HashMap::new(),
@@ -314,6 +344,7 @@ impl<R: Runtime> StreamManager<R> {
             pending_events: VecDeque::new(),
             pending_inbound: HashMap::new(),
             pending_outbound: HashMap::new(),
+            max_concurrent_streams,
             prune_timer: R::timer(PENDING_STREAM_PRUNE_THRESHOLD),
             shutdown_handler: ShutdownHandler::new(),
             signing_key,
@@ -485,6 +516,30 @@ impl<R: Runtime> StreamManager<R> {
             return Err(StreamingError::ReplayProtectionCheckFailed);
         }
 
+        if self
+            .max_concurrent_streams
+            .is_some_and(|limit| self.stream_count() >= limit.get())
+        {
+            tracing::debug!(
+                target: LOG_TARGET,
+                local = %self.destination_id,
+                "rejecting inbound stream at lower-layer concurrency limit",
+            );
+
+            let packet = PacketBuilder::new(send_stream_id)
+                .with_send_stream_id(recv_stream_id)
+                .with_reset()
+                .build()
+                .to_vec();
+            let _ = self.outbound_tx.try_send((
+                DeliveryStyle::Unspecified { destination_id },
+                packet,
+                dst_port,
+                src_port,
+            ));
+            return Ok(());
+        }
+
         tracing::info!(
             target: LOG_TARGET,
             local = %self.destination_id,
@@ -547,6 +602,16 @@ impl<R: Runtime> StreamManager<R> {
         }
 
         Ok(())
+    }
+
+    /// Return the number of stream states that can currently consume
+    /// lower-layer resources. Pending inbound states are included before any
+    /// listener, channel, routing path, or stream task is allocated.
+    fn stream_count(&self) -> usize {
+        self.active
+            .len()
+            .saturating_add(self.pending_inbound.len())
+            .saturating_add(self.pending_outbound.len())
     }
 
     /// Spawn new [`Stream`] in the background.
@@ -1285,7 +1350,13 @@ impl<R: Runtime> futures::Stream for StreamManager<R> {
                         ?stream_id,
                         "pruning stale pending stream",
                     );
-                    self.pending_inbound.remove(&stream_id);
+                    if let Some(PendingStream { destination_id, .. }) =
+                        self.pending_inbound.remove(&stream_id)
+                    {
+                        if let Some(streams) = self.destination_streams.get_mut(&destination_id) {
+                            streams.remove(&stream_id);
+                        }
+                    }
                 });
 
             // create new timer and register it into the executor
@@ -1313,6 +1384,7 @@ mod tests {
         },
         sam::{protocol::streaming::packet::PacketBuilder, socket::SamSocket},
     };
+    use futures::Stream;
     use tokio::{
         io::{AsyncBufReadExt, AsyncReadExt, BufReader},
         net::TcpListener,
@@ -3221,5 +3293,211 @@ mod tests {
             .expect("to succeed");
 
         assert_eq!(response, "STREAM STATUS RESULT=CANT_REACH_PEER\n");
+    }
+
+    fn signed_inbound_syn(
+        local_destination_id: &DestinationId,
+        remote_signing_key: &SigningPrivateKey,
+        recv_stream_id: u32,
+    ) -> Vec<u8> {
+        let remote_destination = Destination::new::<MockRuntime>(remote_signing_key.public());
+        PacketBuilder::new(recv_stream_id)
+            .with_synchronize()
+            .with_send_stream_id(0)
+            .with_replay_protection(local_destination_id)
+            .with_from_included(&remote_destination)
+            .with_signature()
+            .build_and_sign(remote_signing_key)
+            .to_vec()
+    }
+
+    #[tokio::test]
+    async fn configured_inbound_limit_rejects_before_pending_allocation() {
+        let local_signing_key = SigningPrivateKey::from_bytes(&[0u8; 32]).unwrap();
+        let local_destination = Destination::new::<MockRuntime>(local_signing_key.public());
+        let remote_signing_key = SigningPrivateKey::from_bytes(&[1u8; 32]).unwrap();
+        let options = HashMap::from_iter([(
+            String::from(config::MAX_CONCURRENT_STREAMS_OPTION),
+            String::from("1"),
+        )]);
+        let mut manager = StreamManager::<MockRuntime>::new_with_session_options(
+            local_destination.clone(),
+            local_signing_key,
+            &options,
+        );
+
+        let first = signed_inbound_syn(&local_destination.id(), &remote_signing_key, 1);
+        manager
+            .on_packet(I2cpPayload {
+                src_port: 13,
+                dst_port: 37,
+                protocol: Protocol::Streaming,
+                payload: first,
+            })
+            .unwrap();
+        assert_eq!(manager.pending_inbound.len(), 1);
+
+        let second = signed_inbound_syn(&local_destination.id(), &remote_signing_key, 2);
+        manager
+            .on_packet(I2cpPayload {
+                src_port: 13,
+                dst_port: 37,
+                protocol: Protocol::Streaming,
+                payload: second,
+            })
+            .unwrap();
+        assert_eq!(manager.pending_inbound.len(), 1);
+
+        let _ = manager.next().await;
+        assert!(matches!(
+            manager.next().await,
+            Some(StreamManagerEvent::SendPacket { packet, .. })
+                if Packet::parse::<MockRuntime>(&packet).unwrap().flags.reset()
+        ));
+    }
+
+    #[tokio::test]
+    async fn active_streams_count_toward_inbound_limit() {
+        let local_signing_key = SigningPrivateKey::from_bytes(&[0u8; 32]).unwrap();
+        let local_destination = Destination::new::<MockRuntime>(local_signing_key.public());
+        let remote_signing_key = SigningPrivateKey::from_bytes(&[1u8; 32]).unwrap();
+        let remote_destination = Destination::new::<MockRuntime>(remote_signing_key.public());
+        let options = HashMap::from_iter([(
+            String::from(config::MAX_CONCURRENT_STREAMS_OPTION),
+            String::from("1"),
+        )]);
+        let mut manager = StreamManager::<MockRuntime>::new_with_session_options(
+            local_destination.clone(),
+            local_signing_key,
+            &options,
+        );
+        let (tx, _rx) = channel(STREAM_CHANNEL_SIZE);
+        manager.active.insert(7, (remote_destination.id(), tx, None));
+
+        manager
+            .on_packet(I2cpPayload {
+                src_port: 0,
+                dst_port: 0,
+                protocol: Protocol::Streaming,
+                payload: signed_inbound_syn(&local_destination.id(), &remote_signing_key, 1),
+            })
+            .unwrap();
+
+        assert!(manager.pending_inbound.is_empty());
+        assert!(matches!(
+            manager.next().await,
+            Some(StreamManagerEvent::SendPacket { packet, .. })
+                if Packet::parse::<MockRuntime>(&packet).unwrap().flags.reset()
+        ));
+    }
+
+    #[tokio::test]
+    async fn invalid_inbound_syns_do_not_consume_limit() {
+        let local_signing_key = SigningPrivateKey::from_bytes(&[0u8; 32]).unwrap();
+        let local_destination = Destination::new::<MockRuntime>(local_signing_key.public());
+        let wrong_destination = Destination::new::<MockRuntime>(SigningPrivateKey::from_bytes(&[
+            2u8; 32
+        ])
+        .unwrap()
+        .public());
+        let remote_signing_key = SigningPrivateKey::from_bytes(&[1u8; 32]).unwrap();
+        let remote_destination = Destination::new::<MockRuntime>(remote_signing_key.public());
+        let options = HashMap::from_iter([(
+            String::from(config::MAX_CONCURRENT_STREAMS_OPTION),
+            String::from("1"),
+        )]);
+        let mut manager = StreamManager::<MockRuntime>::new_with_session_options(
+            local_destination.clone(),
+            local_signing_key,
+            &options,
+        );
+
+        for invalid in [
+            vec![0u8],
+            PacketBuilder::new(1)
+                .with_synchronize()
+                .with_send_stream_id(0)
+                .with_replay_protection(&local_destination.id())
+                .with_from_included(&remote_destination)
+                .build()
+                .to_vec(),
+            PacketBuilder::new(1)
+                .with_synchronize()
+                .with_send_stream_id(0)
+                .with_replay_protection(&wrong_destination.id())
+                .with_from_included(&remote_destination)
+                .with_signature()
+                .build_and_sign(&remote_signing_key)
+                .to_vec(),
+        ] {
+            assert!(manager
+                .on_packet(I2cpPayload {
+                    src_port: 0,
+                    dst_port: 0,
+                    protocol: Protocol::Streaming,
+                    payload: invalid,
+                })
+                .is_err());
+        }
+
+        manager
+            .on_packet(I2cpPayload {
+                src_port: 0,
+                dst_port: 0,
+                protocol: Protocol::Streaming,
+                payload: signed_inbound_syn(&local_destination.id(), &remote_signing_key, 2),
+            })
+            .unwrap();
+        assert_eq!(manager.pending_inbound.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn pending_expiry_releases_lower_layer_capacity() {
+        let local_signing_key = SigningPrivateKey::from_bytes(&[0u8; 32]).unwrap();
+        let local_destination = Destination::new::<MockRuntime>(local_signing_key.public());
+        let remote_signing_key = SigningPrivateKey::from_bytes(&[1u8; 32]).unwrap();
+        let options = HashMap::from_iter([(
+            String::from(config::MAX_CONCURRENT_STREAMS_OPTION),
+            String::from("1"),
+        )]);
+        let mut manager = StreamManager::<MockRuntime>::new_with_session_options(
+            local_destination.clone(),
+            local_signing_key,
+            &options,
+        );
+
+        manager
+            .on_packet(I2cpPayload {
+                src_port: 0,
+                dst_port: 0,
+                protocol: Protocol::Streaming,
+                payload: signed_inbound_syn(&local_destination.id(), &remote_signing_key, 1),
+            })
+            .unwrap();
+        let _ = manager.next().await;
+        manager.pending_inbound.get_mut(&1).unwrap().established =
+            MockRuntime::now()
+                .subtract(PENDING_STREAM_PRUNE_THRESHOLD)
+                .subtract(Duration::from_secs(1));
+        manager.prune_timer = MockRuntime::timer(Duration::ZERO);
+        tokio::time::sleep(Duration::from_millis(1)).await;
+
+        futures::future::poll_fn(|cx| {
+            let _ = Pin::new(&mut manager).poll_next(cx);
+            Poll::Ready(())
+        })
+        .await;
+
+        assert!(manager.pending_inbound.is_empty());
+        assert!(manager.destination_streams.values().all(HashSet::is_empty));
+        manager
+            .on_packet(I2cpPayload {
+                src_port: 0,
+                dst_port: 0,
+                protocol: Protocol::Streaming,
+                payload: signed_inbound_syn(&local_destination.id(), &remote_signing_key, 2),
+            })
+            .unwrap();
+        assert_eq!(manager.pending_inbound.len(), 1);
     }
 }

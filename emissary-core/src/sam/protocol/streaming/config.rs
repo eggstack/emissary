@@ -21,6 +21,15 @@
 use alloc::string::String;
 use core::{num::NonZeroUsize, time::Duration};
 
+use hashbrown::HashMap;
+
+/// Standard SAM/I2CP option for the per-session streaming concurrency limit.
+pub(crate) const MAX_CONCURRENT_STREAMS_OPTION: &str = "i2p.streaming.maxConcurrentStreams";
+
+/// Keep explicitly configured lower-layer state bounded even when a session is
+/// not created by Emissary's accepted-server runtime.
+const MAX_CONFIGURED_CONCURRENT_STREAMS: usize = 4096;
+
 /// Inactivity action.
 #[derive(Debug)]
 pub enum InactivityAction {
@@ -233,6 +242,31 @@ impl Default for StreamConfig {
             rttdev_dampening: 0.75f64,
             wdw_dampening: 0.75f64,
             write_timeout: None,
+        }
+    }
+}
+
+impl StreamConfig {
+    /// Build the consumed portion of streaming configuration from SAM session
+    /// options. The option is deliberately opt-in: absent or invalid values
+    /// preserve the historical unrestricted default.
+    pub(crate) fn from_session_options(options: &HashMap<String, String>) -> Self {
+        let max_concurrent_streams = options.get(MAX_CONCURRENT_STREAMS_OPTION).and_then(|value| {
+            match value.parse::<NonZeroUsize>() {
+                Ok(value) if value.get() <= MAX_CONFIGURED_CONCURRENT_STREAMS => Some(value),
+                _ => {
+                    tracing::warn!(
+                        target: super::LOG_TARGET,
+                        "ignoring invalid streaming concurrency option",
+                    );
+                    None
+                }
+            }
+        });
+
+        Self {
+            max_concurrent_streams,
+            ..Default::default()
         }
     }
 }

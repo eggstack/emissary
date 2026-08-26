@@ -18,6 +18,9 @@ fn source(path: &str) -> String {
 #[test]
 fn core_changes_stay_inside_the_accepted_m060_budget() {
     let allowed = BTreeSet::from([
+        // M091-approved lower-layer streaming configuration seam; M060's original budget
+        // remains unchanged for all other core paths.
+        "emissary-core/src/sam/protocol/streaming/config.rs",
         "emissary-core/src/error/mod.rs",
         "emissary-core/src/events.rs",
         "emissary-core/src/i2cp/socket.rs",

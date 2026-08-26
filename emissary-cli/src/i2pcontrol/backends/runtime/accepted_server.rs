@@ -1,7 +1,7 @@
-use std::{fmt, sync::Arc, time::Duration};
+use std::{fmt, num::NonZeroUsize, sync::Arc, time::Duration};
 
 use futures::{future::BoxFuture, FutureExt};
-use tokio::sync::{oneshot, watch};
+use tokio::sync::{oneshot, watch, Mutex};
 use yosemite::{style, DestinationKind, Session, SessionOptions, Stream};
 
 use crate::i2pcontrol::server_secret_store::StoredDestination;
@@ -79,6 +79,7 @@ pub async fn run_accepted_server(
     mut cancellation: watch::Receiver<bool>,
     ready: oneshot::Sender<Result<String, AcceptedServerRuntimeError>>,
 ) -> Result<(), AcceptedServerRuntimeError> {
+    let max_connections = config.admission.max_concurrent_connections();
     let mut session = tokio::select! {
         _ = cancellation.changed() => {
             let _ = ready.send(Err(AcceptedServerRuntimeError::SessionSetup));
@@ -92,6 +93,7 @@ pub async fn run_accepted_server(
                 private_key: config.destination.as_str().to_owned(),
             },
             lease_set_enc_type: config.lease_set_enc_type.clone(),
+            max_concurrent_streams: NonZeroUsize::new(max_connections),
             ..Default::default()
         }) => match result {
             Ok(session) => session,
@@ -104,7 +106,6 @@ pub async fn run_accepted_server(
 
     let public_destination = session.destination().to_owned();
     let _ = ready.send(Ok(public_destination));
-    let max_connections = config.admission.max_concurrent_connections();
     let admission = ServerAdmissionState::new(config.admission);
     let handler = config.handler;
     let mut tasks = BoundedTaskGroup::new(max_connections);
@@ -155,15 +156,24 @@ mod tests {
     use super::super::peer_identity::test_fixtures::NULL_CERT_DESTINATION_BYTES;
 
     async fn fake_sam(peer_destination: Arc<String>) -> (u16, tokio::task::JoinHandle<()>) {
+        fake_sam_with_capture(peer_destination, Arc::new(Mutex::new(Vec::new()))).await
+    }
+
+    async fn fake_sam_with_capture(
+        peer_destination: Arc<String>,
+        session_commands: Arc<Mutex<Vec<String>>>,
+    ) -> (u16, tokio::task::JoinHandle<()>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let peer_text = peer_destination.clone();
+        let commands = session_commands.clone();
         let task = tokio::spawn(async move {
             loop {
                 let Ok((stream, _)) = listener.accept().await else {
                     break;
                 };
                 let peer_text = Arc::clone(&peer_text);
+                let commands = Arc::clone(&commands);
                 tokio::spawn(async move {
                     let (read_half, mut write_half) = stream.into_split();
                     let mut reader = BufReader::new(read_half);
@@ -176,6 +186,7 @@ mod tests {
                         let response = if line.starts_with("HELLO") {
                             "HELLO REPLY RESULT=OK VERSION=3.3\n".to_owned()
                         } else if line.starts_with("SESSION CREATE") {
+                            commands.lock().await.push(line.clone());
                             "SESSION STATUS RESULT=OK DESTINATION=server-destination\n".to_owned()
                         } else if line.starts_with("STREAM ACCEPT") {
                             format!("STREAM STATUS RESULT=OK\n{}\n", peer_text.as_str())
@@ -190,6 +201,36 @@ mod tests {
             }
         });
         (port, task)
+    }
+
+    #[tokio::test]
+    async fn accepted_server_carries_application_concurrency_to_stream_session() {
+        let peer_text: Arc<String> =
+            Arc::new(base64_encode(NULL_CERT_DESTINATION_BYTES.as_slice()));
+        let commands = Arc::new(Mutex::new(Vec::new()));
+        let (sam_port, sam_task) = fake_sam_with_capture(peer_text, Arc::clone(&commands)).await;
+        let config = AcceptedServerRuntimeConfig {
+            name: "accepted-server-limit".to_owned(),
+            sam_tcp_port: sam_port,
+            destination: StoredDestination::from_private(base64_encode([7u8; 128])),
+            admission: ServerAdmissionPolicy::new(7, 0, 0, 0, 0, 0, 0).unwrap(),
+            lease_set_enc_type: None,
+            handler: Arc::new(|_| Box::pin(async {})),
+        };
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (ready_tx, ready_rx) = oneshot::channel();
+        let runtime = tokio::spawn(run_accepted_server(config, cancel_rx, ready_tx));
+
+        assert_eq!(ready_rx.await.unwrap().unwrap(), "server-destination");
+        let commands = commands.lock().await;
+        assert!(commands.iter().any(|command| {
+            command.contains("i2p.streaming.maxConcurrentStreams=7")
+        }));
+        drop(commands);
+
+        cancel_tx.send(true).unwrap();
+        assert!(runtime.await.unwrap().is_ok());
+        sam_task.abort();
     }
 
     #[tokio::test]

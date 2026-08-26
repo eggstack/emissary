@@ -1,6 +1,12 @@
 //! Bounded registration-filtered control-plane-owned IRC server tunnel.
 
-use std::{collections::HashMap, future::Future, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    future::Future,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
 
 use futures::FutureExt;
 use parking_lot::Mutex;
@@ -16,7 +22,7 @@ use super::{
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
 use crate::i2pcontrol::{
-    backends::{runtime::*, server::SERVER_IDENTITY_KEY},
+    backends::{http_server::normalize_loopback_target, runtime::*, server::SERVER_IDENTITY_KEY},
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
     server_secret_store::{ServerDestinationStore, StoredDestination},
 };
@@ -37,7 +43,7 @@ pub const POST_REGISTRATION_INACTIVITY: Duration = Duration::from_secs(10 * 60);
 #[derive(Debug, Clone)]
 struct IrcServerConfig {
     name: String,
-    target_host: String,
+    target_address: IpAddr,
     target_port: u16,
     sam_tcp_port: u16,
     destination: StoredDestination,
@@ -220,10 +226,10 @@ impl IrcServerRuntimeSupervisor {
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
             let handler: AcceptedServerHandler = Arc::new(move |connection| {
-                let host = config.target_host.clone();
+                let address = config.target_address;
                 let port = config.target_port;
                 Box::pin(async move {
-                    let _ = handle_accepted_connection(connection, host, port).await;
+                    let _ = handle_accepted_connection(connection, address, port).await;
                 })
             });
             let result = std::panic::AssertUnwindSafe(run_accepted_server(
@@ -294,7 +300,7 @@ impl IrcServerRuntimeSupervisor {
 
 async fn handle_accepted_connection(
     connection: AcceptedServerConnection,
-    target_host: String,
+    target_address: IpAddr,
     target_port: u16,
 ) -> io::Result<()> {
     let peer_hostname = crate::i2pcontrol::address_book_runtime::base32_for_destination(
@@ -312,7 +318,7 @@ async fn handle_accepted_connection(
     .await
     .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "IRC registration timeout"))??;
 
-    let mut local = match connect_local_target(target_host.as_str(), target_port).await {
+    let mut local = match connect_local_target(target_address, target_port).await {
         Ok(stream) => stream,
         Err(_) => return Ok(()),
     };
@@ -323,8 +329,8 @@ async fn handle_accepted_connection(
     relay_with_inactivity(remote_reader, remote_write, local_read, local_write).await
 }
 
-async fn connect_local_target(host: &str, port: u16) -> io::Result<TcpStream> {
-    bounded_connect(TcpStream::connect((host, port))).await
+async fn connect_local_target(address: IpAddr, port: u16) -> io::Result<TcpStream> {
+    bounded_connect(TcpStream::connect(SocketAddr::new(address, port))).await
 }
 
 async fn bounded_connect<F>(connect: F) -> io::Result<TcpStream>
@@ -359,13 +365,25 @@ where
         activity_tx.clone(),
     ));
     let mut local_to_remote = Box::pin(relay_direction(local_read, remote_write, activity_tx));
+    let mut remote_to_local_active = true;
+    let mut local_to_remote_active = true;
     let deadline = tokio::time::sleep(POST_REGISTRATION_INACTIVITY);
     tokio::pin!(deadline);
 
     loop {
+        if !remote_to_local_active && !local_to_remote_active {
+            return Ok(());
+        }
+
         tokio::select! {
-            result = &mut remote_to_local => return result,
-            result = &mut local_to_remote => return result,
+            result = &mut remote_to_local, if remote_to_local_active => {
+                remote_to_local_active = false;
+                result?;
+            }
+            result = &mut local_to_remote, if local_to_remote_active => {
+                local_to_remote_active = false;
+                result?;
+            }
             changed = activity_rx.changed() => {
                 if changed.is_err() {
                     return Ok(());
@@ -599,11 +617,11 @@ impl IrcServerTunnelBackend {
             .or_else(|| definition.raw_config.get("Host"))
             .and_then(|value| value.as_str())
             .unwrap_or("127.0.0.1");
-        if !matches!(target_host, "127.0.0.1" | "localhost") {
-            return Err(BackendError::Internal {
+        let target_address = normalize_loopback_target(target_host, false).ok_or_else(|| {
+            BackendError::Internal {
                 message: "ircserver target host must be loopback".to_owned(),
-            });
-        }
+            }
+        })?;
         let target_port = definition
             .options
             .target_port
@@ -614,7 +632,7 @@ impl IrcServerTunnelBackend {
             })?;
         Ok(IrcServerConfig {
             name: definition.name.as_str().to_owned(),
-            target_host: target_host.to_owned(),
+            target_address,
             target_port,
             sam_tcp_port: self.sam_tcp_port,
             destination: StoredDestination::from_private(String::new()),
@@ -838,9 +856,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remote_eof_ends_relay() {
-        let (remote_peer, remote_stream) = duplex(4096);
-        let (local_peer, local_stream) = duplex(4096);
+    async fn remote_eof_allows_local_to_remote_drain() {
+        let (mut remote_peer, remote_stream) = duplex(4096);
+        let (mut local_peer, local_stream) = duplex(4096);
         let (remote_read, remote_write) = io::split(remote_stream);
         let (local_read, local_write) = io::split(local_stream);
         let relay = tokio::spawn(relay_with_inactivity(
@@ -849,19 +867,19 @@ mod tests {
             local_read,
             local_write,
         ));
-        drop(remote_peer);
-        assert!(tokio::time::timeout(Duration::from_secs(1), relay)
-            .await
-            .unwrap()
-            .unwrap()
-            .is_ok());
-        drop(local_peer);
+        remote_peer.shutdown().await.unwrap();
+        local_peer.write_all(b"response").await.unwrap();
+        let mut response = [0_u8; 8];
+        remote_peer.read_exact(&mut response).await.unwrap();
+        assert_eq!(&response, b"response");
+        local_peer.shutdown().await.unwrap();
+        assert!(relay.await.unwrap().is_ok());
     }
 
     #[tokio::test]
-    async fn local_eof_ends_relay_without_waiting_for_idle_expiry() {
-        let (remote_peer, remote_stream) = duplex(4096);
-        let (local_peer, local_stream) = duplex(4096);
+    async fn local_eof_allows_remote_to_local_drain() {
+        let (mut remote_peer, remote_stream) = duplex(4096);
+        let (mut local_peer, local_stream) = duplex(4096);
         let (remote_read, remote_write) = io::split(remote_stream);
         let (local_read, local_write) = io::split(local_stream);
         let relay = tokio::spawn(relay_with_inactivity(
@@ -870,13 +888,41 @@ mod tests {
             local_read,
             local_write,
         ));
-        drop(local_peer);
-        assert!(tokio::time::timeout(Duration::from_secs(1), relay)
-            .await
-            .unwrap()
-            .unwrap()
-            .is_ok());
-        drop(remote_peer);
+        local_peer.shutdown().await.unwrap();
+        remote_peer.write_all(b"request").await.unwrap();
+        let mut request = [0_u8; 7];
+        local_peer.read_exact(&mut request).await.unwrap();
+        assert_eq!(&request, b"request");
+        remote_peer.shutdown().await.unwrap();
+        assert!(relay.await.unwrap().is_ok());
+    }
+
+    #[tokio::test]
+    async fn half_close_completion_releases_admission_lease() {
+        let (mut remote_peer, remote_stream) = duplex(4096);
+        let (mut local_peer, local_stream) = duplex(4096);
+        let (remote_read, remote_write) = io::split(remote_stream);
+        let (local_read, local_write) = io::split(local_stream);
+        let admission =
+            ServerAdmissionState::new(ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap());
+        let peer =
+            crate::i2pcontrol::backends::runtime::peer_identity::test_fixtures::distinct_peer(8);
+        let lease = match admission.try_acquire(&peer) {
+            AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected admission result: {other:?}"),
+        };
+        let relay = tokio::spawn(async move {
+            let _lease = lease;
+            relay_with_inactivity(remote_read, remote_write, local_read, local_write).await
+        });
+
+        remote_peer.shutdown().await.unwrap();
+        local_peer.shutdown().await.unwrap();
+        assert!(relay.await.unwrap().is_ok());
+        assert!(matches!(
+            admission.try_acquire(&peer),
+            AdmissionDecision::Allowed(_)
+        ));
     }
 
     #[tokio::test(start_paused = true)]
@@ -893,12 +939,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn target_host_is_normalized_to_a_literal_loopback_address() {
+        let backend = IrcServerTunnelBackend::new(1, ServerDestinationStore::new("."));
+        let mut definition = definition("identity");
+        definition
+            .raw_config
+            .insert("TargetHost".to_owned(), serde_json::json!("localhost"));
+        let config = backend.config_without_destination(&definition).await.unwrap();
+        assert_eq!(
+            config.target_address,
+            "127.0.0.1".parse::<IpAddr>().unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn target_host_is_loopback_confined() {
+        let backend = IrcServerTunnelBackend::new(1, ServerDestinationStore::new("."));
+        let mut definition = definition("identity");
+        definition
+            .raw_config
+            .insert("TargetHost".to_owned(), serde_json::json!("10.0.0.1"));
+        assert!(matches!(
+            backend.config_without_destination(&definition).await,
+            Err(BackendError::Internal { message })
+                if message == "ircserver target host must be loopback"
+        ));
+    }
+
+    #[tokio::test]
     async fn published_hosting_destination_does_not_become_local_target() {
         let backend = IrcServerTunnelBackend::new(1, ServerDestinationStore::new("."));
         let mut definition = definition("identity");
         definition.options.hosting_destination = Some("published-router-info".to_owned());
         let config = backend.config_without_destination(&definition).await.unwrap();
-        assert_eq!(config.target_host, "127.0.0.1");
+        assert_eq!(
+            config.target_address,
+            "127.0.0.1".parse::<IpAddr>().unwrap()
+        );
     }
 
     async fn fake_sam() -> (u16, tokio::task::JoinHandle<()>) {

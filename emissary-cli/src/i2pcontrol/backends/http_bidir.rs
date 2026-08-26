@@ -16,7 +16,7 @@ use super::{
         http_client::HttpClientPolicy,
     },
     http_client::make_no_outproxy_handler,
-    http_server::{make_accepted_handler, PostLimiter},
+    http_server::{make_accepted_handler, normalize_loopback_target, PostLimiter},
     options::{validate_options, OptionValidationError, HTTP_BIDIR_SERVER_OPTIONS},
     runtime::{
         run_accepted_server, run_client_listener, AcceptedServerRuntimeConfig,
@@ -42,7 +42,7 @@ const MAX_POST_WINDOW: u64 = 86_400;
 #[derive(Clone)]
 struct HttpBidirConfig {
     name: String,
-    target_host: String,
+    target_address: IpAddr,
     target_port: u16,
     bind_address: IpAddr,
     listen_port: u16,
@@ -337,7 +337,7 @@ async fn run_composite(
 ) -> Result<(), CompositeRuntimeError> {
     let (child_cancellation, child_receiver) = tokio::sync::watch::channel(false);
     let server_handler = make_accepted_handler(
-        config.target_host.clone(),
+        config.target_address,
         config.target_port,
         config.server_policy.clone(),
         config.post_limiter.clone(),
@@ -517,9 +517,8 @@ impl HttpBidirServerTunnelBackend {
         let target_host = raw_string(definition, "TargetHost")?
             .or(raw_string(definition, "Host")?)
             .unwrap_or_else(|| "127.0.0.1".to_owned());
-        if !matches!(target_host.as_str(), "127.0.0.1" | "localhost" | "::1") {
-            return Err(invalid_option("TargetHost must be loopback"));
-        }
+        let target_address = normalize_loopback_target(&target_host, true)
+            .ok_or_else(|| invalid_option("TargetHost must be loopback"))?;
         let target_port =
             definition.options.target_port.ok_or_else(|| BackendError::MissingOption {
                 tunnel_type: TunnelType::HttpBidirServer,
@@ -590,7 +589,7 @@ impl HttpBidirServerTunnelBackend {
 
         Ok(HttpBidirConfig {
             name: definition.name.as_str().to_owned(),
-            target_host,
+            target_address,
             target_port,
             bind_address,
             listen_port,
@@ -946,6 +945,9 @@ mod tests {
         let mut definition = definition();
         definition.options.hosting_destination = Some("published-server-destination".to_owned());
         let config = backend.config_without_destination(&definition).unwrap();
-        assert_eq!(config.target_host, "127.0.0.1");
+        assert_eq!(
+            config.target_address,
+            "127.0.0.1".parse::<IpAddr>().unwrap()
+        );
     }
 }

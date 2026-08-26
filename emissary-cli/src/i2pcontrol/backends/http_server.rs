@@ -3,6 +3,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     io,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     sync::Arc,
     time::Duration,
 };
@@ -56,7 +57,7 @@ pub const HTTP_SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
 #[derive(Debug, Clone)]
 struct HttpServerConfig {
     name: String,
-    target_host: String,
+    target_address: IpAddr,
     target_port: u16,
     sam_tcp_port: u16,
     destination: StoredDestination,
@@ -340,7 +341,7 @@ impl HttpServerRuntimeSupervisor {
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
             let handler = make_accepted_handler(
-                config.target_host.clone(),
+                config.target_address,
                 config.target_port,
                 config.policy.clone(),
                 config.post_limiter.clone(),
@@ -412,7 +413,7 @@ impl HttpServerRuntimeSupervisor {
 
 async fn handle_connection(
     connection: AcceptedServerConnection,
-    target_host: String,
+    target_address: IpAddr,
     target_port: u16,
     policy: HttpServerPolicy,
     limiter: PostLimiter,
@@ -423,7 +424,7 @@ async fn handle_connection(
         remote_read,
         remote_write,
         peer,
-        target_host,
+        target_address,
         target_port,
         policy,
         limiter,
@@ -435,17 +436,18 @@ async fn handle_connection(
 /// composed `httpbidirserver` backend. Keeping this seam here ensures the
 /// composite cannot accidentally grow a second HTTP server filter path.
 pub(crate) fn make_accepted_handler(
-    target_host: String,
+    target_address: IpAddr,
     target_port: u16,
     policy: HttpServerPolicy,
     limiter: PostLimiter,
 ) -> AcceptedServerHandler {
     Arc::new(move |connection| {
-        let target_host = target_host.clone();
+        let target_address = target_address;
         let policy = policy.clone();
         let limiter = limiter.clone();
         Box::pin(async move {
-            let _ = handle_connection(connection, target_host, target_port, policy, limiter).await;
+            let _ =
+                handle_connection(connection, target_address, target_port, policy, limiter).await;
         })
     })
 }
@@ -454,7 +456,7 @@ async fn handle_http_stream<R, W>(
     remote_read: R,
     mut remote_write: W,
     peer: TrustedPeerIdentity,
-    target_host: String,
+    target_address: IpAddr,
     target_port: u16,
     policy: HttpServerPolicy,
     limiter: PostLimiter,
@@ -478,7 +480,7 @@ where
 
     let local = match tokio::time::timeout(
         CONNECT_TIMEOUT,
-        TcpStream::connect((target_host.as_str(), target_port)),
+        TcpStream::connect(SocketAddr::new(target_address, target_port)),
     )
     .await
     {
@@ -503,6 +505,16 @@ where
     };
     remote_write.write_all(&response.head).await?;
     copy_response_body(&mut local_reader, &mut remote_write, &response).await
+}
+
+/// Normalize the small, pre-existing local-target compatibility surface to a
+/// literal address before any accepted stream can reach socket connection.
+pub(crate) fn normalize_loopback_target(host: &str, allow_ipv6: bool) -> Option<IpAddr> {
+    match host {
+        "127.0.0.1" | "localhost" => Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+        "::1" if allow_ipv6 => Some(IpAddr::V6(Ipv6Addr::LOCALHOST)),
+        _ => None,
+    }
 }
 
 async fn send_error<W: tokio::io::AsyncWrite + Unpin>(
@@ -559,12 +571,12 @@ impl HttpServerTunnelBackend {
         let target_host = raw_string(definition, "TargetHost")?
             .or(raw_string(definition, "Host")?)
             .unwrap_or_else(|| "127.0.0.1".to_owned());
-        if !matches!(target_host.as_str(), "127.0.0.1" | "localhost" | "::1") {
-            return Err(BackendError::UnsupportedOption {
+        let target_address = normalize_loopback_target(&target_host, true).ok_or_else(|| {
+            BackendError::UnsupportedOption {
                 tunnel_type: TunnelType::HttpServer,
                 option: "TargetHost must be loopback".to_owned(),
-            });
-        }
+            }
+        })?;
         let website_host = configured_host(definition)?;
         let access_list = raw_string(definition, "AccessList")?
             .or_else(|| definition.options.access_list.clone())
@@ -600,7 +612,7 @@ impl HttpServerTunnelBackend {
         }
         Ok(HttpServerConfig {
             name: definition.name.as_str().to_owned(),
-            target_host,
+            target_address,
             target_port,
             sam_tcp_port: self.sam_tcp_port,
             destination: StoredDestination::from_private(String::new()),
@@ -890,13 +902,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn target_host_is_normalized_to_a_literal_loopback_address() {
+        let root = tempfile::tempdir().unwrap();
+        let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
+
+        let localhost = backend
+            .config_without_destination(&definition(&[(
+                "TargetHost",
+                serde_json::json!("localhost"),
+            )]))
+            .await
+            .unwrap();
+        assert_eq!(localhost.target_address, IpAddr::V4(Ipv4Addr::LOCALHOST));
+
+        let ipv6 = backend
+            .config_without_destination(&definition(&[("TargetHost", serde_json::json!("::1"))]))
+            .await
+            .unwrap();
+        assert_eq!(ipv6.target_address, IpAddr::V6(Ipv6Addr::LOCALHOST));
+    }
+
+    #[tokio::test]
     async fn persisted_public_destination_does_not_select_local_target() {
         let root = tempfile::tempdir().unwrap();
         let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
         let mut definition = definition(&[]);
         definition.options.hosting_destination = Some("published-server-destination".to_owned());
         let config = backend.config_without_destination(&definition).await.unwrap();
-        assert_eq!(config.target_host, "127.0.0.1");
+        assert_eq!(config.target_address, IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
 
     #[tokio::test]
@@ -1007,7 +1040,7 @@ mod tests {
             server_read,
             server_write,
             peer,
-            "127.0.0.1".to_owned(),
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
             local_port,
             HttpServerPolicy {
                 website_host: "localhost".to_owned(),
@@ -1066,7 +1099,7 @@ mod tests {
             server_read,
             server_write,
             peer,
-            "127.0.0.1".to_owned(),
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
             local_port,
             HttpServerPolicy {
                 website_host: "configured.i2p".to_owned(),
@@ -1112,7 +1145,7 @@ mod tests {
             server_read,
             server_write,
             distinct_peer(0xE1),
-            "127.0.0.1".to_owned(),
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
             local_port,
             HttpServerPolicy {
                 website_host: "configured.i2p".to_owned(),

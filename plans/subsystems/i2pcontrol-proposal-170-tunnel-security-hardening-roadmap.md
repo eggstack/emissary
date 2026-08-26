@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: reopened; M090 ready, M091 blocked
+Status: reopened; M090 closed, M091 blocked
 
 Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
@@ -47,7 +47,8 @@ M089 remains valid closure evidence for its pinned head `f0f3fc2204318c2fac69817
 1. HTTP/IRC server target validation accepts the compatibility hostname `localhost`, but the runtime later passes that hostname to `TcpStream::connect`; therefore the loopback-only invariant remains dependent on resolver/NSS configuration rather than on a literal socket address;
 2. `ircserver` post-registration relay terminates when either direction completes, unlike the M087-corrected generic `server` relay, so a one-sided EOF discards useful half-close/drain behavior and creates avoidable termination asymmetry.
 
-These are owned by **M090**, which is the sole dependency-ready handoff.
+These were owned by **M090**, which is now closed with a dedicated closure
+record. No tunnel-security implementation handoff is currently dependency-ready.
 
 The review also reconfirmed M088's medium residual: lower-layer inbound streaming work occurs before `ServerAdmissionState` can reject an accepted stream. The repository now has **M091** as a bounded owner for a future pre-accept stream concurrency defense. M091 is deliberately blocked because Yosemite 0.7.0, and current Yosemite `master`, do not expose a streaming-concurrency session option, while Emissary's declared `StreamConfig` admission fields are not currently carried as per-session configuration into `StreamManager`.
 
@@ -218,7 +219,7 @@ Active sequence:
 M089 closed baseline @ f0f3fc2
           |
           v
-M090 resolver-free loopback + IRC half-close        [READY]
+M090 resolver-free loopback + IRC half-close        [CLOSED @ 172a4e8]
           |
           v
 M091 pre-accept stream concurrency boundary         [BLOCKED]
@@ -227,7 +228,9 @@ M091 pre-accept stream concurrency boundary         [BLOCKED]
 future independent security reclosure               [UNREGISTERED]
 ```
 
-M091 has a hard dependency on M090 closure and an architecture/dependency blocker described in §6.2. The future reclosure remains unregistered until both implementation corrections have accepted closure evidence.
+M090's hard dependency is satisfied. M091 remains blocked by the
+architecture/dependency blocker described in §6.2. The future reclosure remains
+unregistered until M091 also has accepted closure evidence.
 
 ## 8. Milestone summary
 
@@ -267,7 +270,7 @@ Closure: `plans/closure/i2pcontrol-proposal-170/089-closure.md`.
 
 ### M090 — Server Loopback and IRC Half-Close Corrective
 
-Status: **ready**.
+Status: **closed**.
 
 Required outcome:
 
@@ -280,6 +283,8 @@ Required outcome:
 - make no dependency/core/router/startup/frontend/Proposal 170 wire change.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/090-server-loopback-and-irc-half-close-corrective.md`.
+
+Closure: `plans/closure/i2pcontrol-proposal-170/090-closure.md`.
 
 ### M091 — Pre-Accept Stream Concurrency Boundary Hardening
 
@@ -294,7 +299,9 @@ Required future outcome if unblocked:
 - preserve complete post-accept `ServerAdmissionState` as defense in depth;
 - avoid copying Java's entire per-peer/rate throttler into core absent separate evidence.
 
-Readiness requires M090 closure plus an explicitly authorized configuration/dependency strategy. The current plan does not authorize Yosemite/core/dependency changes merely by existing.
+The M090 closure dependency is satisfied. Readiness still requires an explicitly
+authorized configuration/dependency strategy. The current plan does not
+authorize Yosemite/core/dependency changes merely by existing.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/091-pre-accept-stream-concurrency-boundary-hardening.md`.
 
@@ -327,7 +334,7 @@ If later unblocked, every required path outside `i2pcontrol` must be enumerated 
 
 ### M062 planning bookkeeping
 
-The exact M062 planning allowlist includes M090/M091 plan and future closure files. This does not broaden production globs.
+The exact M062 planning allowlist includes M090/M091 plan and closure files. This does not broaden production globs.
 
 ## 10. Verification discipline
 

@@ -1,6 +1,6 @@
 # M090 — Server Loopback and IRC Half-Close Corrective
 
-Status: ready
+Status: closed — implementation complete; see `plans/closure/i2pcontrol-proposal-170/090-closure.md`
 
 Source roadmaps:
 

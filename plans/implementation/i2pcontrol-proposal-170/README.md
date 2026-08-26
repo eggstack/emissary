@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel runtime functionally complete; M087-M089 tunnel-security corrective sequence closed
+Status: partial Proposal 170 support; tunnel runtime functionally complete; M087-M090 tunnel-security corrective sequence closed; M091 blocked
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -21,7 +21,7 @@ Authoritative planning references:
 
 Pinned Proposal 170 revision: `2026-05-20`.
 
-Current M087-M089 planning baseline: `2b01bfd11ebcd768fcd5488f18b063ac336931a2`.
+Current M090 planning baseline: `f0f3fc2204318c2fac69817d347df2702c51287b`.
 
 ## Internal-only rule
 
@@ -40,17 +40,17 @@ The implementation target remains:
 - keep startup-managed tunnel behavior separate from Proposal 170 TunnelManager ownership;
 - avoid hosted CI/fuzz/soak/release machinery for this bounded workstream.
 
-M087-M089 do not authorize a Proposal 170 wire expansion, broad router/core refactor, parallel SAM implementation, Yosemite fork/vendor/patch, or dependency widening. If M088 proves a dependency-boundary change is genuinely required, it must stop and produce a separate explicit plan.
+M087-M090 do not authorize a Proposal 170 wire expansion, broad router/core refactor, parallel SAM implementation, Yosemite fork/vendor/patch, or dependency widening. If M088 proves a dependency-boundary change is genuinely required, it must stop and produce a separate explicit plan.
 
 ## Current handoff
 
 No implementation plan is currently dependency-ready in this tunnel-security
-sequence. M089 is closed with
-`plans/closure/i2pcontrol-proposal-170/089-closure.md`.
+sequence. M090 is closed with
+`plans/closure/i2pcontrol-proposal-170/090-closure.md`.
 
 Future/dependency-gated handoffs:
 
-- None. M088 is closed with its lower-layer limitation explicitly accepted as out of scope for M089.
+- M091 remains blocked by the absent Yosemite/SAM transport for pre-accept streaming concurrency policy; its M090 dependency is now satisfied.
 
 Per `plans/003-planning-process.md`, only the next executable handoff is registered `ready`.
 
@@ -63,7 +63,7 @@ M085 remains valid runtime/security closure evidence for its pinned post-M084 he
 
 These findings do not imply a direct clearnet-address leak, but they are relevant to availability and active load/timing correlation resistance.
 
-The same review found no current reason to add speculative HTTP or Streamr production semantics. HTTP already has bounded request/header/body handling and bounded fail-closed POST state; Streamr's ten-subscriber/60-second expiry model matches Java I2P and I2P+ reference behavior. M089 will recheck and record those residual risks.
+The same review found no current reason to add speculative HTTP or Streamr production semantics. HTTP already has bounded request/header/body handling and bounded fail-closed POST state; Streamr's ten-subscriber/60-second expiry model matches Java I2P and I2P+ reference behavior. M089 rechecked and recorded those residual risks; M090 changes only the two named server-boundary details.
 
 ## Historical runtime/security sequence
 
@@ -95,6 +95,7 @@ The same review found no current reason to add speculative HTTP or Streamr produ
 | M087 | closed | progress-based generic-server inactivity timeout |
 | M088 | closed; Tier 3 unsupported lower-layer semantic | lower-layer/pre-accept admission evidence and residual-risk disposition |
 | M089 | **closed** | independent post-corrective tunnel-security reclosure; current-head authority |
+| M090 | **closed** | resolver-free server targets and IRC half-close correction |
 
 ## Current corrective sequence
 
@@ -106,11 +107,15 @@ M088 pre-accept/lower-layer admission    [CLOSED / TIER 3]
              |
              v
 M089 independent security reclosure      [CLOSED]
+             |
+             v
+M090 resolver-free loopback + IRC half-close [CLOSED]
 ```
 
 M087 -> M088 was an administrative sequencing dependency and is now satisfied.
-M088's unsupported lower-layer semantic is accepted as out of scope; M089 is
-closed and no future tunnel-security handoff is currently registered.
+M088's unsupported lower-layer semantic is accepted as out of scope; M089 and
+M090 are closed. M091 remains explicitly blocked on the lower-layer transport
+boundary.
 
 ## M087 handoff summary
 
@@ -193,7 +198,7 @@ M089 rechecks the existing finite request-body relay deadline and bounded POST l
 
 ### IRC
 
-`ircserver` retains bounded registration and trusted peer-derived presentation, five-second local-target connect, and ten-minute activity-resetting post-registration idle expiry. Post-registration bytes remain raw.
+`ircserver` retains bounded registration and trusted peer-derived presentation, five-second literal-loopback target connect, ten-minute activity-resetting post-registration idle expiry, and half-close drain semantics. Post-registration bytes remain raw.
 
 ### Streamr
 
@@ -205,7 +210,7 @@ The finite subscriber set is not Sybil-resistant. M089 records this as a referen
 
 M061 remains the source-path authority. M062 plus M063 remain the dependency/feature-ownership authority.
 
-The M062 exact planning allowlist is updated only for the M087-M089 implementation/closure document pairs. This planning registration does not broaden production path globs or dependency/feature ownership.
+The M062 exact planning allowlist contains the M090/M091 implementation and closure document pairs. This planning registration does not broaden production path globs or dependency/feature ownership.
 
 ## Accepted unrelated Proposal 170 state
 
@@ -220,11 +225,14 @@ M051 remains blocked by absent substantive news/banned-peer owners. AddressBook 
 
 ## Final status rule
 
-M087 is the current executable tunnel-security handoff.
+M090 is closed. No tunnel-security implementation plan is currently executable;
+M091 remains blocked until its lower-layer transport/dependency boundary is
+resolved.
 
 M085 remains valid historical reclosure authority for its pinned head. M089 is
-now the current-head runtime/security reclosure authority; M085 remains
-historical evidence rather than being erased.
+the current-head runtime/security reclosure authority for its pinned head, and
+M090's closure records the later server-boundary corrections without rewriting
+M089's historical evidence.
 
 Proposal 170 remains separately partial for accepted source/truthfulness limitations, RouterInfo 37/1/5, M051, and unrelated AddressBook/base-I2PControl gaps.
 

@@ -1,0 +1,1756 @@
+# M095 Proposal 170 full-support contract matrix
+
+version = 1
+milestone = "M095"
+proposal = "I2PControl Expansion"
+proposal_number = 170
+proposal_status = "Open"
+proposal_revision = "2026-05-20"
+source_url = "https://i2p.net/proposals/170-i2pcontrol-expansion.txt"
+source_sha256 = "f13ae00b886c5e72131bc5d5b138a371148d1faa6899a119a1dacb65a555e7dc"
+planning_baseline = "630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207"
+current_production_head = "087ee59abb5494e1413d96af8f49f96b00948a7d"
+
+[contract_counts]
+router_info_total = 43
+router_info_available = 37
+router_info_neutral = 1
+router_info_unavailable = 5
+addressbook_setconfig = 13
+canonical_tunnel_types = 12
+canonical_tunnel_actions = 7
+client_services_selectors = 6
+
+[contract_names]
+canonical_tunnel_types = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient", "streamrclient", "server", "httpserver", "httpbidirserver", "ircserver", "streamrserver"]
+canonical_tunnel_actions = ["create", "edit", "get", "start", "stop", "restart", "delete"]
+client_services_selectors = ["I2PTunnel", "HTTPProxy", "SOCKS", "SAM", "BOB", "I2CP"]
+
+[router_info]
+canonical_key_source = "emissary-cli/src/i2pcontrol/rpc.rs::router_info_keys::PROPOSAL_170_CONTRACT"
+current_baseline = "37 available / 1 neutral / 5 unavailable"
+target_rule = "The five unavailable rows are owned by M100-M103; clockskew remains protocol-permitted neutral when no estimate exists."
+
+[[router_info.rows]]
+key = "i2p.router.news"
+json_return_type = "string"
+current_disposition = "unavailable"
+production_owner_source = "router-news"
+i2pcontrol_adapter_serializer = "serialize_router_news"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/101-routerinfo-news-source-completion.md"
+evidence_closure = "M051/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "M101"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.id"
+json_return_type = "string|null"
+current_disposition = "available"
+production_owner_source = "startup-retained"
+i2pcontrol_adapter_serializer = "serialize_router_id"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.clockskew"
+json_return_type = "integer|null"
+current_disposition = "neutral"
+production_owner_source = "router-info-control"
+i2pcontrol_adapter_serializer = "serialize_clockskew"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "neutral"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.info"
+json_return_type = "string|null"
+current_disposition = "available"
+production_owner_source = "startup-retained"
+i2pcontrol_adapter_serializer = "serialize_router_info"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.logs"
+json_return_type = "array<string>"
+current_disposition = "available"
+production_owner_source = "i2pcontrol-log-ring"
+i2pcontrol_adapter_serializer = "serialize_log_messages"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.logs.clear"
+json_return_type = "string"
+current_disposition = "available"
+production_owner_source = "i2pcontrol-log-ring"
+i2pcontrol_adapter_serializer = "serialize_log_clear"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.total.received.bytes"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "event-metrics"
+i2pcontrol_adapter_serializer = "serialize_total_received_bytes"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M049/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.total.sent.bytes"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "event-metrics"
+i2pcontrol_adapter_serializer = "serialize_total_sent_bytes"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M049/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.total.transit.bytes"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "event-metrics"
+i2pcontrol_adapter_serializer = "serialize_total_transit_bytes"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M049/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.bw.transit.15s"
+json_return_type = "integer"
+current_disposition = "unavailable"
+production_owner_source = "transit-bandwidth"
+i2pcontrol_adapter_serializer = "serialize_transit_bandwidth_15s"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/100-routerinfo-transit-15s-source-completion.md"
+evidence_closure = "M054/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "M100"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.shareratio"
+json_return_type = "number"
+current_disposition = "available"
+production_owner_source = "retained-configuration"
+i2pcontrol_adapter_serializer = "serialize_tunnel_share_ratio"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.participating.info"
+json_return_type = "array<object>"
+current_disposition = "available"
+production_owner_source = "tunnel-inspection"
+i2pcontrol_adapter_serializer = "serialize_participating_tunnel_info"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.i2ptunnel"
+json_return_type = "array<object>"
+current_disposition = "available"
+production_owner_source = "startup-tunnel-inventory"
+i2pcontrol_adapter_serializer = "serialize_i2ptunnel_quick_info"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.exploratory.inbound"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "tunnel-inspection"
+i2pcontrol_adapter_serializer = "serialize_exploratory_inbound"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.exploratory.outbound"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "tunnel-inspection"
+i2pcontrol_adapter_serializer = "serialize_exploratory_outbound"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.exploratory.info.list"
+json_return_type = "array<object>"
+current_disposition = "available"
+production_owner_source = "tunnel-inspection"
+i2pcontrol_adapter_serializer = "serialize_exploratory_info_list"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.client.inbound"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "tunnel-inspection"
+i2pcontrol_adapter_serializer = "serialize_client_inbound"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.client.outbound"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "tunnel-inspection"
+i2pcontrol_adapter_serializer = "serialize_client_outbound"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.client.info.list"
+json_return_type = "array<object>"
+current_disposition = "available"
+production_owner_source = "tunnel-inspection"
+i2pcontrol_adapter_serializer = "serialize_client_info_list"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.status.v6"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "network-state"
+i2pcontrol_adapter_serializer = "serialize_network_status_v6"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M050/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.error"
+json_return_type = "integer"
+current_disposition = "unavailable"
+production_owner_source = "network-error"
+i2pcontrol_adapter_serializer = "unavailable"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/102-routerinfo-network-error-owner-completion.md"
+evidence_closure = "M055/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "M102"
+non_i2pcontrol_production_path_required = true
+
+[[router_info.rows]]
+key = "i2p.router.net.error.v6"
+json_return_type = "integer"
+current_disposition = "unavailable"
+production_owner_source = "network-error"
+i2pcontrol_adapter_serializer = "unavailable"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/102-routerinfo-network-error-owner-completion.md"
+evidence_closure = "M055/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "M102"
+non_i2pcontrol_production_path_required = true
+
+[[router_info.rows]]
+key = "i2p.router.net.testing"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "network-state"
+i2pcontrol_adapter_serializer = "serialize_network_testing"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M050/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.testing.v6"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "network-state"
+i2pcontrol_adapter_serializer = "serialize_network_testing_v6"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M050/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.successrate"
+json_return_type = "number"
+current_disposition = "available"
+production_owner_source = "tunnel-build-metrics"
+i2pcontrol_adapter_serializer = "serialize_tunnel_success_rate"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M049/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.totalsuccessrate"
+json_return_type = "number"
+current_disposition = "available"
+production_owner_source = "event-metrics"
+i2pcontrol_adapter_serializer = "serialize_total_tunnel_success_rate"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M049/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.queue"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "tunnel-inspection"
+i2pcontrol_adapter_serializer = "serialize_tunnel_queue"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.net.tunnels.tbmqueue"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "tunnel-inspection"
+i2pcontrol_adapter_serializer = "serialize_tbm_queue"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M026/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.netdb.peers"
+json_return_type = "array<string>"
+current_disposition = "available"
+production_owner_source = "live-profile-storage-inspection"
+i2pcontrol_adapter_serializer = "serialize_netdb_peer_hashes"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M046/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.netdb.activepeers.info"
+json_return_type = "array<string>"
+current_disposition = "available"
+production_owner_source = "transport-and-live-profile-storage-inspection"
+i2pcontrol_adapter_serializer = "serialize_active_peer_router_infos"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M046/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.netdb.ntcp.limit"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "transport-manager-configuration"
+i2pcontrol_adapter_serializer = "serialize_ntcp_limit"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M047/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.netdb.ssu.limit"
+json_return_type = "integer"
+current_disposition = "available"
+production_owner_source = "transport-manager-configuration"
+i2pcontrol_adapter_serializer = "serialize_ssu_limit"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M047/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.netdb.bannedpeers"
+json_return_type = "map<string,map<string,object>>"
+current_disposition = "unavailable"
+production_owner_source = "ban-list"
+i2pcontrol_adapter_serializer = "serialize_banned_peers"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/103-routerinfo-banned-peer-semantic-completion.md"
+evidence_closure = "M051/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "M103"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.netdb.activepeers.list"
+json_return_type = "array<string>"
+current_disposition = "available"
+production_owner_source = "transport-manager-inspection"
+i2pcontrol_adapter_serializer = "serialize_active_peer_hashes"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M046/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.netdb.peers.list"
+json_return_type = "array<string>"
+current_disposition = "available"
+production_owner_source = "live-profile-storage-inspection"
+i2pcontrol_adapter_serializer = "serialize_known_peer_hashes"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M046/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.netdb.peers.info"
+json_return_type = "array<string>"
+current_disposition = "available"
+production_owner_source = "live-profile-storage-inspection"
+i2pcontrol_adapter_serializer = "serialize_peer_router_infos"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M046/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.netdb.activepeers.stats"
+json_return_type = "array<object>"
+current_disposition = "available"
+production_owner_source = "transport-manager-inspection"
+i2pcontrol_adapter_serializer = "serialize_active_peer_stats"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M047/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.addressbook.private.list"
+json_return_type = "array<map<string,string>>"
+current_disposition = "available"
+production_owner_source = "runtime-address-book-handle"
+i2pcontrol_adapter_serializer = "serialize_address_book_private_list"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M030/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.addressbook.local.list"
+json_return_type = "array<map<string,string>>"
+current_disposition = "available"
+production_owner_source = "runtime-address-book-handle"
+i2pcontrol_adapter_serializer = "serialize_address_book_local_list"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M030/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.addressbook.router.list"
+json_return_type = "array<map<string,string>>"
+current_disposition = "available"
+production_owner_source = "runtime-address-book-handle"
+i2pcontrol_adapter_serializer = "serialize_address_book_router_list"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M030/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.addressbook.published.list"
+json_return_type = "array<map<string,string>>"
+current_disposition = "available"
+production_owner_source = "runtime-address-book-handle"
+i2pcontrol_adapter_serializer = "serialize_address_book_published_list"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M030/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = false
+
+[[router_info.rows]]
+key = "i2p.router.addressbook.subscriptions"
+json_return_type = "object{path,entries}"
+current_disposition = "available"
+production_owner_source = "runtime-address-book-handle"
+i2pcontrol_adapter_serializer = "serialize_address_book_subscriptions"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M034/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = true
+
+[[router_info.rows]]
+key = "i2p.router.addressbook.config"
+json_return_type = "object{path,entries}"
+current_disposition = "available"
+production_owner_source = "runtime-address-book-handle"
+i2pcontrol_adapter_serializer = "serialize_address_book_config"
+evidence_plan = "plans/implementation/i2pcontrol-proposal-170/026-bounded-router-inspection-sources.md"
+evidence_closure = "M034/M056"
+final_target_disposition = "available"
+owning_completion_milestone = "none; retained current evidence"
+non_i2pcontrol_production_path_required = true
+
+[addressbook_setconfig]
+canonical_key_source = "emissary-cli/src/i2pcontrol/address_book.rs::{CONFIG_PATH_KEYS,CONFIG_UNSUPPORTED_KEYS}"
+current_boundary = "Every non-empty SetConfig request is rejected before persistence; this is truthful partial support."
+
+[[addressbook_setconfig.rows]]
+key = "subscriptions"
+expected_value_semantics = "string path"
+current_disposition = "rejected_path_boundary"
+classification = "path-valued"
+active_runtime_or_persistence_consumer_required = "address-book subscription downloader/runtime; M096 must activate the configured file"
+confinement_or_migration_requirement = "confined under the I2PControl AddressBook administrative root"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "published_addressbook"
+expected_value_semantics = "string path"
+current_disposition = "rejected_path_boundary"
+classification = "path-valued"
+active_runtime_or_persistence_consumer_required = "published-book persistence/publication owner"
+confinement_or_migration_requirement = "confined under the I2PControl AddressBook administrative root"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "router_addressbook"
+expected_value_semantics = "string path"
+current_disposition = "rejected_path_boundary"
+classification = "path-valued"
+active_runtime_or_persistence_consumer_required = "router-book persistence owner"
+confinement_or_migration_requirement = "confined under the I2PControl AddressBook administrative root"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "local_addressbook"
+expected_value_semantics = "string path"
+current_disposition = "rejected_path_boundary"
+classification = "path-valued"
+active_runtime_or_persistence_consumer_required = "local-book persistence owner"
+confinement_or_migration_requirement = "confined under the I2PControl AddressBook administrative root"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "private_addressbook"
+expected_value_semantics = "string path"
+current_disposition = "rejected_path_boundary"
+classification = "path-valued"
+active_runtime_or_persistence_consumer_required = "private-book persistence owner"
+confinement_or_migration_requirement = "confined under the I2PControl AddressBook administrative root"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "etags"
+expected_value_semantics = "string path"
+current_disposition = "rejected_path_boundary"
+classification = "path-valued"
+active_runtime_or_persistence_consumer_required = "subscription downloader conditional-request metadata"
+confinement_or_migration_requirement = "confined under the I2PControl AddressBook administrative root"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "last_modified"
+expected_value_semantics = "string path"
+current_disposition = "rejected_path_boundary"
+classification = "path-valued"
+active_runtime_or_persistence_consumer_required = "subscription downloader conditional-request metadata"
+confinement_or_migration_requirement = "confined under the I2PControl AddressBook administrative root"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "log"
+expected_value_semantics = "string path"
+current_disposition = "rejected_path_boundary"
+classification = "path-valued"
+active_runtime_or_persistence_consumer_required = "AddressBook-owned bounded diagnostics only; never the global logger"
+confinement_or_migration_requirement = "confined under the I2PControl AddressBook administrative root"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "update_delay"
+expected_value_semantics = "string duration-hours"
+current_disposition = "rejected_unsupported"
+classification = "behaviorally_meaningful"
+active_runtime_or_persistence_consumer_required = "subscription refresh cadence"
+confinement_or_migration_requirement = "bounded finite duration; no sub-second busy loop or unbounded timer arithmetic"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "proxy_port"
+expected_value_semantics = "string port"
+current_disposition = "rejected_unsupported"
+classification = "behaviorally_meaningful"
+active_runtime_or_persistence_consumer_required = "subscription downloader outbound proxy"
+confinement_or_migration_requirement = "validated before publication; affects future fetches only"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "proxy_host"
+expected_value_semantics = "string host"
+current_disposition = "rejected_unsupported"
+classification = "behaviorally_meaningful"
+active_runtime_or_persistence_consumer_required = "subscription downloader outbound proxy"
+confinement_or_migration_requirement = "validated before publication; not an exposed/general-purpose proxy"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "should_publish"
+expected_value_semantics = "string boolean"
+current_disposition = "rejected_unsupported"
+classification = "behaviorally_meaningful"
+active_runtime_or_persistence_consumer_required = "published address-book publication policy"
+confinement_or_migration_requirement = "bounded atomic publication; disabled mode retains the last good artifact"
+owning_milestone = "M096"
+
+[[addressbook_setconfig.rows]]
+key = "theme"
+expected_value_semantics = "string metadata"
+current_disposition = "rejected_unsupported"
+classification = "administrative_metadata"
+active_runtime_or_persistence_consumer_required = "no router/frontend consumer in scope; M096 may round-trip"
+confinement_or_migration_requirement = "must remain inert metadata and must not couple the frontend"
+owning_milestone = "M096"
+
+[tunnel_manager]
+canonical_option_source = "emissary-cli/src/i2pcontrol/tunnel_manager.rs::CANONICAL_OPTION_KEYS"
+compatibility_aliases = ["List", "Create", "Edit", "Get", "Start", "Stop", "Restart", "Delete", "i2p.tunnel.*"]
+canonical_key_rule = "The option keys below are Proposal 170 canonical input names; compatibility aliases and internal i2p.* spellings never satisfy a canonical cell."
+cell_order = "canonical_tunnel_types order in this file"
+cell_disposition_vocabulary = ["apply", "planned_apply", "not_applicable", "blocked_primitive"]
+
+[[tunnel_manager.options]]
+canonical_key = "Port"
+json_value_type = "integer"
+semantics = "local or I2P port"
+security_sensitive = false
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "none"
+current_or_planned_disposition = "apply"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply"]
+cell_notes = {}
+
+[[tunnel_manager.options]]
+canonical_key = "TargetHost"
+json_value_type = "string"
+semantics = "server local target or Streamr local UDP host"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "none"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "apply"]
+cell_notes = { "client" = "The pinned option is not applicable to this tunnel family.", "httpclient" = "The pinned option is not applicable to this tunnel family.", "ircclient" = "The pinned option is not applicable to this tunnel family.", "socks" = "The pinned option is not applicable to this tunnel family.", "socksirc" = "The pinned option is not applicable to this tunnel family.", "connectclient" = "The pinned option is not applicable to this tunnel family.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "Host"
+json_value_type = "string"
+semantics = "canonical alternate spelling for TargetHost"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "none"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "apply"]
+cell_notes = { "client" = "The pinned option is not applicable to this tunnel family.", "httpclient" = "The pinned option is not applicable to this tunnel family.", "ircclient" = "The pinned option is not applicable to this tunnel family.", "socks" = "The pinned option is not applicable to this tunnel family.", "socksirc" = "The pinned option is not applicable to this tunnel family.", "connectclient" = "The pinned option is not applicable to this tunnel family.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "TargetPort"
+json_value_type = "integer"
+semantics = "target or protocol port"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "none"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "apply", "apply", "apply"]
+cell_notes = { "socks" = "SOCKS selects the remote target during the SOCKS request; a persisted target option is not applicable.", "socksirc" = "SOCKS selects the remote target during the SOCKS request; a persisted target option is not applicable." }
+
+[[tunnel_manager.options]]
+canonical_key = "TargetDestination"
+json_value_type = "string"
+semantics = "remote I2P destination"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = true
+compatibility_aliases = []
+completion_owner = "none"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "socks" = "SOCKS selects the remote target during the SOCKS request; a persisted target option is not applicable.", "socksirc" = "SOCKS selects the remote target during the SOCKS request; a persisted target option is not applicable.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "Destination"
+json_value_type = "string"
+semantics = "canonical alternate spelling for TargetDestination"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = true
+compatibility_aliases = []
+completion_owner = "none"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "socks" = "SOCKS selects the remote target during the SOCKS request; a persisted target option is not applicable.", "socksirc" = "SOCKS selects the remote target during the SOCKS request; a persisted target option is not applicable.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "StartOnLoad"
+json_value_type = "boolean"
+semantics = "startup intent"
+security_sensitive = false
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "none"
+current_or_planned_disposition = "apply"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply"]
+cell_notes = {}
+
+[[tunnel_manager.options]]
+canonical_key = "Description"
+json_value_type = "string"
+semantics = "administrative description"
+security_sensitive = false
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "none"
+current_or_planned_disposition = "apply"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply"]
+cell_notes = {}
+
+[[tunnel_manager.options]]
+canonical_key = "ReachableBy"
+json_value_type = "string"
+semantics = "typed listener/local endpoint selector"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "none"
+current_or_planned_disposition = "apply"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply", "apply"]
+cell_notes = {}
+
+[[tunnel_manager.options]]
+canonical_key = "Shared"
+json_value_type = "boolean"
+semantics = "shared client-session request"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = true
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "UseSSL"
+json_value_type = "boolean"
+semantics = "TLS/session presentation mode where supported"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "The pinned option is not applicable to this tunnel family.", "ircclient" = "The pinned option is not applicable to this tunnel family.", "socks" = "The pinned option is not applicable to this tunnel family.", "socksirc" = "The pinned option is not applicable to this tunnel family.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "TunnelLength"
+json_value_type = "integer"
+semantics = "tunnel length, pinned range 0..3"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "TunnelVariance"
+json_value_type = "integer"
+semantics = "tunnel variance, pinned range -2..2"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "TunnelQuantity"
+json_value_type = "integer"
+semantics = "tunnel quantity, pinned range 1..6"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "TunnelBackupQuantity"
+json_value_type = "integer"
+semantics = "backup quantity, pinned range 0..3"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "SigType"
+json_value_type = "string"
+semantics = "destination signing type"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = true
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "EncType"
+json_value_type = "string"
+semantics = "destination encryption type"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = true
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "CustomOptions"
+json_value_type = "object<string,string>"
+semantics = "protocol custom option namespace"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "ProxyList"
+json_value_type = "string"
+semantics = "configured proxy/outproxy endpoint list"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "UseOutproxyPlugin"
+json_value_type = "boolean"
+semantics = "outproxy plugin selection"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "The pinned option is not applicable to this tunnel family.", "ircclient" = "The pinned option is not applicable to this tunnel family.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "ProxyAuth"
+json_value_type = "boolean"
+semantics = "local proxy authentication policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "ProxyUsername"
+json_value_type = "string"
+semantics = "local proxy username"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "ProxyPassword"
+json_value_type = "string"
+semantics = "proxy credential"
+security_sensitive = true
+secret_bearing = true
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "OutproxyAuth"
+json_value_type = "boolean"
+semantics = "outproxy authentication policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "OutproxyUsername"
+json_value_type = "string"
+semantics = "outproxy username"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "OutproxyPassword"
+json_value_type = "string"
+semantics = "outproxy credential"
+security_sensitive = true
+secret_bearing = true
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "OutproxyType"
+json_value_type = "string"
+semantics = "outproxy protocol type"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "SSLProxies"
+json_value_type = "string"
+semantics = "TLS proxy configuration"
+security_sensitive = true
+secret_bearing = false
+path_bearing = true
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "JumpList"
+json_value_type = "string"
+semantics = "proxy jump list"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "ConnectDelay"
+json_value_type = "duration"
+semantics = "connection delay"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "Profile"
+json_value_type = "string"
+semantics = "client profile selection"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "DelayOpen"
+json_value_type = "boolean"
+semantics = "defer client opening"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "Reduce"
+json_value_type = "boolean"
+semantics = "reduce client resources after idle"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "ReduceCount"
+json_value_type = "integer"
+semantics = "reduced resource count"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "ReduceTime"
+json_value_type = "duration"
+semantics = "reduction delay"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "Close"
+json_value_type = "boolean"
+semantics = "close idle client"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "CloseTime"
+json_value_type = "duration"
+semantics = "idle-close delay"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "NewDest"
+json_value_type = "boolean"
+semantics = "explicit destination/key generation"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = true
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "PersistentClientKey"
+json_value_type = "boolean"
+semantics = "persistent client identity"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = true
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "PrivKeyFile"
+json_value_type = "string path"
+semantics = "private-key import path"
+security_sensitive = true
+secret_bearing = true
+path_bearing = true
+identity_or_key_affecting = true
+compatibility_aliases = []
+completion_owner = "M097"
+current_or_planned_disposition = "blocked_primitive"
+cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable"]
+cell_notes = { "client" = "missing primitive: confined private-key import plus atomic handoff into the backend-owned key store; blocking milestone M097", "httpclient" = "missing primitive: confined private-key import plus atomic handoff into the backend-owned key store; blocking milestone M097", "ircclient" = "missing primitive: confined private-key import plus atomic handoff into the backend-owned key store; blocking milestone M097", "socks" = "missing primitive: confined private-key import plus atomic handoff into the backend-owned key store; blocking milestone M097", "socksirc" = "missing primitive: confined private-key import plus atomic handoff into the backend-owned key store; blocking milestone M097", "connectclient" = "missing primitive: confined private-key import plus atomic handoff into the backend-owned key store; blocking milestone M097", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "missing primitive: confined private-key import plus atomic handoff into the backend-owned key store; blocking milestone M097", "httpserver" = "missing primitive: confined private-key import plus atomic handoff into the backend-owned key store; blocking milestone M097", "httpbidirserver" = "missing primitive: confined private-key import plus atomic handoff into the backend-owned key store; blocking milestone M097", "ircserver" = "missing primitive: confined private-key import plus atomic handoff into the backend-owned key store; blocking milestone M097", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+blocked_primitive = "confined private-key import plus atomic handoff into the backend-owned key store"
+blocking_milestone = "M097"
+
+[[tunnel_manager.options]]
+canonical_key = "AllowUserAgent"
+json_value_type = "boolean"
+semantics = "HTTP User-Agent forwarding policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP client/server filter role.", "ircclient" = "This type is not an HTTP client/server filter role.", "socks" = "This type is not an HTTP client/server filter role.", "socksirc" = "This type is not an HTTP client/server filter role.", "connectclient" = "This type is not an HTTP client/server filter role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP client/server filter role.", "ircserver" = "This type is not an HTTP client/server filter role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "AllowReferer"
+json_value_type = "boolean"
+semantics = "HTTP Referer forwarding policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP client/server filter role.", "ircclient" = "This type is not an HTTP client/server filter role.", "socks" = "This type is not an HTTP client/server filter role.", "socksirc" = "This type is not an HTTP client/server filter role.", "connectclient" = "This type is not an HTTP client/server filter role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP client/server filter role.", "ircserver" = "This type is not an HTTP client/server filter role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "AllowAccept"
+json_value_type = "boolean"
+semantics = "HTTP Accept forwarding policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP client/server filter role.", "ircclient" = "This type is not an HTTP client/server filter role.", "socks" = "This type is not an HTTP client/server filter role.", "socksirc" = "This type is not an HTTP client/server filter role.", "connectclient" = "This type is not an HTTP client/server filter role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP client/server filter role.", "ircserver" = "This type is not an HTTP client/server filter role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "AllowInternalSSL"
+json_value_type = "boolean"
+semantics = "internal TLS forwarding policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M098"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP client/server filter role.", "ircclient" = "This type is not an HTTP client/server filter role.", "socks" = "This type is not an HTTP client/server filter role.", "socksirc" = "This type is not an HTTP client/server filter role.", "connectclient" = "This type is not an HTTP client/server filter role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP client/server filter role.", "ircserver" = "This type is not an HTTP client/server filter role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "WebsiteHostname"
+json_value_type = "string"
+semantics = "HTTP presentation hostname"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "SpoofedHost"
+json_value_type = "string"
+semantics = "HTTP presentation Host override"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "BlockAccessInProxies"
+json_value_type = "boolean"
+semantics = "proxy-access policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "BlockUserAgents"
+json_value_type = "boolean"
+semantics = "User-Agent block policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "UserAgents"
+json_value_type = "string"
+semantics = "bounded User-Agent policy list"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "UniqueLocalAddressPerClient"
+json_value_type = "boolean"
+semantics = "per-client local address policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "BlockReferers"
+json_value_type = "boolean"
+semantics = "Referer block policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "MultiHoming"
+json_value_type = "boolean"
+semantics = "HTTP presentation multihoming policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "AccessOption"
+json_value_type = "string"
+semantics = "allow/deny access policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "AccessList"
+json_value_type = "string"
+semantics = "bounded peer access list"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "FilterFilePath"
+json_value_type = "string path"
+semantics = "confined filter/access file"
+security_sensitive = true
+secret_bearing = false
+path_bearing = true
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type does not own the accepted TCP server/admission role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "MaxConcurrentConns"
+json_value_type = "integer"
+semantics = "bounded accepted-connection ceiling"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "ClientPerMinute"
+json_value_type = "integer"
+semantics = "per-peer minute rate"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "ClientPerHour"
+json_value_type = "integer"
+semantics = "per-peer hour rate"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "ClientPerDay"
+json_value_type = "integer"
+semantics = "per-peer day rate"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "TotalInPerMinute"
+json_value_type = "integer"
+semantics = "aggregate minute rate"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "TotalInPerHour"
+json_value_type = "integer"
+semantics = "aggregate hour rate"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "TotalInPerDay"
+json_value_type = "integer"
+semantics = "aggregate day rate"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "PostLimit"
+json_value_type = "integer"
+semantics = "peer POST limit"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "PostLimitTime"
+json_value_type = "duration"
+semantics = "peer POST window"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "PerClientPeriod"
+json_value_type = "duration"
+semantics = "peer admission period"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "TotalPeriod"
+json_value_type = "duration"
+semantics = "aggregate admission period"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "TotalBanTime"
+json_value_type = "duration"
+semantics = "temporary tunnel-local denial interval"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = false
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "EncryptLeaseSet"
+json_value_type = "string enum"
+semantics = "LeaseSet confidentiality mode"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = true
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply"]
+cell_notes = { "client" = "This type does not create the server-side LeaseSet/session role for this option.", "httpclient" = "This type does not create the server-side LeaseSet/session role for this option.", "ircclient" = "This type does not create the server-side LeaseSet/session role for this option.", "socks" = "This type does not create the server-side LeaseSet/session role for this option.", "socksirc" = "This type does not create the server-side LeaseSet/session role for this option.", "connectclient" = "This type does not create the server-side LeaseSet/session role for this option.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "OptionalLookup"
+json_value_type = "boolean"
+semantics = "LeaseSet lookup policy"
+security_sensitive = true
+secret_bearing = false
+path_bearing = false
+identity_or_key_affecting = true
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply"]
+cell_notes = { "client" = "This type does not create the server-side LeaseSet/session role for this option.", "httpclient" = "This type does not create the server-side LeaseSet/session role for this option.", "ircclient" = "This type does not create the server-side LeaseSet/session role for this option.", "socks" = "This type does not create the server-side LeaseSet/session role for this option.", "socksirc" = "This type does not create the server-side LeaseSet/session role for this option.", "connectclient" = "This type does not create the server-side LeaseSet/session role for this option.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[[tunnel_manager.options]]
+canonical_key = "LeaseSetClientAuths"
+json_value_type = "array<object>"
+semantics = "LeaseSet client authorization entries"
+security_sensitive = true
+secret_bearing = true
+path_bearing = false
+identity_or_key_affecting = true
+compatibility_aliases = []
+completion_owner = "M099"
+current_or_planned_disposition = "planned_apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply"]
+cell_notes = { "client" = "This type does not create the server-side LeaseSet/session role for this option.", "httpclient" = "This type does not create the server-side LeaseSet/session role for this option.", "ircclient" = "This type does not create the server-side LeaseSet/session role for this option.", "socks" = "This type does not create the server-side LeaseSet/session role for this option.", "socksirc" = "This type does not create the server-side LeaseSet/session role for this option.", "connectclient" = "This type does not create the server-side LeaseSet/session role for this option.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+
+[method_inventory]
+method_scope_rule = "Only AddressBook, TunnelManager, and ClientServicesInfo are Proposal 170 methods here; broader/base methods remain separately recorded."
+
+[[method_inventory.methods]]
+method = "Authenticate"
+disposition = "outside_proposal_170_scope"
+
+[[method_inventory.methods]]
+method = "RouterInfo"
+disposition = "outside_proposal_170_scope; Proposal 170 additions are separately inventoried"
+
+[[method_inventory.methods]]
+method = "GetKeys"
+disposition = "outside_proposal_170_scope"
+
+[[method_inventory.methods]]
+method = "GetRate"
+disposition = "outside_proposal_170_scope"
+
+[[method_inventory.methods]]
+method = "RouterManager"
+disposition = "outside_proposal_170_scope"
+
+[[method_inventory.methods]]
+method = "NetworkSetting"
+disposition = "outside_proposal_170_scope"
+
+[[method_inventory.methods]]
+method = "AdvancedSettings"
+disposition = "outside_proposal_170_scope"
+
+[[method_inventory.methods]]
+method = "SetSubscriptions"
+disposition = "outside_proposal_170_scope; shipped compatibility alias"
+
+[[method_inventory.methods]]
+method = "SetConfig"
+disposition = "outside_proposal_170_scope; shipped compatibility alias"
+
+[containment]
+rule = "M096-M101 target I2PControl-local production paths; M102 is the only anticipated neutral lower-layer exception; M103 does not invent a ban owner."
+
+[[containment.budgets]]
+milestone = "M096"
+production_paths = ["emissary-cli/src/i2pcontrol/address_book.rs", "emissary-cli/src/i2pcontrol/address_book_runtime.rs", "emissary-cli/src/i2pcontrol/domain/address_book.rs"]
+non_i2pcontrol_production_path_required = false
+path_budget_notes = "All 13 keys; one versioned durable config authority; confined administrative root; no global logger or resolver redesign."
+
+[[containment.budgets]]
+milestone = "M097"
+production_paths = ["emissary-cli/src/i2pcontrol/backends/options.rs", "emissary-cli/src/i2pcontrol/tunnel_manager.rs", "emissary-cli/src/i2pcontrol/domain/tunnel.rs", "emissary-cli/src/i2pcontrol/backends/runtime/"]
+non_i2pcontrol_production_path_required = false
+path_budget_notes = "Common session/key options through existing Yosemite/SAM primitives; PrivKeyFile remains blocked until a confined import/store primitive is evidenced."
+
+[[containment.budgets]]
+milestone = "M098"
+production_paths = ["emissary-cli/src/i2pcontrol/backends/options.rs", "emissary-cli/src/i2pcontrol/backends/http_client.rs", "emissary-cli/src/i2pcontrol/backends/connect_client.rs", "emissary-cli/src/i2pcontrol/backends/socks.rs", "emissary-cli/src/i2pcontrol/backends/socks_irc.rs", "emissary-cli/src/i2pcontrol/backends/irc_client.rs", "emissary-cli/src/i2pcontrol/backends/client.rs", "emissary-cli/src/i2pcontrol/backends/filters/"]
+non_i2pcontrol_production_path_required = false
+path_budget_notes = "Client proxy/outproxy/management/HTTP options only; preserve clearnet routing, authentication, filtering, and generation bounds."
+
+[[containment.budgets]]
+milestone = "M099"
+production_paths = ["emissary-cli/src/i2pcontrol/backends/options.rs", "emissary-cli/src/i2pcontrol/backends/server.rs", "emissary-cli/src/i2pcontrol/backends/http_server.rs", "emissary-cli/src/i2pcontrol/backends/http_bidir.rs", "emissary-cli/src/i2pcontrol/backends/irc_server.rs", "emissary-cli/src/i2pcontrol/backends/streamr.rs", "emissary-cli/src/i2pcontrol/backends/runtime/admission.rs"]
+non_i2pcontrol_production_path_required = false
+path_budget_notes = "Server access/throttle/filter/LeaseSet options; preserve M093 admission, trusted-peer, literal-loopback, HTTP/IRC, and Streamr boundaries."
+
+[[containment.budgets]]
+milestone = "M100"
+production_paths = ["emissary-cli/src/i2pcontrol/observability.rs", "emissary-cli/src/i2pcontrol/observers.rs", "emissary-cli/src/i2pcontrol/production.rs", "emissary-cli/src/i2pcontrol/router_info.rs", "emissary-cli/src/i2pcontrol/router_info_handler.rs"]
+non_i2pcontrol_production_path_required = false
+path_budget_notes = "I2PControl-local request-independent sampler over the existing cumulative transit counter; no core edits."
+
+[[containment.budgets]]
+milestone = "M101"
+production_paths = ["emissary-cli/src/i2pcontrol/observability.rs", "emissary-cli/src/i2pcontrol/production.rs", "emissary-cli/src/i2pcontrol/router_info.rs", "emissary-cli/src/i2pcontrol/router_info_handler.rs"]
+non_i2pcontrol_production_path_required = false
+path_budget_notes = "I2PControl-local bounded real source/cache; no arbitrary public-web substitute and no core news subsystem."
+
+[[containment.budgets]]
+milestone = "M102"
+production_paths = ["emissary-core/src/events.rs", "emissary-core/src/inspection.rs", "emissary-core/src/transport/mod.rs", "emissary-cli/src/i2pcontrol/observers.rs", "emissary-cli/src/i2pcontrol/router_info.rs", "emissary-cli/src/i2pcontrol/router_info_handler.rs", "emissary-cli/src/i2pcontrol/production.rs"]
+non_i2pcontrol_production_path_required = true
+path_budget_notes = "Candidate paths only: M095 found no existing explicit neutral error owner, so M102 must narrow this to exact writer/owner files before code. Wire mapping remains I2PControl-local."
+
+[[containment.budgets]]
+milestone = "M103"
+production_paths = ["emissary-cli/src/i2pcontrol/router_info.rs", "emissary-cli/src/i2pcontrol/router_info_handler.rs", "emissary-cli/src/i2pcontrol/observability.rs"]
+non_i2pcontrol_production_path_required = false
+path_budget_notes = "Exhaustive audit of router/transport/profile/NetDB exclusions; preferred completion is explicit by-design-empty proof, otherwise stop for architecture decision."
+
+[evidence]
+proposal_revision_verification = "Official source identifies Proposal 170 as Open, created 2026-05-20, last updated 2026-05-20; source hash recorded above."
+router_info_reconciliation = "Current source authority is 43 rows with 37 available, 1 protocol-permitted neutral, and 5 unavailable; no historical 40/1/2 count is carried forward."
+addressbook_reconciliation = "All 13 pinned SetConfig keys are classified; no unknown or accept_inert disposition is used."
+tunnel_option_reconciliation = "Every CANONICAL_OPTION_KEYS entry has 12 explicit cells. Apply means current backend behavior; planned_apply is assigned to M097-M099; not_applicable has a cell note; blocked_primitive names the missing primitive and milestone."
+client_services_reconciliation = "Exactly six selectors are listed; broader/base methods are outside this phase."
+security = "No secrets, private keys, destination private material, tokens, or file contents are present in this matrix."

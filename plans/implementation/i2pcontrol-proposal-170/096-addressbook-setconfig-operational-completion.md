@@ -1,6 +1,6 @@
 # M096 — AddressBook SetConfig Operational Completion
 
-Status: blocked on M095
+Status: ready; dependency M095 closed
 
 Source roadmap:
 

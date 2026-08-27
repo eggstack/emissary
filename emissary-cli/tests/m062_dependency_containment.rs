@@ -513,6 +513,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md"
             | "plans/implementation/i2pcontrol-proposal-170/094-post-m093-planning-state-reconciliation.md"
             | "plans/implementation/i2pcontrol-proposal-170/095-full-support-contract-matrix-and-containment-budget.md"
+            | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
             | "plans/implementation/i2pcontrol-proposal-170/096-addressbook-setconfig-operational-completion.md"
             | "plans/implementation/i2pcontrol-proposal-170/097-tunnel-common-session-and-key-option-completion.md"
             | "plans/implementation/i2pcontrol-proposal-170/098-client-proxy-management-and-http-option-completion.md"
@@ -558,6 +559,8 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/092-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/093-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/094-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/095-closure.md"
+            | "emissary-cli/tests/m095_full_support_matrix.rs"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }

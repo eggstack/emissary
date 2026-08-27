@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095 is the sole dependency-ready implementation handoff
+Status: active; M095 closed; M096/M097/M100-M103 are dependency-ready
 
 Planning baseline: `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207` — M094 closed planning head before this newly authorized phase.
 
@@ -155,7 +155,7 @@ No Proposal 170 field name, JSON type, or administrative configuration object sh
 
 ## 6. Full-support matrix rule
 
-M095 creates the authoritative machine-readable completion matrix. Final closure requires:
+M095 created the authoritative machine-readable completion matrix. Final closure requires:
 
 - all 43 Proposal 170 RouterInfo additions classified `available`, except a protocol-defined neutral value may remain neutral only where the proposal itself permits it;
 - all 13 SetConfig keys classified with an operational owner and verification path;
@@ -201,12 +201,12 @@ Dependency classes:
 
 - M095 -> every implementation milestone: hard. No code work begins from an inferred option/source inventory.
 - M097 -> M098/M099: hard for shared session/key option plumbing and final applicability model.
-- M096, M100, M101 may proceed independently after M095.
-- M102/M103 depend on M095's owner audit and exact containment classification; their production execution remains blocked until that evidence exists.
+- M096, M100, M101 may proceed independently now that M095 is closed.
+- M102/M103 are ready for their bounded owner/semantic work because M095 recorded their exact audit gates and path budgets.
 - M104 depends on all capability milestones M096-M103 closing.
 - Public-network/reference-router reachability is an operational dependency for M104 only; local code may close earlier milestones without creating a hosted network farm.
 
-Per planning governance, M095 is the only registered dependency-ready implementation plan at roadmap creation. Future plan files exist for handoff continuity but remain blocked until dependencies close.
+Per planning governance, M095 was the only registered dependency-ready implementation plan at roadmap creation. Its closure now permits M096, M097, and M100-M103; M098/M099 still wait for M097.
 
 ## 8. Milestones and exit conditions
 
@@ -214,19 +214,19 @@ Per planning governance, M095 is the only registered dependency-ready implementa
 
 Plan: `095-full-support-contract-matrix-and-containment-budget.md`.
 
-Status: ready.
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/095-closure.md`.
 
 Primary class: invariant / infrastructure.
 
-Re-audit the pinned proposal against current production, create one machine-readable matrix covering RouterInfo, AddressBook SetConfig, TunnelManager options/type applicability, and ClientServicesInfo, and assign every remaining cell to an owner/path budget. This milestone makes no runtime behavior change.
+Re-audit the pinned proposal against current production, create one machine-readable matrix covering RouterInfo, AddressBook SetConfig, TunnelManager options/type applicability, and ClientServicesInfo, and assign every remaining cell to an owner/path budget. This milestone made no runtime behavior change. The resulting authority is `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`, guarded by `emissary-cli/tests/m095_full_support_matrix.rs`.
 
-Exit: no unknown applicability/source row remains; all later milestones have exact bounded inputs; lower-layer candidates are explicitly identified before code.
+Exit: no unknown applicability/source row remains; all later milestones have exact bounded inputs; lower-layer candidates are explicitly identified before code. M095 is closed; M096, M097, and M100-M103 are now ready, while M098/M099 remain blocked on M097 and M104 remains blocked on M096-M103.
 
 ### M096 — AddressBook SetConfig operational completion
 
 Plan: `096-addressbook-setconfig-operational-completion.md`.
 
-Status: blocked on M095.
+Status: ready; dependency M095 closed.
 
 Primary class: capability / security / persistence.
 
@@ -238,7 +238,7 @@ Exit: non-empty valid SetConfig requests succeed only after durable/runtime publ
 
 Plan: `097-tunnel-common-session-and-key-option-completion.md`.
 
-Status: blocked on M095.
+Status: ready; dependency M095 closed.
 
 Primary class: capability / infrastructure.
 
@@ -274,7 +274,7 @@ Exit: every applicable server-side cell is applied and verified before allocatio
 
 Plan: `100-routerinfo-transit-15s-source-completion.md`.
 
-Status: blocked on M095.
+Status: ready; dependency M095 closed.
 
 Primary class: capability / infrastructure.
 
@@ -286,7 +286,7 @@ Exit: deterministic tests prove request-independent 15-second bytes/sec semantic
 
 Plan: `101-routerinfo-news-source-completion.md`.
 
-Status: blocked on M095.
+Status: ready; dependency M095 closed.
 
 Primary class: capability / security / operations.
 
@@ -298,7 +298,7 @@ Exit: `i2p.router.news` returns real bounded news content from the adopted sourc
 
 Plan: `102-routerinfo-network-error-owner-completion.md`.
 
-Status: blocked on M095 owner/path audit.
+Status: ready; M095 owner/path audit closed.
 
 Primary class: capability / containment.
 
@@ -310,7 +310,7 @@ Exit: both error rows come from explicit canonical state; no transport/router de
 
 Plan: `103-routerinfo-banned-peer-semantic-completion.md`.
 
-Status: blocked on M095 semantic audit.
+Status: ready; M095 semantic/source audit closed.
 
 Primary class: capability / invariant.
 

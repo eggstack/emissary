@@ -30,6 +30,10 @@ Streamr families, with deterministic runtime-option validation. Tunnel data plan
 sources that Emissary does not own remain explicit unsupported/unavailable behavior. See
 [`docs/i2pcontrol/proposal-170-support.md`](docs/i2pcontrol/proposal-170-support.md).
 
+The current partial-support contract and bounded completion handoff are recorded in
+[`095-full-support-matrix.toml`](plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml);
+this matrix does not change the runtime support claim.
+
 ### Directory layout
 
 * `emissary-core/` - I2P protocol implementation as an asynchronous library

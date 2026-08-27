@@ -1,6 +1,6 @@
 # M097 — Tunnel Common Session and Key Option Completion
 
-Status: blocked on M095
+Status: ready; dependency M095 closed
 
 Source roadmap:
 

@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M080-M086 closed; tunnel runtime/security line complete against the pinned contract and current internal fork head; M086 documentation/evidence reconciliation closed
+Status: partial Proposal 170 support; M093 production/security reclosure and M094 planning reconciliation closed; M095 full-support matrix closed
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -13,6 +13,8 @@ Current roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 - tunnel-runtime completion: `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`
+- full-support completion: `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`
+- authoritative aggregate matrix: `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`
 
 Tunnel-runtime reclosure:
 

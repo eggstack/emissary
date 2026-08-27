@@ -1,6 +1,6 @@
 # I2PControl for Emissary
 
-Status: partial Proposal 170 support; M072 corrective pass required
+Status: partial Proposal 170 support; M095 full-support matrix closed; M096/M097/M100-M103 ready
 
 Proposal 170 remains **Open**. This documentation is pinned to the revision
 created and last updated on `2026-05-20`.
@@ -26,10 +26,17 @@ M039 independently reviewed the complete M031–M038 final head and formally
 closed the authorized workstream as partial support.
 
 The later M066–M071 tunnel-family sequence made all twelve production tunnel
-types real. M072's integrated reclosure found a medium generic `client`/`server`
-option-truthfulness defect; M073 is the ready corrective handoff. This does not
-reopen the accepted RouterInfo 37/1/5 matrix or the unrelated AddressBook/base
-method limitations.
+types real. M072 and M073 are retained historical runtime-composition and
+option-truthfulness closures. The current aggregate workstream is M095, which
+records the exact remaining RouterInfo, SetConfig, tunnel-option, and owner/path
+boundaries without overstating production support.
+
+The authoritative aggregate handoff is
+[`095-full-support-matrix.toml`](../../plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml),
+with focused exhaustiveness coverage in
+`emissary-cli/tests/m095_full_support_matrix.rs`. It records the current baseline
+and later owner/path budgets; it does not promote any planned cell to production
+support.
 
 The expected bounded final status remains `partial Proposal 170 support` because five
 RouterInfo additions remain unavailable. M066 through M071 close the IRC, HTTP, CONNECT,

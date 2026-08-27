@@ -4,6 +4,12 @@ Status: M014 implementation accepted by M017 (truthful live sources and local re
 
 This document describes the read-only inspection architecture for I2PControl Proposal 170 in Emissary.
 
+The cross-domain completion inventory is maintained separately in
+[`plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`](../../plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml).
+It records current source dispositions and future owner budgets; this
+read-only architecture remains partial until later capability milestones
+provide production evidence.
+
 ## Design principles
 
 1. **Read-only boundary**: Inspection requests never mutate router state

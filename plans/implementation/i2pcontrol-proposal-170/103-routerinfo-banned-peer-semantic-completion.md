@@ -1,6 +1,6 @@
 # M103 — RouterInfo Banned-Peer Semantic Completion
 
-Status: blocked on M095 semantic/source audit
+Status: ready; dependency M095 closed
 
 Source roadmap:
 

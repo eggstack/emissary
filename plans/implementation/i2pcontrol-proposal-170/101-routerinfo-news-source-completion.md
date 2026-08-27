@@ -1,6 +1,6 @@
 # M101 — RouterInfo News Source Completion
 
-Status: blocked on M095
+Status: ready; dependency M095 closed
 
 Source roadmap:
 

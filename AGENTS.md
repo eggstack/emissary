@@ -38,6 +38,12 @@ and inspection sources without a canonical Emissary owner remain explicit unsupp
 responses. Keep changes within `emissary-cli/src/i2pcontrol/` and its composition seams; do not
 turn the administrative API into a router lifecycle or protocol implementation.
 
+The current Proposal 170 baseline remains partial: RouterInfo is 43 additions with
+37 available, 1 protocol-permitted neutral, and 5 unavailable; non-empty AddressBook
+SetConfig is still rejected truthfully; and unapplied runtime options fail before
+allocation. The authoritative completion inventory is
+`plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`.
+
 Streamr is intentionally separate from TCP tunnel helpers. Preserve its documented
 16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh,
 and bounded shutdown limits. Remote datagrams must never choose a local UDP destination.

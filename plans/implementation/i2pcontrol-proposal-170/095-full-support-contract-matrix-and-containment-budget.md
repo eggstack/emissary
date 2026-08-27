@@ -1,6 +1,6 @@
 # M095 — Full-Support Contract Matrix and Containment Budget
 
-Status: ready
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/095-closure.md`
 
 Source roadmap:
 
@@ -42,6 +42,10 @@ M095 must reconcile these into one current-head contract/applicability matrix ag
 Create:
 
 `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`
+
+The matrix and its focused static guard are the authoritative M095 outputs. The
+matrix records the current partial production baseline; it does not itself
+authorize production edits or claim full Proposal 170 support.
 
 The matrix must be deterministic and reviewable without executing the router. It must include at least four sections.
 

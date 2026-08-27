@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; all twelve tunnel runtimes real; production tunnel security closed by M093; full-support completion phase authorized by ADR-0004; M095 ready; M096-M104 blocked by dependency order
+Status: partial Proposal 170 production support; all twelve tunnel runtimes real; production tunnel security closed by M093; M095 closed with the full-support matrix; M096/M097/M100-M103 ready; M098/M099/M104 remain dependency-blocked
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -64,19 +64,19 @@ ADR-0004 changes the intended end state, not the truthfulness of this current ba
 
 ## Current full-support completion sequence
 
-Only the dependency-ready plan registered in `plans/registry.md` is executable. Future plan files below are prewritten for continuity and remain blocked until their hard dependencies close.
+Only dependency-ready plans registered in `plans/registry.md` are executable. Future plan files below are prewritten for continuity and remain blocked until their hard dependencies close.
 
 | Handoff | Status | Scope |
 |---|---|---|
-| M095 | **ready** | exact machine-readable full-support matrix and owner/containment budgets; no production behavior |
-| M096 | blocked on M095 | operational AddressBook SetConfig for all 13 pinned keys with path confinement/persistence |
-| M097 | blocked on M095 | common tunnel session/tunnel/key/persistence options using existing Yosemite/SAM primitives |
+| M095 | **closed** | exact machine-readable full-support matrix and owner/containment budgets; no production behavior |
+| M096 | **ready** | operational AddressBook SetConfig for all 13 pinned keys with path confinement/persistence |
+| M097 | **ready** | common tunnel session/tunnel/key/persistence options using existing Yosemite/SAM primitives |
 | M098 | blocked on M097 | client proxy/outproxy/auth/management/HTTP privacy option completion |
 | M099 | blocked on M097 | server access/filter/throttle/LeaseSet option completion |
-| M100 | blocked on M095 | request-independent transit 15-second RouterInfo source |
-| M101 | blocked on M095 | bounded real router-news source |
-| M102 | blocked on M095 owner/path audit | minimal neutral IPv4/IPv6 network-error owner observation; wire mapping stays in I2PControl |
-| M103 | blocked on M095 semantic/source audit | real banned-peer owner or proven by-design-empty semantics; no new ban algorithm solely for telemetry |
+| M100 | **ready** | request-independent transit 15-second RouterInfo source |
+| M101 | **ready** | bounded real router-news source |
+| M102 | **ready** | minimal neutral IPv4/IPv6 network-error owner observation; wire mapping stays in I2PControl |
+| M103 | **ready** | real banned-peer owner or proven by-design-empty semantics; no new ban algorithm solely for telemetry |
 | M104 | blocked on M096-M103 | integrated live interoperability, final matrix/security/containment reclosure, revision-pinned full-support decision |
 
 Plans:
@@ -92,9 +92,12 @@ Plans:
 - `103-routerinfo-banned-peer-semantic-completion.md`
 - `104-full-proposal-170-live-interoperability-and-reclosure.md`
 
-### M095 is the sole ready handoff
+### M095 closure and the next ready handoffs
 
-M095 must create `095-full-support-matrix.toml` covering:
+M095 created `095-full-support-matrix.toml` covering:
+
+The matrix is the authoritative cross-domain planning inventory and is guarded
+by `emissary-cli/tests/m095_full_support_matrix.rs`.
 
 - all 43 RouterInfo additions;
 - all 13 SetConfig keys;

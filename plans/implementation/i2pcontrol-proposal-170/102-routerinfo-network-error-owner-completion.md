@@ -1,6 +1,6 @@
 # M102 — RouterInfo Canonical Network-Error Owner Completion
 
-Status: blocked on M095 owner/path audit
+Status: ready; dependency M095 closed
 
 Source roadmap:
 

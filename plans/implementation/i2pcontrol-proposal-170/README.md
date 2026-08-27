@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; all twelve tunnel runtimes real; production tunnel security closed by M093; M095-M096 closed; M097/M100-M103 ready; M098/M099/M104 remain dependency-blocked
+Status: partial Proposal 170 production support; all twelve tunnel runtimes real; production tunnel security closed by M093; M095-M096 closed; M097 closed as blocked; M100-M103 ready; M098/M099/M104 remain dependency-blocked
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -70,7 +70,7 @@ Only dependency-ready plans registered in `plans/registry.md` are executable. Fu
 |---|---|---|
 | M095 | **closed** | exact machine-readable full-support matrix and owner/containment budgets; no production behavior |
 | M096 | **closed** | operational AddressBook SetConfig for all 13 pinned keys with path confinement/persistence |
-| M097 | **ready** | common tunnel session/tunnel/key/persistence options using existing Yosemite/SAM primitives |
+| M097 | **blocked; closed as blocked** | common tunnel session/tunnel/key/persistence options; supported length/quantity/encryption plumbing landed, remaining cells await bounded primitives |
 | M098 | blocked on M097 | client proxy/outproxy/auth/management/HTTP privacy option completion |
 | M099 | blocked on M097 | server access/filter/throttle/LeaseSet option completion |
 | M100 | **ready** | request-independent transit 15-second RouterInfo source |
@@ -116,7 +116,7 @@ M096 must turn the current exact-but-rejected SetConfig inventory into operation
 
 ### Tunnel options
 
-M097-M099 change the final option target from `apply-or-reject` to `apply every applicable cell`, while preserving fail-before-allocation as the safe intermediate rule.
+M097-M099 change the final option target from `apply-or-reject` to `apply every applicable cell`, while preserving fail-before-allocation as the safe intermediate rule. M097's closure records the remaining Yosemite/SAM and control-plane key-lifecycle blockers explicitly; M098 and M099 remain blocked on that milestone.
 
 Common session/key options should map through existing Yosemite/SAM/session primitives. Client proxy/privacy options stay in the existing client/filter runtime. Server access/throttle/LeaseSet options compose with the accepted M093 admission/filter/identity boundary.
 

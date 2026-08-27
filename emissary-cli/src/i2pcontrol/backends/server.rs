@@ -9,6 +9,7 @@ use tokio::{
     net::TcpStream,
     task::JoinHandle,
 };
+use yosemite::{DestinationKind, SessionOptions};
 
 use super::{
     options::{validate_options, OptionValidationError, SERVER_OPTIONS},
@@ -58,8 +59,9 @@ struct GenericServerRuntimeConfig {
     target_port: u16,
     destination: StoredDestination,
     sam_tcp_port: u16,
-    admission: ServerAdmissionPolicy,
-    lease_set_enc_type: Option<String>,
+        admission: ServerAdmissionPolicy,
+        lease_set_enc_type: Option<String>,
+        session_options: SessionOptions,
 }
 
 /// Bounded, per-name runtime supervisor for control-plane server tunnels.
@@ -234,6 +236,7 @@ impl ServerRuntimeSupervisor {
                     destination: config.destination,
                     admission: config.admission,
                     lease_set_enc_type: config.lease_set_enc_type,
+                    session_options: Some(config.session_options),
                     handler,
                 },
                 ready_cancellation.clone(),
@@ -409,6 +412,14 @@ impl TunnelBackend for ServerTunnelBackend {
             .ok_or_else(|| BackendError::Internal {
                 message: "server destination identity is unavailable".to_string(),
             })?;
+        let session_options = super::runtime::session::build_session_options(
+            definition,
+            self.supervisor.sam_tcp_port,
+            true,
+            DestinationKind::Persistent {
+                private_key: destination.as_str().to_owned(),
+            },
+        )?;
         self.supervisor
             .start(GenericServerRuntimeConfig {
                 name: definition.name.as_str().to_string(),
@@ -417,6 +428,7 @@ impl TunnelBackend for ServerTunnelBackend {
                 sam_tcp_port: self.supervisor.sam_tcp_port,
                 admission,
                 lease_set_enc_type,
+                session_options,
             })
             .await
     }

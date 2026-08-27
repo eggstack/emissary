@@ -110,6 +110,9 @@ pub fn validate_options(
     }
 
     for field in present_runtime_fields(options) {
+        if is_common_runtime_field(field) {
+            continue;
+        }
         if !capabilities.optional.contains(&field)
             && !capabilities.required.contains(&field)
             && !capabilities.required_any.contains(&field)
@@ -135,6 +138,80 @@ pub fn validate_options(
     }
 
     Ok(())
+}
+
+/// Validate the common Proposal 170 session/key fields shared by the real
+/// backends. This check is deliberately separate from each protocol backend's
+/// capability declaration so every backend uses the same ranges and mapping.
+pub fn validate_common_options(
+    tunnel_type: TunnelType,
+    options: &TunnelOptions,
+) -> Result<(), OptionValidationError> {
+    let is_streamr = matches!(tunnel_type, TunnelType::StreamrClient | TunnelType::StreamrServer);
+
+    // These fields are represented canonically, but the current Yosemite
+    // dependency does not carry them to the SAM SESSION CREATE wire. Keep
+    // them fail-closed until a supported primitive exists; accepting them
+    // here would make a persisted option look applied when it is not.
+    for (present, field) in [
+        (options.shared.is_some(), "Shared"),
+        (options.use_ssl.is_some(), "UseSSL"),
+        (options.tunnel_variance.is_some(), "TunnelVariance"),
+        (options.tunnel_backup_quantity.is_some(), "TunnelBackupQuantity"),
+        (options.sig_type.is_some(), "SigType"),
+        (!options.custom_options.is_empty(), "CustomOptions"),
+        (options.priv_key_file.is_some(), "PrivKeyFile"),
+    ] {
+        if present {
+            return Err(common_unsupported(tunnel_type, field));
+        }
+    }
+
+    for (present, field) in [
+        (options.tunnel_length.is_some(), "TunnelLength"),
+        (options.tunnel_quantity.is_some(), "TunnelQuantity"),
+        (options.enc_type.is_some(), "EncType"),
+    ] {
+        if present && is_streamr {
+            return Err(common_unsupported(tunnel_type, field));
+        }
+    }
+    // NewDest and PersistentClientKey require a control-plane-owned client
+    // destination store and lifecycle authority. They remain explicit
+    // blocked cells until that authority is implemented.
+    if options.new_dest.is_some() {
+        return Err(common_unsupported(tunnel_type, "NewDest"));
+    }
+    if options.persistent_client_key.is_some() {
+        return Err(common_unsupported(tunnel_type, "PersistentClientKey"));
+    }
+
+    Ok(())
+}
+
+fn common_unsupported(tunnel_type: TunnelType, option: &'static str) -> OptionValidationError {
+    OptionValidationError::Unsupported {
+        tunnel_type,
+        option: option.to_owned(),
+    }
+}
+
+fn is_common_runtime_field(field: &str) -> bool {
+    matches!(
+        field,
+        "Shared"
+            | "UseSSL"
+            | "TunnelLength"
+            | "TunnelVariance"
+            | "TunnelQuantity"
+            | "TunnelBackupQuantity"
+            | "SigType"
+            | "EncType"
+            | "NewDest"
+            | "PersistentClientKey"
+            | "PrivKeyFile"
+            | "CustomOptions"
+    )
 }
 
 /// Runtime fields supported by the existing generic client backend.
@@ -264,6 +341,17 @@ fn present_runtime_fields(options: &TunnelOptions) -> Vec<&'static str> {
         ("ListenPort", options.listen_port.is_some()),
         ("AccessList", options.access_list.is_some()),
         ("AllowPlaintext", options.allowplaintext.is_some()),
+        ("Shared", options.shared.is_some()),
+        ("UseSSL", options.use_ssl.is_some()),
+        ("TunnelLength", options.tunnel_length.is_some()),
+        ("TunnelVariance", options.tunnel_variance.is_some()),
+        ("TunnelQuantity", options.tunnel_quantity.is_some()),
+        ("TunnelBackupQuantity", options.tunnel_backup_quantity.is_some()),
+        ("SigType", options.sig_type.is_some()),
+        ("EncType", options.enc_type.is_some()),
+        ("NewDest", options.new_dest.is_some()),
+        ("PersistentClientKey", options.persistent_client_key.is_some()),
+        ("PrivKeyFile", options.priv_key_file.is_some()),
         ("HostingDestination", options.hosting_destination.is_some()),
         ("IsPrivate", options.is_private.is_some()),
         ("HashCash", options.hashcash_proofs_required.is_some()),

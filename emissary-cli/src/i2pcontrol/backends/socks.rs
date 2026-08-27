@@ -21,6 +21,7 @@ use super::{
     options::{validate_options, OptionCapabilities, OptionValidationError, SOCKS_OPTIONS},
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
+use yosemite::SessionOptions;
 use crate::i2pcontrol::{
     address_book_runtime::RuntimeAddressBookHandle,
     backends::runtime::{
@@ -448,6 +449,7 @@ pub(crate) struct SocksConfig {
     pub(crate) outproxy_credentials: Option<(String, String)>,
     pub(crate) address_book: Option<Arc<RuntimeAddressBookHandle>>,
     pub(crate) require_auth: bool,
+    pub(crate) session_options: SessionOptions,
 }
 
 impl fmt::Debug for SocksConfig {
@@ -810,6 +812,7 @@ impl SocksRuntimeSupervisor {
                     destination: "unused-socks-destination".to_owned(),
                     destination_port: 1,
                     sam_tcp_port: config.sam_tcp_port,
+                    session_options: config.session_options,
                     max_connections: MAX_CONNECTIONS,
                     handler,
                 },
@@ -991,6 +994,7 @@ pub(crate) fn config_for(
         outproxy_credentials,
         address_book,
         require_auth,
+        session_options: SessionOptions::default(),
     })
 }
 
@@ -1172,18 +1176,20 @@ impl TunnelBackend for SocksTunnelBackend {
     }
 
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
-        self.supervisor
-            .start(
-                config_for(
+        let mut config = config_for(
                     definition,
                     TunnelType::Socks,
                     self.sam_tcp_port,
                     self.address_book.clone(),
                     SOCKS_OPTIONS,
-                )?,
-                PayloadMode::Raw,
-            )
-            .await
+                )?;
+        config.session_options = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            false,
+            yosemite::DestinationKind::Transient,
+        )?;
+        self.supervisor.start(config, PayloadMode::Raw).await
     }
 
     async fn stop(&self, definition: &TunnelDefinition) -> BackendResult<()> {
@@ -1218,6 +1224,7 @@ mod tests {
             outproxy_credentials: None,
             address_book: None,
             require_auth,
+            session_options: SessionOptions::default(),
         }
     }
 
@@ -1352,6 +1359,8 @@ mod tests {
             let mut runtime_config = config(false);
             runtime_config.name = name.to_owned();
             runtime_config.sam_tcp_port = sam_port;
+            runtime_config.session_options.samv3_tcp_port = sam_port;
+            runtime_config.session_options.nickname = name.to_owned();
             supervisor.start(runtime_config.clone(), mode).await.unwrap();
             assert_eq!(supervisor.inspect(name).0, TunnelRuntimeState::Running);
             assert!(supervisor.start(runtime_config.clone(), mode).await.is_err());

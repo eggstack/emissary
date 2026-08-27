@@ -16,6 +16,7 @@ use tokio::{
     task::JoinHandle,
     time::Instant,
 };
+use yosemite::{DestinationKind, SessionOptions};
 
 use super::{
     filters::http::{
@@ -64,6 +65,7 @@ struct HttpServerConfig {
     admission: ServerAdmissionPolicy,
     policy: HttpServerPolicy,
     post_limiter: PostLimiter,
+    session_options: SessionOptions,
 }
 
 #[derive(Clone, Debug)]
@@ -353,6 +355,7 @@ impl HttpServerRuntimeSupervisor {
                     destination: config.destination,
                     admission: config.admission,
                     lease_set_enc_type: None,
+                    session_options: Some(config.session_options),
                     handler,
                 },
                 ready_cancellation.clone(),
@@ -636,6 +639,7 @@ impl HttpServerTunnelBackend {
                 access_option,
             },
             post_limiter: PostLimiter::new(post_limit as usize, Duration::from_secs(post_window)),
+            session_options: SessionOptions::default(),
         })
     }
 }
@@ -665,6 +669,14 @@ impl TunnelBackend for HttpServerTunnelBackend {
             .ok_or_else(|| BackendError::Internal {
                 message: "httpserver destination identity is unavailable".to_owned(),
             })?;
+        config.session_options = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            true,
+            DestinationKind::Persistent {
+                private_key: config.destination.as_str().to_owned(),
+            },
+        )?;
         self.supervisor.start(config).await
     }
 

@@ -11,6 +11,7 @@ use super::{
     options::{validate_options, OptionValidationError, IRC_CLIENT_OPTIONS},
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
+use yosemite::SessionOptions;
 use crate::i2pcontrol::{
     backends::runtime::{
         run_client_listener, ClientConnectionHandler, ClientListenerRuntimeConfig,
@@ -32,6 +33,7 @@ struct IrcClientConfig {
     destination: String,
     destination_port: u16,
     sam_tcp_port: u16,
+    session_options: SessionOptions,
 }
 
 #[derive(Debug)]
@@ -213,6 +215,7 @@ impl IrcClientRuntimeSupervisor {
                     destination: config.destination,
                     destination_port: config.destination_port,
                     sam_tcp_port: config.sam_tcp_port,
+                    session_options: config.session_options,
                     max_connections: MAX_CONNECTIONS,
                     handler,
                 },
@@ -320,6 +323,7 @@ impl IrcClientTunnelBackend {
             destination: destination.to_owned(),
             destination_port: definition.options.target_port.unwrap_or(0),
             sam_tcp_port: self.sam_tcp_port,
+            session_options: SessionOptions::default(),
         })
     }
 }
@@ -359,7 +363,14 @@ impl TunnelBackend for IrcClientTunnelBackend {
     }
 
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
-        self.supervisor.start(self.config(definition)?).await
+        let mut config = self.config(definition)?;
+        config.session_options = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            false,
+            yosemite::DestinationKind::Transient,
+        )?;
+        self.supervisor.start(config).await
     }
 
     async fn stop(&self, definition: &TunnelDefinition) -> BackendResult<()> {

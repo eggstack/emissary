@@ -36,7 +36,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal status remains Open).
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active; M095-M096 closed | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | M097/M100-M103 | M098/M099 remain blocked on M097; M104 remains blocked on M097-M103 |
+| I2PControl Proposal 170 full-support completion | active; M095-M097 closed (M097 blocked) | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | M100-M103 | M098/M099 remain blocked on M097; M104 remains blocked on M097-M103 |
 | I2PControl Proposal 170 source/truthfulness | historical partial baseline closed through M057; successor work authorized by ADR-0004 | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | successor source work is M100-M103 under the full-support roadmap | current production matrix remains 37 available / 1 protocol-permitted neutral / 5 unavailable until owning completion milestones close |
 | I2PControl Proposal 170 containment | accepted authority; pre-M091 semantics restored by M092 | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | none | M061 source boundary and M062/M063 dependency/feature rules remain authoritative; new planning paths may be added only as exact bookkeeping entries |
 | I2PControl Proposal 170 tunnel runtime completion | functionally complete | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no data-plane handoff | all twelve registered tunnel backends remain real; full-option semantics continue under M097-M099 without redesigning the data planes |
@@ -109,7 +109,7 @@ The following plans exist for handoff continuity but are not registered as execu
 | Milestone | Status | Plan | Primary target |
 |---|---|---|---|
 | M096 | **closed** | `plans/implementation/i2pcontrol-proposal-170/096-addressbook-setconfig-operational-completion.md` | operational semantics for all 13 SetConfig keys with confined filesystem ownership |
-| M097 | **ready** | `plans/implementation/i2pcontrol-proposal-170/097-tunnel-common-session-and-key-option-completion.md` | common session/tunnel/key/persistence options through existing Yosemite/SAM primitives |
+| M097 | **blocked; closed as blocked** | `plans/implementation/i2pcontrol-proposal-170/097-tunnel-common-session-and-key-option-completion.md` | common session/tunnel/key/persistence options; remaining cells await bounded Yosemite/SAM and control-plane lifecycle primitives |
 | M098 | blocked on M097 | `plans/implementation/i2pcontrol-proposal-170/098-client-proxy-management-and-http-option-completion.md` | client proxy/outproxy/auth/management/HTTP privacy options |
 | M099 | blocked on M097 | `plans/implementation/i2pcontrol-proposal-170/099-server-access-throttle-and-leaseset-option-completion.md` | server access/throttle/filter/LeaseSet options while preserving M093 security boundaries |
 | M100 | **ready** | `plans/implementation/i2pcontrol-proposal-170/100-routerinfo-transit-15s-source-completion.md` | request-independent I2PControl-owned transit 15-second sampler |
@@ -187,7 +187,7 @@ The five current unavailable RouterInfo rows are assigned to M100-M103. Historic
 
 ## Registry maintenance rules
 
-1. M095 and M096 are closed; M097 and M100-M103 are the ready/executable full-support handoffs.
+1. M095 and M096 are closed; M097 is closed as blocked; M100-M103 are the ready/executable full-support handoffs.
 2. M098/M099 remain blocked on M097 and M104 remains blocked on M097-M103; existence of a plan file is not execution authority.
 3. Do not alter the current partial-support claim merely because planning exists.
 4. M093 remains the current tunnel production/security reclosure authority until a later integrated reclosure closes.

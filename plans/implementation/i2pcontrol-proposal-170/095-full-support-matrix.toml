@@ -811,9 +811,11 @@ path_bearing = false
 identity_or_key_affecting = true
 compatibility_aliases = []
 completion_owner = "M097"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+current_or_planned_disposition = "blocked_primitive"
+cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "missing primitive: bounded shared-session ownership table and compatible-session handoff; blocking milestone M097", "httpclient" = "missing primitive: bounded shared-session ownership table and compatible-session handoff; blocking milestone M097", "ircclient" = "missing primitive: bounded shared-session ownership table and compatible-session handoff; blocking milestone M097", "socks" = "missing primitive: bounded shared-session ownership table and compatible-session handoff; blocking milestone M097", "socksirc" = "missing primitive: bounded shared-session ownership table and compatible-session handoff; blocking milestone M097", "connectclient" = "missing primitive: bounded shared-session ownership table and compatible-session handoff; blocking milestone M097", "streamrclient" = "missing primitive: bounded shared-session ownership table and compatible-session handoff; blocking milestone M097", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "The pinned option is not applicable to this tunnel family." }
+blocked_primitive = "bounded shared-session ownership table and compatible-session handoff"
+blocking_milestone = "M097"
 
 [[tunnel_manager.options]]
 canonical_key = "UseSSL"
@@ -825,9 +827,11 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M097"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "The pinned option is not applicable to this tunnel family.", "ircclient" = "The pinned option is not applicable to this tunnel family.", "socks" = "The pinned option is not applicable to this tunnel family.", "socksirc" = "The pinned option is not applicable to this tunnel family.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+current_or_planned_disposition = "blocked_primitive"
+cells = ["not_applicable", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "blocked_primitive", "not_applicable", "not_applicable", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable"]
+blocked_primitive = "Yosemite 0.7.0 SessionOptions.ssl is not emitted on the SAM SESSION CREATE wire"
+blocking_milestone = "M097"
+cell_notes = { "client" = "The pinned option is not applicable to this tunnel family.", "httpclient" = "blocked on Yosemite SAM wire support.", "ircclient" = "The pinned option is not applicable to this tunnel family.", "socks" = "The pinned option is not applicable to this tunnel family.", "socksirc" = "The pinned option is not applicable to this tunnel family.", "connectclient" = "blocked on Yosemite SAM wire support.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "blocked on Yosemite SAM wire support.", "httpbidirserver" = "blocked on Yosemite SAM wire support.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
 canonical_key = "TunnelLength"
@@ -839,8 +843,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M097"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -853,9 +857,11 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M097"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
-cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+current_or_planned_disposition = "blocked_primitive"
+cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable"]
+cell_notes = { "client" = "blocked on Yosemite SAM wire support.", "httpclient" = "blocked on Yosemite SAM wire support.", "ircclient" = "blocked on Yosemite SAM wire support.", "socks" = "blocked on Yosemite SAM wire support.", "socksirc" = "blocked on Yosemite SAM wire support.", "connectclient" = "blocked on Yosemite SAM wire support.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "blocked on Yosemite SAM wire support.", "httpserver" = "blocked on Yosemite SAM wire support.", "httpbidirserver" = "blocked on Yosemite SAM wire support.", "ircserver" = "blocked on Yosemite SAM wire support.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+blocked_primitive = "Yosemite 0.7.0 exposes variance in Rust but does not emit it on the SAM SESSION CREATE wire"
+blocking_milestone = "M097"
 
 [[tunnel_manager.options]]
 canonical_key = "TunnelQuantity"
@@ -867,8 +873,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M097"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -881,9 +887,11 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M097"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
-cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+current_or_planned_disposition = "blocked_primitive"
+cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable"]
+cell_notes = { "client" = "blocked on Yosemite SAM wire support.", "httpclient" = "blocked on Yosemite SAM wire support.", "ircclient" = "blocked on Yosemite SAM wire support.", "socks" = "blocked on Yosemite SAM wire support.", "socksirc" = "blocked on Yosemite SAM wire support.", "connectclient" = "blocked on Yosemite SAM wire support.", "streamrclient" = "The pinned option is not applicable to this tunnel family.", "server" = "blocked on Yosemite SAM wire support.", "httpserver" = "blocked on Yosemite SAM wire support.", "httpbidirserver" = "blocked on Yosemite SAM wire support.", "ircserver" = "blocked on Yosemite SAM wire support.", "streamrserver" = "The pinned option is not applicable to this tunnel family." }
+blocked_primitive = "Yosemite 0.7.0 exposes backup quantity in Rust but does not emit it on the SAM SESSION CREATE wire"
+blocking_milestone = "M097"
 
 [[tunnel_manager.options]]
 canonical_key = "SigType"
@@ -895,9 +903,11 @@ path_bearing = false
 identity_or_key_affecting = true
 compatibility_aliases = []
 completion_owner = "M097"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
-cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+current_or_planned_disposition = "blocked_primitive"
+cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable"]
+cell_notes = { "client" = "blocked on Yosemite SAM wire support.", "httpclient" = "blocked on Yosemite SAM wire support.", "ircclient" = "blocked on Yosemite SAM wire support.", "socks" = "blocked on Yosemite SAM wire support.", "socksirc" = "blocked on Yosemite SAM wire support.", "connectclient" = "blocked on Yosemite SAM wire support.", "streamrclient" = "The pinned option is not applicable to this tunnel family.", "server" = "blocked on Yosemite SAM wire support.", "httpserver" = "blocked on Yosemite SAM wire support.", "httpbidirserver" = "blocked on Yosemite SAM wire support.", "ircserver" = "blocked on Yosemite SAM wire support.", "streamrserver" = "The pinned option is not applicable to this tunnel family." }
+blocked_primitive = "Yosemite 0.7.0 hardcodes signing type 7 on the SAM SESSION CREATE path and does not map SigType"
+blocking_milestone = "M097"
 
 [[tunnel_manager.options]]
 canonical_key = "EncType"
@@ -909,8 +919,8 @@ path_bearing = false
 identity_or_key_affecting = true
 compatibility_aliases = []
 completion_owner = "M097"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -923,9 +933,11 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M097"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
-cell_notes = { "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+current_or_planned_disposition = "blocked_primitive"
+cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable"]
+cell_notes = { "client" = "blocked on Yosemite SAM wire support.", "httpclient" = "blocked on Yosemite SAM wire support.", "ircclient" = "blocked on Yosemite SAM wire support.", "socks" = "blocked on Yosemite SAM wire support.", "socksirc" = "blocked on Yosemite SAM wire support.", "connectclient" = "blocked on Yosemite SAM wire support.", "streamrclient" = "The pinned option is not applicable to this tunnel family.", "server" = "blocked on Yosemite SAM wire support.", "httpserver" = "blocked on Yosemite SAM wire support.", "httpbidirserver" = "blocked on Yosemite SAM wire support.", "ircserver" = "blocked on Yosemite SAM wire support.", "streamrserver" = "The pinned option is not applicable to this tunnel family." }
+blocked_primitive = "Yosemite 0.7.0 has no bounded allowlisted custom-option pass-through to SAM SESSION CREATE"
+blocking_milestone = "M097"
 
 [[tunnel_manager.options]]
 canonical_key = "ProxyList"
@@ -1093,7 +1105,7 @@ compatibility_aliases = []
 completion_owner = "M098"
 current_or_planned_disposition = "planned_apply_or_not_applicable"
 cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+cell_notes = { "client" = "blocked on the control-plane destination lifecycle authority.", "httpclient" = "blocked on the control-plane destination lifecycle authority.", "ircclient" = "blocked on the control-plane destination lifecycle authority.", "socks" = "blocked on the control-plane destination lifecycle authority.", "socksirc" = "blocked on the control-plane destination lifecycle authority.", "connectclient" = "blocked on the control-plane destination lifecycle authority.", "streamrclient" = "blocked on the control-plane destination lifecycle authority.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
 canonical_key = "Profile"
@@ -1107,7 +1119,7 @@ compatibility_aliases = []
 completion_owner = "M098"
 current_or_planned_disposition = "planned_apply_or_not_applicable"
 cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+cell_notes = { "client" = "blocked on the control-plane destination store.", "httpclient" = "blocked on the control-plane destination store.", "ircclient" = "blocked on the control-plane destination store.", "socks" = "blocked on the control-plane destination store.", "socksirc" = "blocked on the control-plane destination store.", "connectclient" = "blocked on the control-plane destination store.", "streamrclient" = "blocked on the control-plane destination store.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
 canonical_key = "DelayOpen"
@@ -1203,9 +1215,11 @@ path_bearing = false
 identity_or_key_affecting = true
 compatibility_aliases = []
 completion_owner = "M097"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+current_or_planned_disposition = "blocked_primitive"
+cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "blocked on the control-plane destination lifecycle authority.", "httpclient" = "blocked on the control-plane destination lifecycle authority.", "ircclient" = "blocked on the control-plane destination lifecycle authority.", "socks" = "blocked on the control-plane destination lifecycle authority.", "socksirc" = "blocked on the control-plane destination lifecycle authority.", "connectclient" = "blocked on the control-plane destination lifecycle authority.", "streamrclient" = "blocked on the control-plane destination lifecycle authority.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+blocked_primitive = "control-plane-owned client destination store and explicit generation-rotation lifecycle"
+blocking_milestone = "M097"
 
 [[tunnel_manager.options]]
 canonical_key = "PersistentClientKey"
@@ -1217,9 +1231,11 @@ path_bearing = false
 identity_or_key_affecting = true
 compatibility_aliases = []
 completion_owner = "M097"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+current_or_planned_disposition = "blocked_primitive"
+cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "blocked on the control-plane destination store.", "httpclient" = "blocked on the control-plane destination store.", "ircclient" = "blocked on the control-plane destination store.", "socks" = "blocked on the control-plane destination store.", "socksirc" = "blocked on the control-plane destination store.", "connectclient" = "blocked on the control-plane destination store.", "streamrclient" = "blocked on the control-plane destination store.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+blocked_primitive = "control-plane-owned persistent client destination store and restart-safe identity handoff"
+blocking_milestone = "M097"
 
 [[tunnel_manager.options]]
 canonical_key = "PrivKeyFile"

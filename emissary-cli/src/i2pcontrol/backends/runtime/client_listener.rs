@@ -77,6 +77,7 @@ pub struct ClientListenerRuntimeConfig {
     pub destination_port: u16,
     pub sam_tcp_port: u16,
     pub max_connections: usize,
+    pub session_options: SessionOptions,
     pub handler: ClientConnectionHandler,
 }
 
@@ -118,12 +119,7 @@ pub async fn run_client_listener(
             let _ = ready.send(Err(ClientListenerRuntimeError::SessionSetup));
             return Ok(());
         }
-        result = Session::<style::Stream>::new(SessionOptions {
-            samv3_tcp_port: config.sam_tcp_port,
-            nickname: config.name.clone(),
-            publish: false,
-            ..Default::default()
-        }) => match result {
+        result = Session::<style::Stream>::new(config.session_options.clone()) => match result {
             Ok(session) => session,
             Err(_) => {
                 let _ = ready.send(Err(ClientListenerRuntimeError::SessionSetup));
@@ -172,6 +168,25 @@ pub async fn run_client_listener(
 
     tasks.drain(STOP_TIMEOUT).await;
     Ok(())
+}
+
+/// Run the plain client tunnel shape used by the generic `client` backend.
+/// Keeping it in the I2PControl runtime owner lets that backend apply the
+/// same validated session settings as the filtered client families.
+pub async fn run_generic_client(
+    config: ClientListenerRuntimeConfig,
+    cancellation: watch::Receiver<bool>,
+    ready: oneshot::Sender<Result<SocketAddr, ClientListenerRuntimeError>>,
+) -> Result<(), ClientListenerRuntimeError> {
+    let handler: ClientConnectionHandler = Arc::new(|mut local, connector| {
+        Box::pin(async move {
+            if let Ok(mut remote) = connector.connect().await {
+                let _ = tokio::io::copy_bidirectional(&mut local, &mut remote).await;
+            }
+        })
+    });
+    let config = ClientListenerRuntimeConfig { handler, ..config };
+    run_client_listener(config, cancellation, ready).await
 }
 
 #[cfg(test)]
@@ -228,6 +243,11 @@ mod tests {
             destination_port: 8080,
             sam_tcp_port,
             max_connections,
+            session_options: SessionOptions {
+                samv3_tcp_port: sam_tcp_port,
+                nickname: "client-listener".to_owned(),
+                ..Default::default()
+            },
             handler,
         }
     }

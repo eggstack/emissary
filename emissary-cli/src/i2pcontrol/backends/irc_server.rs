@@ -15,6 +15,7 @@ use tokio::{
     net::TcpStream,
     task::JoinHandle,
 };
+use yosemite::{DestinationKind, SessionOptions};
 
 use super::{
     filters::irc::{command_and_params, normalize_line, read_bounded_line, rewrite_server_user},
@@ -48,6 +49,7 @@ struct IrcServerConfig {
     sam_tcp_port: u16,
     destination: StoredDestination,
     admission: ServerAdmissionPolicy,
+    session_options: SessionOptions,
 }
 
 #[derive(Debug)]
@@ -239,6 +241,7 @@ impl IrcServerRuntimeSupervisor {
                     destination: config.destination,
                     admission: config.admission,
                     lease_set_enc_type: None,
+                    session_options: Some(config.session_options),
                     handler,
                 },
                 ready_cancellation.clone(),
@@ -571,6 +574,14 @@ impl TunnelBackend for IrcServerTunnelBackend {
             .ok_or_else(|| BackendError::Internal {
                 message: "ircserver destination identity is unavailable".to_owned(),
             })?;
+        config.session_options = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            true,
+            DestinationKind::Persistent {
+                private_key: config.destination.as_str().to_owned(),
+            },
+        )?;
         self.supervisor.start(config).await
     }
 
@@ -637,6 +648,7 @@ impl IrcServerTunnelBackend {
             sam_tcp_port: self.sam_tcp_port,
             destination: StoredDestination::from_private(String::new()),
             admission,
+            session_options: SessionOptions::default(),
         })
     }
 }

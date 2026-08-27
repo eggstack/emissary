@@ -62,12 +62,18 @@ impl TunnelBackend for SocksIrcTunnelBackend {
                 attempted_action: "start",
             });
         }
-        let config = config_for(
+        let mut config = config_for(
             definition,
             TunnelType::SocksIrc,
             self.sam_tcp_port,
             self.address_book.clone(),
             SOCKS_IRC_OPTIONS,
+        )?;
+        config.session_options = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            false,
+            yosemite::DestinationKind::Transient,
         )?;
         self.supervisor.start(config, PayloadMode::Irc).await
     }

@@ -47,6 +47,8 @@ pub struct AcceptedServerRuntimeConfig {
     /// server families must explicitly set `None` so they do not silently
     /// gain capabilities their own option contracts do not document.
     pub lease_set_enc_type: Option<String>,
+    /// Fully translated common session settings, when supplied by a backend.
+    pub session_options: Option<SessionOptions>,
     pub handler: AcceptedServerHandler,
 }
 
@@ -84,7 +86,7 @@ pub async fn run_accepted_server(
             let _ = ready.send(Err(AcceptedServerRuntimeError::SessionSetup));
             return Ok(());
         }
-        result = Session::<style::Stream>::new(SessionOptions {
+        result = Session::<style::Stream>::new(config.session_options.clone().unwrap_or_else(|| SessionOptions {
             samv3_tcp_port: config.sam_tcp_port,
             nickname: config.name.clone(),
             publish: true,
@@ -93,7 +95,7 @@ pub async fn run_accepted_server(
             },
             lease_set_enc_type: config.lease_set_enc_type.clone(),
             ..Default::default()
-        }) => match result {
+        })) => match result {
             Ok(session) => session,
             Err(_) => {
                 let _ = ready.send(Err(AcceptedServerRuntimeError::SessionSetup));
@@ -221,6 +223,7 @@ mod tests {
             destination: StoredDestination::from_private(base64_encode([7u8; 128])),
             admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
             lease_set_enc_type: None,
+            session_options: None,
             handler,
         };
         let (cancel_tx, cancel_rx) = watch::channel(false);
@@ -262,6 +265,7 @@ mod tests {
             destination: StoredDestination::from_private(base64_encode([7u8; 128])),
             admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
             lease_set_enc_type: None,
+            session_options: None,
             handler,
         };
         let (cancel_tx, cancel_rx) = watch::channel(false);
@@ -289,6 +293,7 @@ mod tests {
                 destination: StoredDestination::from_private("private".to_owned()),
                 admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
                 lease_set_enc_type: None,
+                session_options: None,
                 handler: Arc::new(|_| Box::pin(async {})),
             },
             cancel_rx,

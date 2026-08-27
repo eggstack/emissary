@@ -457,6 +457,51 @@ pub struct TunnelOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowplaintext: Option<bool>,
 
+    // === Common Proposal 170 session options ===
+    /// Whether compatible client definitions may share one I2CP session.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shared: Option<bool>,
+
+    /// Whether the SAM connection uses TLS.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub use_ssl: Option<bool>,
+
+    /// Requested inbound and outbound tunnel length.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tunnel_length: Option<u8>,
+
+    /// Requested inbound and outbound tunnel length variance.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tunnel_variance: Option<i8>,
+
+    /// Requested inbound and outbound tunnel quantity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tunnel_quantity: Option<u8>,
+
+    /// Requested inbound and outbound backup tunnel quantity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tunnel_backup_quantity: Option<u8>,
+
+    /// Destination signing type, retained in its canonical textual form.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sig_type: Option<String>,
+
+    /// Destination encryption/LeaseSet encryption type.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enc_type: Option<String>,
+
+    /// Explicitly request a fresh destination/key generation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_dest: Option<bool>,
+
+    /// Keep a client destination/key generation across restart.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub persistent_client_key: Option<bool>,
+
+    /// Confined private-key import path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priv_key_file: Option<String>,
+
     // === Server tunnel options ===
     /// Hosting destination (base64 RouterInfo for server tunnels).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -549,6 +594,17 @@ impl Default for TunnelOptions {
             listen_port: None,
             access_list: None,
             allowplaintext: None,
+            shared: None,
+            use_ssl: None,
+            tunnel_length: None,
+            tunnel_variance: None,
+            tunnel_quantity: None,
+            tunnel_backup_quantity: None,
+            sig_type: None,
+            enc_type: None,
+            new_dest: None,
+            persistent_client_key: None,
+            priv_key_file: None,
             hosting_destination: None,
             is_private: None,
             hashcash_proofs_required: None,

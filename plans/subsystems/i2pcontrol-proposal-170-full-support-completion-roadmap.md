@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096 closed; M097/M100-M103 are dependency-ready
+Status: active; M095-M097 closed (M097 blocked); M100-M103 are dependency-ready
 
 Planning baseline: `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207` — M094 closed planning head before this newly authorized phase.
 
@@ -206,7 +206,7 @@ Dependency classes:
 - M104 depends on all capability milestones M097-M103 closing; M096 is now closed.
 - Public-network/reference-router reachability is an operational dependency for M104 only; local code may close earlier milestones without creating a hosted network farm.
 
-Per planning governance, M095 was the only registered dependency-ready implementation plan at roadmap creation. Its closure now permits M096, M097, and M100-M103; M098/M099 still wait for M097.
+Per planning governance, M095 was the only registered dependency-ready implementation plan at roadmap creation. M096 and M097 have now been processed; M097 is closed as blocked on named primitives. M100-M103 remain independently ready, while M098/M099 still wait for an unblocked M097.
 
 ## 8. Milestones and exit conditions
 
@@ -220,7 +220,7 @@ Primary class: invariant / infrastructure.
 
 Re-audit the pinned proposal against current production, create one machine-readable matrix covering RouterInfo, AddressBook SetConfig, TunnelManager options/type applicability, and ClientServicesInfo, and assign every remaining cell to an owner/path budget. This milestone made no runtime behavior change. The resulting authority is `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`, guarded by `emissary-cli/tests/m095_full_support_matrix.rs`.
 
-Exit: no unknown applicability/source row remains; all later milestones have exact bounded inputs; lower-layer candidates are explicitly identified before code. M095 is closed; M096 is closed by its accepted closure record; M097 and M100-M103 remain ready, while M098/M099 remain blocked on M097 and M104 remains blocked on M097-M103.
+Exit: no unknown applicability/source row remains; all later milestones have exact bounded inputs; lower-layer candidates are explicitly identified before code. M095 and M096 are closed; M097 is closed as blocked with exact Yosemite/SAM and key-lifecycle blockers; M100-M103 remain ready, while M098/M099 remain blocked on M097 and M104 remains blocked on M097-M103.
 
 ### M096 — AddressBook SetConfig operational completion
 
@@ -238,13 +238,13 @@ Exit: non-empty valid SetConfig requests succeed only after durable/runtime publ
 
 Plan: `097-tunnel-common-session-and-key-option-completion.md`.
 
-Status: ready; dependency M095 closed.
+Status: blocked; closed as blocked by missing Yosemite/SAM and key-lifecycle primitives.
 
 Primary class: capability / infrastructure.
 
 Implement common Proposal 170 options that map to destination/session/tunnel construction and key persistence through existing Yosemite/SAM/backend primitives, including exact handling of tunnel length/variance/quantity/backup, signing/encryption types, shared/persistent/new-destination semantics, CustomOptions policy, and confined private-key references where applicable.
 
-Exit: the common option matrix contains no applicable unsupported cell assigned to this milestone; no new core API is introduced for convenience.
+Exit: the common option matrix has runtime evidence for length/quantity/encryption cells; variance, backup, SSL, signing, custom, shared, persistent, new-destination, and private-key import cells remain explicitly blocked on named primitives; no new core API is introduced for convenience.
 
 ### M098 — Client/proxy/management/HTTP option completion
 

@@ -1,6 +1,6 @@
 # M097 — Tunnel Common Session and Key Option Completion
 
-Status: ready; dependency M095 closed
+Status: blocked; closed as blocked by missing Yosemite/SAM and key-lifecycle primitives
 
 Source roadmap:
 

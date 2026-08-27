@@ -9,6 +9,7 @@ use std::{collections::HashMap, net::IpAddr, sync::Arc, time::Duration};
 use futures::FutureExt;
 use parking_lot::Mutex;
 use tokio::task::JoinHandle;
+use yosemite::{DestinationKind, SessionOptions};
 
 use super::{
     filters::{
@@ -56,6 +57,8 @@ struct HttpBidirConfig {
     require_proxy_auth: bool,
     client_policy: HttpClientPolicy,
     address_book: Option<Arc<RuntimeAddressBookHandle>>,
+    server_session_options: SessionOptions,
+    client_session_options: SessionOptions,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -358,6 +361,7 @@ async fn run_composite(
             destination: config.destination,
             admission: config.admission,
             lease_set_enc_type: None,
+            session_options: Some(config.server_session_options),
             handler: server_handler,
         },
         child_receiver.clone(),
@@ -371,6 +375,7 @@ async fn run_composite(
             destination: "direct-i2p-only".to_owned(),
             destination_port: 80,
             sam_tcp_port: config.sam_tcp_port,
+            session_options: config.client_session_options,
             max_connections: MAX_CONNECTIONS,
             handler: client_handler,
         },
@@ -626,6 +631,8 @@ impl HttpBidirServerTunnelBackend {
                 outproxy_authorization: None,
             },
             address_book: self.address_book.clone(),
+            server_session_options: SessionOptions::default(),
+            client_session_options: SessionOptions::default(),
         })
     }
 }
@@ -655,6 +662,20 @@ impl TunnelBackend for HttpBidirServerTunnelBackend {
             .ok_or_else(|| BackendError::Internal {
                 message: "httpbidirserver destination identity is unavailable".to_owned(),
             })?;
+        config.server_session_options = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            true,
+            DestinationKind::Persistent {
+                private_key: config.destination.as_str().to_owned(),
+            },
+        )?;
+        config.client_session_options = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            false,
+            DestinationKind::Transient,
+        )?;
         self.supervisor.start(config).await
     }
 

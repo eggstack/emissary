@@ -21,6 +21,7 @@ use super::{
     options::{validate_options, OptionValidationError, HTTP_CLIENT_OPTIONS},
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
+use yosemite::SessionOptions;
 use crate::i2pcontrol::{
     address_book_runtime::{RuntimeAddressBookHandle, RuntimeAddressBookType},
     backends::runtime::{
@@ -48,6 +49,7 @@ struct HttpClientConfig {
     require_auth: bool,
     policy: HttpClientPolicy,
     address_book: Option<Arc<RuntimeAddressBookHandle>>,
+    session_options: SessionOptions,
 }
 
 impl std::fmt::Debug for HttpClientConfig {
@@ -204,6 +206,7 @@ impl RuntimeSupervisor {
                     destination: "unused-httpclient-destination".to_owned(),
                     destination_port: 80,
                     sam_tcp_port: config.sam_tcp_port,
+                    session_options: config.session_options,
                     max_connections: MAX_CONNECTIONS,
                     handler,
                 },
@@ -564,6 +567,7 @@ impl HttpClientTunnelBackend {
                 outproxy_authorization,
             },
             address_book: self.address_book.clone(),
+            session_options: SessionOptions::default(),
         })
     }
 }
@@ -687,7 +691,14 @@ impl TunnelBackend for HttpClientTunnelBackend {
     }
 
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
-        self.supervisor.start(self.config(definition)?).await
+        let mut config = self.config(definition)?;
+        config.session_options = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            false,
+            yosemite::DestinationKind::Transient,
+        )?;
+        self.supervisor.start(config).await
     }
 
     async fn stop(&self, definition: &TunnelDefinition) -> BackendResult<()> {

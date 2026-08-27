@@ -200,7 +200,12 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
                 "unknown cell disposition {disposition}"
             );
             if disposition != "apply" && disposition != "planned_apply" {
-                assert!(notes.contains_key(tunnel_types[index]));
+                assert!(
+                    notes.contains_key(tunnel_types[index]),
+                    "{} cell {} needs a rationale",
+                    string_field(row, "canonical_key"),
+                    tunnel_types[index]
+                );
             }
         }
         if string_field(row, "canonical_key") == "PrivKeyFile" {

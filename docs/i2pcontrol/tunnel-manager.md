@@ -334,17 +334,32 @@ are accepted, validated where the proposal gives a bound/type, and retained in
 `rawConfig` for lossless round-trip. Retention is wire/CRUD support, not runtime
 data-plane support.
 
+M097 applies the common session controls that current Yosemite/SAM can carry on the
+actual session-creation path. `TunnelLength` (0–3), `TunnelQuantity` (1–6), and
+typed `EncType` values are validated before allocation and map to both inbound and
+outbound session settings. `EncType` accepts current core-supported values 3–7,
+with at most two distinct values and at most one ML-KEM variant.
+
+The remaining common fields are retained canonically for truthful `get`/`edit`
+round-tripping but fail before session/listener allocation: `Shared`, `UseSSL`,
+`TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions`, `NewDest`,
+`PersistentClientKey`, and `PrivKeyFile`. Yosemite 0.7.0 does not serialize the
+corresponding session controls on its SAM wire (and hardcodes signing type 7),
+while Emissary does not yet have the bounded shared/client-key authorities those
+identity semantics require. `CustomOptions` is bounded to 32 string entries with
+128-byte keys and values; it is not an arbitrary SAM escape hatch.
+
 | Disposition | Proposal 170 fields |
 |---|---|
 | Parsed and round-tripped | `Description`, `StartOnLoad`, `TargetDestination`, `Destination`, `TargetPort`, `ReachableBy`, `Port`, `TargetHost`, `Host` |
 | Validated and retained in raw configuration | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `UseOutproxyPlugin`, `ProxyAuth`, `OutproxyAuth`, `DelayOpen`, `Reduce`, `Close`, `NewDest`, `PersistentClientKey`, `AllowInternalSSL`, `BlockAccessInProxies`, `UniqueLocalAddressPerClient`, `MultiHoming`, `CustomOptions`, `LeaseSetClientAuths` |
 | Accepted and retained in raw configuration | `SigType`, `EncType`, `ProxyList`, `ProxyUsername`, `ProxyPassword`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `SSLProxies`, `JumpList`, `ConnectDelay`, `Profile`, `ReduceCount`, `ReduceTime`, `CloseTime`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `WebsiteHostname`, `SpoofedHost`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `OptionalLookup`, `EncryptLeaseSet` |
 
-`PrivKeyFile` is part of the pinned input inventory but is rejected by the
-canonical Emissary boundary because generic raw configuration must not accept
-runtime-generated key material. Passwords and authentication containers are
-accepted only for future backend persistence and are never serialized in
-generic responses.
+`PrivKeyFile` is part of the pinned input inventory and is retained as a redacted
+canonical path value, but start is rejected until confined import and atomic
+handoff into an I2PControl-owned key store exist. Passwords and authentication
+containers are accepted only for future backend persistence and are never
+serialized in generic responses.
 
 No field in this matrix starts a tunnel, creates a data-plane session, or
 reports a fabricated runtime state. Unsupported backends return an explicit

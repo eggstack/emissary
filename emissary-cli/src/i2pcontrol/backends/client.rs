@@ -26,14 +26,16 @@ use tokio::task::JoinHandle;
 
 use super::{
     options::{validate_options, OptionValidationError, CLIENT_OPTIONS},
+    runtime::{run_generic_client, ClientListenerRuntimeConfig, ClientListenerRuntimeError},
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
 use crate::{
     i2pcontrol::domain::tunnel::{
         TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType,
     },
-    tunnel_client::{run_single_client, ClientRuntimeError, ClientTunnelRuntimeConfig},
+    tunnel_client::{ClientRuntimeError, ClientTunnelRuntimeConfig},
 };
+use yosemite::{DestinationKind, SessionOptions};
 
 const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -207,31 +209,57 @@ impl ClientRuntimeSupervisor {
     }
 
     /// Start one validated client definition and wait for runtime readiness.
-    pub async fn start(&self, config: ClientTunnelRuntimeConfig) -> BackendResult<()> {
+    pub async fn start(
+        &self,
+        config: ClientTunnelRuntimeConfig,
+        session_options: SessionOptions,
+    ) -> BackendResult<()> {
         let (generation, cancellation) = self.reserve(&config)?;
         let ready_config = config.clone();
         let ready_cancellation = cancellation.clone();
         let map = Arc::clone(&self.inner);
         let name = config.name.clone();
         let task_name = name.clone();
-        let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+        let (listener_ready_tx, listener_ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
-            let result = std::panic::AssertUnwindSafe(run_single_client(
-                ready_config,
+            let result = std::panic::AssertUnwindSafe(run_generic_client(
+                ClientListenerRuntimeConfig {
+                    name: ready_config.name,
+                    bind_address: ready_config
+                        .address
+                        .as_deref()
+                        .unwrap_or("127.0.0.1")
+                        .parse()
+                        .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)),
+                    port: ready_config.port,
+                    destination: ready_config.destination,
+                    destination_port: ready_config.destination_port.unwrap_or(0),
+                    sam_tcp_port: ready_config.sam_tcp_port,
+                    max_connections: 1,
+                    session_options,
+                    handler: std::sync::Arc::new(|_, _| Box::pin(async {})),
+                },
                 ready_cancellation.clone(),
-                ready_tx,
+                listener_ready_tx,
             ))
             .catch_unwind()
             .await
-            .unwrap_or(Err(ClientRuntimeError::Panicked));
+            .unwrap_or(Err(ClientListenerRuntimeError::Panicked));
             let cancelled = *ready_cancellation.borrow();
-            ClientRuntimeSupervisor::complete(map, task_name, generation, result, cancelled).await;
+            ClientRuntimeSupervisor::complete(
+                map,
+                task_name,
+                generation,
+                result.map_err(|_| crate::tunnel_client::ClientRuntimeError::Panicked),
+                cancelled,
+            )
+            .await;
         });
 
         self.set_task(&name, generation, task);
 
-        match tokio::time::timeout(START_TIMEOUT, ready_rx).await {
-            Ok(Ok(Ok(()))) =>
+        match tokio::time::timeout(START_TIMEOUT, listener_ready_rx).await {
+            Ok(Ok(Ok(_))) =>
                 if self.mark_running(&name, generation) {
                     Ok(())
                 } else {
@@ -240,9 +268,11 @@ impl ClientRuntimeSupervisor {
                         message: "client tunnel runtime exited during start".to_string(),
                     })
                 },
-            Ok(Ok(Err(message))) => {
+            Ok(Ok(Err(_))) => {
                 let _ = self.stop_generation(&name, generation).await;
-                Err(BackendError::Internal { message })
+                Err(BackendError::Internal {
+                    message: "client tunnel runtime failed to start".to_owned(),
+                })
             }
             Ok(Err(_)) => {
                 let _ = self.stop_generation(&name, generation).await;
@@ -405,7 +435,13 @@ impl TunnelBackend for ClientTunnelBackend {
 
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
         let config = self.config(definition)?;
-        self.supervisor.start(config).await
+        let session_options = super::runtime::session::build_session_options(
+            definition,
+            self.supervisor.sam_tcp_port,
+            false,
+            DestinationKind::Transient,
+        )?;
+        self.supervisor.start(config, session_options).await
     }
 
     async fn stop(&self, definition: &TunnelDefinition) -> BackendResult<()> {

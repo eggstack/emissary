@@ -78,16 +78,6 @@ pub(crate) async fn handle_tunnel_manager(
         }
     };
 
-    // Private-key material is never accepted through the generic administrative
-    // raw configuration boundary, including the compatibility path.
-    if params.contains_key("PrivKeyFile") {
-        return error_response(
-            id,
-            rpc::error_codes::INVALID_PARAMS,
-            "PrivKeyFile is not accepted by TunnelManager",
-        );
-    }
-
     // Extract and validate action (required)
     let action_str = match params.get("Action").and_then(|v| v.as_str()) {
         Some(s) => s,
@@ -1080,6 +1070,49 @@ fn insert_typed_canonical_options(
     if let Some(value) = def.options.listen_port {
         insert("Port", serde_json::json!(value), raw_config);
     }
+    if let Some(value) = def.options.shared {
+        insert("Shared", serde_json::json!(value), raw_config);
+    }
+    if let Some(value) = def.options.use_ssl {
+        insert("UseSSL", serde_json::json!(value), raw_config);
+    }
+    if let Some(value) = def.options.tunnel_length {
+        insert("TunnelLength", serde_json::json!(value), raw_config);
+    }
+    if let Some(value) = def.options.tunnel_variance {
+        insert("TunnelVariance", serde_json::json!(value), raw_config);
+    }
+    if let Some(value) = def.options.tunnel_quantity {
+        insert("TunnelQuantity", serde_json::json!(value), raw_config);
+    }
+    if let Some(value) = def.options.tunnel_backup_quantity {
+        insert("TunnelBackupQuantity", serde_json::json!(value), raw_config);
+    }
+    if let Some(value) = &def.options.sig_type {
+        insert("SigType", serde_json::json!(value), raw_config);
+    }
+    if let Some(value) = &def.options.enc_type {
+        insert("EncType", serde_json::json!(value), raw_config);
+    }
+    if let Some(value) = def.options.new_dest {
+        insert("NewDest", serde_json::json!(value), raw_config);
+    }
+    if let Some(value) = def.options.persistent_client_key {
+        insert("PersistentClientKey", serde_json::json!(value), raw_config);
+    }
+    if let Some(value) = &def.options.priv_key_file {
+        insert("PrivKeyFile", serde_json::json!(value), raw_config);
+    }
+}
+
+fn option_text(value: &serde_json::Value, key: &str) -> Result<String, String> {
+    if let Some(value) = value.as_str() {
+        return Ok(value.to_owned());
+    }
+    if let Some(value) = value.as_u64() {
+        return Ok(value.to_string());
+    }
+    Err(format!("{key} must be a string or non-negative integer"))
 }
 
 /// Extract tunnel options from request params.
@@ -1109,6 +1142,41 @@ fn extract_tunnel_options(
         } else {
             StartIntent::DoNotStart
         });
+    }
+
+    // Common session options
+    if let Some(v) = params.get("Shared").and_then(|v| v.as_bool()) {
+        options.shared = Some(v);
+    }
+    if let Some(v) = params.get("UseSSL").and_then(|v| v.as_bool()) {
+        options.use_ssl = Some(v);
+    }
+    if let Some(v) = params.get("TunnelLength").and_then(|v| v.as_u64()) {
+        options.tunnel_length = Some(v as u8);
+    }
+    if let Some(v) = params.get("TunnelVariance").and_then(|v| v.as_i64()) {
+        options.tunnel_variance = Some(v as i8);
+    }
+    if let Some(v) = params.get("TunnelQuantity").and_then(|v| v.as_u64()) {
+        options.tunnel_quantity = Some(v as u8);
+    }
+    if let Some(v) = params.get("TunnelBackupQuantity").and_then(|v| v.as_u64()) {
+        options.tunnel_backup_quantity = Some(v as u8);
+    }
+    if let Some(v) = params.get("SigType") {
+        options.sig_type = Some(option_text(v, "SigType")?);
+    }
+    if let Some(v) = params.get("EncType") {
+        options.enc_type = Some(option_text(v, "EncType")?);
+    }
+    if let Some(v) = params.get("NewDest").and_then(|v| v.as_bool()) {
+        options.new_dest = Some(v);
+    }
+    if let Some(v) = params.get("PersistentClientKey").and_then(|v| v.as_bool()) {
+        options.persistent_client_key = Some(v);
+    }
+    if let Some(v) = params.get("PrivKeyFile").and_then(|v| v.as_str()) {
+        options.priv_key_file = Some(v.to_owned());
     }
 
     // Client options
@@ -1262,6 +1330,21 @@ fn merge_tunnel_options(existing: &TunnelOptions, new: &TunnelOptions) -> Tunnel
         listen_port: new.listen_port.or(existing.listen_port),
         access_list: new.access_list.clone().or(existing.access_list.clone()),
         allowplaintext: new.allowplaintext.or(existing.allowplaintext),
+        shared: new.shared.or(existing.shared),
+        use_ssl: new.use_ssl.or(existing.use_ssl),
+        tunnel_length: new.tunnel_length.or(existing.tunnel_length),
+        tunnel_variance: new.tunnel_variance.or(existing.tunnel_variance),
+        tunnel_quantity: new.tunnel_quantity.or(existing.tunnel_quantity),
+        tunnel_backup_quantity: new
+            .tunnel_backup_quantity
+            .or(existing.tunnel_backup_quantity),
+        sig_type: new.sig_type.clone().or(existing.sig_type.clone()),
+        enc_type: new.enc_type.clone().or(existing.enc_type.clone()),
+        new_dest: new.new_dest.or(existing.new_dest),
+        persistent_client_key: new
+            .persistent_client_key
+            .or(existing.persistent_client_key),
+        priv_key_file: new.priv_key_file.clone().or(existing.priv_key_file.clone()),
         hosting_destination: new
             .hosting_destination
             .clone()
@@ -1642,8 +1725,7 @@ fn validate_canonical_options(
             | "SpoofedHost" | "BlockUserAgents" | "UserAgents" | "AccessOption" | "AccessList"
             | "FilterFilePath" | "OptionalLookup" | "ProxyPassword" | "OutproxyPassword" =>
                 validate_string(key, value)?,
-            "PrivKeyFile" =>
-                return Err("PrivKeyFile is not accepted by canonical TunnelManager".to_string()),
+            "PrivKeyFile" => validate_string(key, value)?,
             _ if is_canonical_option_key(key) => validate_string_or_scalar(key, value)?,
             _ => {}
         }
@@ -1693,6 +1775,20 @@ fn validate_text_or_integer(key: &str, value: &serde_json::Value) -> Result<(), 
 
 fn validate_string_map(key: &str, value: &serde_json::Value) -> Result<(), String> {
     let object = value.as_object().ok_or_else(|| format!("{key} must be an object"))?;
+    if object.len() > 32 {
+        return Err(format!("{key} contains too many entries"));
+    }
+    if object.iter().any(|(entry_key, entry_value)| {
+        entry_key.is_empty()
+            || entry_key.len() > 128
+            || entry_value.as_str().is_some_and(|entry| entry.len() > 128)
+            || entry_key.chars().any(char::is_control)
+            || entry_value
+                .as_str()
+                .is_some_and(|entry| entry.chars().any(char::is_control))
+    }) {
+        return Err(format!("{key} contains an invalid entry"));
+    }
     if object.values().any(|entry| !entry.is_string()) {
         return Err(format!("{key} values must be strings"));
     }

@@ -23,7 +23,8 @@ use yosemite::{style, DatagramOptions, DestinationKind, Session, SessionOptions}
 
 use super::{
     options::{
-        validate_options, OptionValidationError, STREAMR_CLIENT_OPTIONS, STREAMR_SERVER_OPTIONS,
+        validate_common_options, validate_options, OptionValidationError, STREAMR_CLIENT_OPTIONS,
+        STREAMR_SERVER_OPTIONS,
     },
     server::SERVER_IDENTITY_KEY,
     BackendError, BackendResult, BackendStatus, TunnelBackend,
@@ -499,6 +500,8 @@ impl StreamrClientTunnelBackend {
             STREAMR_CLIENT_OPTIONS,
         )
         .map_err(option_error)?;
+        validate_common_options(TunnelType::StreamrClient, &definition.options)
+            .map_err(option_error)?;
         validate_raw_streamr_options(definition, TunnelType::StreamrClient, true)?;
         let producer = definition
             .options
@@ -629,6 +632,8 @@ impl StreamrServerTunnelBackend {
             STREAMR_SERVER_OPTIONS,
         )
         .map_err(option_error)?;
+        validate_common_options(TunnelType::StreamrServer, &definition.options)
+            .map_err(option_error)?;
         validate_raw_streamr_options(definition, TunnelType::StreamrServer, false)?;
         let local_port =
             definition.options.listen_port.ok_or_else(|| BackendError::MissingOption {

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095 closed; M096/M097/M100-M103 are dependency-ready
+Status: active; M095-M096 closed; M097/M100-M103 are dependency-ready
 
 Planning baseline: `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207` — M094 closed planning head before this newly authorized phase.
 
@@ -190,7 +190,7 @@ M102 canonical network-error owner            M103 banned-peer semantic closure
   |                                                |
   +----------------------+-------------------------+
                          |
-M096-M103 all closed ----+
+M097-M103 all closed ----+
                          |
                          v
                  M104 live interoperability +
@@ -203,7 +203,7 @@ Dependency classes:
 - M097 -> M098/M099: hard for shared session/key option plumbing and final applicability model.
 - M096, M100, M101 may proceed independently now that M095 is closed.
 - M102/M103 are ready for their bounded owner/semantic work because M095 recorded their exact audit gates and path budgets.
-- M104 depends on all capability milestones M096-M103 closing.
+- M104 depends on all capability milestones M097-M103 closing; M096 is now closed.
 - Public-network/reference-router reachability is an operational dependency for M104 only; local code may close earlier milestones without creating a hosted network farm.
 
 Per planning governance, M095 was the only registered dependency-ready implementation plan at roadmap creation. Its closure now permits M096, M097, and M100-M103; M098/M099 still wait for M097.
@@ -220,13 +220,13 @@ Primary class: invariant / infrastructure.
 
 Re-audit the pinned proposal against current production, create one machine-readable matrix covering RouterInfo, AddressBook SetConfig, TunnelManager options/type applicability, and ClientServicesInfo, and assign every remaining cell to an owner/path budget. This milestone made no runtime behavior change. The resulting authority is `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`, guarded by `emissary-cli/tests/m095_full_support_matrix.rs`.
 
-Exit: no unknown applicability/source row remains; all later milestones have exact bounded inputs; lower-layer candidates are explicitly identified before code. M095 is closed; M096, M097, and M100-M103 are now ready, while M098/M099 remain blocked on M097 and M104 remains blocked on M096-M103.
+Exit: no unknown applicability/source row remains; all later milestones have exact bounded inputs; lower-layer candidates are explicitly identified before code. M095 is closed; M096 is closed by its accepted closure record; M097 and M100-M103 remain ready, while M098/M099 remain blocked on M097 and M104 remains blocked on M097-M103.
 
 ### M096 — AddressBook SetConfig operational completion
 
 Plan: `096-addressbook-setconfig-operational-completion.md`.
 
-Status: ready; dependency M095 closed.
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/096-closure.md`.
 
 Primary class: capability / security / persistence.
 
@@ -322,7 +322,7 @@ Exit: `bannedpeers` has an authoritative semantic owner; if satisfying the propo
 
 Plan: `104-full-proposal-170-live-interoperability-and-reclosure.md`.
 
-Status: blocked on M096-M103.
+Status: blocked on M097-M103.
 
 Primary class: invariant / capability / operations.
 

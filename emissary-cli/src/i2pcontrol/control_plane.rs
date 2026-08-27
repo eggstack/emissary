@@ -124,10 +124,11 @@ pub trait AddressBookControl: Send + Sync {
     /// Get the current address book configuration.
     async fn configuration(&self) -> Result<AddressBookConfiguration, String>;
 
-    /// Set the address book configuration atomically.
+    /// Set the validated address book configuration atomically.
     ///
-    /// Production currently supports the empty set only. Non-empty Proposal 170 configuration
-    /// keys must be rejected before persistence unless a live Emissary owner is added.
+    /// Production validates all pinned Proposal 170 keys, confines paths to the
+    /// AddressBook administrative root, and publishes the active generation before
+    /// returning success.
     async fn set_configuration(
         &self,
         configuration: AddressBookConfiguration,
@@ -435,8 +436,9 @@ impl TunnelManagerControl for FakeTunnelManagerControl {
         let backend = self.registry.get(def.tunnel_type);
         match backend.start(&def).await {
             Ok(()) => Ok(format!("ok - {} started", def.tunnel_type.as_str())),
-            Err(BackendError::NotImplemented { tunnel_type }) =>
-                Ok(format!("error - {} not implemented", tunnel_type.as_str())),
+            Err(BackendError::NotImplemented { tunnel_type }) => {
+                Ok(format!("error - {} not implemented", tunnel_type.as_str()))
+            }
             Err(e) => Ok(format!("error - {}", e)),
         }
     }
@@ -471,8 +473,9 @@ impl TunnelManagerControl for FakeTunnelManagerControl {
         let _ = backend.stop(&def).await;
         match backend.start(&def).await {
             Ok(()) => Ok(format!("ok - {} restarted", def.tunnel_type.as_str())),
-            Err(BackendError::NotImplemented { tunnel_type }) =>
-                Ok(format!("error - {} not implemented", tunnel_type.as_str())),
+            Err(BackendError::NotImplemented { tunnel_type }) => {
+                Ok(format!("error - {} not implemented", tunnel_type.as_str()))
+            }
             Err(e) => Ok(format!("error - {}", e)),
         }
     }

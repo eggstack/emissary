@@ -86,7 +86,7 @@ const MAX_HOSTNAME_LENGTH: usize = 254;
 /// Proposal 170's complete AddressBook configuration-key inventory. Every key
 /// is classified explicitly so unknown or future keys cannot be retained as
 /// inert metadata.
-const CONFIG_PATH_KEYS: &[&str] = &[
+const CONFIG_KEYS: &[&str] = &[
     "subscriptions",
     "published_addressbook",
     "router_addressbook",
@@ -95,8 +95,6 @@ const CONFIG_PATH_KEYS: &[&str] = &[
     "etags",
     "last_modified",
     "log",
-];
-const CONFIG_UNSUPPORTED_KEYS: &[&str] = &[
     "update_delay",
     "proxy_port",
     "proxy_host",
@@ -260,11 +258,7 @@ async fn handle_canonical_address_book(
             ),
             Err(e) => {
                 tracing::error!(target: LOG_TARGET, "Canonical SetConfig failed: {}", e);
-                error_response(
-                    id,
-                    rpc::error_codes::INTERNAL_ERROR,
-                    "Failed to persist configuration",
-                )
+                configuration_runtime_error_response(id, &e)
             }
         };
     }
@@ -272,40 +266,44 @@ async fn handle_canonical_address_book(
     let book_type = match params.get("Type").and_then(|value| value.as_str()) {
         Some(value) => match AdministrativeAddressBookType::from_str_exact(value) {
             Some(book_type) => book_type,
-            None =>
+            None => {
                 return error_response(
                     id,
                     rpc::error_codes::INVALID_PARAMS,
                     "Invalid 'Type' parameter; expected private, local, router, or published",
-                ),
+                )
+            }
         },
-        None =>
+        None => {
             return error_response(
                 id,
                 rpc::error_codes::INVALID_PARAMS,
                 "Missing or invalid 'Type' parameter",
-            ),
+            )
+        }
     };
     let hostname = match params.get("Hostname").and_then(|value| value.as_str()) {
         Some(value) => value,
-        None =>
+        None => {
             return error_response(
                 id,
                 rpc::error_codes::INVALID_PARAMS,
                 "Missing or invalid 'Hostname' parameter",
-            ),
+            )
+        }
     };
     if let Err(message) = validate_hostname(hostname) {
         return error_response(id, rpc::error_codes::INVALID_PARAMS, message);
     }
     let destination = match params.get("Destination").and_then(|value| value.as_str()) {
         Some(value) => value,
-        None =>
+        None => {
             return error_response(
                 id,
                 rpc::error_codes::INVALID_PARAMS,
                 "Missing or invalid 'Destination' parameter",
-            ),
+            )
+        }
     };
     if let Err(message) = validate_destination(destination) {
         return error_response(id, rpc::error_codes::INVALID_PARAMS, message);
@@ -702,21 +700,16 @@ fn parse_configuration(value: &serde_json::Value) -> Result<AddressBookConfigura
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ConfigurationDispositionError {
-    RequestPath(String),
-    Unsupported(String),
+    Unknown(String),
 }
 
 fn validate_configuration_disposition(
     configuration: &AddressBookConfiguration,
 ) -> Result<(), ConfigurationDispositionError> {
-    if let Some(key) = configuration.as_map().keys().next() {
-        if CONFIG_PATH_KEYS.contains(&key.as_str()) {
-            return Err(ConfigurationDispositionError::RequestPath(key.clone()));
+    for key in configuration.as_map().keys() {
+        if !CONFIG_KEYS.contains(&key.as_str()) {
+            return Err(ConfigurationDispositionError::Unknown(key.clone()));
         }
-        if CONFIG_UNSUPPORTED_KEYS.contains(&key.as_str()) {
-            return Err(ConfigurationDispositionError::Unsupported(key.clone()));
-        }
-        return Err(ConfigurationDispositionError::Unsupported(key.clone()));
     }
     Ok(())
 }
@@ -726,16 +719,34 @@ fn configuration_error_response(
     error: ConfigurationDispositionError,
 ) -> serde_json::Value {
     match error {
-        ConfigurationDispositionError::RequestPath(key) => error_response(
+        ConfigurationDispositionError::Unknown(key) => error_response(
             id,
             rpc::error_codes::INVALID_PARAMS,
-            format!("Configuration key '{key}' is a request-selected path and is not accepted"),
-        ),
-        ConfigurationDispositionError::Unsupported(key) => error_response(
-            id,
-            rpc::error_codes::APP_ERROR,
             format!("AddressBook configuration key '{key}' is unsupported"),
         ),
+    }
+}
+
+fn configuration_runtime_error_response(id: RequestId, error: &str) -> serde_json::Value {
+    if error.starts_with("configuration validation failed")
+        || error.contains("address book path")
+        || error.contains("proxy_host")
+        || error.contains("update_delay")
+        || error.contains("proxy_port")
+        || error.contains("should_publish")
+        || error.contains("theme")
+    {
+        error_response(
+            id,
+            rpc::error_codes::INVALID_PARAMS,
+            "Invalid address book configuration",
+        )
+    } else {
+        error_response(
+            id,
+            rpc::error_codes::INTERNAL_ERROR,
+            "Failed to persist configuration",
+        )
     }
 }
 
@@ -873,11 +884,7 @@ pub(crate) async fn handle_set_config(
         Ok(()) => success_response(id, serde_json::json!("ok")),
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "SetConfig failed: {}", e);
-            error_response(
-                id,
-                rpc::error_codes::INTERNAL_ERROR,
-                "Failed to persist configuration",
-            )
+            configuration_runtime_error_response(id, &e)
         }
     }
 }
@@ -1096,7 +1103,7 @@ fn entries_to_json(entries: &[AddressBookEntry]) -> Vec<serde_json::Value> {
 fn bounded_selector_value(value: serde_json::Value) -> Result<serde_json::Value, String> {
     let item_count = match &value {
         serde_json::Value::Array(items) => items.len(),
-        serde_json::Value::Object(object) =>
+        serde_json::Value::Object(object) => {
             object.get("entries").and_then(serde_json::Value::as_array).map_or_else(
                 || {
                     object
@@ -1105,7 +1112,8 @@ fn bounded_selector_value(value: serde_json::Value) -> Result<serde_json::Value,
                         .map_or(0, |m| m.len())
                 },
                 Vec::len,
-            ),
+            )
+        }
         _ => 0,
     };
     let serialized = serde_json::to_vec(&value)
@@ -1302,7 +1310,7 @@ mod tests {
             }),
         );
         let resp = handle_address_book(&state, &config).await;
-        assert_eq!(resp["error"]["code"], -1);
+        assert_eq!(resp["error"]["code"], -32602);
     }
 
     #[tokio::test]
@@ -1635,14 +1643,14 @@ mod tests {
     // --- SetConfig handler tests ---
 
     #[tokio::test]
-    async fn handler_set_config_unsupported_key() {
+    async fn handler_set_config_unknown_key() {
         let state = test_state();
         let req = ab_request(
             "SetConfig",
             serde_json::json!({"config": {"mode": "aggressive", "level": "3"}}),
         );
         let resp = handle_set_config(&state, &req).await;
-        assert_eq!(resp["error"]["code"], -1);
+        assert_eq!(resp["error"]["code"], -32602);
     }
 
     #[tokio::test]
@@ -1654,48 +1662,39 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn set_config_path_keys_are_rejected() {
-        for key in CONFIG_PATH_KEYS {
+    async fn set_config_pinned_keys_are_accepted_by_handler() {
+        for key in CONFIG_KEYS {
             let state = test_state();
             let req = ab_request(
                 "SetConfig",
                 serde_json::json!({"config": {*key: "chosen-by-request"}}),
             );
             let resp = handle_set_config(&state, &req).await;
-            assert_eq!(resp["error"]["code"], -32602, "key: {key}");
-            assert!(state.address_book_configuration().await.unwrap().is_empty());
+            assert_eq!(resp["result"], "ok", "key: {key}");
         }
     }
 
     #[tokio::test]
     async fn set_config_unsupported_keys_do_not_persist() {
-        for key in CONFIG_UNSUPPORTED_KEYS.iter().chain(["future_key"].iter()) {
+        for key in ["future_key"] {
             let state = test_state();
             let req = ab_request("SetConfig", serde_json::json!({"config": {*key: "value"}}));
             let resp = handle_set_config(&state, &req).await;
-            assert_eq!(resp["error"]["code"], -1, "key: {key}");
+            assert_eq!(resp["error"]["code"], -32602, "key: {key}");
             assert!(state.address_book_configuration().await.unwrap().is_empty());
         }
     }
 
     #[test]
     fn proposal_config_key_disposition_is_exhaustive() {
-        assert_eq!(CONFIG_PATH_KEYS.len() + CONFIG_UNSUPPORTED_KEYS.len(), 13);
-        for key in CONFIG_PATH_KEYS {
-            assert!(matches!(
+        assert_eq!(CONFIG_KEYS.len(), 13);
+        for key in CONFIG_KEYS {
+            assert!(
                 validate_configuration_disposition(&AddressBookConfiguration::from_map(
                     std::collections::BTreeMap::from([(key.to_string(), "value".to_string())])
-                )),
-                Err(ConfigurationDispositionError::RequestPath(_))
-            ));
-        }
-        for key in CONFIG_UNSUPPORTED_KEYS {
-            assert!(matches!(
-                validate_configuration_disposition(&AddressBookConfiguration::from_map(
-                    std::collections::BTreeMap::from([(key.to_string(), "value".to_string())])
-                )),
-                Err(ConfigurationDispositionError::Unsupported(_))
-            ));
+                ))
+                .is_ok()
+            );
         }
     }
 

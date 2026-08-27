@@ -21,9 +21,9 @@ and lookup coherence and independently closed this AddressBook dimension.
 ## Overview
 
 The AddressBook API provides administrative management of four independent
-address books, a live subscription source set, and a read-only configuration
-view. Configuration mutation is intentionally empty-set-only until Emissary
-has a safe live owner for another field.
+address books, a live subscription source set, and a versioned configuration
+view. M096 gives all thirteen pinned configuration keys explicit operational
+semantics, with `theme` retained as inert metadata.
 
 When I2PControl is enabled, successful entry mutations must be committed by one
 runtime control owner and immediately visible to normal destination lookup.
@@ -115,26 +115,38 @@ Bounds:
 
 ### SetConfig
 
-The production supported configuration-key set is empty. An empty object is a
-successful no-op. Every non-empty key is rejected before persistence:
+M096 makes the complete pinned Proposal 170 configuration set operational. The
+configuration is stored as a versioned typed part of the AddressBook owner’s
+durable generation. A successful non-empty request means validation, configured
+artifact preparation, and the active-generation publication point were reached.
 
-| Proposal 170 key class | Keys | Result |
+Path values are relative to the enabled AddressBook administrative root. `.` and
+`..` are normalized only when the result remains inside that root; absolute paths,
+control characters, symlink escapes, reserved runtime artifacts, and non-regular
+files are rejected before mutation. Configured files are replaced atomically on
+their owning filesystem. The four book paths select AddressBook-owned JSON
+snapshots; subscription, ETag, and Last-Modified paths feed the one existing
+bounded downloader worker. The configured `log` path receives only a bounded
+AddressBook diagnostic artifact and never redirects global logging.
+
+| Proposal 170 key class | Keys | Operational meaning |
 |---|---|---|
-| Request-selected path | `subscriptions`, `published_addressbook`, `router_addressbook`, `local_addressbook`, `private_addressbook`, `etags`, `last_modified`, `log` | Invalid parameters |
-| No live Emissary owner | `update_delay`, `proxy_port`, `proxy_host`, `should_publish`, `theme` | Unsupported operation |
-| Unknown/future key | any other key | Unsupported operation |
+| Confined path | `subscriptions`, `published_addressbook`, `router_addressbook`, `local_addressbook`, `private_addressbook`, `etags`, `last_modified`, `log` | Selects an AddressBook-owned artifact or metadata file |
+| Runtime behavior | `update_delay`, `proxy_port`, `proxy_host`, `should_publish` | Controls the existing refresh worker, outbound proxy, and bounded publication |
+| Administrative metadata | `theme` | Durable round-trip only; no frontend/router side effect |
 
-The table is exhaustive against the pinned Proposal 170 key inventory. Emissary
-does not accept arbitrary filesystem paths, proxy changes, scheduler changes,
-publication toggles, or UI settings through this API. Legacy inert configuration
-metadata is discarded during enabled-mode migration rather than treated as
-operational.
+The table is exhaustive against the pinned Proposal 170 key inventory. Unknown
+keys remain invalid. Legacy rejected/inert configuration metadata is not revived
+during migration.
 
 Bounds:
 
 - maximum 1000 entries;
 - maximum 256-byte keys;
 - maximum 4096-byte values.
+- `update_delay` is an integer number of hours from 1 through 720.
+- `proxy_port` is non-zero and `proxy_host` is a bounded host/IP value.
+- `should_publish` accepts only the strings `true` and `false`.
 
 ## Address books
 
@@ -206,7 +218,8 @@ M030 revalidated it against the frozen final repository head.
 - Full destinations, subscriptions, configuration values, and raw state are not
   logged.
 - Input cannot select arbitrary filesystem paths.
-- Request-selected configuration paths are rejected before persistence.
+- Configuration paths are confined and rejected before persistence when they are absolute,
+  escaping, symlinked, reserved, or non-regular.
 - Subscription commands are capacity-bounded; no request creates a detached
   refresh task or an unbounded queue.
 - State and response sizes are bounded.

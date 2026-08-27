@@ -1737,7 +1737,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn production_setters_do_not_report_inert_success() {
+    async fn production_setters_apply_operational_configuration() {
         use crate::i2pcontrol::control_plane::AddressBookControl;
 
         let base = tempfile::tempdir().unwrap().keep();
@@ -1757,14 +1757,17 @@ mod tests {
             "private_addressbook".to_string(),
             "chosen-by-request".to_string(),
         );
-        assert!(adapter.set_configuration(config).await.is_err());
-        assert!(control.runtime_configuration().await.unwrap().is_empty());
+        adapter.set_configuration(config).await.unwrap();
+        assert_eq!(
+            control.runtime_configuration().await.unwrap().get("private_addressbook"),
+            Some(&"chosen-by-request".to_string())
+        );
 
         let subscriptions =
             SubscriptionSet::from_vec(vec!["https://example.i2p/hosts.txt".to_string()]);
         assert!(adapter.set_subscriptions(subscriptions).await.is_err());
         assert!(control.runtime_subscriptions().await.unwrap().is_empty());
-        assert!(!control.runtime_authority_present());
+        assert!(control.runtime_authority_present());
     }
 
     #[tokio::test]

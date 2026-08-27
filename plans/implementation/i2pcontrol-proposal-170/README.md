@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; all twelve tunnel runtimes real; production tunnel security closed by M093; M095 closed with the full-support matrix; M096/M097/M100-M103 ready; M098/M099/M104 remain dependency-blocked
+Status: partial Proposal 170 production support; all twelve tunnel runtimes real; production tunnel security closed by M093; M095-M096 closed; M097/M100-M103 ready; M098/M099/M104 remain dependency-blocked
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -53,7 +53,7 @@ M091 remains the cautionary boundary case: while its plan was registered blocked
 The current production state remains partial, despite the new full-support plans:
 
 - RouterInfo: 43 canonical Proposal 170 additions / 37 available / 1 protocol-permitted neutral / 5 unavailable;
-- AddressBook CRUD and `SetSubscriptions` operational; non-empty `SetConfig` requests remain truthfully rejected;
+- AddressBook CRUD, `SetSubscriptions`, and all thirteen `SetConfig` keys operational within the confined AddressBook owner;
 - exactly 12 Proposal 170 tunnel types have real backends;
 - exactly 7 canonical TunnelManager actions are implemented;
 - applicable but not-yet-implemented runtime options fail before allocation rather than being silently ignored;
@@ -69,7 +69,7 @@ Only dependency-ready plans registered in `plans/registry.md` are executable. Fu
 | Handoff | Status | Scope |
 |---|---|---|
 | M095 | **closed** | exact machine-readable full-support matrix and owner/containment budgets; no production behavior |
-| M096 | **ready** | operational AddressBook SetConfig for all 13 pinned keys with path confinement/persistence |
+| M096 | **closed** | operational AddressBook SetConfig for all 13 pinned keys with path confinement/persistence |
 | M097 | **ready** | common tunnel session/tunnel/key/persistence options using existing Yosemite/SAM primitives |
 | M098 | blocked on M097 | client proxy/outproxy/auth/management/HTTP privacy option completion |
 | M099 | blocked on M097 | server access/filter/throttle/LeaseSet option completion |
@@ -77,7 +77,7 @@ Only dependency-ready plans registered in `plans/registry.md` are executable. Fu
 | M101 | **ready** | bounded real router-news source |
 | M102 | **ready** | minimal neutral IPv4/IPv6 network-error owner observation; wire mapping stays in I2PControl |
 | M103 | **ready** | real banned-peer owner or proven by-design-empty semantics; no new ban algorithm solely for telemetry |
-| M104 | blocked on M096-M103 | integrated live interoperability, final matrix/security/containment reclosure, revision-pinned full-support decision |
+| M104 | blocked on M097-M103 | integrated live interoperability, final matrix/security/containment reclosure, revision-pinned full-support decision |
 
 Plans:
 

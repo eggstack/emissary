@@ -157,12 +157,11 @@ Base64 views share one full-destination owner, including first activation,
 historical seed repair, stale-file update/delete, download merge, and
 re-enable deletion semantics.
 
-M034 closes the setter-truthfulness gap: subscription replacement is applied by
-the live downloader through a bounded command seam and durably published, while
-all non-empty configuration mutations are rejected before persistence. The
-Proposal 170 configuration inventory is explicitly classified into
-request-selected paths and unsupported runtime fields; no inert metadata is
-reported as a successful mutation.
+M034 closes the setter-truthfulness gap for subscription replacement. M096
+extends that boundary to all thirteen pinned configuration keys: validated
+path, cadence, proxy, publication, and AddressBook-owned log settings are
+durably published before success, while `theme` is explicitly metadata-only.
+No behaviorally meaningful key is accepted inertly.
 
 M036 closes the remaining authentication and publication-hardening gap:
 password comparison uses a reviewed constant-time primitive, failed

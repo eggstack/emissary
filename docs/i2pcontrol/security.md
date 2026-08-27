@@ -188,13 +188,16 @@ AddressBook setter isolation is stricter:
 - the command channel has capacity one, with at most one in-flight refresh and
   one newest pending generation;
 - durable state is committed by the runtime manager before success is returned;
-- unavailable manager/channel state fails explicitly and cannot claim deferred
-  success;
-- all Proposal 170 `SetConfig` keys are classified, with arbitrary path keys
-  rejected as invalid parameters and every other non-empty key rejected as
-  unsupported;
-- legacy configuration metadata is cleared during enabled migration and never
-  controls filesystem, proxy, scheduler, publication, or logging behavior.
+- unavailable manager/channel state fails explicitly for subscription replacement;
+- all thirteen Proposal 170 `SetConfig` keys are validated before commit;
+- configured paths are normalized under the AddressBook administrative root and
+  reject absolute paths, traversal, symlink escapes, reserved runtime artifacts,
+  and special files;
+- configuration artifacts are atomically replaced, and the existing one-worker
+  downloader consumes the active cadence, proxy, metadata paths, and publication
+  policy without spawning duplicate workers;
+- `log` is limited to an AddressBook-owned bounded artifact, while `theme` is
+  inert metadata and cannot control global logging, the router, or the frontend.
 
 ## Compilation features
 

@@ -7,19 +7,20 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
-    path::PathBuf,
+    path::{Component, Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
-use crate::i2pcontrol::stores::publication::{publish_with_backup, publish_with_backup_sync};
 use crate::address_book::{
-    AddressBookManager, AddressBookRuntimeContext, AddressBookRuntimeHook,
+    AddressBookManager, AddressBookRuntimeContext, AddressBookRuntimeHook, RuntimeRefreshSettings,
     RuntimeSubscriptionCommand, RuntimeSubscriptionControl,
 };
 use crate::config::AddressBookConfig;
+use crate::i2pcontrol::stores::publication::{publish_with_backup, publish_with_backup_sync};
 use emissary_core::{
     crypto::{base32_encode, base64_decode},
     primitives::Destination,
@@ -29,6 +30,304 @@ use parking_lot::RwLock;
 pub(crate) const MAX_LEGACY_DESTINATION_ENTRIES: usize = 10_000;
 pub(crate) const MAX_LEGACY_DESTINATION_FILE_BYTES: usize = 64 * 1024;
 pub(crate) const MAX_LEGACY_DESTINATION_BYTES: usize = 1024 * 1024;
+const CONFIG_SCHEMA_VERSION: u32 = 2;
+const DEFAULT_UPDATE_DELAY_HOURS: u64 = 24;
+const MIN_UPDATE_DELAY_HOURS: u64 = 1;
+const MAX_UPDATE_DELAY_HOURS: u64 = 24 * 30;
+const MAX_CONFIGURATION_PATH_LENGTH: usize = 1024;
+const MAX_THEME_LENGTH: usize = 128;
+const MAX_ADMIN_FILE_BYTES: usize = 4 * 1024 * 1024;
+
+const CONFIG_KEYS: &[&str] = &[
+    "subscriptions",
+    "published_addressbook",
+    "router_addressbook",
+    "local_addressbook",
+    "private_addressbook",
+    "etags",
+    "last_modified",
+    "log",
+    "update_delay",
+    "proxy_port",
+    "proxy_host",
+    "should_publish",
+    "theme",
+];
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct RuntimeAddressBookConfiguration {
+    pub version: u32,
+    #[serde(default)]
+    pub paths: BTreeMap<String, String>,
+    pub update_delay_hours: u64,
+    pub proxy_port: Option<u16>,
+    pub proxy_host: Option<String>,
+    pub should_publish: bool,
+    pub theme: Option<String>,
+    #[serde(default)]
+    pub explicit_keys: std::collections::BTreeSet<String>,
+}
+
+impl Default for RuntimeAddressBookConfiguration {
+    fn default() -> Self {
+        Self {
+            version: CONFIG_SCHEMA_VERSION,
+            paths: BTreeMap::new(),
+            update_delay_hours: DEFAULT_UPDATE_DELAY_HOURS,
+            proxy_port: None,
+            proxy_host: None,
+            should_publish: true,
+            theme: None,
+            explicit_keys: std::collections::BTreeSet::new(),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for RuntimeAddressBookConfiguration {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        if !value.is_object() {
+            return Err(serde::de::Error::custom(
+                "address book configuration must be an object",
+            ));
+        }
+        if value.get("version").is_none() && value.get("paths").is_none() {
+            // M034 stored rejected values as a flat string map. Those values
+            // were never active, so loading them as defaults preserves the
+            // durable authority without reviving inert behavior.
+            return Ok(Self::default());
+        }
+        #[derive(serde::Deserialize)]
+        struct Stored {
+            #[serde(default = "default_config_version")]
+            version: u32,
+            #[serde(default)]
+            paths: BTreeMap<String, String>,
+            #[serde(default = "default_update_delay")]
+            update_delay_hours: u64,
+            #[serde(default)]
+            proxy_port: Option<u16>,
+            #[serde(default)]
+            proxy_host: Option<String>,
+            #[serde(default = "default_should_publish")]
+            should_publish: bool,
+            #[serde(default)]
+            theme: Option<String>,
+            #[serde(default)]
+            explicit_keys: std::collections::BTreeSet<String>,
+        }
+        fn default_config_version() -> u32 {
+            CONFIG_SCHEMA_VERSION
+        }
+        fn default_update_delay() -> u64 {
+            DEFAULT_UPDATE_DELAY_HOURS
+        }
+        fn default_should_publish() -> bool {
+            true
+        }
+        let stored: Stored = serde_json::from_value(value).map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            version: stored.version,
+            paths: stored.paths,
+            update_delay_hours: stored.update_delay_hours,
+            proxy_port: stored.proxy_port,
+            proxy_host: stored.proxy_host,
+            should_publish: stored.should_publish,
+            theme: stored.theme,
+            explicit_keys: stored.explicit_keys,
+        })
+    }
+}
+
+impl RuntimeAddressBookConfiguration {
+    fn validate_stored(&self) -> Result<(), String> {
+        if self.version != CONFIG_SCHEMA_VERSION {
+            return Err("address book configuration schema version is unsupported".to_string());
+        }
+        if self.explicit_keys.iter().any(|key| !CONFIG_KEYS.contains(&key.as_str())) {
+            return Err("address book configuration contains an unknown key".to_string());
+        }
+        for key in self.paths.keys() {
+            if !matches!(
+                key.as_str(),
+                "subscriptions"
+                    | "published_addressbook"
+                    | "router_addressbook"
+                    | "local_addressbook"
+                    | "private_addressbook"
+                    | "etags"
+                    | "last_modified"
+                    | "log"
+            ) || !self.explicit_keys.contains(key)
+            {
+                return Err("address book configuration contains an invalid path".to_string());
+            }
+            let value = self.paths.get(key).expect("path key was just checked");
+            if value.is_empty() || value.len() > MAX_CONFIGURATION_PATH_LENGTH {
+                return Err("address book configuration path is invalid".to_string());
+            }
+        }
+        for key in &self.explicit_keys {
+            if matches!(
+                key.as_str(),
+                "subscriptions"
+                    | "published_addressbook"
+                    | "router_addressbook"
+                    | "local_addressbook"
+                    | "private_addressbook"
+                    | "etags"
+                    | "last_modified"
+                    | "log"
+            ) && !self.paths.contains_key(key)
+            {
+                return Err("address book configuration is incomplete".to_string());
+            }
+        }
+        if self.update_delay_hours < MIN_UPDATE_DELAY_HOURS
+            || self.update_delay_hours > MAX_UPDATE_DELAY_HOURS
+        {
+            return Err("update_delay is outside its supported range".to_string());
+        }
+        if self.explicit_keys.contains("proxy_port") && self.proxy_port == Some(0) {
+            return Err("proxy_port must be non-zero".to_string());
+        }
+        if let Some(host) = &self.proxy_host {
+            validate_proxy_host(host)?;
+        }
+        if let Some(theme) = &self.theme {
+            if theme.is_empty() || theme.len() > MAX_THEME_LENGTH {
+                return Err("theme is outside its supported size".to_string());
+            }
+        }
+        for key in ["proxy_port", "proxy_host", "should_publish", "theme"] {
+            if self.explicit_keys.contains(key)
+                && match key {
+                    "proxy_port" => self.proxy_port.is_none(),
+                    "proxy_host" => self.proxy_host.is_none(),
+                    "theme" => self.theme.is_none(),
+                    _ => false,
+                }
+            {
+                return Err("address book configuration is incomplete".to_string());
+            }
+        }
+        Ok(())
+    }
+
+    fn from_external(values: &BTreeMap<String, String>) -> Result<Self, String> {
+        let mut configuration = Self::default();
+        for (key, value) in values {
+            if !CONFIG_KEYS.contains(&key.as_str()) {
+                return Err("unknown address book configuration key".to_string());
+            }
+            configuration.explicit_keys.insert(key.clone());
+            match key.as_str() {
+                "subscriptions"
+                | "published_addressbook"
+                | "router_addressbook"
+                | "local_addressbook"
+                | "private_addressbook"
+                | "etags"
+                | "last_modified"
+                | "log" => {
+                    if value.is_empty() || value.len() > MAX_CONFIGURATION_PATH_LENGTH {
+                        return Err("address book configuration path is invalid".to_string());
+                    }
+                    configuration.paths.insert(key.clone(), value.clone());
+                }
+                "update_delay" => {
+                    let hours = value.parse::<u64>().map_err(|_| {
+                        "update_delay must be an integer number of hours".to_string()
+                    })?;
+                    if !(MIN_UPDATE_DELAY_HOURS..=MAX_UPDATE_DELAY_HOURS).contains(&hours) {
+                        return Err("update_delay is outside its supported range".to_string());
+                    }
+                    configuration.update_delay_hours = hours;
+                }
+                "proxy_port" => {
+                    let port = value
+                        .parse::<u16>()
+                        .map_err(|_| "proxy_port must be a valid port".to_string())?;
+                    if port == 0 {
+                        return Err("proxy_port must be non-zero".to_string());
+                    }
+                    configuration.proxy_port = Some(port);
+                }
+                "proxy_host" => {
+                    validate_proxy_host(value)?;
+                    configuration.proxy_host = Some(value.clone());
+                }
+                "should_publish" => {
+                    configuration.should_publish = match value.as_str() {
+                        "true" => true,
+                        "false" => false,
+                        _ => return Err("should_publish must be true or false".to_string()),
+                    };
+                }
+                "theme" => {
+                    if value.is_empty() || value.len() > MAX_THEME_LENGTH {
+                        return Err("theme is outside its supported size".to_string());
+                    }
+                    configuration.theme = Some(value.clone());
+                }
+                _ => unreachable!(),
+            }
+        }
+        Ok(configuration)
+    }
+
+    fn external_map(&self) -> BTreeMap<String, String> {
+        self.explicit_keys
+            .iter()
+            .filter_map(|key| {
+                let value = match key.as_str() {
+                    "update_delay" => self.update_delay_hours.to_string(),
+                    "proxy_port" => self.proxy_port?.to_string(),
+                    "proxy_host" => self.proxy_host.clone()?,
+                    "should_publish" => self.should_publish.to_string(),
+                    "theme" => self.theme.clone()?,
+                    _ => self.paths.get(key)?.clone(),
+                };
+                Some((key.clone(), value))
+            })
+            .collect()
+    }
+
+    fn path_value(&self, key: &str, default: &str) -> String {
+        self.paths.get(key).cloned().unwrap_or_else(|| default.to_string())
+    }
+}
+
+fn validate_proxy_host(host: &str) -> Result<(), String> {
+    if host.is_empty()
+        || host.len() > 254
+        || host
+            .chars()
+            .any(|character| character.is_control() || character.is_whitespace())
+        || host.chars().any(|character| matches!(character, '/' | '\\' | '@'))
+    {
+        return Err("proxy_host is invalid".to_string());
+    }
+    if host.starts_with('[') || host.ends_with(']') {
+        let Some(inner) = host.strip_prefix('[').and_then(|host| host.strip_suffix(']')) else {
+            return Err("proxy_host is invalid".to_string());
+        };
+        if inner.parse::<std::net::Ipv6Addr>().is_err() {
+            return Err("proxy_host is invalid".to_string());
+        }
+    }
+    if host.parse::<std::net::IpAddr>().is_err()
+        && !host.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_' | b'[' | b']')
+        })
+    {
+        return Err("proxy_host is invalid".to_string());
+    }
+    Ok(())
+}
 
 pub(crate) fn base32_for_destination(destination: &str) -> String {
     base64_decode(destination)
@@ -116,6 +415,41 @@ pub(crate) fn validate_runtime_snapshot(state: &RuntimeAddressBookSnapshot) -> R
     Ok(())
 }
 
+fn validate_loadable_snapshot(state: &RuntimeAddressBookSnapshot) -> Result<(), String> {
+    let books = [
+        (&state.private, false),
+        (&state.local, false),
+        (&state.router, false),
+        (&state.published, true),
+    ];
+    let total_entries = books.iter().map(|(book, _)| book.len()).sum::<usize>();
+    if total_entries > MAX_LEGACY_DESTINATION_ENTRIES {
+        return Err("address book state exceeds its entry limit".to_string());
+    }
+    let mut hostnames = std::collections::BTreeSet::new();
+    for (book, published) in books {
+        for (hostname, entry) in book {
+            if published && !is_valid_full_destination(&entry.destination) {
+                if hostname != &entry.hostname
+                    || hostname.is_empty()
+                    || hostname.len() > 254
+                    || hostname.contains('/')
+                    || hostname.contains('\\')
+                    || hostname.chars().any(|character| character.is_control())
+                {
+                    return Err("address book state contains an invalid hostname".to_string());
+                }
+            } else {
+                validate_runtime_entry(hostname, entry)?;
+            }
+            if !hostnames.insert(hostname) {
+                return Err("address book state contains a hostname collision".to_string());
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Administrative address-book source selected by Proposal 170.
 #[cfg(feature = "i2pcontrol")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,8 +488,8 @@ pub struct RuntimeAddressBookSnapshot {
     pub published: BTreeMap<String, RuntimeAddressBookEntry>,
     /// Stored subscription metadata.
     pub subscriptions: Vec<String>,
-    /// Stored non-operative configuration metadata.
-    pub configuration: BTreeMap<String, String>,
+    /// Versioned, validated Proposal 170 configuration.
+    pub configuration: RuntimeAddressBookConfiguration,
 }
 
 #[cfg(feature = "i2pcontrol")]
@@ -212,6 +546,9 @@ impl RuntimeAddressBookOwner {
         let current_exists = state_path.exists();
         let backup_exists = backup_path.exists();
         let mut initialization_error = None;
+        if let Err(error) = ensure_admin_root(&path).await {
+            initialization_error = Some(error);
+        }
 
         let loaded = match tokio::fs::read_to_string(&state_path).await {
             Ok(raw) => match serde_json::from_str::<RuntimeAddressBookSnapshot>(&raw) {
@@ -229,17 +566,27 @@ impl RuntimeAddressBookOwner {
 
         let authority_present = current_exists || backup_exists;
         let initial_subscriptions_for_fallback = initial_subscriptions.clone();
-        let state = loaded.unwrap_or_else(|| {
+        let mut state = loaded.unwrap_or_else(|| {
             if authority_present {
                 initialization_error = Some("address book state is corrupt".to_string());
             }
             RuntimeAddressBookSnapshot {
-                subscriptions: initial_subscriptions_for_fallback,
+                subscriptions: initial_subscriptions_for_fallback.clone(),
                 ..RuntimeAddressBookSnapshot::default()
             }
         });
+        if state.configuration.validate_stored().is_err()
+            || validate_loadable_snapshot(&state).is_err()
+        {
+            initialization_error = Some("address book state is corrupt".to_string());
+            state = RuntimeAddressBookSnapshot {
+                subscriptions: initial_subscriptions_for_fallback,
+                ..RuntimeAddressBookSnapshot::default()
+            };
+        }
         let active_subscriptions = state.subscriptions.clone();
         let (sender, receiver) = tokio::sync::mpsc::channel(1);
+        let settings = RuntimeRefreshSettings::defaults(&path, "127.0.0.1", 4444);
         let owner = Arc::new(Self {
             path,
             addresses,
@@ -251,6 +598,7 @@ impl RuntimeAddressBookOwner {
             subscription_control: Arc::new(RuntimeSubscriptionControl {
                 sender,
                 active: RwLock::new(active_subscriptions),
+                settings: RwLock::new(settings),
                 started: AtomicBool::new(false),
                 receiver: std::sync::Mutex::new(Some(receiver)),
             }),
@@ -352,6 +700,101 @@ impl RuntimeAddressBookOwner {
         .map_err(|_| "address book persistence failed".to_string())
     }
 
+    fn artifact_paths(
+        &self,
+        configuration: &RuntimeAddressBookConfiguration,
+    ) -> Result<[PathBuf; 5], String> {
+        let defaults = [
+            "private_addressbook",
+            "local_addressbook",
+            "router_addressbook",
+            "published_addressbook",
+            "subscriptions",
+        ];
+        let keys = [
+            "private_addressbook",
+            "local_addressbook",
+            "router_addressbook",
+            "published_addressbook",
+            "subscriptions",
+        ];
+        let mut paths = [
+            PathBuf::new(),
+            PathBuf::new(),
+            PathBuf::new(),
+            PathBuf::new(),
+            PathBuf::new(),
+        ];
+        for ((path, key), default) in paths.iter_mut().zip(keys).zip(defaults) {
+            *path = resolve_confined_path(&self.path, &configuration.path_value(key, default))?;
+        }
+        for (index, path) in paths.iter().enumerate() {
+            if paths[..index].contains(path) {
+                return Err("address book configuration paths must be distinct".to_string());
+            }
+        }
+        Ok(paths)
+    }
+
+    async fn publish_configured_artifacts(
+        &self,
+        state: &RuntimeAddressBookSnapshot,
+    ) -> Result<(), String> {
+        let paths = self.artifact_paths(&state.configuration)?;
+        for (path, book) in paths[..3].iter().zip([&state.private, &state.local, &state.router]) {
+            atomic_write(path, &serialize_book(book)?).await?;
+        }
+        if state.configuration.should_publish {
+            atomic_write(&paths[3], &serialize_book(&state.published)?).await?;
+        }
+        atomic_write(&paths[4], state.subscriptions.join("\n").as_bytes()).await?;
+        if let Some(log_path) = state.configuration.paths.get("log") {
+            let log_path = resolve_confined_path(&self.path, log_path)?;
+            atomic_write(
+                &log_path,
+                b"AddressBook administrative generation committed\n",
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
+    async fn load_configured_generation(
+        &self,
+        configuration: &RuntimeAddressBookConfiguration,
+        current: &RuntimeAddressBookSnapshot,
+    ) -> Result<RuntimeAddressBookSnapshot, String> {
+        let paths = self.artifact_paths(configuration)?;
+        let mut next = current.clone();
+        for (slot, path) in [
+            &mut next.private,
+            &mut next.local,
+            &mut next.router,
+            &mut next.published,
+        ]
+        .into_iter()
+        .zip(paths[..4].iter())
+        {
+            if let Some(book) = load_book(path).await? {
+                *slot = book;
+            }
+        }
+        if let Some(bytes) = read_bounded(&paths[4]).await? {
+            let raw = String::from_utf8(bytes)
+                .map_err(|_| "configured subscription file is invalid".to_string())?;
+            let subscriptions = raw
+                .lines()
+                .filter(|line| !line.is_empty())
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            validate_runtime_subscriptions(&subscriptions)?;
+            next.subscriptions = subscriptions;
+        }
+        next.configuration = configuration.clone();
+        validate_runtime_snapshot(&next)?;
+        Ok(next)
+    }
+
     fn persist_sync(&self, state: &RuntimeAddressBookSnapshot) {
         let Ok(raw) = serde_json::to_vec(state) else {
             return;
@@ -388,6 +831,7 @@ impl RuntimeAddressBookOwner {
 
     async fn commit(&self, state: RuntimeAddressBookSnapshot) -> Result<(), String> {
         let _guard = self.mutation.lock().await;
+        self.publish_configured_artifacts(&state).await?;
         self.persist(&state).await?;
         *self.state.write() = state;
         self.authority_present.store(true, Ordering::Release);
@@ -402,6 +846,7 @@ impl RuntimeAddressBookOwner {
         let _guard = self.mutation.lock().await;
         let mut state = self.snapshot();
         let result = update(&mut state)?;
+        self.publish_configured_artifacts(&state).await?;
         self.persist(&state).await?;
         *self.state.write() = state;
         self.authority_present.store(true, Ordering::Release);
@@ -426,9 +871,9 @@ impl RuntimeAddressBookOwner {
         if !legacy.subscriptions.is_empty() {
             merged.subscriptions = legacy.subscriptions;
         }
-        // Proposal 170 configuration has no live Emissary owner. Do not
-        // promote historical inert metadata into the runtime authority.
-        merged.configuration.clear();
+        // Rejected M034 configuration values were inert metadata. Do not
+        // promote them into the operational authority during migration.
+        merged.configuration = RuntimeAddressBookConfiguration::default();
         for (hostname, entry) in &destinations {
             merged.published.entry(hostname.clone()).or_insert_with(|| entry.clone());
         }
@@ -474,11 +919,44 @@ impl RuntimeAddressBookOwner {
                 Some(_) => {}
             }
         }
-        if validate_runtime_snapshot(&state).is_ok() && self.persist(&state).await.is_ok() {
+        if validate_runtime_snapshot(&state).is_ok()
+            && self.publish_configured_artifacts(&state).await.is_ok()
+            && self.persist(&state).await.is_ok()
+        {
             *self.state.write() = state;
             self.authority_present.store(true, Ordering::Release);
             self.rebuild_runtime_indexes();
         }
+    }
+
+    async fn set_configuration(
+        &self,
+        configuration: RuntimeAddressBookConfiguration,
+    ) -> Result<(), String> {
+        let defaults = self.subscription_control.settings.read().clone();
+        let settings = resolved_settings(&self.path, &configuration, &defaults)?;
+        let mut all_paths = self.artifact_paths(&configuration)?.to_vec();
+        all_paths.push(settings.etags_path.clone());
+        all_paths.push(settings.last_modified_path.clone());
+        if let Some(log_path) = configuration.paths.get("log") {
+            all_paths.push(resolve_confined_path(&self.path, log_path)?);
+        }
+        all_paths.sort();
+        if all_paths.windows(2).any(|paths| paths[0] == paths[1]) {
+            return Err("address book configuration paths must be distinct".to_string());
+        }
+        let _guard = self.mutation.lock().await;
+        let current = self.snapshot();
+        let mut next = self.load_configured_generation(&configuration, &current).await?;
+        next.configuration = configuration;
+        self.publish_configured_artifacts(&next).await?;
+        self.persist(&next).await?;
+        *self.state.write() = next;
+        *self.subscription_control.active.write() = self.state.read().subscriptions.clone();
+        *self.subscription_control.settings.write() = settings;
+        self.authority_present.store(true, Ordering::Release);
+        self.rebuild_runtime_indexes();
+        Ok(())
     }
 
     pub(crate) fn subscription_control(&self) -> Arc<RuntimeSubscriptionControl> {
@@ -519,6 +997,207 @@ fn validate_runtime_subscriptions(subscriptions: &[String]) -> Result<(), String
     Ok(())
 }
 
+fn resolve_confined_path(root: &Path, raw: &str) -> Result<PathBuf, String> {
+    if raw.is_empty()
+        || raw.len() > MAX_CONFIGURATION_PATH_LENGTH
+        || raw.contains('\0')
+        || raw.chars().any(|character| character.is_control())
+        || raw.contains('\\')
+    {
+        return Err("address book path is invalid".to_string());
+    }
+    let candidate = Path::new(raw);
+    if candidate.is_absolute() {
+        return Err("address book path must be relative to its administrative root".to_string());
+    }
+
+    let mut normalized = PathBuf::new();
+    for component in candidate.components() {
+        match component {
+            Component::CurDir => {}
+            Component::Normal(part) => normalized.push(part),
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    return Err("address book path escapes its administrative root".to_string());
+                }
+            }
+            Component::RootDir | Component::Prefix(_) => {
+                return Err("address book path is invalid".to_string());
+            }
+        }
+    }
+    if normalized.as_os_str().is_empty() {
+        return Err("address book path must name a file".to_string());
+    }
+    if matches!(
+        normalized.file_name().and_then(|name| name.to_str()),
+        Some(
+            "control-state.json"
+                | "control-state.json.bak"
+                | ".control-state.json.tmp"
+                | "addresses"
+                | "host_modified_times"
+                | "destinations"
+        )
+    ) {
+        return Err("address book path names a reserved runtime artifact".to_string());
+    }
+
+    let root = std::fs::canonicalize(root)
+        .map_err(|_| "address book administrative root is unavailable".to_string())?;
+    let path = root.join(normalized);
+    let mut current = root.clone();
+    let relative = path
+        .strip_prefix(&root)
+        .map_err(|_| "address book path escapes its administrative root".to_string())?;
+    let components = relative.components().collect::<Vec<_>>();
+    for (index, component) in components.iter().enumerate() {
+        current.push(component);
+        match std::fs::symlink_metadata(&current) {
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink()
+                    || (index + 1 < components.len() && !metadata.is_dir())
+                    || (index + 1 == components.len() && !metadata.is_file())
+                {
+                    return Err("address book path is not a regular confined file".to_string());
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                break;
+            }
+            Err(_) => return Err("address book path is unavailable".to_string()),
+        }
+    }
+    Ok(path)
+}
+
+async fn ensure_admin_root(root: &Path) -> Result<(), String> {
+    tokio::fs::create_dir_all(root)
+        .await
+        .map_err(|_| "address book administrative root is unavailable".to_string())?;
+    let metadata = tokio::fs::symlink_metadata(root)
+        .await
+        .map_err(|_| "address book administrative root is unavailable".to_string())?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err("address book administrative root is invalid".to_string());
+    }
+    Ok(())
+}
+
+fn resolved_settings(
+    root: &Path,
+    configuration: &RuntimeAddressBookConfiguration,
+    defaults: &RuntimeRefreshSettings,
+) -> Result<RuntimeRefreshSettings, String> {
+    let mut settings = defaults.clone();
+    settings.interval = Duration::from_secs(
+        configuration
+            .update_delay_hours
+            .checked_mul(60 * 60)
+            .ok_or_else(|| "update_delay is outside its supported range".to_string())?,
+    );
+    settings.proxy_host =
+        configuration.proxy_host.clone().unwrap_or_else(|| defaults.proxy_host.clone());
+    settings.proxy_port = configuration.proxy_port.unwrap_or(defaults.proxy_port);
+    settings.should_publish = configuration.should_publish;
+    settings.subscriptions_path = resolve_confined_path(
+        root,
+        &configuration.path_value("subscriptions", "subscriptions"),
+    )?;
+    settings.etags_path = resolve_confined_path(root, &configuration.path_value("etags", "etags"))?;
+    settings.last_modified_path = resolve_confined_path(
+        root,
+        &configuration.path_value("last_modified", "last_modified"),
+    )?;
+    Ok(settings)
+}
+
+async fn read_bounded(path: &Path) -> Result<Option<Vec<u8>>, String> {
+    let metadata = match tokio::fs::symlink_metadata(path).await {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(_) => return Err("address book configured file is unavailable".to_string()),
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err("address book configured file is not a regular file".to_string());
+    }
+    if metadata.len() > MAX_ADMIN_FILE_BYTES as u64 {
+        return Err("address book configured file exceeds its size limit".to_string());
+    }
+    tokio::fs::read(path)
+        .await
+        .map(Some)
+        .map_err(|_| "address book configured file is unavailable".to_string())
+}
+
+async fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    if bytes.len() > MAX_ADMIN_FILE_BYTES {
+        return Err("address book configured file exceeds its size limit".to_string());
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| "address book configured file has no parent".to_string())?;
+    tokio::fs::create_dir_all(parent)
+        .await
+        .map_err(|_| "address book configured directory is unavailable".to_string())?;
+    let metadata = tokio::fs::symlink_metadata(path).await;
+    if let Ok(metadata) = metadata {
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err("address book configured file is not a regular file".to_string());
+        }
+    }
+    let temporary = path.with_extension("m096-tmp");
+    atomic_write_inner(&temporary, path, bytes).await
+}
+
+async fn atomic_write_inner(temporary: &Path, target: &Path, bytes: &[u8]) -> Result<(), String> {
+    tokio::fs::write(temporary, bytes)
+        .await
+        .map_err(|_| "address book configured file publication failed".to_string())?;
+    let file = tokio::fs::File::open(temporary)
+        .await
+        .map_err(|_| "address book configured file publication failed".to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        tokio::fs::set_permissions(temporary, std::fs::Permissions::from_mode(0o600))
+            .await
+            .map_err(|_| "address book configured file publication failed".to_string())?;
+    }
+    file.sync_all()
+        .await
+        .map_err(|_| "address book configured file publication failed".to_string())?;
+    tokio::fs::rename(temporary, target)
+        .await
+        .map_err(|_| "address book configured file publication failed".to_string())
+}
+
+fn serialize_book(book: &BTreeMap<String, RuntimeAddressBookEntry>) -> Result<Vec<u8>, String> {
+    serde_json::to_vec(book).map_err(|_| "address book serialization failed".to_string())
+}
+
+async fn load_book(
+    path: &Path,
+) -> Result<Option<BTreeMap<String, RuntimeAddressBookEntry>>, String> {
+    let Some(bytes) = read_bounded(path).await? else {
+        return Ok(None);
+    };
+    let book = serde_json::from_slice(&bytes)
+        .map_err(|_| "configured address book file is invalid".to_string())?;
+    validate_runtime_book(&book)?;
+    Ok(Some(book))
+}
+
+fn validate_runtime_book(book: &BTreeMap<String, RuntimeAddressBookEntry>) -> Result<(), String> {
+    if book.len() > MAX_LEGACY_DESTINATION_ENTRIES {
+        return Err("configured address book exceeds its entry limit".to_string());
+    }
+    for (hostname, entry) in book {
+        validate_runtime_entry(hostname, entry)?;
+    }
+    Ok(())
+}
+
 impl AddressBookRuntimeHook for Arc<RuntimeAddressBookOwner> {
     fn initial_subscriptions(&self, configured: &[String]) -> Vec<String> {
         let stored = self.state.read().subscriptions.clone();
@@ -527,6 +1206,11 @@ impl AddressBookRuntimeHook for Arc<RuntimeAddressBookOwner> {
         } else {
             configured.to_vec()
         }
+    }
+
+    fn refresh_settings(&self, defaults: RuntimeRefreshSettings) -> RuntimeRefreshSettings {
+        resolved_settings(&self.path, &self.state.read().configuration, &defaults)
+            .unwrap_or(defaults)
     }
 
     fn subscription_control(&self) -> Arc<RuntimeSubscriptionControl> {
@@ -559,6 +1243,16 @@ impl AddressBookRuntimeHook for Arc<RuntimeAddressBookOwner> {
         Box::pin(async move { owner.merge_downloaded_impl(addresses).await })
     }
 
+    fn publish_artifacts(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        let owner = Arc::clone(self);
+        Box::pin(async move {
+            let state = owner.snapshot();
+            if let Err(error) = owner.publish_configured_artifacts(&state).await {
+                tracing::warn!(target: "emissary::i2pcontrol::address_book", ?error, "address book artifact publication failed");
+            }
+        })
+    }
+
     fn resolve_base32(&self, hostname: &str) -> Option<String> {
         RuntimeAddressBookOwner::resolve_base32(self, hostname)
     }
@@ -568,7 +1262,10 @@ impl AddressBookRuntimeHook for Arc<RuntimeAddressBookOwner> {
     }
 
     fn legacy_publish(&self, hostname: String, destination: String) {
-        self.legacy_publish_sync(RuntimeAddressBookEntry { hostname, destination });
+        self.legacy_publish_sync(RuntimeAddressBookEntry {
+            hostname,
+            destination,
+        });
     }
 
     fn legacy_remove(&self, hostname: &str) {
@@ -592,7 +1289,8 @@ pub async fn new_controlled_manager(
 ) -> (AddressBookManager, Arc<RuntimeAddressBookHandle>) {
     let configured_subscriptions = config.subscriptions.clone().unwrap_or_default();
     let manager = AddressBookManager::new(base_path, config).await;
-    let owner = RuntimeAddressBookOwner::new(manager.runtime_context(), configured_subscriptions).await;
+    let owner =
+        RuntimeAddressBookOwner::new(manager.runtime_context(), configured_subscriptions).await;
     let hook: Arc<dyn AddressBookRuntimeHook> = Arc::new(Arc::clone(&owner));
     let handle = RuntimeAddressBookHandle::new(owner);
     (manager.with_runtime_hook(hook), handle)
@@ -706,21 +1404,22 @@ impl RuntimeAddressBookHandle {
         self.owner.subscription_control.active.read().clone()
     }
 
-    pub async fn runtime_set_subscriptions(&self, subscriptions: Vec<String>) -> Result<(), String> {
+    pub async fn runtime_set_subscriptions(
+        &self,
+        subscriptions: Vec<String>,
+    ) -> Result<(), String> {
         validate_runtime_subscriptions(&subscriptions)?;
-        if !self
-            .owner
-            .subscription_control
-            .started
-            .load(Ordering::Acquire)
-        {
+        if !self.owner.subscription_control.started.load(Ordering::Acquire) {
             return Err("address book downloader is unavailable".to_string());
         }
         let (response, result) = futures::channel::oneshot::channel();
         self.owner
             .subscription_control
             .sender
-            .send(RuntimeSubscriptionCommand { subscriptions, response })
+            .send(RuntimeSubscriptionCommand {
+                subscriptions,
+                response,
+            })
             .await
             .map_err(|_| "address book subscription command was unavailable".to_string())?;
         result
@@ -729,7 +1428,18 @@ impl RuntimeAddressBookHandle {
     }
 
     pub async fn runtime_configuration(&self) -> Result<BTreeMap<String, String>, String> {
-        Ok(self.owner.state.read().configuration.clone())
+        Ok(self.owner.state.read().configuration.external_map())
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn runtime_refresh_settings(&self) -> RuntimeRefreshSettings {
+        let defaults = self.owner.subscription_control.settings.read().clone();
+        resolved_settings(
+            &self.owner.path,
+            &self.owner.state.read().configuration,
+            &defaults,
+        )
+        .unwrap_or(defaults)
     }
 
     pub async fn runtime_set_configuration(
@@ -739,16 +1449,43 @@ impl RuntimeAddressBookHandle {
         if configuration.is_empty() {
             return Ok(());
         }
-        Err("address book configuration is unsupported".to_string())
+        let parsed = RuntimeAddressBookConfiguration::from_external(&configuration)
+            .map_err(|error| format!("configuration validation failed: {error}"))?;
+        ensure_admin_root(&self.owner.path).await?;
+        self.owner.set_configuration(parsed).await?;
+
+        // The existing downloader worker is the sole refresh owner. A
+        // configuration commit updates its shared settings and queues one
+        // bounded refresh; no second worker is created.
+        if self.owner.subscription_control.started.load(Ordering::Acquire) {
+            let (response, result) = futures::channel::oneshot::channel();
+            let subscriptions = self.owner.subscription_control.active.read().clone();
+            if self
+                .owner
+                .subscription_control
+                .sender
+                .send(RuntimeSubscriptionCommand {
+                    subscriptions,
+                    response,
+                })
+                .await
+                .is_ok()
+            {
+                let _ = result.await;
+            } else {
+                tracing::warn!(target: "emissary::i2pcontrol::address_book", "address book refresh worker was unavailable after configuration commit");
+            }
+        }
+        Ok(())
     }
 
     pub async fn runtime_clear_unsupported_configuration(&self) -> Result<(), String> {
-        if self.owner.state.read().configuration.is_empty() {
+        if self.owner.state.read().configuration.explicit_keys.is_empty() {
             return Ok(());
         }
         self.owner
             .mutate(|state| {
-                state.configuration.clear();
+                state.configuration = RuntimeAddressBookConfiguration::default();
                 Ok(())
             })
             .await
@@ -854,4 +1591,120 @@ async fn load_legacy_destinations(
         );
     }
     Ok(snapshot)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(values: &[(&str, &str)]) -> BTreeMap<String, String> {
+        values
+            .iter()
+            .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn confined_paths_normalize_without_escaping() {
+        let root = tempfile::tempdir().unwrap();
+        assert_eq!(
+            resolve_confined_path(root.path(), "nested/../chosen.json").unwrap(),
+            root.path().join("chosen.json")
+        );
+        assert!(resolve_confined_path(root.path(), "../../outside.json").is_err());
+        assert!(resolve_confined_path(root.path(), "/tmp/outside.json").is_err());
+        assert!(resolve_confined_path(root.path(), "nested\\outside.json").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn confined_paths_reject_symlink_escape_and_special_files() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        symlink(outside.path(), root.path().join("escape")).unwrap();
+        assert!(resolve_confined_path(root.path(), "escape/file.json").is_err());
+
+        std::fs::write(root.path().join("file.json"), b"{}").unwrap();
+        assert!(resolve_confined_path(root.path(), "file.json").is_ok());
+        assert!(resolve_confined_path(root.path(), "control-state.json").is_err());
+    }
+
+    #[tokio::test]
+    async fn configuration_is_typed_confined_and_restart_safe() {
+        let base = tempfile::tempdir().unwrap().keep();
+        let (_manager, handle) = new_controlled_manager(
+            base.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let values = config(&[
+            ("private_addressbook", "books/private.json"),
+            ("local_addressbook", "books/local.json"),
+            ("router_addressbook", "books/router.json"),
+            ("published_addressbook", "books/published.json"),
+            ("subscriptions", "meta/subscriptions"),
+            ("etags", "meta/etags"),
+            ("last_modified", "meta/last-modified"),
+            ("log", "meta/addressbook.log"),
+            ("update_delay", "2"),
+            ("proxy_host", "127.0.0.1"),
+            ("proxy_port", "4445"),
+            ("should_publish", "false"),
+            ("theme", "dark"),
+        ]);
+        handle.runtime_set_configuration(values.clone()).await.unwrap();
+        assert_eq!(handle.runtime_configuration().await.unwrap(), values);
+        assert_eq!(
+            handle.runtime_refresh_settings().interval,
+            Duration::from_secs(7200)
+        );
+        assert_eq!(handle.runtime_refresh_settings().proxy_port, 4445);
+        assert!(!handle.runtime_refresh_settings().should_publish);
+        assert!(base.join("addressbook/meta/addressbook.log").exists());
+
+        drop(handle);
+        let (_manager, restarted) = new_controlled_manager(
+            base,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        assert_eq!(restarted.runtime_configuration().await.unwrap(), values);
+        assert_eq!(restarted.runtime_refresh_settings().proxy_port, 4445);
+    }
+
+    #[tokio::test]
+    async fn invalid_path_and_target_failure_preserve_prior_generation() {
+        let base = tempfile::tempdir().unwrap().keep();
+        let (_manager, handle) = new_controlled_manager(
+            base,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let initial = config(&[("theme", "light")]);
+        handle.runtime_set_configuration(initial.clone()).await.unwrap();
+        assert!(handle
+            .runtime_set_configuration(config(&[("private_addressbook", "../../escape.json")]))
+            .await
+            .is_err());
+        assert_eq!(handle.runtime_configuration().await.unwrap(), initial);
+
+        let root = handle.owner.path.clone();
+        tokio::fs::write(root.join("bad.json"), b"not-json").await.unwrap();
+        assert!(handle
+            .runtime_set_configuration(config(&[("private_addressbook", "bad.json")]))
+            .await
+            .is_err());
+        assert_eq!(handle.runtime_configuration().await.unwrap(), initial);
+    }
 }

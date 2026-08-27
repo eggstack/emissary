@@ -54,7 +54,13 @@ Address book subscription URLs are stored as an ordered set. Insertion order is 
 
 ### Address book configuration
 
-String-keyed configuration map with deterministic ordering (BTreeMap). Used for address book behavior settings.
+The enabled runtime AddressBook owner stores a version-2 typed configuration in
+the same durable control generation as the four books and subscriptions. Its
+external Proposal 170 spelling remains a deterministic string map, while paths,
+duration, proxy port, publication policy, and metadata are validated internal
+values. Path-selected book/subscription/conditional-request artifacts are confined
+to the AddressBook administrative root and atomically replaced; `theme` has no
+frontend or router effect.
 
 ## Generation store design
 
@@ -118,7 +124,8 @@ The store retains at most 5 prior good generations plus the current one (6 total
 
 ## Schema versioning
 
-The current schema version is 1. Future schema changes:
+The generic administrative store schema remains version 1. The runtime
+AddressBook configuration has its own version-2 payload marker. Future schema changes:
 
 - Must read older versions into a validated domain object before writing a new generation
 - In-place mutation of generation files is prohibited

@@ -336,7 +336,7 @@ Retained enabled-mode status: M022 established one runtime/durable authority for
 private, local, router, and published books and normal lookup publication. M034
 replaces the former inert subscription/configuration setter behavior.
 
-M034 additionally proves:
+M034 additionally proves the retained CRUD and subscription behavior:
 
 - `SetSubscriptions` reaches the active downloader through one bounded typed
   command seam and publishes complete generations durably;
@@ -345,10 +345,23 @@ M034 additionally proves:
   refresh-worker unavailability cannot turn the completed mutation into an
   error response;
 - URL/count/aggregate bounds are enforced before mutation;
-- every pinned `SetConfig` key has an explicit path/unsupported disposition;
-- non-empty configuration requests never persist or report success;
 - disabled/default execution still does not construct or consult the control
   command seam.
+
+M096 operationally completes the pinned `SetConfig` surface while keeping the
+overall Proposal 170 status partial pending M097-M104:
+
+- all thirteen keys are validated and persisted in one versioned typed runtime
+  configuration;
+- path keys are normalized and confined to the AddressBook administrative root,
+  with symlink/special-file/reserved-artifact rejection and atomic replacement;
+- `update_delay`, proxy host/port, and `should_publish` are consumed by the
+  existing single bounded refresh/publication worker generation;
+- `etags`, `last_modified`, and subscriptions use configured metadata files;
+- `theme` round-trips as explicitly inert administrative metadata, with no
+  frontend or router coupling;
+- failed target parsing or publication leaves the prior committed generation,
+  and restart restores the durable configuration and active semantics.
 
 TunnelManager lifecycle reconciliation is operational for all twelve
 control-plane tunnel families. `StartOnLoad` is honored only for persisted

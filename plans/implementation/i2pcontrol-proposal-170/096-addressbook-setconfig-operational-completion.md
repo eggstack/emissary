@@ -1,6 +1,6 @@
 # M096 — AddressBook SetConfig Operational Completion
 
-Status: ready; dependency M095 closed
+Status: closed (closure at `plans/closure/i2pcontrol-proposal-170/096-closure.md`)
 
 Source roadmap:
 
@@ -151,12 +151,18 @@ Target production changes:
 - `emissary-cli/src/i2pcontrol/address_book_runtime.rs`;
 - `emissary-cli/src/i2pcontrol/domain/address_book.rs`;
 - `emissary-cli/src/i2pcontrol/production.rs` only if composition/state construction must pass the durable configuration authority;
+- `emissary-cli/src/address_book.rs` only for the existing neutral downloader seam that consumes the I2PControl-owned validated refresh settings; this is the recorded M096 containment amendment;
 - existing I2PControl persistence/state modules under `emissary-cli/src/i2pcontrol/**` identified by M095;
 - focused I2PControl tests and support documentation.
 
 No `emissary-core/**`, startup proxy/tunnel module, root manifest, lockfile, frontend, workflow, or unrelated CLI path is authorized by default.
 
-If implementation proves a non-I2PControl production path is required, stop and amend containment before editing it.
+The initial M095 budget treated the neutral downloader seam as outside the I2PControl
+budget. Implementation proved that changing cadence/proxy/conditional-metadata behavior
+without that seam would require a duplicate downloader, which is forbidden. The exact
+M096 amendment is limited to `emissary-cli/src/address_book.rs`: typed settings are read
+from the I2PControl hook, the existing worker remains the sole downloader, and no core,
+router, dependency, or global logger path is added.
 
 ## 6. Invariants
 

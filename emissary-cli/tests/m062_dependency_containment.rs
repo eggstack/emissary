@@ -390,11 +390,13 @@ fn allowed_production_paths_match_the_m062_budget() {
             .any(|allowed| allowed == path);
         let authorized_m064 = path == "emissary-core/src/events.rs";
         let authorized_m065 = is_authorized_m065_path(path);
+        let authorized_m096 = is_authorized_m096_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
                 || authorized_m064
                 || authorized_m065
+                || authorized_m096
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -404,6 +406,7 @@ fn allowed_production_paths_match_the_m062_budget() {
             assert!(
                 authorized_m064
                     || authorized_m065
+                    || authorized_m096
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -466,6 +469,30 @@ fn is_authorized_m065_path(path: &str) -> bool {
             | "emissary-cli/src/i2pcontrol/backends/streamr.rs"
             | "docs/i2pcontrol/streamr-runtime.md"
             | "plans/closure/i2pcontrol-proposal-170/071-closure.md"
+    )
+}
+
+fn is_authorized_m096_path(path: &str) -> bool {
+    matches!(
+        path,
+        "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/address-book.md"
+            | "docs/i2pcontrol/administrative-state.md"
+            | "docs/i2pcontrol/proposal-170-conformance.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/security.md"
+            | "plans/closure/i2pcontrol-proposal-170/096-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/096-addressbook-setconfig-operational-completion.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "emissary-cli/src/address_book.rs"
+            | "emissary-cli/src/i2pcontrol/address_book.rs"
+            | "emissary-cli/src/i2pcontrol/address_book_runtime.rs"
+            | "emissary-cli/src/i2pcontrol/control_plane.rs"
+            | "emissary-cli/src/i2pcontrol/production.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }
 

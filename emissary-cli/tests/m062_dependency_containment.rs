@@ -509,6 +509,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/091-pre-accept-stream-concurrency-boundary-hardening.md"
             | "plans/implementation/i2pcontrol-proposal-170/092-m091-authorization-and-containment-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/094-post-m093-planning-state-reconciliation.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md"
@@ -542,6 +543,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/091-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/092-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/093-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/094-closure.md"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )
 }

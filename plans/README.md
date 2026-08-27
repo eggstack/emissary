@@ -88,6 +88,24 @@ Infrastructure and polish MUST NOT be represented as completed capability withou
 
 Use stable subsystem names. Do not encode dates in filenames unless the document is inherently time-bound.
 
-## Current workstream
+## Current Proposal 170 workstream
 
-The initial registered workstream is the exact implementation of I2P Proposal 170 through I2PControl. Its scope is intentionally narrow: API contract implementation, truthful inspection, persistent administrative state, and explicit tunnel backend stubs. New tunnel data planes, router protocol changes, router behavioral changes, and frontend work are outside this workstream.
+The active workstream is the exact internal implementation of I2P Proposal 170 through I2PControl, pinned to the proposal revision created/updated `2026-05-20`.
+
+The workstream has progressed through three architectural phases:
+
+1. contract completion and truthful partial runtime under ADR-0001/ADR-0002;
+2. all-twelve-tunnel runtime completion and application-layer security filtering under ADR-0003;
+3. full-support completion under ADR-0004, covering the remaining RouterInfo sources, operational AddressBook SetConfig semantics, all applicable TunnelManager option semantics, and final live interoperability/reclosure.
+
+The preferred production boundary remains `emissary-cli/src/i2pcontrol/**`. Lower-layer changes are exceptional and require an explicitly registered plan naming the canonical owner and exact path budget before implementation.
+
+The active phase is defined by:
+
+- `adrs/ADR-0004-pinned-full-proposal-170-completion-boundary.md`;
+- `subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`;
+- `registry.md`.
+
+Only the dependency-ready plan registered in `registry.md` is executable. Prewritten future plans are continuity documents, not authorization to skip dependencies.
+
+This workstream remains internal-only. External I2P/I2P+/i2pd/Java I2P/Yosemite repositories and specifications are read-only evidence. No upstream issue, pull request, review, merge, submission, contribution preparation, adoption request, or maintainer contact is authorized.

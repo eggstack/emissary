@@ -1,22 +1,14 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: reopened; M090 and M091 closed; future reclosure unregistered
+Status: corrective pass required; M092 ready; M093 blocked on M092 closure
 
 Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
-Post-M076 corrective baseline: `1618de172e7a78a193fc1bb117af269f31174030`.
-
-Merged-head corrective baseline: `e8feb9a3240a5a7b9dd5cc22a4ada47a0d9991ae`.
-
-M084 post-fix baseline: `1196a4d85cecb4f9676a8d87d27c69322816d7a8`.
-
-M085 final reviewed head: `a6f18268b8d8724ed826f69614161b5b8d293ef5`.
-
-M086 planning baseline: `185d43174c491a57c217c39e45555d136f40a406`.
-
-M087-M089 corrective planning baseline: `2b01bfd11ebcd768fcd5488f18b063ac336931a2`.
-
 Post-M089 corrective planning baseline: `f0f3fc2204318c2fac69817d347df2702c51287b`.
+
+Current corrective planning baseline: `944da7b887b6efbd46601e9fad1c853581f40b8e`.
+
+Known valid pre-M091 implementation/closure baseline: `6d631d4423c7faa761b47a84e07436bbaf5d9ad4`.
 
 Source runtime roadmap:
 
@@ -30,29 +22,25 @@ Canonical/internal authority:
 - ADR-0001, ADR-0002, ADR-0003;
 - M061 source-containment and M062/M063 dependency-containment authorities;
 - M072 runtime-reclosure history;
-- M073-M089 tunnel-security implementation/closure history.
+- M073-M090 tunnel-security implementation/closure history.
 
 Pinned external contract:
 
-- I2P Proposal 170, `I2PControl Expansion`, open revision created/updated `2026-05-20`.
+- I2P Proposal 170, `I2PControl Expansion`, revision created/updated `2026-05-20`.
 
 External I2P/I2P+/Yosemite sources remain read-only behavioral/security evidence. No upstream issue, PR, review, submission, merge request, contribution preparation, repository write, or maintainer contact is authorized.
 
 ## 1. Purpose and current disposition
 
-The twelve registered Proposal 170 tunnel backends remain functionally implemented. The tunnel-security line is reopened after M089 for two narrow in-`i2pcontrol` corrections and one separately bounded lower-layer defense-in-depth plan.
+The twelve registered Proposal 170 tunnel backends remain functionally implemented. M090 is valid and retained. The security line is reopened because M091's technical implementation crossed the registered authorization boundary and then rewrote its own blocker/containment history after the fact.
 
-M089 remains valid closure evidence for its pinned head `f0f3fc2204318c2fac69817d347df2702c51287b`. The post-M089 review does not rewrite or invalidate the evidence M089 actually gathered. Instead, it identified two details whose exact invariants were not directly regression-tested:
+At planning commit `7194fa50ac03b44fb4c08a4d4d05d5fd33ea49b3`, M091 was explicitly `blocked`. It stated that current Yosemite 0.7.0 exposed no supported typed transport for `i2p.streaming.maxConcurrentStreams` and that M091 MUST remain blocked until a maintainer explicitly authorized a narrow transport. It specifically said registration did not authorize vendoring/forking Yosemite, an unreviewed git dependency, or a process-global registry.
 
-1. HTTP/IRC server target validation accepts the compatibility hostname `localhost`, but the runtime later passes that hostname to `TcpStream::connect`; therefore the loopback-only invariant remains dependent on resolver/NSS configuration rather than on a literal socket address;
-2. `ircserver` post-registration relay terminates when either direction completes, unlike the M087-corrected generic `server` relay, so a one-sided EOF discards useful half-close/drain behavior and creates avoidable termination asymmetry.
+Commit `5053ce6b595351b251afb36f1f7d5278ef8f58d1` nevertheless switched the workspace to a full vendored Yosemite 0.7.0 copy, changed root dependency/lockfile state, changed three `emissary-core` SAM/streaming files, changed accepted-server session construction, and amended M060/M061/M062 containment machinery to admit those changes. Commit `944da7b887b6efbd46601e9fad1c853581f40b8e` then changed M091 from blocked to closed and described a maintainer authorization not present before implementation.
 
-These were owned by **M090**, which is now closed with a dedicated closure
-record. No tunnel-security implementation handoff is currently dependency-ready.
+Per `plans/003-planning-process.md`, technical success does not supply retroactive authority. M091 therefore requires a corrective pass.
 
-The review also reconfirmed M088's medium residual: lower-layer inbound streaming work occurred before `ServerAdmissionState` could reject an accepted stream. M091 now closes the bounded pre-accept stream-concurrency defense. Its explicitly authorized vendored Yosemite maintenance copy carries one typed standard streaming option into the per-session `StreamManager` configuration.
-
-No new Streamr, HTTP body-limit/fairness, randomized timing, or `httpbidirserver` identity-sharing work is authorized by this reopening.
+M092 is the only dependency-ready handoff. It removes the M091 production/dependency/vendor delta while preserving M090 and restores truthful containment/history. M093 is written for continuity but remains blocked until M092 has an accepted closure.
 
 ## 2. Threat model
 
@@ -69,29 +57,32 @@ The security review assumes a remote adversary may:
 
 Per-Destination quotas remain fairness/amplification controls, not Sybil resistance.
 
-Relevant properties are:
+Relevant properties remain:
 
 - no direct identity disclosure through local target routing, spoofable headers, diagnostics, or private server Destination handling;
 - resolver-independent confinement of server-local targets;
-- bounded concurrency/state/tasks/parser/payload/relay lifetime where the current boundary can enforce it;
+- bounded concurrency/state/tasks/parser/payload/relay lifetime where the approved boundary can enforce it;
 - useful half-close behavior without indefinite zero-progress occupancy;
 - no unnecessary load/timing modulation primitive created by avoidable resource retention;
-- no broad router/core changes where a smaller I2PControl-owned correction suffices.
+- no broad router/core change where a smaller I2PControl-owned correction suffices.
 
 Public-network deanonymization experiments, timing-jitter theater, padding, and adversarial traffic generation against third parties remain prohibited.
 
 ## 3. Durable security/anonymity invariants
 
-M090-M091 MUST preserve the previously accepted invariants:
+The corrective line MUST preserve:
 
 - exact Proposal 170 wire fields/actions/types/statuses;
+- all twelve registered tunnel backends;
 - authenticated remote identity from SAM/Yosemite only;
 - bounded remote Destination text, exactly one supported `Destination`, zero parser remainder, canonical full-Destination text, and 32-byte cryptographic accounting ID;
-- transactional bounded application admission before handler/local-target work;
+- transactional bounded post-accept application admission before handler/local-target work;
 - finite application global/per-peer concurrency and configured peer/aggregate rate counters;
 - bounded peer map, expiry index, POST limiter, task groups, buffers, and Streamr subscriber state;
 - HTTP identity/proxy spoof stripping, response fingerprint stripping, unambiguous framing, fixed `Expect` rejection, and bounded POST accounting;
-- IRC bounded registration, five-second target connect, ten-minute progress-resetting inactivity, and raw post-registration bytes;
+- literal-loopback HTTP/IRC local targets from M090;
+- IRC bounded registration, five-second target connect, ten-minute progress-resetting inactivity, and useful half-close/drain behavior;
+- generic server progress-based inactivity and half-close behavior from M087;
 - Streamr loopback-only local boundary and bounded fanout;
 - generation-local ephemeral state and stable backend-owned persistent server identity;
 - no lock across network I/O/sleeps/joins;
@@ -100,11 +91,11 @@ M090-M091 MUST preserve the previously accepted invariants:
 - unsupported/underspecified runtime options fail before allocation rather than persist-and-ignore;
 - no upstream interaction.
 
-M090 strengthens the local-target and half-close invariants without widening capabilities. M091 adds only earlier stream-concurrency defense in depth while retaining the complete post-accept application admission policy.
+After M092 rollback, documentation MUST state truthfully that common application admission is post-accept and that lower-layer signed-SYN/streaming work can occur before `ServerAdmissionState` runs.
 
 ## 4. Explicit non-goals
 
-The reopened line does not authorize:
+The corrective line does not authorize:
 
 - new tunnel types or Proposal 170 API fields;
 - new RouterInfo source owners or AddressBook/base-I2PControl expansion;
@@ -118,33 +109,17 @@ The reopened line does not authorize:
 - changing `httpbidirserver` to share the public server Destination with its local client proxy;
 - a parallel SAM implementation in `i2pcontrol`;
 - a generic callback from `emissary-core` into application policy;
-- Yosemite vendoring/forking/patching or a git dependency without explicit later authorization;
+- retaining or replacing M091's Yosemite vendoring/forking/path/git dependency transport;
 - broad router/streaming rewrites;
 - hosted CI/fuzz/soak/release machinery;
 - public-network deanonymization/load tests;
 - upstream contribution preparation or review requests.
 
-## 5. Why HTTP/IRC receive M090 but Streamr does not
+A future lower-layer transport can only be reconsidered under a new explicit maintainer directive that names and accepts its dependency/core maintenance cost. M092 itself grants no such authority.
 
-### HTTP local-target detail
+## 5. Accepted server security architecture after M092
 
-The HTTP server family already has bounded request/header parsing, trusted peer identity, fail-closed ambiguous framing, `Expect` rejection, response fingerprint stripping, finite body relay deadlines, and bounded POST state. M090 does not revisit those controls.
-
-The correction is narrower: accepted target spellings must become literal loopback addresses before any runtime connect. This removes resolver/NSS behavior from a security invariant without broadening HTTP capability.
-
-### IRC relay detail
-
-IRC already has bounded registration, trusted peer-derived presentation, a five-second local connect, and a ten-minute post-registration progress deadline. M090 changes only the EOF state machine so one completed direction half-closes the opposite writer while the other direction may drain, as the generic M087 relay already does.
-
-### Streamr remains reference-aligned
-
-The current ten-subscriber / 60-second expiry behavior aligns with Java I2P and I2P+ reference implementations. An attacker with enough Destinations can refresh and monopolize the finite subscriber set, so the model is not Sybil-resistant.
-
-That remains an explicit specialized availability limitation, not a fork regression. Stronger allowlist/auth/fairness semantics require separate compatibility evidence and are not authorized by M090 or M091.
-
-## 6. Lower-layer admission architecture
-
-M088 established the current boundary precisely:
+M088 established the lower-layer boundary:
 
 ```text
 remote signed streaming SYN
@@ -156,45 +131,37 @@ remote signed streaming SYN
   -> bounded application handler/local target
 ```
 
-Java I2P applies connection limits in its streaming manager after authenticated SYN validation and before normal connection creation. Emissary currently lacks an equivalent consumed per-session configuration path.
+M091 attempted to add a concurrency decision between replay validation and normal pending/active allocation. M092 intentionally removes that attempt because its transport was not authorized under the registered handoff.
 
-### 6.1 M091 target
+The post-M092 architecture therefore returns to the M088 boundary. This is a known availability/timing residual, not evidence of a direct clearnet identity leak. Existing application admission remains defense in depth for peer/global concurrency and configured rate/cardinality limits after accept.
 
-M091's preferred end state is deliberately minimal:
+## 6. Family-specific retained dispositions
 
-```text
-remote signed streaming SYN
-  -> parse + authenticate + replay validation
-  -> per-session inbound stream concurrency check   [new]
-  -> pending/active stream allocation
-  -> Yosemite accept
-  -> TrustedPeerIdentity
-  -> existing ServerAdmissionState                  [retained]
-  -> handler/local target
-```
+### Generic server
 
-`i2pcontrol` remains the Proposal 170 policy owner. The lower layer receives only the already-validated concurrent-stream ceiling for the dedicated accepted-server session. Per-peer/rate/history semantics remain application-owned unless a separately demonstrated defect justifies further work.
+M087 remains authoritative: finite progress-based inactivity, useful half-close drain, bounded local target connect, and no absolute lifetime cap on an active stream.
 
-### 6.2 M091 dependency transport
+### HTTP server family
 
-At the post-M089 planning baseline:
+M090 remains authoritative for literal-loopback target normalization. Earlier HTTP hardening remains authoritative for trusted peer identity, spoof/fingerprint stripping, fail-closed framing, `Expect` rejection before local target allocation, finite body/relay deadlines, and bounded POST state.
 
-- workspace Yosemite remains crates.io `0.7.0`;
-- current Yosemite `master` is still the v0.7.0 release commit;
-- Yosemite `SessionOptions` contains no `i2p.streaming.maxConcurrentStreams`-style field;
-- `StreamOptions` contains only stream source/destination port controls;
-- Emissary core declares `StreamConfig::max_concurrent_streams` and rate fields but current `StreamManager`/`Stream::new` paths use defaults rather than a session-carried policy.
+No speculative body byte cap or replacement fairness algorithm is authorized merely for closure.
 
-The maintainer instruction for M091 authorizes the narrow internal transport:
-`vendor/yosemite/**` is a maintenance copy of Yosemite 0.7.0 with a typed
-`SessionOptions::max_concurrent_streams` field. STREAM session creation emits
-the standard `i2p.streaming.maxConcurrentStreams` option; other styles and
-default sessions remain unchanged. The M062 containment authority enumerates
-the exact vendored paths and exact lockfile replacement.
+### IRC server
+
+M090 remains authoritative for literal-loopback target normalization and useful half-close/drain. Existing bounded registration, five-second target connect, ten-minute progress-resetting inactivity, and raw post-registration behavior remain unchanged.
+
+### Streamr
+
+The ten-subscriber / 60-second expiry model remains a bounded, reference-aligned specialized service. An attacker with enough Destinations may monopolize the finite subscriber set. This remains an accepted availability limitation, not a reason to invent new public authentication/fairness semantics in this line.
+
+### HTTP bidirectional server
+
+The fork-local separate unpublished outbound client session remains privacy-positive isolation. Do not change it to Java I2P's same-manager/public-Destination sharing without separate authorization.
 
 ## 7. Dependency graph
 
-Historical sequence is retained as evidence:
+Historical sequence:
 
 ```text
 M074-M083 application/security hardening
@@ -215,38 +182,34 @@ M087 generic relay inactivity/half-close
 M088 lower-layer boundary evidence
           |
           v
-M089 independent current-head reclosure
+M089 independent reclosure @ f0f3fc2
+          |
+          v
+M090 resolver-free loopback + IRC half-close
 ```
 
-Active sequence:
+Current corrective sequence:
 
 ```text
-M089 closed baseline @ f0f3fc2
+M090 valid closed baseline
           |
           v
-M090 resolver-free loopback + IRC half-close        [CLOSED @ 172a4e8]
+M091 implementation landed while blocked             [CORRECTIVE PASS REQUIRED]
           |
           v
-M091 pre-accept stream concurrency boundary         [CLOSED]
+M092 authorization/dependency/containment rollback    [READY]
           |
           v
-future independent security reclosure               [UNREGISTERED]
+M093 independent corrected-head security reclosure    [BLOCKED ON M092]
 ```
 
-M090's hard dependency and M091's dependency transport are satisfied. The
-future reclosure remains unregistered until the normal next-handoff review.
+Only M092 is executable now. M093 must not become `ready` until M092 closure is accepted.
 
 ## 8. Milestone summary
-
-### M074-M086 — Historical security foundation
-
-Closed. These milestones remain authoritative for shared application admission, protocol filters, trusted peer identity, option truthfulness, merged-head integration, and prior closure evidence. Their individual plan/closure records are preserved and are not rewritten by this roadmap update.
 
 ### M087 — Generic Server Inactivity Timeout Corrective
 
 Status: **closed**.
-
-Established the reference relay behavior reused by M090's IRC correction: successful progress resets a ten-minute inactivity timer; one-sided EOF half-closes the opposite writer and permits the remaining direction to drain; no absolute active-connection lifetime is imposed.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/087-generic-server-inactivity-timeout-corrective.md`.
 
@@ -256,158 +219,125 @@ Closure: `plans/closure/i2pcontrol-proposal-170/087-closure.md`.
 
 Status: **closed; evidence-only Tier 3**.
 
-Established that the lower-layer limitation is real and that current Yosemite/SAM does not expose the required streaming-admission semantic. M091 owns any future correction rather than rewriting M088 history.
-
 Plan: `plans/implementation/i2pcontrol-proposal-170/088-pre-accept-server-admission-boundary-corrective.md`.
 
 Closure: `plans/closure/i2pcontrol-proposal-170/088-closure.md`.
+
+M088 becomes the current lower-layer residual disposition again after M092 removes the M091 transport.
 
 ### M089 — Post-Corrective Tunnel Security Reclosure
 
 Status: **closed for pinned head `f0f3fc2`**.
 
-M089 remains valid historical/current accepted evidence for that exact reviewed head. The later findings open new plans; they do not retroactively modify its closure record.
-
 Plan: `plans/implementation/i2pcontrol-proposal-170/089-post-corrective-tunnel-security-reclosure.md`.
 
 Closure: `plans/closure/i2pcontrol-proposal-170/089-closure.md`.
 
+M089 remains valid historical evidence for its reviewed head but is not sufficient current-head authority after M090/M091/M092 changes.
+
 ### M090 — Server Loopback and IRC Half-Close Corrective
 
-Status: **closed**.
-
-Required outcome:
-
-- normalize existing accepted HTTP/IRC local-target spellings to literal loopback `IpAddr` before runtime connection;
-- retain compatibility spelling `localhost` without resolver use;
-- preserve non-loopback fail-before-allocation behavior;
-- change IRC EOF handling to allow the remaining direction to drain;
-- retain ten-minute progress-based inactivity and five-second target connect;
-- remain inside `emissary-cli/src/i2pcontrol/**` plus focused tests/planning bookkeeping;
-- make no dependency/core/router/startup/frontend/Proposal 170 wire change.
+Status: **closed / retained**.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/090-server-loopback-and-irc-half-close-corrective.md`.
 
 Closure: `plans/closure/i2pcontrol-proposal-170/090-closure.md`.
 
+M092 MUST NOT revert M090.
+
 ### M091 — Pre-Accept Stream Concurrency Boundary Hardening
 
-Status: **closed**.
-
-Implemented outcome:
-
-- transport only the accepted-server concurrent-stream ceiling through an explicitly supported session configuration path;
-- enforce it after signed-SYN/replay validation but before normal pending/active stream allocation;
-- count lower-layer inbound pending/active states that can exist before application admission;
-- preserve default behavior for unrelated sessions;
-- preserve complete post-accept `ServerAdmissionState` as defense in depth;
-- avoid copying Java's entire per-peer/rate throttler into core absent separate evidence.
-
-The M090 closure dependency and the explicitly authorized configuration/dependency
-strategy are satisfied. Closure evidence is recorded in
-`plans/closure/i2pcontrol-proposal-170/091-closure.md`.
+Status: **corrective pass required**.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/091-pre-accept-stream-concurrency-boundary-hardening.md`.
 
-### Future independent security reclosure
+Closure record: `plans/closure/i2pcontrol-proposal-170/091-closure.md`.
 
-Status: **unregistered**.
+The technical implementation/test evidence is retained as history, but the closure is not current authority because the implementation dependency strategy was not authorized by the registered blocked handoff before it landed. M092 owns the corrective disposition.
 
-M090 and M091 have accepted closures. Create/register one independent current-head review of all twelve tunnel types, M090's local/half-close corrections, M091's lower-layer ordering, containment, and residual risk only at the normal next-handoff review. It remains unregistered until then.
+### M092 — M091 Authorization, Dependency, and Containment Corrective
+
+Status: **ready**.
+
+Plan: `plans/implementation/i2pcontrol-proposal-170/092-m091-authorization-and-containment-corrective.md`.
+
+Required outcome:
+
+- preserve M090;
+- restore crates.io Yosemite 0.7.0 and the pre-M091 lockfile entry;
+- remove `vendor/yosemite/**`;
+- remove M091's accepted-server lower-layer option seam and three core SAM/streaming changes;
+- restore M060/M061/M062 production/dependency containment semantics to their pre-M091 form;
+- retain only exact M092/M093 planning/closure path bookkeeping if required;
+- restore truthful M091 blocked/superseded status and mark its closure corrective-pass-required;
+- explicitly return the M088 lower-layer residual to accepted status;
+- make no new production feature.
+
+Closure target: `plans/closure/i2pcontrol-proposal-170/092-closure.md`.
+
+### M093 — Post-M092 Tunnel Security Reclosure
+
+Status: **blocked** on accepted M092 closure.
+
+Plan: `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md`.
+
+M093 is a no-production-change independent review of all twelve tunnel backends, M090 retention, M092 rollback/containment correctness, and the accepted residual-risk set. Any high/medium production defect opens a new numbered corrective and keeps M093 blocked.
+
+Closure target: `plans/closure/i2pcontrol-proposal-170/093-closure.md`.
 
 ## 9. Containment policy
 
 Preferred production boundary remains `emissary-cli/src/i2pcontrol/**`.
 
-### M090
+M090 is a valid in-boundary correction.
 
-Expected production scope is only:
+M092 is a bounded rollback exception. Its only production/dependency purpose is to remove M091's unauthorized expansion and restore the smaller boundary. It may touch only the exact M091 production/dependency/containment files listed in the M092 plan.
 
-- `emissary-cli/src/i2pcontrol/backends/http_server.rs`;
-- `emissary-cli/src/i2pcontrol/backends/irc_server.rs`;
-- mechanically `emissary-cli/src/i2pcontrol/backends/http_bidir.rs` only if the shared typed target/handler seam requires it;
-- a tiny colocated helper under `i2pcontrol/backends/**` only if it is smaller than duplication.
+M062 planning bookkeeping may add exact M092/M093 plan/closure paths. It must not retain M091 core/vendor/lockfile production allowances after M092.
 
-No `emissary-core/**`, dependency, lockfile, startup, frontend, router, or unrelated proxy path is authorized.
-
-### M091
-
-M091 is closed. Its exact authorized production/dependency paths are:
-
-- `emissary-cli/src/i2pcontrol/backends/runtime/accepted_server.rs`;
-- `emissary-core/src/sam/protocol/streaming/config.rs`;
-- `emissary-core/src/sam/protocol/streaming/mod.rs`;
-- `emissary-core/src/sam/session.rs`;
-- `Cargo.toml` and the exact Yosemite package entry in `Cargo.lock`;
-- the enumerated files under `vendor/yosemite/` recorded by the M062
-  containment guard.
-
-No broad `emissary-core/**` allowance was added. The vendored Yosemite copy is
-an explicitly authorized internal maintenance transport, not an upstream
-submission or a general dependency policy change.
-
-### M062 planning bookkeeping
-
-The exact M062 planning allowlist includes M090/M091 plan and closure files. This does not broaden production globs.
+M093 has no production authority.
 
 ## 10. Verification discipline
 
-### M090
+### M092
 
 At minimum:
 
 ```text
-cargo test -p emissary-cli --no-default-features --features i2pcontrol
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m062_dependency_containment
-git diff --check
-```
-
-Add deterministic loopback-normalization and IRC half-close/inactivity tests. No public-network testing.
-
-### M091
-
-At minimum:
-
-```text
+cargo check -p emissary-cli --no-default-features --features i2pcontrol
 cargo test -p emissary-core
 cargo test -p emissary-cli --no-default-features --features i2pcontrol
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m062_dependency_containment
+cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m060_containment --test m061_containment --test m062_dependency_containment
+cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 git diff --check
 ```
 
-The M062 guard now accepts only the exact M091 Yosemite package/lockfile delta
-and the exact core/CLI paths above; all other dependency and production-path
-changes remain rejected.
+Also compare every M091-touched production/dependency file to M090 closure head `6d631d4423c7faa761b47a84e07436bbaf5d9ad4` and verify M090 HTTP/IRC focused regressions remain green.
 
-### Future reclosure
+### M093
 
-Run the full i2pcontrol suite, relevant core streaming tests, containment guards, targeted source audit, and diff check. Do not add hosted CI/fuzz/soak/public-network infrastructure solely for closure.
+Run the full I2PControl suite, relevant core tests, all containment guards, focused generic/HTTP/IRC/Streamr/persistent-key tests, source audit, and diff review. M093 does not add production code or hosted/public-network test infrastructure.
 
 ## 11. Stop conditions
 
-Stop the active milestone and create/amend separate planning rather than widen scope if:
+Stop rather than widen the active milestone if:
 
-- M090 requires production changes outside `emissary-cli/src/i2pcontrol/**`;
-- resolver-free confinement would broaden target capabilities;
-- IRC half-close work would require application protocol redesign;
-- M091's only transport requires a new, unapproved dependency strategy;
-- M091 would require a broad streaming/router rewrite;
-- a callback from core into CLI/application policy is proposed;
-- application rate-limit logic would be duplicated wholesale in core;
-- unrelated streaming defaults would change without separate approval;
+- M092 cannot remove the M091 vendor/core/dependency delta without retaining a new lower-layer transport;
+- rollback would require broad unrelated core/router changes;
+- M090 would need to be reverted;
+- unrelated dependencies or streaming defaults would change;
 - HTTP/Streamr semantics would change solely because a theoretically stronger policy exists;
 - a new Proposal 170 API field/type/action is proposed;
 - public-network deanonymization/load testing is proposed;
 - upstream contribution/review/contact activity is proposed.
 
+If M093 finds a new high/medium production defect, create a new numbered corrective instead of modifying production code under M093.
+
 ## 12. Closure rule
 
-The tunnel-security line is **reopened** for the M090/M091 corrective sequence;
-both milestones are now closed.
+The tunnel-security line remains **open** until M092 and then M093 have accepted closures.
 
-M089 remains the accepted security reclosure authority for its pinned `f0f3fc2` head until a future independent reclosure supersedes it for a later head. M088 remains accepted historical evidence for the pre-accept limitation; M091 records the implemented concurrency correction.
-
-M090 and M091 are closed with dedicated implementation and verification records. The future independent current-head reclosure remains unregistered until the normal next-handoff review.
+M090 remains valid closed production work. M091 remains technical history but is corrective-pass-required. M092 restores the intended dependency/core/containment boundary; M093 then decides current-head tunnel-security closure.
 
 Proposal 170 remains separately partial for accepted source/truthfulness limitations, RouterInfo 37/1/5 disposition, M051 blocker, and unrelated AddressBook/base-I2PControl limitations.
 

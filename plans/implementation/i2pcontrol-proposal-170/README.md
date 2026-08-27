@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 support; tunnel runtime functionally complete; M092/M093 closed; production security closed; M094 documentation reconciliation ready
+Status: partial Proposal 170 support; tunnel runtime functionally complete; M092/M093/M094 closed; production security closed; no tunnel-security handoff ready
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -44,11 +44,11 @@ The implementation target remains:
 
 M090 remains a valid in-boundary correction. M091 crossed the intended boundary into root dependency state, a full vendored Yosemite copy, `emissary-core`, and historical containment machinery while its registered plan was still blocked. M092 removed that unauthorized expansion and restored the smaller boundary. M093 independently reclosed the corrected production head.
 
-## Current handoff
+## Current tunnel-security state
 
-The production/security line is already closed by M093. The sole ready handoff is documentation/evidence reconciliation:
+The production/security line is closed by M093. M094 completed the documentation/evidence reconciliation, and no tunnel-security handoff is currently ready:
 
-- **M094** `094-post-m093-planning-state-reconciliation.md` — status `ready`.
+- **M094** `094-post-m093-planning-state-reconciliation.md` — status `closed`; closure `plans/closure/i2pcontrol-proposal-170/094-closure.md`.
 
 M094 reconciles stale M092/M093 plan-state wording and commit-head terminology only. It must make no production, dependency, runtime, core, router, startup, frontend, API, security-policy, or residual-risk change.
 
@@ -57,7 +57,7 @@ Closed predecessors:
 - M092: `plans/closure/i2pcontrol-proposal-170/092-closure.md`;
 - M093: `plans/closure/i2pcontrol-proposal-170/093-closure.md`.
 
-Per `plans/003-planning-process.md`, M094 is the only dependency-ready tunnel-security handoff.
+Per `plans/003-planning-process.md`, M094 was the only dependency-ready tunnel-security handoff while open. It is now closed.
 
 ## Why the corrective line reopened
 
@@ -101,7 +101,7 @@ The technical tests recorded by M091 remain useful evidence, but they do not cur
 | M091 | **corrective pass required** | lower-layer concurrency implementation landed while registered plan was blocked |
 | M092 | **closed** | remove M091 production/dependency/vendor delta; restore containment/history |
 | M093 | **closed** | independent post-M092 corrected-head tunnel-security reclosure; current production security authority |
-| M094 | **ready** | post-M093 planning-state/SHA reconciliation; no production change |
+| M094 | **closed** | post-M093 planning-state/SHA reconciliation; no production change |
 
 ## Current corrective sequence
 
@@ -127,10 +127,10 @@ M092 authorization/dependency/containment rollback    [CLOSED @ 8860407]
 M093 independent corrected-head security reclosure    [CLOSED @ 4da022e]
   |
   v
-M094 planning-state reconciliation                    [READY / DOCS ONLY]
+M094 planning-state reconciliation                    [CLOSED / DOCS ONLY]
 ```
 
-The production/security line remains current-head closed by M093. M094 exists only to converge planning records.
+The production/security line remains current-head closed by M093. M094 converged the planning records and left no ready handoff.
 
 ## M092 handoff summary
 
@@ -172,7 +172,7 @@ Result:
 
 Plan: `094-post-m093-planning-state-reconciliation.md`.
 
-Status: ready.
+Status: closed. Closure: `plans/closure/i2pcontrol-proposal-170/094-closure.md`.
 
 Required result:
 
@@ -243,7 +243,7 @@ M051 remains blocked by absent substantive news/banned-peer owners. AddressBook 
 
 ## Final status rule
 
-Production/runtime tunnel security remains current-head closed after M093. M094 is the sole ready handoff and is documentation/evidence reconciliation only. It may return the planning line to `closed / no ready handoff` after its closure.
+Production/runtime tunnel security remains current-head closed after M093. M094 is closed as documentation/evidence reconciliation only, and the planning line now has no ready handoff.
 
 M090 remains valid closed production work. M091 remains technical history but is not current authority. M092 remains rollback/containment authority. M093 remains the current production security reclosure authority.
 

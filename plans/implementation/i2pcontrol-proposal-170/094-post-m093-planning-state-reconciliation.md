@@ -1,6 +1,6 @@
 # M094 — Post-M093 Planning-State Reconciliation
 
-Status: ready
+Status: closed (closure at `plans/closure/i2pcontrol-proposal-170/094-closure.md`)
 
 Source roadmap:
 
@@ -230,7 +230,7 @@ Create `plans/closure/i2pcontrol-proposal-170/094-closure.md` containing:
 - explicit statement that M088/M090/M091/M092/M093 technical dispositions are unchanged;
 - internal-only/no-upstream attestation.
 
-M094 closure may return the tunnel-security planning line to `closed / no ready handoff`. It must not claim a new production security review; M093 remains that authority.
+M094 returned the tunnel-security planning line to `closed / no ready handoff`. It does not claim a new production security review; M093 remains that authority.
 
 ## 12. Internal-only rule
 

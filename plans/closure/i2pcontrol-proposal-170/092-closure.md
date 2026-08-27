@@ -21,7 +21,7 @@ Planning baseline: `944da7b887b6efbd46601e9fad1c853581f40b8e`.
 
 Known valid pre-M091 implementation/closure baseline: `6d631d4423c7faa761b47a84e07436bbaf5d9ad4`.
 
-Implementation head: see commit referenced by this closure in the registry.
+Implementation head: `8860407a79347ce925603821cdb231e47a680623`.
 
 Review date: 2026-08-27.
 

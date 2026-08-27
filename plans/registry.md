@@ -30,7 +30,7 @@ Canonical direction:
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | accepted authority; pre-M091 semantics restored by M092 | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | none | M061/M062/M063 semantics are restored; M094 may add only exact planning-path bookkeeping |
 | I2PControl Proposal 170 tunnel runtime completion | functionally complete; security corrective sequence tracked separately | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no runtime-feature handoff | all twelve registered tunnel backends remain real; M094 is documentation/evidence reconciliation only |
-| I2PControl Proposal 170 tunnel security hardening | production/security closed after M093; **M094 planning cleanup ready** | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | M094 | no production blocker; M094 reconciles stale M092/M093 planning-state and SHA-role wording only |
+| I2PControl Proposal 170 tunnel security hardening | production/security closed after M093; M094 documentation cleanup closed | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | no ready handoff | M094 reconciled stale M092/M093 planning-state and SHA-role wording; no production blocker |
 
 ## Canonical scope for tunnel runtimes
 
@@ -74,20 +74,23 @@ M092 authorization/dependency/containment rollback    [CLOSED @ 8860407]
 M093 post-M092 independent security reclosure         [CLOSED @ 4da022e]
   |
   v
-M094 post-M093 planning-state reconciliation          [READY / DOCS ONLY]
+M094 post-M093 planning-state reconciliation          [CLOSED / DOCS ONLY]
 ```
 
 The production/security line remains closed by M093. M094 does not reopen production security work; it reconciles the remaining planning-record inconsistencies.
 
-## Current ready handoff — M094
+## Current tunnel-security state — no ready handoff
 
-Plan:
+Closed reconciliation:
 
 - `plans/implementation/i2pcontrol-proposal-170/094-post-m093-planning-state-reconciliation.md`
+- `plans/closure/i2pcontrol-proposal-170/094-closure.md`
 
-Status: **ready**.
+Status: **closed**.
 
-M094 is the sole dependency-ready tunnel-security handoff. It is documentation/evidence reconciliation only. It must:
+M094 was the sole dependency-ready tunnel-security handoff while open. It was documentation/evidence reconciliation only and made no production change. M093 remains the current production/security reclosure authority. There is no current tunnel-security implementation handoff.
+
+M094 reconciled:
 
 - mark the already-closed M092 plan closed and link its closure;
 - remove stale live-readiness language from the already-closed M093 plan;
@@ -116,7 +119,7 @@ Closure target:
 | M091 | **corrective pass required** | `plans/implementation/i2pcontrol-proposal-170/091-pre-accept-stream-concurrency-boundary-hardening.md` | technical implementation landed while registered plan was blocked; closure is historical only |
 | M092 | **closed** | `plans/implementation/i2pcontrol-proposal-170/092-m091-authorization-and-containment-corrective.md` | removed M091 production/dependency/vendor delta and repaired history/containment |
 | M093 | **closed** | `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md` | independent corrected-head reclosure; current production security authority |
-| M094 | **ready** | `plans/implementation/i2pcontrol-proposal-170/094-post-m093-planning-state-reconciliation.md` | documentation/evidence convergence only; no production change |
+| M094 | **closed** | `plans/implementation/i2pcontrol-proposal-170/094-post-m093-planning-state-reconciliation.md` | documentation/evidence convergence only; no production change |
 
 Older M064-M082 history remains in the implementation directory, closure records, and subsystem roadmaps and is not duplicated here.
 
@@ -159,7 +162,7 @@ M051 remains blocked by absent substantive news/banned-peer owners. AddressBook 
 
 ## Registry maintenance rules
 
-1. M094 is the sole ready tunnel-security handoff and is documentation/evidence reconciliation only.
+1. M094 was the sole ready tunnel-security handoff while open; it is now closed and no ready handoff remains.
 2. M093 remains the current production security/anonymity reclosure authority for the corrected M092 production head.
 3. M092 is closed and its implementation head is `8860407a79347ce925603821cdb231e47a680623`.
 4. M090 remains closed and must not be reverted.

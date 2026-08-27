@@ -20,7 +20,8 @@ Corrective predecessors:
 
 Planning baseline: `944da7b887b6efbd46601e9fad1c853581f40b8e`.
 Known valid pre-M091 implementation/closure baseline: `6d631d4423c7faa761b47a84e07436bbaf5d9ad4`.
-Reviewed implementation head: `8860407a79347ce925603821cdb231e47a680623` (M092-corrected head, also M093’s final head; M093 makes one exact planning-test bookkeeping addition to `emissary-cli/tests/m062_dependency_containment.rs`).
+Reviewed production head: `8860407a79347ce925603821cdb231e47a680623` (the M092-corrected production head audited by M093).
+M093 closure/planning commit: `4da022ec874e9915e2d38fe63c609bff537ee8ff`.
 Review date: 2026-08-27.
 
 ## 1. Disposition
@@ -322,7 +323,7 @@ Focused tests:
 
 ## 10. Independent review rule (§10)
 
-M093 was reviewed independently against the actual M092-corrected head `8860407`. It does not restate M089/M090/M092 closure claims. Each security-critical invariant in §§3–8 above distinguishes:
+M093 was reviewed independently against the actual M092-corrected production head `8860407a79347ce925603821cdb231e47a680623`. It does not restate M089/M090/M092 closure claims. Each security-critical invariant in §§3–8 above distinguishes:
 
 - **Directly verified behavior** — code/test evidence cited by file:line. Predominant classification throughout this closure.
 - **Inherited historical evidence still applicable** — M087 lifetime invariants preserved; M090 loopback/half-close preserved; M078 Streamr bounds preserved; M083 trusted-peer-identity boundaries preserved.

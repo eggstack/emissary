@@ -20,11 +20,11 @@ Perform an independent current-head security/anonymity reclosure of all twelve P
 
 M093 is evidence and closure work only. It MUST NOT make production changes. Any new high- or medium-severity production defect opens a new numbered corrective plan and keeps M093 blocked.
 
-## 2. Readiness blocker
+## 2. Historical readiness evidence
 
-M092 has an accepted closure at `plans/closure/i2pcontrol-proposal-170/092-closure.md`. M093 is the dependency-ready next security reclosure and is now the active implementation handoff.
+M092 had an accepted closure at `plans/closure/i2pcontrol-proposal-170/092-closure.md`. After that closure, M093 was the dependency-ready next security reclosure and served as the active implementation handoff. That sequencing is historical: M093 is now closed, and this plan is not an active or current handoff.
 
-The reclosure must audit the actual corrected head, not the current M091-vendored head and not the older M089 pinned head. M093 is now executable against the M092-corrected head.
+The reclosure audited the actual corrected head, not the current M091-vendored head and not the older M089 pinned head. The reviewed production head and the accepted closure/planning commit are recorded separately in `plans/closure/i2pcontrol-proposal-170/093-closure.md`.
 
 ## 3. Review scope
 

@@ -1,6 +1,6 @@
 # M092 — M091 Authorization, Dependency, and Containment Corrective
 
-Status: ready
+Status: closed (closure at `plans/closure/i2pcontrol-proposal-170/092-closure.md`)
 
 Source roadmap:
 

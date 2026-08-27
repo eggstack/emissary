@@ -30,7 +30,7 @@ Canonical direction:
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | accepted authority; M091 exception under corrective rollback | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M092 | M061/M062/M063 semantics must be restored to the pre-M091 production/dependency boundary |
 | I2PControl Proposal 170 tunnel runtime completion | functionally complete; security corrective sequence tracked separately | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no runtime-feature handoff | all twelve registered tunnel backends remain real; M092 is rollback/governance correction, not new tunnel capability |
-| I2PControl Proposal 170 tunnel security hardening | **corrective pass required; M092 ready** | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | `plans/implementation/i2pcontrol-proposal-170/092-m091-authorization-and-containment-corrective.md` | M091 implemented while blocked and its dependency authorization was applied post hoc; M093 is blocked on accepted M092 closure |
+| I2PControl Proposal 170 tunnel security hardening | **corrective pass required; M092 closed; M093 ready** | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md` | M091 implemented while blocked and its dependency authorization was applied post hoc; M092 is closed; M093 is the next dependency-ready handoff |
 
 ## Canonical scope for tunnel runtimes
 
@@ -68,19 +68,19 @@ M090 resolver-free loopback + IRC half-close          [CLOSED]
 M091 pre-accept stream concurrency implementation     [CORRECTIVE PASS REQUIRED]
   |
   v
-M092 authorization/dependency/containment rollback    [READY]
+M092 authorization/dependency/containment rollback    [CLOSED]
   |
   v
-M093 post-M092 independent security reclosure         [BLOCKED / NOT READY]
+M093 post-M092 independent security reclosure         [READY]
 ```
 
-Only M092 is dependency-ready and registered for execution. M093 has been written for handoff continuity but remains blocked until M092 has an accepted closure record. Per `plans/003-planning-process.md`, M093 must not be treated as ready merely because its plan file exists.
+M093 is the only dependency-ready tunnel-security implementation handoff. M092 has an accepted closure record at `plans/closure/i2pcontrol-proposal-170/092-closure.md`.
 
-## Current ready handoff — M092
+## Current ready handoff — M093
 
 Plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/092-m091-authorization-and-containment-corrective.md`
+- `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md`
 
 Planning baseline:
 
@@ -90,28 +90,24 @@ Known valid pre-M091 implementation/closure baseline:
 
 - `6d631d4423c7faa761b47a84e07436bbaf5d9ad4`.
 
-M092 must:
+M092 has been executed and closed; see `plans/closure/i2pcontrol-proposal-170/092-closure.md`. M093 is now the only dependency-ready tunnel-security handoff.
 
-- preserve M090 production behavior and closure evidence;
-- restore crates.io Yosemite 0.7.0 and the pre-M091 lockfile entry;
-- remove `vendor/yosemite/**`;
-- remove the M091 lower-layer changes from `emissary-core` and accepted-server session construction;
-- restore M060/M061/M062 production/dependency containment semantics to the pre-M091 authority while allowing only exact new planning/closure bookkeeping paths;
-- restore truthful M091 blocked/superseded status and mark its closure corrective-pass-required rather than deleting its technical history;
-- return the M088 pre-accept/lower-layer resource/timing limitation to the accepted residual set;
-- make no new production feature or lower-layer replacement.
+M093 must:
 
-M092 does not authorize retaining the M091 vendor strategy, replacing it with another dependency transport, or broadening the core/router surface.
+- independently audit all twelve Proposal 170 tunnel backends at the corrected head;
+- verify M090 remains intact;
+- verify M091 production/dependency/vendor artifacts are gone;
+- verify containment semantics were restored rather than weakened;
+- recheck generic/HTTP/IRC/Streamr security and lifetime behavior;
+- explicitly record the post-accept application-admission boundary and accepted lower-layer resource/timing residual;
+- make no production code changes;
+- open a new numbered corrective for any high/medium production defect.
 
-## Future handoff — M093
+## Former ready handoff — M092 (closed)
 
-Plan:
+M092 has been executed and closed. See `plans/closure/i2pcontrol-proposal-170/092-closure.md`.
 
-- `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md`
-
-Status: **blocked** on accepted M092 closure.
-
-M093 is an independent no-production-change security/anonymity reclosure of all twelve Proposal 170 tunnel backends at the corrected head. Any new high/medium production defect must open a new numbered corrective and keep M093 blocked.
+No further tunnel-security handoff is registered or ready. Subsequent registry updates follow the normal next-handoff review; future work remains in the subsystem roadmap rather than being promoted to active planning merely because M092 closed.
 
 ## Recently closed / corrective authority
 
@@ -126,8 +122,8 @@ M093 is an independent no-production-change security/anonymity reclosure of all 
 | M089 | closed for pinned head | `plans/implementation/i2pcontrol-proposal-170/089-post-corrective-tunnel-security-reclosure.md` | historical reviewed-head authority only |
 | M090 | **closed / retained** | `plans/implementation/i2pcontrol-proposal-170/090-server-loopback-and-irc-half-close-corrective.md` | valid resolver-free server targets and IRC half-close correction |
 | M091 | **corrective pass required** | `plans/implementation/i2pcontrol-proposal-170/091-pre-accept-stream-concurrency-boundary-hardening.md` | technical implementation landed while registered plan was blocked; closure is not current authority |
-| M092 | **ready** | `plans/implementation/i2pcontrol-proposal-170/092-m091-authorization-and-containment-corrective.md` | remove M091 production/dependency/vendor delta and repair history/containment |
-| M093 | **blocked** | `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md` | independent corrected-head reclosure after M092 |
+| M092 | **closed** | `plans/implementation/i2pcontrol-proposal-170/092-m091-authorization-and-containment-corrective.md` | remove M091 production/dependency/vendor delta and repair history/containment |
+| M093 | **ready** | `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md` | independent corrected-head reclosure after M092 |
 
 Older M064-M082 history remains in the implementation directory, closure records, and subsystem roadmaps and is not duplicated here.
 
@@ -190,8 +186,8 @@ M051 remains blocked by absent substantive news/banned-peer owners. AddressBook 
 
 ## Registry maintenance rules
 
-1. M092 is the only dependency-ready tunnel-security implementation handoff.
-2. M093 remains blocked until `plans/closure/i2pcontrol-proposal-170/092-closure.md` is accepted.
+1. M093 is the only dependency-ready tunnel-security implementation handoff.
+2. M092 is closed; see `plans/closure/i2pcontrol-proposal-170/092-closure.md`.
 3. M090 remains closed and must not be reverted by M092.
 4. M091 is corrective-pass-required; its technical history is retained but its post-hoc authorization/closure is not current authority.
 5. M088 becomes the current lower-layer residual disposition after M092 removes the M091 transport.

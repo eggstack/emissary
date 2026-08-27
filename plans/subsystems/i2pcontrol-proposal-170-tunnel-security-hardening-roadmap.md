@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: corrective pass required; M092 ready; M093 blocked on M092 closure
+Status: corrective pass required; M092 closed; M093 ready
 
 Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
@@ -40,7 +40,7 @@ Commit `5053ce6b595351b251afb36f1f7d5278ef8f58d1` nevertheless switched the work
 
 Per `plans/003-planning-process.md`, technical success does not supply retroactive authority. M091 therefore requires a corrective pass.
 
-M092 is the only dependency-ready handoff. It removes the M091 production/dependency/vendor delta while preserving M090 and restores truthful containment/history. M093 is written for continuity but remains blocked until M092 has an accepted closure.
+M092 is closed; see `plans/closure/i2pcontrol-proposal-170/092-closure.md`. M093 is the dependency-ready next security reclosure and is now the active implementation handoff.
 
 ## 2. Threat model
 
@@ -197,13 +197,13 @@ M090 valid closed baseline
 M091 implementation landed while blocked             [CORRECTIVE PASS REQUIRED]
           |
           v
-M092 authorization/dependency/containment rollback    [READY]
-          |
-          v
-M093 independent corrected-head security reclosure    [BLOCKED ON M092]
+M092 authorization/dependency/containment rollback    [CLOSED]
+  |
+  v
+M093 independent corrected-head security reclosure    [READY]
 ```
 
-Only M092 is executable now. M093 must not become `ready` until M092 closure is accepted.
+M093 is executable now and is the active ready handoff.
 
 ## 8. Milestone summary
 
@@ -257,9 +257,11 @@ The technical implementation/test evidence is retained as history, but the closu
 
 ### M092 — M091 Authorization, Dependency, and Containment Corrective
 
-Status: **ready**.
+Status: **closed**.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/092-m091-authorization-and-containment-corrective.md`.
+
+Closure: `plans/closure/i2pcontrol-proposal-170/092-closure.md`.
 
 Required outcome:
 
@@ -273,11 +275,9 @@ Required outcome:
 - explicitly return the M088 lower-layer residual to accepted status;
 - make no new production feature.
 
-Closure target: `plans/closure/i2pcontrol-proposal-170/092-closure.md`.
-
 ### M093 — Post-M092 Tunnel Security Reclosure
 
-Status: **blocked** on accepted M092 closure.
+Status: **ready** after M092 closure.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md`.
 

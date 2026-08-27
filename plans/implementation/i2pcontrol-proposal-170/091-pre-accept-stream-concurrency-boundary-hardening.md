@@ -1,6 +1,12 @@
 # M091 — Pre-Accept Stream Concurrency Boundary Hardening
 
-Status: closed
+Status: blocked / superseded by M092
+
+Disposition: corrective pass required. The plan below is restored to its pre-implementation `blocked` truth at planning commit `7194fa50ac03b44fb4c08a4d4d05d5fd33ea49b3`. M092 removed the implementation that landed while this plan was blocked; see `plans/implementation/i2pcontrol-proposal-170/092-m091-authorization-and-containment-corrective.md` and `plans/closure/i2pcontrol-proposal-170/092-closure.md`.
+
+The technical implementation/test evidence recorded by `plans/closure/i2pcontrol-proposal-170/091-closure.md` is retained as history but is **not** current authority, because the dependency strategy used at `5053ce6b595351b251afb36f1f7d5278ef8f58d1` (full Yosemite vendor copy + root path dependency) was not authorized by the registered blocked handoff before it landed. Technical test success does not cure missing pre-implementation authority.
+
+The M088 pre-accept / lower-layer limitation is the current accepted residual disposition again; the M091 lower-layer concurrency design is not executable under any current authorization.
 
 Source roadmaps:
 
@@ -16,7 +22,7 @@ Corrective authority and predecessors:
 
 Planning baseline: `f0f3fc2204318c2fac69817d347df2702c51287b`.
 
-Classification: dependency-boundary security corrective / streaming infrastructure.
+Classification: blocked dependency-boundary security corrective / streaming infrastructure.
 
 ## 1. Objective
 
@@ -24,19 +30,9 @@ Add the smallest defensible lower-layer concurrency bound that can reject an aut
 
 M091 deliberately targets **pre-accept stream concurrency only**. It does not duplicate the full Proposal 170 per-peer minute/hour/day rate policy in `emissary-core`. Keeping the richer policy in `i2pcontrol` minimizes security-sensitive changes to the previously reviewed router/core codebase.
 
-## 2. Blocker resolution
+## 2. Current blocker
 
-M091 was blocked at the planning baseline because Yosemite 0.7.0 did not
-expose a typed streaming-concurrency session option. The maintainer instruction
-for this implementation authorizes the plan's narrow internal dependency
-transport: a vendored maintenance copy of Yosemite 0.7.0 adds one typed
-`SessionOptions::max_concurrent_streams` field and emits the standard
-`i2p.streaming.maxConcurrentStreams` option only for STREAM session creation.
-
-This resolves the transport without raw-command construction, a process-global
-registry, a nickname convention, or a parallel SAM implementation. The
-vendored copy preserves Yosemite's public behavior and defaults; the only
-behavioral addition is the explicitly configured STREAM-session option.
+M091 is not dependency-ready at the planning baseline.
 
 M088 established that:
 
@@ -45,10 +41,13 @@ M088 established that:
 - `emissary-core/src/sam/protocol/streaming/config.rs` declares `StreamConfig::max_concurrent_streams` and related fields, but current `StreamManager` construction/stream spawning uses defaults and does not consume the declared admission fields;
 - passing Java option names through current I2CP/SAM options would therefore be persist-and-ignore behavior.
 
-The read-only upstream evidence remains unchanged and is not treated as
-authority to submit or modify upstream. The exact dependency strategy is now
-internal vendoring under `vendor/yosemite/**`, with the containment guard
-enumerating each vendored path and the exact `Cargo.lock` delta.
+This remains true against the current read-only Yosemite `master` checked on 2026-08-26: `master` is still commit `d0fe71da214b212790773be12a93162ae71f3e03` (`prepare release v0.7.0`), and `SessionOptions` still exposes no streaming-concurrency field.
+
+Therefore the exact blocker is:
+
+> There is no currently supported in-repository configuration path by which `i2pcontrol` can carry its accepted-server concurrency policy through Yosemite/SAM into the Emissary streaming manager before `accept()`.
+
+M091 MUST remain `blocked` until a maintainer explicitly authorizes one narrow internal configuration transport that resolves this gap. Merely registering this plan does not authorize vendoring/forking Yosemite, switching to an unreviewed git dependency, or adding a process-global magic registry.
 
 ## 3. Preferred architecture once the blocker is resolved
 
@@ -125,12 +124,9 @@ Minimal core scope, only as required to consume the option:
 
 Dependency scope:
 
-- the vendored Yosemite maintenance copy is the explicitly authorized narrow
-  transport for this milestone;
-- no upstream Yosemite interaction, dependency submission, or unreviewed git
-  dependency is part of the implementation;
-- the M062 containment authority is amended only for the exact manifest,
-  lockfile, core, CLI, and vendored Yosemite paths used by M091.
+- no Yosemite change is authorized while M091 remains blocked;
+- if the blocker is resolved by a new released Yosemite version that exposes the exact option, a separately reviewed manifest/lockfile delta may be added to this plan before it is marked ready;
+- if resolution requires vendoring/forking/patching Yosemite or a git dependency, M091 stays blocked until an explicit maintainer directive authorizes that exact dependency strategy and the containment plan is amended accordingly.
 
 No other core/router/startup/frontend path is pre-authorized.
 
@@ -214,8 +210,7 @@ Counter release must be automatic on:
 
 Before changing code, inspect the exact Yosemite version/API proposed for the transport. Confirm it can carry one explicit standard streaming concurrency option without arbitrary raw-command construction.
 
-The released Yosemite API still lacks this field; the explicitly authorized
-internal vendored maintenance copy is the selected transport.
+If not, stop; M091 remains blocked.
 
 ### B. Make core concurrency configuration consumable
 
@@ -287,8 +282,7 @@ With the preferred design:
 
 ## 13. Readiness gate
 
-M091 readiness was satisfied for implementation when all of the following were
-verified:
+M091 may move from `blocked` to `ready` only when all of the following are true:
 
 1. M090 has an accepted closure record;
 2. a concrete supported configuration transport from `i2pcontrol` through Yosemite/SAM to the Emissary streaming manager is identified;
@@ -313,7 +307,7 @@ Stop rather than widening M091 if:
 
 ## 15. Closure evidence required
 
-Create `plans/closure/i2pcontrol-proposal-170/091-closure.md` containing:
+When and only when M091 is unblocked and implemented, create `plans/closure/i2pcontrol-proposal-170/091-closure.md` containing:
 
 - exact blocker resolution and dependency/API evidence;
 - implementation baseline/head;
@@ -329,7 +323,4 @@ Create `plans/closure/i2pcontrol-proposal-170/091-closure.md` containing:
 
 ## 16. Future reclosure
 
-After M090 and M091 both have accepted closure records, the security roadmap
-should register one independent current-head tunnel-security reclosure
-milestone. That future reclosure remains unregistered pending the normal
-next-handoff review; future milestones remain in the roadmap until registered.
+After M090 and M091 both have accepted closure records, the security roadmap should register one independent current-head tunnel-security reclosure milestone. That future reclosure is intentionally not registered now because M091 is blocked and planning governance requires future milestones to remain in the roadmap until dependencies are satisfied.

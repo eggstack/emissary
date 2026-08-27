@@ -1,6 +1,6 @@
 # M093 — Post-M092 Tunnel Security Reclosure
 
-Status: blocked
+Status: ready
 
 Source roadmap:
 
@@ -22,11 +22,9 @@ M093 is evidence and closure work only. It MUST NOT make production changes. Any
 
 ## 2. Readiness blocker
 
-M093 is not executable until M092 closes.
+M092 has an accepted closure at `plans/closure/i2pcontrol-proposal-170/092-closure.md`. M093 is the dependency-ready next security reclosure and is now the active implementation handoff.
 
-The reclosure must audit the actual corrected head, not the current M091-vendored head and not the older M089 pinned head. Registering or writing this plan does not make it dependency-ready.
-
-After M092 closure, the registry may move M093 from blocked/unregistered roadmap work to the single next `ready` handoff.
+The reclosure must audit the actual corrected head, not the current M091-vendored head and not the older M089 pinned head. M093 is now executable against the M092-corrected head.
 
 ## 3. Review scope
 

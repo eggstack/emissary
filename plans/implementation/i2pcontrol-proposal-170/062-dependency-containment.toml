@@ -16,14 +16,13 @@ metrics = []
 "subtle" = "absent"
 
 [lockfile]
-expected = "M091-authorized vendored Yosemite delta only"
+expected = "byte-identical to baseline"
 baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
 [allowed_production_paths]
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",
-  "Cargo.lock",
 ]
 
 [prohibited_production_paths]

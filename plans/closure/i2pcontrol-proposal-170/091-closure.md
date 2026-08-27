@@ -1,6 +1,12 @@
 # M091 Closure — Pre-Accept Stream Concurrency Boundary Hardening
 
-Status: closed
+Status: corrective pass required / superseded by M092
+
+Historical disposition: this record preserves the technical implementation/test evidence that landed at commits `5053ce6b595351b251afb36f1f7d5278ef8f58d1` and `944da7b887b6efbd46601e9fad1c853581f40b8e`. It is **not** current authority for the proposed lower-layer concurrency design because the registered plan was `blocked` at `7194fa50ac03b44fb4c08a4d4d05d5fd33ea49b3` and the implementation's full-Yosemite-vendor / root-path-dependency strategy was not authorized before it landed. Per `plans/003-planning-process.md`, technical success does not cure missing pre-implementation authority.
+
+M092 (`plans/implementation/i2pcontrol-proposal-170/092-m091-authorization-and-containment-corrective.md`, closure at `plans/closure/i2pcontrol-proposal-170/092-closure.md`) removed the vendored Yosemite copy, restored crates.io Yosemite 0.7.0, removed the three `emissary-core` SAM/streaming changes and the accepted-server lower-layer option seam, restored M060/M061/M062 containment semantics to their pre-M091 authority, and returned the M088 pre-accept / lower-layer limitation to the accepted residual disposition.
+
+The M091 plan at `plans/implementation/i2pcontrol-proposal-170/091-pre-accept-stream-concurrency-boundary-hardening.md` has been returned to its pre-implementation `blocked` status with a `superseded by M092` annotation. Any future lower-layer concurrency design must be re-registered under a new explicit maintainer authorization; this closure does not retroactively approve the deprecated vendor strategy.
 
 Source implementation plan:
 

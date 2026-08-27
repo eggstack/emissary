@@ -1,6 +1,6 @@
 # M093 — Post-M092 Tunnel Security Reclosure
 
-Status: ready
+Status: closed (closure at `plans/closure/i2pcontrol-proposal-170/093-closure.md`)
 
 Source roadmap:
 

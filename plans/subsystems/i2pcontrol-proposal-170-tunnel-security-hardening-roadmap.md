@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Tunnel Security Hardening Roadmap
 
-Status: corrective pass required; M092 closed; M093 ready
+Status: closed; tunnel-security current-head closed after M093
 
 Original planning baseline: `04e0c2e5a35888e6fec8fd0b6aef80437174e3b0`.
 
@@ -40,7 +40,7 @@ Commit `5053ce6b595351b251afb36f1f7d5278ef8f58d1` nevertheless switched the work
 
 Per `plans/003-planning-process.md`, technical success does not supply retroactive authority. M091 therefore requires a corrective pass.
 
-M092 is closed; see `plans/closure/i2pcontrol-proposal-170/092-closure.md`. M093 is the dependency-ready next security reclosure and is now the active implementation handoff.
+M092 is closed; see `plans/closure/i2pcontrol-proposal-170/092-closure.md`. M093 is closed; see `plans/closure/i2pcontrol-proposal-170/093-closure.md`. The tunnel-security line is current-head closed at the M092-corrected head. No further tunnel-security implementation handoff is registered.
 
 ## 2. Threat model
 
@@ -200,12 +200,14 @@ M091 implementation landed while blocked             [CORRECTIVE PASS REQUIRED]
 M092 authorization/dependency/containment rollback    [CLOSED]
   |
   v
-M093 independent corrected-head security reclosure    [READY]
+M093 independent corrected-head security reclosure    [CLOSED]
 ```
 
-M093 is executable now and is the active ready handoff.
+The tunnel-security line is current-head closed after M093. No further handoff is registered or required.
 
 ## 8. Milestone summary
+
+The tunnel-security line covers M087–M093. All milestones in this corrective sequence are now closed; the line is current-head closed after M093.
 
 ### M087 — Generic Server Inactivity Timeout Corrective
 
@@ -277,13 +279,13 @@ Required outcome:
 
 ### M093 — Post-M092 Tunnel Security Reclosure
 
-Status: **ready** after M092 closure.
+Status: **closed** at the corrected head `8860407`.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md`.
 
-M093 is a no-production-change independent review of all twelve tunnel backends, M090 retention, M092 rollback/containment correctness, and the accepted residual-risk set. Any high/medium production defect opens a new numbered corrective and keeps M093 blocked.
+Closure: `plans/closure/i2pcontrol-proposal-170/093-closure.md`.
 
-Closure target: `plans/closure/i2pcontrol-proposal-170/093-closure.md`.
+M093 independently audited all twelve tunnel backends at the M092-corrected head, verified M090 retention, verified M091 production/dependency/vendor removal, verified M060/M061/M062 containment restoration, rechecked generic/HTTP/IRC/Streamr security and lifetime behavior with file:line citations, and recorded the post-accept application-admission boundary plus the accepted lower-layer residual. No high-, medium-, or low-severity production security/anonymity defect was found. M093 added a single exact planning-test allowlist entry (`emissary-cli/tests/m062_dependency_containment.rs::is_authorized_planning_path` for `092-closure.md` and `093-closure.md`) to record a low-severity M092 bookkeeping defect. The tunnel-security line is current-head closed.
 
 ## 9. Containment policy
 
@@ -295,7 +297,7 @@ M092 is a bounded rollback exception. Its only production/dependency purpose is 
 
 M062 planning bookkeeping may add exact M092/M093 plan/closure paths. It must not retain M091 core/vendor/lockfile production allowances after M092.
 
-M093 has no production authority.
+M093 had no production authority and applies only one exact planning-test allowlist entry for `092-closure.md` and `093-closure.md` in `emissary-cli/tests/m062_dependency_containment.rs::is_authorized_planning_path`. No production code change.
 
 ## 10. Verification discipline
 
@@ -335,10 +337,10 @@ If M093 finds a new high/medium production defect, create a new numbered correct
 
 ## 12. Closure rule
 
-The tunnel-security line remains **open** until M092 and then M093 have accepted closures.
+The tunnel-security line is **current-head closed** after the accepted M093 closure at `plans/closure/i2pcontrol-proposal-170/093-closure.md`.
 
-M090 remains valid closed production work. M091 remains technical history but is corrective-pass-required. M092 restores the intended dependency/core/containment boundary; M093 then decides current-head tunnel-security closure.
+M090 remains valid closed production work. M091 remains technical history but is corrective-pass-required. M092 restored the intended dependency/core/containment boundary; M093 then closed the line at the corrected head with no high-, medium-, or low-severity production defect inside the approved Proposal 170 boundary.
 
 Proposal 170 remains separately partial for accepted source/truthfulness limitations, RouterInfo 37/1/5 disposition, M051 blocker, and unrelated AddressBook/base-I2PControl limitations.
 
-No upstream review, acceptance, merge, adoption, or submission is implied or authorized.
+No upstream review, acceptance, merge, adoption, or submission is implied or authorized. A new tunnel-security implementation handoff will be registered only when a new explicit maintainer authorization or substantial evidence surfaces a new workstream.

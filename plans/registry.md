@@ -30,7 +30,7 @@ Canonical direction:
 | I2PControl Proposal 170 source/truthfulness | partial Proposal 170 support; M057 closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | no source-completion handoff | M051 remains blocked by absent substantive news/ban owners; accepted RouterInfo matrix remains 37/1/5 |
 | I2PControl Proposal 170 containment | accepted authority; M091 exception under corrective rollback | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M092 | M061/M062/M063 semantics must be restored to the pre-M091 production/dependency boundary |
 | I2PControl Proposal 170 tunnel runtime completion | functionally complete; security corrective sequence tracked separately | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no runtime-feature handoff | all twelve registered tunnel backends remain real; M092 is rollback/governance correction, not new tunnel capability |
-| I2PControl Proposal 170 tunnel security hardening | **corrective pass required; M092 closed; M093 ready** | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md` | M091 implemented while blocked and its dependency authorization was applied post hoc; M092 is closed; M093 is the next dependency-ready handoff |
+| I2PControl Proposal 170 tunnel security hardening | **closed; tunnel-security current-head closed after M093** | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | none | M091 implemented while blocked and its dependency authorization was applied post hoc; M092 closed and removed the unauthorized expansion; M093 is the current-head reclosure and is now closed at the corrected head |
 
 ## Canonical scope for tunnel runtimes
 
@@ -71,43 +71,20 @@ M091 pre-accept stream concurrency implementation     [CORRECTIVE PASS REQUIRED]
 M092 authorization/dependency/containment rollback    [CLOSED]
   |
   v
-M093 post-M092 independent security reclosure         [READY]
+M093 post-M092 independent security reclosure         [CLOSED]
 ```
 
-M093 is the only dependency-ready tunnel-security implementation handoff. M092 has an accepted closure record at `plans/closure/i2pcontrol-proposal-170/092-closure.md`.
+The tunnel-security line is current-head closed after the accepted M093 closure at `plans/closure/i2pcontrol-proposal-170/093-closure.md`. M092 has an accepted closure record at `plans/closure/i2pcontrol-proposal-170/092-closure.md`. No further tunnel-security implementation handoff is registered or ready.
 
-## Current ready handoff — M093
+## Current ready handoff — none
 
-Plan:
+The tunnel-security line is current-head closed. No future implementation handoff is registered or pending. M093 at `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md` is closed; closure at `plans/closure/i2pcontrol-proposal-170/093-closure.md`.
 
-- `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md`
+The next planned handoff will be determined by the normal next-handoff review against future workstreams; it does not exist in the registry today. M051 (RouterInfo news/banned-peer sources) and the accepted RouterInfo 37/1/5 disposition remain independently blocked or fixed, and are not unblocked by M093.
 
-Planning baseline:
+## Former ready handoff — M093 (closed)
 
-- `944da7b887b6efbd46601e9fad1c853581f40b8e`.
-
-Known valid pre-M091 implementation/closure baseline:
-
-- `6d631d4423c7faa761b47a84e07436bbaf5d9ad4`.
-
-M092 has been executed and closed; see `plans/closure/i2pcontrol-proposal-170/092-closure.md`. M093 is now the only dependency-ready tunnel-security handoff.
-
-M093 must:
-
-- independently audit all twelve Proposal 170 tunnel backends at the corrected head;
-- verify M090 remains intact;
-- verify M091 production/dependency/vendor artifacts are gone;
-- verify containment semantics were restored rather than weakened;
-- recheck generic/HTTP/IRC/Streamr security and lifetime behavior;
-- explicitly record the post-accept application-admission boundary and accepted lower-layer resource/timing residual;
-- make no production code changes;
-- open a new numbered corrective for any high/medium production defect.
-
-## Former ready handoff — M092 (closed)
-
-M092 has been executed and closed. See `plans/closure/i2pcontrol-proposal-170/092-closure.md`.
-
-No further tunnel-security handoff is registered or ready. Subsequent registry updates follow the normal next-handoff review; future work remains in the subsystem roadmap rather than being promoted to active planning merely because M092 closed.
+M093 has been executed and closed. See `plans/closure/i2pcontrol-proposal-170/093-closure.md`. The tunnel-security line is current-head closed at the M092-corrected head; no further tunnel-security handoff is registered or ready.
 
 ## Recently closed / corrective authority
 
@@ -123,7 +100,7 @@ No further tunnel-security handoff is registered or ready. Subsequent registry u
 | M090 | **closed / retained** | `plans/implementation/i2pcontrol-proposal-170/090-server-loopback-and-irc-half-close-corrective.md` | valid resolver-free server targets and IRC half-close correction |
 | M091 | **corrective pass required** | `plans/implementation/i2pcontrol-proposal-170/091-pre-accept-stream-concurrency-boundary-hardening.md` | technical implementation landed while registered plan was blocked; closure is not current authority |
 | M092 | **closed** | `plans/implementation/i2pcontrol-proposal-170/092-m091-authorization-and-containment-corrective.md` | remove M091 production/dependency/vendor delta and repair history/containment |
-| M093 | **ready** | `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md` | independent corrected-head reclosure after M092 |
+| M093 | **closed** | `plans/implementation/i2pcontrol-proposal-170/093-post-m092-tunnel-security-reclosure.md` | independent corrected-head reclosure after M092; tunnel-security line current-head closed |
 
 Older M064-M082 history remains in the implementation directory, closure records, and subsystem roadmaps and is not duplicated here.
 
@@ -165,13 +142,13 @@ The prior M074-M090 work remains authoritative for:
 - unsupported/underspecified runtime options failing before allocation;
 - no upstream interaction.
 
-After M092, documentation must again state truthfully that application admission is post-accept and that lower-layer signed-SYN/streaming work may occur before it. Streamr's finite subscriber set remains non-Sybil-resistant and is retained as a reference-aligned specialized availability limitation.
+After M093, documentation truthfully states that application admission is post-accept and that lower-layer signed-SYN/streaming work may occur before it; M093 verified the M092 rollback restored this disposition. Streamr's finite subscriber set remains non-Sybil-resistant and is retained as a reference-aligned specialized availability limitation.
 
 ## Containment authority
 
 M061 remains the source-boundary authority. M062/M063 remain the dependency/feature-containment authority.
 
-M092 must remove the M091 core/vendor/lockfile exceptions and restore the pre-M091 semantic assertions. The cumulative M062 planning allowlist may contain exact M092/M093 plan and closure paths only as planning bookkeeping; this must not broaden production globs or dependency ownership.
+M092 restored the pre-M091 semantic assertions by removing the M091 core/vendor/lockfile exceptions. The cumulative M062 planning allowlist contains exact M092/M093 plan and closure paths only as planning bookkeeping and one exact M093 closure-test allowlist entry for the `092-closure.md` and `093-closure.md` paths; the allowlist does not broaden production globs or dependency ownership.
 
 ## Accepted unrelated Proposal 170 state
 
@@ -186,11 +163,11 @@ M051 remains blocked by absent substantive news/banned-peer owners. AddressBook 
 
 ## Registry maintenance rules
 
-1. M093 is the only dependency-ready tunnel-security implementation handoff.
+1. The tunnel-security line is current-head closed after M093; see `plans/closure/i2pcontrol-proposal-170/093-closure.md`.
 2. M092 is closed; see `plans/closure/i2pcontrol-proposal-170/092-closure.md`.
-3. M090 remains closed and must not be reverted by M092.
+3. M090 remains closed and must not be reverted.
 4. M091 is corrective-pass-required; its technical history is retained but its post-hoc authorization/closure is not current authority.
-5. M088 becomes the current lower-layer residual disposition after M092 removes the M091 transport.
+5. M088 is the current lower-layer residual disposition; no M091 pre-accept transport remains.
 6. Preserve RouterInfo 37/1/5 and M051 unless separate source-owner work changes them.
 7. Preserve ADR-0003 and the preferred `emissary-cli/src/i2pcontrol/**` production boundary wherever technically possible.
 8. Unsupported/underspecified runtime options fail before allocation; persist-and-ignore is forbidden.

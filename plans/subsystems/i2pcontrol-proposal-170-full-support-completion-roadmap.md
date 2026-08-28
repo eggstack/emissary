@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096 and M100 closed (M097 blocked); M101-M103 are dependency-ready
+Status: active; M095-M096, M100, and M101 closed (M097 blocked); M102-M103 are dependency-ready
 
 Planning baseline: `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207` — M094 closed planning head before this newly authorized phase.
 
@@ -29,7 +29,7 @@ Move the internal fork from truthful partial Proposal 170 support to full suppor
 
 Current accepted baseline:
 
-- RouterInfo: 43 canonical Proposal 170 additions, 38 available, 1 protocol-permitted neutral, 4 unavailable;
+- RouterInfo: 43 canonical Proposal 170 additions, 39 available, 1 protocol-permitted neutral, 3 unavailable;
 - AddressBook CRUD and subscription replacement operational;
 - AddressBook `SetConfig` key inventory exact but non-empty configuration requests are currently rejected rather than applied;
 - all twelve Proposal 170 TunnelManager types have real backends and all seven canonical actions are implemented;
@@ -201,12 +201,12 @@ Dependency classes:
 
 - M095 -> every implementation milestone: hard. No code work begins from an inferred option/source inventory.
 - M097 -> M098/M099: hard for shared session/key option plumbing and final applicability model.
-- M096 and M101 may proceed independently now that M095 is closed; M100 is now closed.
+- M096 and M101 may proceed independently now that M095 is closed; M100 and M101 are now closed.
 - M102/M103 are ready for their bounded owner/semantic work because M095 recorded their exact audit gates and path budgets.
 - M104 depends on all capability milestones M097-M103 closing; M096 is now closed.
 - Public-network/reference-router reachability is an operational dependency for M104 only; local code may close earlier milestones without creating a hosted network farm.
 
-Per planning governance, M095 was the only registered dependency-ready implementation plan at roadmap creation. M096, M097, and M100 have now been processed; M097 is closed as blocked on named primitives. M101-M103 remain independently ready, while M098/M099 still wait for an unblocked M097.
+Per planning governance, M095 was the only registered dependency-ready implementation plan at roadmap creation. M096, M097, M100, and M101 have now been processed; M097 is closed as blocked on named primitives. M102-M103 remain independently ready, while M098/M099 still wait for an unblocked M097.
 
 ## 8. Milestones and exit conditions
 
@@ -220,7 +220,7 @@ Primary class: invariant / infrastructure.
 
 Re-audit the pinned proposal against current production, create one machine-readable matrix covering RouterInfo, AddressBook SetConfig, TunnelManager options/type applicability, and ClientServicesInfo, and assign every remaining cell to an owner/path budget. This milestone made no runtime behavior change. The resulting authority is `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`, guarded by `emissary-cli/tests/m095_full_support_matrix.rs`.
 
-Exit: no unknown applicability/source row remains; all later milestones have exact bounded inputs; lower-layer candidates are explicitly identified before code. M095, M096, and M100 are closed; M097 is closed as blocked with exact Yosemite/SAM and key-lifecycle blockers; M101-M103 remain ready, while M098/M099 remain blocked on M097 and M104 remains blocked on M097-M103.
+Exit: no unknown applicability/source row remains; all later milestones have exact bounded inputs; lower-layer candidates are explicitly identified before code. M095, M096, M100, and M101 are closed; M097 is closed as blocked with exact Yosemite/SAM and key-lifecycle blockers; M102-M103 remain ready, while M098/M099 remain blocked on M097 and M104 remains blocked on M097-M103.
 
 ### M096 — AddressBook SetConfig operational completion
 
@@ -286,7 +286,8 @@ Exit: deterministic tests prove request-independent 15-second bytes/sec semantic
 
 Plan: `101-routerinfo-news-source-completion.md`.
 
-Status: ready; dependency M095 closed.
+Status: closed; dependency M095 closed; closure:
+`plans/closure/i2pcontrol-proposal-170/101-closure.md`.
 
 Primary class: capability / security / operations.
 

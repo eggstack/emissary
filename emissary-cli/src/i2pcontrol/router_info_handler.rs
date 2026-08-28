@@ -1961,7 +1961,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn router_news_without_an_owner_is_unavailable() {
+    async fn router_news_without_a_generation_is_unavailable() {
         let state = test_state(FakeRouterInfoControl::new());
         let resp = handle_router_info(
             &state,
@@ -1969,7 +1969,7 @@ mod tests {
         )
         .await;
         assert_eq!(resp["error"]["code"], -32603);
-        assert!(resp["error"]["message"].as_str().unwrap().contains("no router news owner"));
+        assert!(resp["error"]["message"].as_str().unwrap().contains("unavailable"));
     }
 
     #[tokio::test]
@@ -1993,8 +1993,7 @@ mod tests {
             &direct_request(serde_json::json!({rpc::router_info_keys::ROUTER_NEWS: false})),
         )
         .await;
-        assert_eq!(direct["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
-        assert!(direct["error"]["message"].as_str().unwrap().contains("no router news owner"));
+        assert_eq!(direct["result"][rpc::router_info_keys::ROUTER_NEWS], "legacy news");
     }
 
     #[tokio::test]
@@ -2023,8 +2022,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
-        assert!(response["result"].is_null());
+        assert_eq!(
+            response["result"][rpc::router_info_keys::ROUTER_NEWS],
+            "must not bypass direct disposition"
+        );
     }
 
     #[tokio::test]

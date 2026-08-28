@@ -40,6 +40,7 @@ use super::{
     auth::{self, AuthThrottle, TokenService},
     control_plane::{AddressBookControl, ControlPlane, TunnelManagerControl},
     errors::I2pControlError,
+    news::RouterNewsSource,
     production::{
         EventMetrics, ProductionAddressBookControl, ProductionControlPlane,
         ProductionRouterInfoControl, ProductionTunnelManagerControl, StartupTunnelInventory,
@@ -647,6 +648,8 @@ pub struct ServerInitContext {
     pub active_peer_source: Option<Arc<dyn ActivePeerSource>>,
     /// Canonical bounded current tunnel source.
     pub tunnel_source: Option<Arc<dyn TunnelSource>>,
+    /// Optional I2PControl-owned authenticated RouterInfo news source.
+    pub(crate) router_news_source: Option<Arc<RouterNewsSource>>,
 }
 
 impl ServerInitContext {
@@ -670,6 +673,7 @@ impl ServerInitContext {
             peer_directory: None,
             active_peer_source: None,
             tunnel_source: None,
+            router_news_source: None,
         }
     }
 
@@ -757,6 +761,13 @@ impl ServerInitContext {
     /// Inject the canonical current tunnel source.
     pub fn with_tunnel_source(mut self, source: Arc<dyn TunnelSource>) -> Self {
         self.tunnel_source = Some(source);
+        self
+    }
+
+    /// Inject the I2PControl-owned RouterInfo news source.
+    #[allow(dead_code)]
+    pub(crate) fn with_router_news_source(mut self, source: Arc<RouterNewsSource>) -> Self {
+        self.router_news_source = Some(source);
         self
     }
 }
@@ -867,6 +878,9 @@ pub async fn init_server(
     }
     if let Some(source) = ctx.tunnel_source {
         router_info_control = router_info_control.with_tunnel_source(source);
+    }
+    if let Some(source) = ctx.router_news_source {
+        router_info_control = router_info_control.with_router_news_source(source);
     }
     let router_info: Arc<dyn RouterInfoControl> = Arc::new(router_info_control);
 

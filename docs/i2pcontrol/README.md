@@ -1,6 +1,6 @@
 # I2PControl for Emissary
 
-Status: partial Proposal 170 support; M095-M096 and M100 closed; M097 blocked; M101-M103 ready
+Status: partial Proposal 170 support; M095-M096, M100, and M101 closed; M097 blocked; M102-M103 ready
 
 Proposal 170 remains **Open**. This documentation is pinned to the revision
 created and last updated on `2026-05-20`.
@@ -38,14 +38,15 @@ with focused exhaustiveness coverage in
 and later owner/path budgets; it does not promote any planned cell to production
 support.
 
-The expected bounded final status remains `partial Proposal 170 support` because four
+The expected bounded final status remains `partial Proposal 170 support` because three
 RouterInfo additions remain unavailable. M066 through M071 close the IRC, HTTP, CONNECT,
 SOCKS, bidirectional HTTP, and Streamr families. The canonical
-43-addition matrix currently contains 38 available selectors, one
-protocol-permitted neutral selector, and four unavailable selectors; the
-unavailable rows are router news, banned peers, and both network-error selectors.
-M100 now supplies transit bandwidth through a bounded request-independent
-I2PControl-owned sampler over the authoritative cumulative transit counter.
+43-addition matrix currently contains 39 available selectors, one
+protocol-permitted neutral selector, and three unavailable selectors; the
+unavailable rows are banned peers and both network-error selectors.
+M100 supplies transit bandwidth through a bounded request-independent
+I2PControl-owned sampler, and M101 supplies authenticated signed router news
+through a bounded I2PControl-owned refresh/cache task.
 
 ## Compile feature
 
@@ -231,9 +232,9 @@ backend stubs are not operational coverage.
 
 The retained matrix contains:
 
-- 38 available selectors;
+- 39 available selectors;
 - 1 protocol-permitted neutral selector;
-- 4 unavailable selectors.
+- 3 unavailable selectors.
 
 Unavailable selectors fail explicitly and are never substituted with zero,
 false, empty, or semantically adjacent values.

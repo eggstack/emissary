@@ -1,6 +1,7 @@
 # M101 — RouterInfo News Source Completion
 
-Status: ready; dependency M095 closed
+Status: closed; dependency M095 closed; closure:
+`plans/closure/i2pcontrol-proposal-170/101-closure.md`
 
 Source roadmap:
 
@@ -120,7 +121,7 @@ Target production changes under `emissary-cli/src/i2pcontrol/**`, likely:
 - I2PControl-local persistence only if M095 requires durable cache;
 - focused tests/docs/M095 matrix updates.
 
-Dependency additions are discouraged. Prefer dependencies already present in `emissary-cli`. If a genuinely new I2PControl-only direct dependency is necessary for the adopted signed format, stop and create an explicit M062/M063-compatible dependency amendment rather than adding it incidentally.
+Dependency additions are discouraged. Prefer dependencies already present in `emissary-cli`. If a genuinely new I2PControl-only direct dependency is necessary for the adopted signed format, stop and create an explicit M062/M063-compatible dependency amendment rather than adding it incidentally. M101 uses the existing `emissary-util` SU3/certificate primitives as a named non-core seam; the updated M095 budget records those exact paths.
 
 No `emissary-core/**`, root dependency, startup router behavior, frontend, workflow, or release path is authorized.
 

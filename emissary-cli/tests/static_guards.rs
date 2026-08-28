@@ -346,6 +346,23 @@ fn transit_bandwidth_15s_has_no_request_local_sampler() {
 }
 
 #[test]
+fn router_news_fetch_is_owned_and_bounded_outside_the_handler() {
+    let handler = read_source("src/i2pcontrol/router_info_handler.rs");
+    let news = read_source("src/i2pcontrol/news.rs");
+    let main = read_source("src/main.rs");
+
+    assert!(!handler.contains("reqwest"));
+    assert!(!handler.contains("RouterNewsSource::start"));
+    assert!(news.contains("Policy::none"));
+    assert!(news.contains("MAX_COMPRESSED_BYTES"));
+    assert!(news.contains("MAX_RENDERED_BYTES"));
+    assert!(news.contains("MAX_ENTRIES"));
+    assert!(news.contains("MAX_STALENESS"));
+    assert!(news.contains(".chunk()"));
+    assert!(main.contains("#[cfg(feature = \"i2pcontrol\")]"));
+}
+
+#[test]
 fn network_error_rows_require_an_authoritative_owner() {
     let handler = read_source("src/i2pcontrol/router_info_handler.rs");
     let events = std::fs::read_to_string(workspace_root().join("emissary-core/src/events.rs"))

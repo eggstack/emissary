@@ -610,8 +610,8 @@ pub trait RouterInfoControl: Send + Sync {
     /// Clear the I2PControl log buffer.
     async fn log_clear(&self) -> Result<(), InspectionError>;
 
-    /// Get router news. Emissary has no news subsystem, so production returns
-    /// an explicit unavailable error rather than an empty placeholder.
+    /// Get the current bounded HTML generation rendered from the authenticated
+    /// I2P news feed. A missing or stale generation is unavailable.
     fn router_news(&self) -> Result<String, InspectionError>;
 
     /// Get bandwidth shares/ratios from configuration.

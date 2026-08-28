@@ -121,13 +121,13 @@ M055 owns the network-error truthfulness correction for M050. M056 owns the
 accepted integrated reclosure and final 43-row source audit.
 
 Expected final disposition under the authorized scope remains
-`partial Proposal 170 support` because five of the 43 RouterInfo additions lack
+`partial Proposal 170 support` because three of the 43 RouterInfo additions lack
 bounded authoritative sources. M066 adds real filtered `ircclient` and
 `ircserver`, M067 adds filtered accepted-stream `httpserver`, M068 adds real
 `httpclient` and `connectclient`, M069 adds bounded `socks` and filtered
 `socksirc`, and M070 adds the deprecated composed `httpbidirserver`; the
-unavailable rows are router news, banned peers, transit-15s, and v4/v6
-network-error.
+unavailable rows are banned peers and v4/v6 network-error; M100 and M101 now
+provide bounded transit-15s and signed router-news sources.
 
 ## M038 live-runtime evidence
 
@@ -405,15 +405,17 @@ M028 does not alter these sources. M029 revalidated them.
 
 ## RouterInfo
 
-Current source matrix after M100:
+Current source matrix after M101:
 
-- 38 available;
+- 39 available;
 - 1 protocol-permitted neutral;
-- 4 unavailable.
+- 3 unavailable.
 
 Available selectors have bounded current owners. Clock skew uses `null` only
-when the protocol permits it. Unavailable selectors—including both network-error
-selectors, for which Emissary has no canonical error owner—fail with sanitized
+when the protocol permits it. Router news is rendered from the authenticated
+canonical XML_GZ feed by an I2PControl-owned refresh/cache task and is unavailable
+before a validated generation or after seven days of failed refreshes. Unavailable
+selectors—including both network-error selectors, for which Emissary has no canonical error owner—fail with sanitized
 errors before assembly and never return fabricated zero, false, empty, partial,
 or semantically adjacent values.
 

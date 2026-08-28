@@ -85,6 +85,18 @@ const LIKOGAN_RESEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/assets/certificates/admin_at_likogan.dev.crt"
 ));
+const ECHELON_NEWS: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/assets/certificates/news/echelon_at_mail.i2p.crt"
+));
+const HANKHILL19580_NEWS: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/assets/certificates/news/hankhill19580_at_gmail.com.crt"
+));
+const ZZZ_NEWS: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/assets/certificates/news/zzz_at_mail.i2p.crt"
+));
 
 pub const CREATIVECOWPAT_SSL: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -142,4 +154,25 @@ pub static PUBLIC_KEYS: LazyLock<HashMap<&'static str, RsaPublicKey>> = LazyLock
             }
         })
         .collect()
+});
+
+/// Public keys of the pinned I2P news-feed signers.
+pub static NEWS_PUBLIC_KEYS: LazyLock<HashMap<&'static str, RsaPublicKey>> = LazyLock::new(|| {
+    [
+        ("echelon@mail.i2p", ECHELON_NEWS),
+        ("hankhill19580@gmail.com", HANKHILL19580_NEWS),
+        ("zzz@mail.i2p", ZZZ_NEWS),
+    ]
+    .into_iter()
+    .filter_map(|(key, value)| {
+        let cert = pem::parse(value).ok()?.into_contents();
+        let (_, cert) = x509_parser::parse_x509_certificate(&cert).ok()?;
+        let PublicKey::RSA(public_key) = cert.public_key().parsed().ok()? else {
+            return None;
+        };
+        let modulus = BigUint::from_bytes_be(public_key.modulus);
+        let exponent = BigUint::from_bytes_be(public_key.exponent);
+        Some((key, RsaPublicKey::new(modulus, exponent).ok()?))
+    })
+    .collect()
 });

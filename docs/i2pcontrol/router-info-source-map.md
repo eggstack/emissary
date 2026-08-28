@@ -3,13 +3,14 @@
 Status: exact-wire source inventory for the pinned-revision closure
 
 This is the reviewed source map for the pinned Proposal 170 revision created and
-last updated on `2026-08-11`. M027 independently revalidated the matrix against
+last updated on `2026-08-28`. M027 independently revalidated the matrix against
 the external revision. The machine-readable authority is
 `router_info_keys::PROPOSAL_170_CONTRACT` in `emissary-cli/src/i2pcontrol/rpc.rs`.
-Summary: 43 total, 38 available, 1 protocol-permitted neutral, and 4 unavailable.
+Summary: 43 total, 39 available, 1 protocol-permitted neutral, and 3 unavailable.
 M051 adjudicated the news and ban rows, M055 adjudicated the v4/v6 network-error
-rows, and M100 completed the request-independent transit-15s source against the
-pinned proposal and read-only reference evidence. Empty values, request-local
+rows, M100 completed the request-independent transit-15s source, and M101
+completed the authenticated bounded news source against the pinned proposal and
+read-only reference evidence. Empty values, request-local
 sampling, and `0`/`No error` from an unset source are not authoritative capability
 states and are not emitted.
 The table below is intentionally one row per canonical addition. Base selectors and
@@ -32,7 +33,7 @@ is read-only. Actual serialized response size is checked after assembly.
 
 | Wire key | JSON type | Disposition | Owner / reason | Serializer | Fixture | Bound | Base alias |
 |---|---|---|---|---|---|---|---|
-| `i2p.router.news` | string | unavailable | router-news: no authoritative news-feed owner; empty string is not contract-proven | `serialize_router_news` | `p170.router_news.string` | — | base Router news (same wire key) |
+| `i2p.router.news` | string | available | i2pcontrol-router-news: signed XML_GZ feed; bounded 128 entries / 64 KiB fields / 1 MiB rendered output / 7-day staleness | `serialize_router_news` | `p170.router_news.string` | 1 MiB / 7 days | base Router news (same wire key) |
 | `i2p.router.id` | string or null | available | startup-retained | `serialize_router_id` | `p170.router_id.nullable_string` | 4 KiB | — |
 | `i2p.router.clockskew` | integer or null | protocol-permitted neutral | router-info-control: null when no peer estimate exists | `serialize_clockskew` | `p170.clockskew.nullable_integer` | — | — |
 | `i2p.router.info` | string or null | available | startup-retained | `serialize_router_info` | `p170.router_info.nullable_string` | 4 MiB | — |

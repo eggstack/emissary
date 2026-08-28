@@ -63,11 +63,11 @@ It contains exactly 43 Proposal 170 additions and records, for each selector:
 - compatibility/base separation;
 - residual limitation.
 
-Current counts:
+Current counts after M101:
 
-- 38 available;
+- 39 available;
 - 1 protocol-permitted neutral;
-- 4 unavailable.
+- 3 unavailable.
 
 The separate existing-I2PControl and Emissary compatibility inventories are not
 counted in the 43 additions.

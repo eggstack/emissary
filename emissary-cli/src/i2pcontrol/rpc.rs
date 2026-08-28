@@ -897,14 +897,13 @@ pub mod router_info_keys {
         field!(
             ROUTER_NEWS,
             JsonType::String,
-            SourceDisposition::Unavailable {
-                owner: "router-news",
-                reason: "no router news owner"
+            SourceDisposition::Available {
+                owner: "i2pcontrol-router-news",
             },
             "serialize_router_news",
             "p170.router_news.string",
             Mutation::ReadOnly,
-            Bound::None,
+            Bound::Bytes(1024 * 1024),
             Some(ROUTER_NEWS)
         ),
         field!(
@@ -2062,7 +2061,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (38, 1, 4));
+        assert_eq!((available, neutral, unavailable), (39, 1, 3));
     }
 
     #[test]

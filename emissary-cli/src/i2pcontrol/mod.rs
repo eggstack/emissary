@@ -24,6 +24,7 @@ pub mod client_services;
 pub mod control_plane;
 pub mod domain;
 pub mod errors;
+pub(crate) mod news;
 pub mod observability;
 pub mod observers;
 pub mod production;

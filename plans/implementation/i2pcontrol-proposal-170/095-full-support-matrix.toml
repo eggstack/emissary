@@ -28,17 +28,17 @@ client_services_selectors = ["I2PTunnel", "HTTPProxy", "SOCKS", "SAM", "BOB", "I
 
 [router_info]
 canonical_key_source = "emissary-cli/src/i2pcontrol/rpc.rs::router_info_keys::PROPOSAL_170_CONTRACT"
-current_baseline = "38 available / 1 neutral / 4 unavailable"
-target_rule = "The four unavailable rows are owned by M101-M103; clockskew remains protocol-permitted neutral when no estimate exists."
+current_baseline = "39 available / 1 neutral / 3 unavailable"
+target_rule = "The three unavailable rows are owned by M102-M103; clockskew remains protocol-permitted neutral when no estimate exists."
 
 [[router_info.rows]]
 key = "i2p.router.news"
 json_return_type = "string"
-current_disposition = "unavailable"
-production_owner_source = "router-news"
+current_disposition = "available"
+production_owner_source = "i2pcontrol-router-news"
 i2pcontrol_adapter_serializer = "serialize_router_news"
 evidence_plan = "plans/implementation/i2pcontrol-proposal-170/101-routerinfo-news-source-completion.md"
-evidence_closure = "M051/M056"
+evidence_closure = "M101"
 final_target_disposition = "available"
 owning_completion_milestone = "M101"
 non_i2pcontrol_production_path_required = false
@@ -1747,9 +1747,9 @@ path_budget_notes = "I2PControl-local request-independent sampler over the exist
 
 [[containment.budgets]]
 milestone = "M101"
-production_paths = ["emissary-cli/src/i2pcontrol/observability.rs", "emissary-cli/src/i2pcontrol/production.rs", "emissary-cli/src/i2pcontrol/router_info.rs", "emissary-cli/src/i2pcontrol/router_info_handler.rs"]
-non_i2pcontrol_production_path_required = false
-path_budget_notes = "I2PControl-local bounded real source/cache; no arbitrary public-web substitute and no core news subsystem."
+production_paths = ["emissary-cli/src/i2pcontrol/mod.rs", "emissary-cli/src/i2pcontrol/news.rs", "emissary-cli/src/i2pcontrol/production.rs", "emissary-cli/src/i2pcontrol/router_info.rs", "emissary-cli/src/i2pcontrol/router_info_handler.rs", "emissary-cli/src/i2pcontrol/rpc.rs", "emissary-cli/src/i2pcontrol/server.rs", "emissary-cli/src/main.rs", "emissary-util/src/certificates.rs", "emissary-util/src/su3.rs", "emissary-util/assets/certificates/news/echelon_at_mail.i2p.crt", "emissary-util/assets/certificates/news/hankhill19580_at_gmail.com.crt", "emissary-util/assets/certificates/news/zzz_at_mail.i2p.crt"]
+non_i2pcontrol_production_path_required = true
+path_budget_notes = "I2PControl-local bounded real source/cache plus the existing emissary-util SU3/certificate seam; no arbitrary public-web substitute, no new dependency, and no core news subsystem."
 
 [[containment.budgets]]
 milestone = "M102"
@@ -1765,7 +1765,7 @@ path_budget_notes = "Exhaustive audit of router/transport/profile/NetDB exclusio
 
 [evidence]
 proposal_revision_verification = "Official source identifies Proposal 170 as Open, created 2026-05-20, last updated 2026-05-20; source hash recorded above."
-router_info_reconciliation = "Current source authority is 43 rows with 38 available, 1 protocol-permitted neutral, and 4 unavailable; no historical 40/1/2 count is carried forward."
+router_info_reconciliation = "Current source authority is 43 rows with 39 available, 1 protocol-permitted neutral, and 3 unavailable; no historical 40/1/2 count is carried forward."
 addressbook_reconciliation = "All 13 pinned SetConfig keys are classified; no unknown or accept_inert disposition is used."
 tunnel_option_reconciliation = "Every CANONICAL_OPTION_KEYS entry has 12 explicit cells. Apply means current backend behavior; planned_apply is assigned to M097-M099; not_applicable has a cell note; blocked_primitive names the missing primitive and milestone."
 client_services_reconciliation = "Exactly six selectors are listed; broader/base methods are outside this phase."

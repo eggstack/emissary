@@ -47,6 +47,7 @@ use crate::i2pcontrol::{
         },
         tunnel::{TunnelDefinition, TunnelName, TunnelType},
     },
+    news::RouterNewsSource,
     observability::LogRing,
     router_info::{
         ActivePeerSnapshot, ActivePeerSource, ActivePeerStats, BannedPeer, ClockSkew,
@@ -1365,6 +1366,7 @@ pub struct ProductionRouterInfoControl {
     peer_directory: Option<Arc<dyn PeerDirectorySource>>,
     active_peer_source: Option<Arc<dyn ActivePeerSource>>,
     tunnel_source: Option<Arc<dyn TunnelSource>>,
+    router_news: Option<Arc<RouterNewsSource>>,
 }
 
 impl ProductionRouterInfoControl {
@@ -1395,6 +1397,7 @@ impl ProductionRouterInfoControl {
             peer_directory: None,
             active_peer_source: None,
             tunnel_source: None,
+            router_news: None,
         }
     }
 
@@ -1413,6 +1416,12 @@ impl ProductionRouterInfoControl {
     /// Attach the canonical live tunnel source.
     pub fn with_tunnel_source(mut self, source: Arc<dyn TunnelSource>) -> Self {
         self.tunnel_source = Some(source);
+        self
+    }
+
+    /// Attach the optional, bounded signed news source owned by I2PControl.
+    pub(crate) fn with_router_news_source(mut self, source: Arc<RouterNewsSource>) -> Self {
+        self.router_news = Some(source);
         self
     }
 
@@ -1678,10 +1687,14 @@ impl RouterInfoControl for ProductionRouterInfoControl {
     }
 
     fn router_news(&self) -> Result<String, InspectionError> {
-        Err(InspectionError::UnavailableReason {
-            group: InspectionGroup::Retained,
-            reason: "no router news owner",
-        })
+        self.router_news
+            .as_ref()
+            .ok_or(InspectionError::UnavailableReason {
+                group: InspectionGroup::Retained,
+                reason: "no router news owner",
+            })?
+            .snapshot()
+            .map_err(Into::into)
     }
 
     async fn share_ratio(&self) -> Result<f64, InspectionError> {

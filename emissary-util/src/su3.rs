@@ -37,7 +37,7 @@ use tempfile::TempDir;
 
 use std::{
     fs::File,
-    io::{copy, Write},
+    io::{copy, Read, Write},
 };
 
 /// Logging target for the file.
@@ -313,6 +313,44 @@ impl<'a> Su3<'a> {
 
         Some(router_infos)
     }
+
+    /// Parse and authenticate the pinned I2P news feed.
+    ///
+    /// The news feed is an RSA-SHA512 signed XML_GZ SU3 document. The
+    /// decompressed payload is bounded before it is returned to a caller for
+    /// format-specific Atom/XHTML validation.
+    pub fn parse_news(input: &'a [u8], verify: bool) -> Option<Vec<u8>> {
+        const MAX_NEWS_XML_BYTES: usize = 4 * 1024 * 1024;
+
+        let (rest, su3) = Self::parse_inner(input).ok()?;
+        if !rest.is_empty()
+            || su3.signature_kind != SignatureKind::Rsa4096Sha512
+            || su3.file_kind != FileKind::XmlGz
+            || su3.content_kind != ContentKind::NewsFeed
+        {
+            return None;
+        }
+
+        if verify {
+            let signer_id = std::str::from_utf8(su3.signer_id).ok()?;
+            let key = crate::certificates::NEWS_PUBLIC_KEYS.get(signer_id)?;
+            rsa::Pkcs1v15Sign::new_unprefixed()
+                .verify(key, &Sha512::digest(su3.message), su3.signature)
+                .ok()?;
+        }
+
+        let mut decoder = flate2::read::GzDecoder::new(su3.content);
+        let mut xml = Vec::new();
+        decoder
+            .by_ref()
+            .take((MAX_NEWS_XML_BYTES + 1) as u64)
+            .read_to_end(&mut xml)
+            .ok()?;
+        if xml.len() > MAX_NEWS_XML_BYTES || !decoder.into_inner().is_empty() {
+            return None;
+        }
+        Some(xml)
+    }
 }
 
 #[cfg(test)]
@@ -344,5 +382,11 @@ mod tests {
         }
 
         assert!(Su3::parse_reseed(&bytes, false).is_some());
+    }
+
+    #[test]
+    fn news_trust_anchors_are_loaded_and_reseed_data_is_rejected() {
+        assert_eq!(crate::certificates::NEWS_PUBLIC_KEYS.len(), 3);
+        assert!(Su3::parse_news(SU3, false).is_none());
     }
 }

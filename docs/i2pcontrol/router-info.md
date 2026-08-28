@@ -14,10 +14,11 @@ The `RouterInfo` method allows authenticated callers to request specific router 
 Proposal 170 addition manifest. The 121-key catalog is not counted as Proposal
 170 coverage. The machine-readable manifest declares exact nested JSON types,
 direct-presence semantics, mutation, owner, serializer, fixture, bound, and
-source disposition for every addition: 38 available, 1 protocol-permitted
-neutral, and 4 unavailable. Known-peer, active-peer, transport, tunnel, and
-v4/v6 status/testing fields use bounded live owners; router news, ban, and
-v4/v6 network-error fields remain unavailable because no canonical owner exists
+source disposition for every addition: 39 available, 1 protocol-permitted
+neutral, and 3 unavailable. Known-peer, active-peer, transport, tunnel, and
+v4/v6 status/testing fields use bounded live owners; router news uses the
+I2PControl-owned signed XML_GZ feed, while ban and v4/v6 network-error fields
+remain unavailable because no canonical owner exists
 for those facts. The 15-second transit-bandwidth field uses a bounded
 I2PControl-owned sampler over the authoritative cumulative transit counter.
 M051's semantic adjudication confirmed that the pinned proposal does not
@@ -53,7 +54,7 @@ any source query. The machine-readable inventories and overlap table are in
 | Group | Prefix | Count | Source |
 |---|---|---|---|
 | Identity/static | `i2p.router.identity`, `i2p.router.version`, `i2p.router.uptime` | 3 | Startup-retained values |
-| Router news | `i2p.router.news` | 1 | Unavailable: no router news owner |
+| Router news | `i2p.router.news` | 1 | I2PControl-owned signed XML_GZ feed; bounded 7-day cache |
 | Clock skew | `i2p.router.clock.skew` | 1 | Compatibility alias; RouterInfo control source |
 | Network status | `i2p.router.net.bw.*` | 2 | EventMetrics firewall status |
 | Share ratio | `i2p.router.shareRatio` | 1 | Retained configuration |
@@ -162,8 +163,8 @@ zero, false, or an empty collection.
 ## Null/unavailable behavior
 
 - Clock skew: `null` when not yet determined (protocol-permitted nullable)
-- Router news: unavailable because Emissary has no authoritative news-feed owner;
-  an empty string is not an authorized capability-empty value
+- Router news: signed XML_GZ feed rendered to bounded HTML; unavailable before a
+  validated generation or after seven days without a successful refresh
 - Banned peers: unavailable because Emissary has no authoritative ban-list owner;
   an empty map is not an authorized capability-empty value
 - Peer RouterInfo: `null` when no peer ID specified

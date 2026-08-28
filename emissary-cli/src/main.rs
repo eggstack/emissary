@@ -201,6 +201,8 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
 
     let path = config.base_path.clone();
     let http = config.http_proxy.take();
+    #[cfg(feature = "i2pcontrol")]
+    let news_proxy = http.as_ref().map(|config| (config.host.clone(), config.port));
     let socks = config.socks_proxy.take();
     let port_forwarding = config.port_forwarding.take();
     let client_tunnels = mem::take(&mut config.client_tunnels);
@@ -639,6 +641,14 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                 if let Some(sam_tcp_port) = router.protocol_address_info().sam_tcp.map(|a| a.port())
                 {
                     ctx = ctx.with_sam_tcp_port(sam_tcp_port);
+                }
+
+                if let Some((proxy_host, proxy_port)) = news_proxy.as_ref() {
+                    let source = i2pcontrol::news::RouterNewsSource::start(proxy_host, *proxy_port)
+                        .map_err(|error| {
+                            anyhow!("failed to initialize router news source: {error}")
+                        })?;
+                    ctx = ctx.with_router_news_source(source);
                 }
 
                 let instance =

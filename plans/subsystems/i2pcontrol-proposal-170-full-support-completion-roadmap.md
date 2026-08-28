@@ -1,14 +1,16 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096 and M100-M103 closed (M097 blocked); M104 remains blocked
+Status: active; M095-M096 and M100-M103 closed; M097 closed as blocked; revised M098 is current handoff; M104 remains blocked
 
-Planning baseline: `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207` — M094 closed planning head before this newly authorized phase.
+Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
+
+Current corrective planning baseline: post-M103 `master` (`30cd8bcc9728c286b418cfb534d4f19c6b1eb4f5`).
 
 Pinned external authority:
 
 - I2P Proposal 170, `I2PControl Expansion`;
 - status: `Open`;
-- revision created/updated `2026-05-20`.
+- pinned revision: `2026-05-20`.
 
 Canonical/internal authority:
 
@@ -16,400 +18,375 @@ Canonical/internal authority:
 - `plans/001-terminology-and-domain-model.md`;
 - `plans/002-long-term-roadmap.md`;
 - `plans/003-planning-process.md`;
-- `plans/adrs/ADR-0001-proposal-170-contract-and-stub-boundary.md`;
-- `plans/adrs/ADR-0002-control-plane-tunnel-runtime-ownership.md`;
-- `plans/adrs/ADR-0003-proposal-170-tunnel-runtime-completion-and-filter-boundary.md`;
-- `plans/adrs/ADR-0004-pinned-full-proposal-170-completion-boundary.md`;
-- `plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml`;
-- M093 production/security reclosure and M094 planning reconciliation.
+- ADR-0001/0002/0003/0004;
+- M061/M062/M063 containment authority;
+- M093 current tunnel security reclosure;
+- M095 machine-readable full-support matrix.
 
 ## 1. Purpose
 
-Move the internal fork from truthful partial Proposal 170 support to full support against the pinned `2026-05-20` revision without treating conformance count as authority to spread Proposal 170 policy into the heavily reviewed router core.
+Move the internal fork from truthful partial Proposal 170 support to full support against the pinned `2026-05-20` revision while keeping Proposal 170 policy concentrated under `emissary-cli/src/i2pcontrol/**` and refusing to turn conformance gaps into broad router-core redesign.
 
-Current accepted baseline:
+The workstream is Proposal 170 only. It is not general I2PControl parity and it is not an upstream contribution program.
 
-- RouterInfo: 43 canonical Proposal 170 additions, 42 available, 1 protocol-permitted neutral, 0 unavailable;
-- AddressBook CRUD and subscription replacement operational;
-- AddressBook `SetConfig` key inventory exact but non-empty configuration requests are currently rejected rather than applied;
-- all twelve Proposal 170 TunnelManager types have real backends and all seven canonical actions are implemented;
-- runtime option capability enforcement is fail-before-allocation, but many applicable Proposal 170 options are still explicitly rejected;
-- ClientServicesInfo is operational for all six selectors;
-- M061/M062/M063 containment authority remains accepted;
-- M093 remains the current tunnel production/security authority;
-- M088's lower-layer pre-accept residual and Streamr's bounded non-Sybil-resistant subscriber-set limitation remain accepted and are not reopened by completeness work unless a new direct defect is found.
+## 2. Current production state
 
-This roadmap is a completeness workstream, not a general I2PControl or router-feature roadmap.
+The current production state after M103 is:
 
-## 2. Ownership boundary
+- RouterInfo: 43 canonical additions / 42 available / 1 protocol-permitted neutral / 0 unavailable;
+- AddressBook CRUD, `SetSubscriptions`, and all 13 `SetConfig` keys operational under the confined AddressBook owner;
+- all 12 canonical TunnelManager tunnel types have real data planes;
+- all 7 canonical TunnelManager actions are implemented;
+- M097 applied `TunnelLength`, `TunnelQuantity`, and typed `EncType` where applicable;
+- unresolved common/session/key options still fail before allocation rather than being persisted-and-ignored;
+- all 6 ClientServicesInfo selectors are implemented;
+- full public-network/reference-router certification remains open;
+- full support remains blocked by TunnelManager option parity and M104 live reclosure.
 
-### 2.1 Preferred I2PControl ownership
+M093 remains the current tunnel security authority. M088's accepted lower-layer pre-accept residual and the bounded Streamr availability limitation are not reopened merely for option parity.
 
-All remaining administrative/application policy should live under:
+## 3. Corrective dependency finding after M097
+
+The original roadmap treated M098 and M099 as milestone-wide hard dependents of successful M097 completion.
+
+M097 closure proved that decomposition too coarse:
+
+- some common/session/key cells genuinely require missing shared-session, destination/key, private-key-import, or Yosemite SAM serializer primitives;
+- many client proxy/outproxy/auth/HTTP-filter options are already owned by bounded I2PControl client runtimes;
+- many server HTTP presentation/access/filter/admission/rate options are already owned by the accepted M074-M093 I2PControl server runtime.
+
+Therefore dependency authority is now per option cell, not per entire milestone.
+
+This correction does **not** redefine full support. Residual blocked cells still prevent M104.
+
+## 4. Ownership boundary
+
+### Preferred ownership
+
+Remaining Proposal 170 policy belongs under:
 
 `emissary-cli/src/i2pcontrol/**`
 
-This includes:
+This includes option validation/application, proxy/filter policy, server admission configuration, administrative file confinement, matrix reconciliation, and final I2PControl interoperability harnesses.
 
-- full-support contract/applicability/source matrices;
-- AddressBook SetConfig parsing, persistence, path confinement, refresh/publish/proxy behavior, and administrative metadata;
-- TunnelManager option normalization/capability/application semantics;
-- request-independent 15-second transit sampling derived from authoritative existing counters;
-- router-news acquisition/cache/parsing;
-- mapping neutral network-error observations to Proposal 170 integer codes;
-- final interoperability harness/control requests where they are specific to I2PControl.
+### Lower-layer exception rule
 
-### 2.2 Core-owner exception rule
-
-A production edit outside `emissary-cli/src/i2pcontrol/**` is allowed only when all are true:
+A change outside `i2pcontrol` is allowed only when:
 
 1. the required fact belongs to an existing lower-layer canonical owner;
-2. no truthful I2PControl-local derivation is possible;
-3. the plan names exact paths before implementation;
-4. the exposed state is neutral and reusable, not named after Proposal 170 or JSON-RPC;
-5. the change is bounded/passive and does not alter router decisions;
+2. no truthful I2PControl-local implementation exists;
+3. exact paths/owners are named before implementation;
+4. exposed state is neutral/reusable rather than Proposal-170-shaped;
+5. behavior is bounded/passive and does not alter router decisions;
 6. M061 containment is not widened implicitly.
 
-M102 is the only currently planned milestone expected to require such a neutral owner change. M103 must avoid adding a peer-ban algorithm solely for a getter.
+M102's existing network-error observation is the deliberate full-support lower-layer exception. The corrected M098/M099 passes authorize no new core path.
 
-### 2.3 No aesthetic crate split
+### Dependency rule
 
-The current `i2pcontrol` feature/module boundary is the accepted isolation unit. Do not extract a standalone crate merely to make the source tree look cleaner.
+No plan in this roadmap authorizes:
 
-## 3. Work classification
+- vendoring/forking/patching Yosemite;
+- replacing Yosemite with an internal duplicate SAM stack;
+- adding Proposal-170-shaped APIs to `emissary-core`;
+- adding dependencies merely to make matrix counts green.
 
-### Invariants
+If a residual option requires one of those actions, it remains blocked until a separately approved architecture decision changes the boundary.
 
-- exact pinned Proposal 170 names/types/actions/response shapes;
-- truthful state; no fabricated zero/false/empty fallback;
-- Proposal 170 policy stays in `i2pcontrol`;
-- no new router algorithms solely for conformance;
-- all lower-layer path changes explicitly budgeted;
-- startup/control-plane ownership remains separate;
-- existing HTTP/IRC/Streamr security boundaries remain mandatory;
-- secrets and path-valued configuration remain confined/redacted;
-- default/feature-disabled Emissary gains no I2PControl tasks or dependencies;
-- external sources are read-only and all writes remain internal to `eggstack/emissary`.
+## 5. Invariants
 
-### Capabilities
+- exact pinned names, types, actions, response shapes, and direct presence semantics;
+- no fabricated state or inert accepted configuration;
+- every applicable `apply` cell changes real runtime behavior;
+- policy remains in I2PControl wherever possible;
+- startup/control-plane ownership remains distinct;
+- HTTP/IRC/Streamr anonymity and resource bounds remain mandatory;
+- server local targets remain confined as accepted;
+- secrets and path-valued configuration remain redacted/confined;
+- feature-disabled/default Emissary gains no I2PControl-only runtime/dependency behavior;
+- external sources are read-only;
+- all repository writes remain internal to `eggstack/emissary`.
 
-- all thirteen AddressBook SetConfig keys have operational semantics appropriate to Emissary;
-- all applicable Proposal 170 TunnelManager option/type cells are implemented;
-- all five currently unavailable RouterInfo rows become truthfully available;
-- live interoperability establishes that all twelve tunnel families actually carry traffic and survive lifecycle/restart expectations;
-- support documentation may truthfully claim full support against the pinned revision.
+## 6. Explicit non-goals
 
-### Infrastructure
+This workstream MUST NOT:
 
-- machine-readable full-support matrix;
-- versioned AddressBook configuration persistence/migration;
-- bounded transit sampler;
-- bounded news source/cache;
-- neutral network-error snapshot if required;
-- focused live interoperability harness.
+- implement unrelated base methods such as `GetKeys`, `GetRate`, `RouterManager`, `NetworkSetting`, or `AdvancedSettings`;
+- add non-Proposal-170 methods, tunnel types, actions, statuses, or wire fields;
+- redesign real tunnel data planes solely to share code;
+- reopen M088/M091 without new independent security evidence;
+- add DCC/WEBIRC/SOCKS BIND/UDP ASSOCIATE absent a pinned requirement;
+- add router-wide banning merely for telemetry or server throttling;
+- couple I2PControl to frontend state;
+- add broad hosted CI/fuzz/coverage/release infrastructure;
+- initiate or prepare upstream review/merge/submission/adoption/contact.
 
-### Polish
-
-- support/conformance documentation reconciliation;
-- diagnostics needed to make failure states understandable without leaking secrets.
-
-## 4. Explicit non-goals
-
-This roadmap MUST NOT:
-
-- implement unrelated base I2PControl methods such as `GetKeys`, `GetRate`, `RouterManager`, `NetworkSetting`, or `AdvancedSettings`;
-- add non-Proposal-170 methods, selectors, aliases, statuses, fields, tunnel types, or actions;
-- redesign already-closed tunnel data planes merely to share code;
-- reopen M088 lower-layer pre-accept work without a new independently demonstrated defect;
-- add DCC, WEBIRC, SOCKS BIND/UDP ASSOCIATE, or other subfeatures unless the pinned Proposal 170 option matrix actually requires them;
-- change runtime resolver precedence for administrative books except where the pinned SetConfig behavior explicitly requires an already-approved administrative file/source change;
-- add frontend UI/state;
-- create a router ban algorithm solely to satisfy `bannedpeers`;
-- add broad core timers/pollers/news services;
-- add hosted CI/fuzz/coverage/soak/release machinery solely for this phase;
-- prepare or request upstream review, merge, issue, PR, adoption, submission, or maintainer contact.
-
-## 5. Target architecture
+## 7. Target architecture
 
 ```text
-                           Proposal 170 JSON-RPC
-                                  |
-                                  v
-                    emissary-cli/src/i2pcontrol/**
-        +-------------------------+----------------------------+
-        |                         |                            |
-        v                         v                            v
- AddressBook config        Tunnel option mapping       RouterInfo completion
- state/runtime             + backend application        + news/transit local
-        |                         |                      + neutral owner reads
-        v                         v                            |
- existing address-book     Yosemite/SAM + existing            |
- runtime/persistence       bounded tunnel backends             |
-                                                           only if unavoidable
-                                                                v
-                                             minimal neutral emissary-core owner
-                                             (network-error state only expected)
+                         Proposal 170 JSON-RPC
+                                |
+                                v
+                  emissary-cli/src/i2pcontrol/**
+      +-------------------------+--------------------------+
+      |                         |                          |
+      v                         v                          v
+AddressBook config       Tunnel option policy       RouterInfo sources
+and confined state       + existing real backends   + bounded local owners
+      |                         |                          |
+      v                         v                          v
+existing downloader      existing Yosemite/SAM      existing neutral core
+seam where required      interfaces only            observation seams only
 ```
 
-No Proposal 170 field name, JSON type, or administrative configuration object should cross into core.
+No new Proposal 170 business object belongs in router core.
 
-## 6. Full-support matrix rule
+## 8. Full-support matrix rule
 
-M095 created the authoritative machine-readable completion matrix. Final closure requires:
+The M095 machine-readable matrix remains authoritative.
 
-- all 43 Proposal 170 RouterInfo additions classified `available`, except a protocol-defined neutral value may remain neutral only where the proposal itself permits it;
-- all 13 SetConfig keys classified with an operational owner and verification path;
-- every TunnelManager canonical option cross-product cell classified `apply` or `not_applicable`; applicable `unsupported` cells are not allowed at final closure;
-- all 12 tunnel types and 7 canonical actions retained exactly;
-- all 6 ClientServicesInfo selectors retained exactly;
-- compatibility aliases/extensions are clearly separated from the canonical contract and do not count toward completion.
+Final closure requires:
 
-An `available` or `apply` classification requires production evidence, not parser acceptance.
+- RouterInfo: all 43 rows available except proposal-permitted neutral semantics;
+- AddressBook: all 13 SetConfig keys operational with explicit owners;
+- TunnelManager: every canonical option/type cell is `apply` or evidenced `not_applicable`;
+- zero applicable `planned_apply`, `blocked_primitive`, `unsupported`, or unknown cells;
+- exactly 12 tunnel types and 7 actions;
+- exactly 6 ClientServicesInfo selectors;
+- compatibility aliases/extensions clearly separated from canonical completion.
 
-## 7. Dependency graph
+Parser acceptance, persistence without runtime effect, or fail-before-allocation rejection is not final `apply` evidence.
+
+## 9. Corrected dependency graph
 
 ```text
-M095 exact full-support matrix + containment budget
+M095 exact matrix + containment budget              [CLOSED]
   |
-  +------------------+-------------------+------------------+
-  |                  |                   |                  |
-  v                  v                   v                  v
-M096 AddressBook   M097 common tunnel  M100 transit 15s   M101 router news
-SetConfig          session/key opts    source             source
-                       |
-                       +----------------------+
-                       |                      |
-                       v                      v
-                 M098 client/proxy      M099 server/
-                 management/HTTP opts   LeaseSet/access opts
-
-M095 ----------------------------------------------+
-  |                                                |
-  v                                                v
-M102 canonical network-error owner            M103 banned-peer semantic closure
-  |                                                |
-  +----------------------+-------------------------+
-                         |
-M097-M103 all closed ----+
-                         |
-                         v
-                 M104 live interoperability +
-                 full Proposal 170 reclosure
+  +--> M096 AddressBook SetConfig                    [CLOSED]
+  +--> M100 transit 15s                              [CLOSED]
+  +--> M101 router news                              [CLOSED]
+  +--> M102 network-error owner                      [CLOSED]
+  +--> M103 banned-peer semantics                    [CLOSED]
+  |
+  +--> M097 common session/key options               [CLOSED AS BLOCKED]
+         | supported: TunnelLength/TunnelQuantity/EncType
+         | residual primitive blockers retained
+         |
+         +----------------------+----------------------+
+                                |                      |
+                                v                      |
+M098 client/proxy/HTTP independent slice             |
+[READY — CURRENT HANDOFF]                            |
+  |                                                  |
+  | transfers genuine primitive-dependent cells -----+
+  v
+M099 server/access/throttle independent slice
+[BLOCKED ON M098 — INTEGRATION ORDER ONLY]
+  |
+  | transfers genuine LeaseSet/session/unsafe cells -+
+  v                                                  |
+residual option blocker line <-----------------------+
+[NO EXECUTABLE PLAN UNTIL A BOUNDED PRIMITIVE PATH EXISTS]
+  |
+  v
+M104 live interoperability + final reclosure
+[BLOCKED UNTIL ZERO RESIDUAL APPLICABLE CELLS]
 ```
 
-Dependency classes:
+M098 and M099 are serialized because they share matrix/option/filter artifacts. The server slice does not semantically depend on successful implementation of client behavior.
 
-- M095 -> every implementation milestone: hard. No code work begins from an inferred option/source inventory.
-- M097 -> M098/M099: hard for shared session/key option plumbing and final applicability model.
-- M096 and M101 may proceed independently now that M095 is closed; M100 and M101 are now closed.
-- M102 is closed with its bounded owner work and M103 is now closed with an explicit by-design-empty source because M095 recorded the completion budgets.
-- M104 depends on all capability milestones M097-M103 closing; M096 is now closed.
-- Public-network/reference-router reachability is an operational dependency for M104 only; local code may close earlier milestones without creating a hosted network farm.
+## 10. Milestone status and exit conditions
 
-Per planning governance, M095 was the only registered dependency-ready implementation plan at roadmap creation. M096, M097, and M100-M103 have now been processed; M097 is closed as blocked on named primitives. M098/M099 still wait for an unblocked M097, and M104 remains blocked on M097-M103.
+### M095 — full-support matrix and containment budget
 
-## 8. Milestones and exit conditions
+Status: closed.
 
-### M095 — Exact full-support matrix and containment budget
+Exit evidence remains the exact 43 / 13 / 12×options / 6 inventory and path budgets.
 
-Plan: `095-full-support-contract-matrix-and-containment-budget.md`.
+### M096 — AddressBook SetConfig
 
-Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/095-closure.md`.
+Status: closed.
 
-Primary class: invariant / infrastructure.
+All 13 pinned keys now have bounded operational/metadata semantics. The sole non-I2PControl production amendment reused the existing AddressBook downloader seam rather than creating competing ownership.
 
-Re-audit the pinned proposal against current production, create one machine-readable matrix covering RouterInfo, AddressBook SetConfig, TunnelManager options/type applicability, and ClientServicesInfo, and assign every remaining cell to an owner/path budget. This milestone made no runtime behavior change. The resulting authority is `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`, guarded by `emissary-cli/tests/m095_full_support_matrix.rs`.
+### M097 — common tunnel session/key options
 
-Exit: no unknown applicability/source row remains; all later milestones have exact bounded inputs; lower-layer candidates are explicitly identified before code. M095, M096, and M100-M103 are closed; M097 is closed as blocked with exact Yosemite/SAM and key-lifecycle blockers; M098/M099 remain blocked on M097 and M104 remains blocked on M097-M103.
+Status: closed as blocked.
 
-### M096 — AddressBook SetConfig operational completion
+Implemented safe subset:
 
-Plan: `096-addressbook-setconfig-operational-completion.md`.
+- `TunnelLength`;
+- `TunnelQuantity`;
+- typed `EncType`.
 
-Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/096-closure.md`.
+Retained blockers include:
 
-Primary class: capability / security / persistence.
+- `Shared`: no bounded compatible shared-session owner/handoff;
+- `UseSSL`, `TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions`: current Yosemite 0.7.0 SAM `SESSION CREATE` path does not emit required semantics;
+- `NewDest`, `PersistentClientKey`: no accepted client destination/key lifecycle owner;
+- `PrivKeyFile`: no confined validated import/store/handoff authority.
 
-Implement all thirteen pinned SetConfig keys with deterministic persistence and security-preserving path semantics. Behaviorally meaningful keys must affect the active AddressBook runtime; harmless UI metadata may round-trip without creating frontend coupling.
+M097's stop condition remains valid. No speculative dependency fork is authorized.
 
-Exit: non-empty valid SetConfig requests succeed only after durable/runtime publication; restart preserves semantics; invalid/unsafe paths fail before mutation.
+### M098 — client proxy, management, and HTTP independent slice
 
-### M097 — Common tunnel session/key/profile option completion
+Status: ready; current handoff.
 
-Plan: `097-tunnel-common-session-and-key-option-completion.md`.
+Before production code, M098 must reclassify every M098-owned cell using M097 closure evidence. It implements only exact behaviors owned by existing I2PControl client/proxy/filter/runtime surfaces and transfers genuine residual blockers out of M098.
 
-Status: blocked; closed as blocked by missing Yosemite/SAM and key-lifecycle primitives.
+Expected independent work:
 
-Primary class: capability / infrastructure.
+- proxy/outproxy configuration;
+- local proxy authentication/credential policy;
+- direct-I2P vs explicit-outproxy routing;
+- HTTP privacy/filter controls;
+- generation-local client-management behavior only where exact semantics exist.
 
-Implement common Proposal 170 options that map to destination/session/tunnel construction and key persistence through existing Yosemite/SAM/backend primitives, including exact handling of tunnel length/variance/quantity/backup, signing/encryption types, shared/persistent/new-destination semantics, CustomOptions policy, and confined private-key references where applicable.
+Exit: every cell still owned by M098 is `apply`; transferred blockers are explicit; no lower-layer/dependency expansion; M099 becomes current handoff.
 
-Exit: the common option matrix has runtime evidence for length/quantity/encryption cells; variance, backup, SSL, signing, custom, shared, persistent, new-destination, and private-key import cells remain explicitly blocked on named primitives; no new core API is introduced for convenience.
+### M099 — server access, throttle, and LeaseSet independent slice
 
-### M098 — Client/proxy/management/HTTP option completion
+Status: blocked on M098 closure for integration order only.
 
-Plan: `098-client-proxy-management-and-http-option-completion.md`.
+After consuming M098's final matrix ownership, M099 implements server cells supported by existing accepted server/filter/admission runtime and transfers genuine residual session/LeaseSet/unsafe-owner blockers.
 
-Status: blocked on M097.
+Expected independent work:
 
-Primary class: capability / security.
+- HTTP presentation/filter policy;
+- peer access lists;
+- confined filter files;
+- connection ceilings;
+- per-peer and aggregate rates;
+- POST limits and periods;
+- tunnel-local temporary denial.
 
-Complete client proxy/outproxy/authentication, client management, and HTTP-client filter option semantics across the relevant real backends.
+LeaseSet encryption/auth/session-security cells remain blocked when exact supported Yosemite/SAM semantics do not exist.
 
-Exit: every applicable client-side cell is applied; unsafe proxy exposure and secret handling remain fail-closed.
+Exit: every cell still owned by M099 is `apply`; no M093 security regression; residual blocker ledger exact.
 
-### M099 — Server/access/LeaseSet option completion
+### Residual option blocker line
 
-Plan: `099-server-access-throttle-and-leaseset-option-completion.md`.
+Status: blocked; no registered implementation plan.
 
-Status: blocked on M097.
+After M099, planning must inspect the residual matrix. A new implementation plan is registered only if current repository/dependency evidence shows a bounded solution inside accepted ownership.
 
-Primary class: capability / security.
+A missing external/library primitive is a legitimate blocker. It is not permission to vendor or fork the dependency.
 
-Complete server access/throttle/filter/host controls and LeaseSet encryption/authentication/lookup semantics without weakening M074-M093 server admission/filtering boundaries.
+### M100 — transit 15s
 
-Exit: every applicable server-side cell is applied and verified before allocation/publication.
+Status: closed.
 
-### M100 — Request-independent transit 15-second source
+Request-independent I2PControl-owned sampler over the authoritative cumulative transit source.
 
-Plan: `100-routerinfo-transit-15s-source-completion.md`.
+### M101 — router news
 
-Status: closed; dependency M095 closed.
+Status: closed.
 
-Primary class: capability / infrastructure.
+Bounded signed router-news acquisition/cache using the existing SU3/certificate seam. Live `.i2p` fetch evidence remains part of M104.
 
-Implement a feature-gated I2PControl-owned sampler over the existing authoritative cumulative transit counter. Sampling history must exist independently of API calls.
+### M102 — network error owner
 
-Exit: deterministic tests prove request-independent 15-second bytes/sec semantics and feature-off zero impact. M100 is closed with the required bounded sampler and source disposition evidence.
+Status: closed.
 
-### M101 — Router news source
+Minimal neutral v4/v6 observation in existing core owners; Proposal 170 mapping remains in I2PControl.
 
-Plan: `101-routerinfo-news-source-completion.md`.
+### M103 — banned peers
 
-Status: closed; dependency M095 closed; closure:
-`plans/closure/i2pcontrol-proposal-170/101-closure.md`.
+Status: closed.
 
-Primary class: capability / security / operations.
+Explicit by-design-empty router-wide banned-peer source after exhaustive proof that Emissary has no such ban owner. No ban algorithm added.
 
-Implement the pinned router-news semantics in I2PControl with bounded source acquisition, authenticity/format validation, caching, refresh, cancellation, and failure behavior. No core news subsystem.
+### M104 — full live interoperability/reclosure
 
-Exit: `i2p.router.news` returns real bounded news content from the adopted source and remains truthful during source failure/restart.
+Status: blocked.
 
-### M102 — Canonical IPv4/IPv6 network-error owner
+M104 cannot start until revised M098/M099 close and every residual applicable TunnelManager cell is resolved by a separately registered closure.
 
-Plan: `102-routerinfo-network-error-owner-completion.md`.
+Exit: full integrated matrix, live data-plane evidence for all 12 tunnel families, AddressBook/RouterInfo/ClientServicesInfo validation, security/containment reclosure, and revision-pinned support statement.
 
-Status: closed; M095 owner/path audit closed; closure: `plans/closure/i2pcontrol-proposal-170/102-closure.md`.
+## 11. Security and anonymity requirements
 
-Primary class: capability / containment.
+Corrective option work must preserve:
 
-Add the smallest neutral state necessary for explicit IPv4/IPv6 network-error reasons only if current lower-layer owners cannot already provide them. Wire-code mapping remains under I2PControl.
+- trusted Yosemite-derived peer identity;
+- bounded transactional server admission;
+- literal-loopback server targets;
+- HTTP framing/spoof/fingerprint/Expect/POST protections;
+- IRC registration/DCC/CTCP/lifetime protections;
+- bounded Streamr subscriber/payload/fanout state;
+- secret-safe persistence/get/logging;
+- explicit I2P outproxy requirement for clearnet proxy traffic;
+- no local DNS fallback for direct I2P destinations;
+- no silent LeaseSet security downgrade.
 
-Exit: both error rows come from explicit canonical state; no transport/router decision or algorithm changes; exact core path delta stays within the plan budget. M102 is closed with uninitialized/firewalled states remaining truthfully unavailable.
+Any high/medium regression creates a new corrective plan rather than being absorbed into M104.
 
-### M103 — Banned-peer semantic closure
+## 12. Failure, lifecycle, and contention requirements
 
-Plan: `103-routerinfo-banned-peer-semantic-completion.md`.
+- validation before allocation/publication where technically possible;
+- failed edits preserve prior durable/runtime generations;
+- per-name tunnel lifecycle remains serialized;
+- timers/workers/tasks remain generation-local and cancellable;
+- no lock crosses network I/O, sleeps, joins, or cancellation waits;
+- bounded cleanup on stop/restart;
+- blocked options continue to fail before allocation;
+- no partial state presented as successful configuration.
 
-Status: ready; M095 semantic/source audit closed.
+## 13. Verification policy
 
-Primary class: capability / invariant.
+Use focused unit/integration/static guards plus the existing broad feature-gated suite. Do not build a CI farm for this phase.
 
-Determine and implement the truthful banned-peer result without creating a ban engine merely for telemetry. Prefer read-only exposure of an existing enforced exclusion owner. If exhaustive evidence proves Emissary has no possible banned state, codify a by-design empty result with static/runtime proof rather than an unowned fallback.
-
-Exit: `bannedpeers` has an authoritative by-design-empty semantic owner; no ban
-behavior or ban-management API is introduced, and M104 remains blocked on M097.
-
-### M104 — Live interoperability and full-support reclosure
-
-Plan: `104-full-proposal-170-live-interoperability-and-reclosure.md`.
-
-Status: blocked on M097-M103; M103 is closed, but M097 remains blocked.
-
-Primary class: invariant / capability / operations.
-
-Reconcile the full matrix, run focused real-network/reference-router interoperability, verify persistence/restart and all twelve tunnel families, review containment/security, update support documentation, and decide whether the pinned full-support claim is justified.
-
-Exit: every pinned applicable matrix cell is evidenced; no high/medium correctness/security/containment finding remains; docs state full support only if evidence supports it.
-
-## 9. Cross-cutting failure/lifecycle requirements
-
-- Administrative mutations are atomic/durable before success where the existing control-plane contract requires durability.
-- Background sampler/news tasks are bounded, cancellable, and created only for enabled I2PControl composition.
-- A source acquisition failure does not corrupt the prior good generation or fabricate a fresh empty/zero value.
-- Tunnel option validation occurs before listener/session/target allocation.
-- Restart reconstructs configuration and backend-owned identity from durable state without adopting startup-managed resources.
-- No lock is held across network I/O, sleeps, joins, or cancellation waits where avoidable.
-- Concurrent edits/lifecycle operations preserve current generation/name ownership semantics.
-
-## 10. Security requirements
-
-- Preserve M093's accepted production/security conclusions unless new evidence directly invalidates one.
-- Keep HTTP/IRC filtering non-bypassable.
-- Keep server local targets literal-loopback/confined as currently accepted.
-- Do not weaken trusted peer identity or admission accounting for option parity.
-- SetConfig path values cannot grant arbitrary filesystem access.
-- News content is untrusted input and must be bounded/validated before retention/serialization.
-- Proxy/key/auth secrets never appear in logs, errors, Debug, support matrices, or ordinary API responses.
-- Core network-error observations are passive and Proposal-170-agnostic.
-- No new peer-ban behavior is introduced solely for telemetry.
-
-## 11. Compatibility and migration
-
-- Public canonical Proposal 170 spelling remains unchanged.
-- Existing compatibility aliases/extensions remain optional internal compatibility and do not redefine the canonical matrix.
-- Tunnel definition schema changes should be additive/versioned only if new persisted option representation is unavoidable.
-- AddressBook configuration persistence must define migration from the current state where non-empty SetConfig was rejected and therefore no legacy accepted-but-inert config should exist.
-- Feature-disabled/default builds must remain behaviorally unchanged.
-
-## 12. Verification discipline
-
-Each milestone uses focused package/integration tests plus the existing containment guards. Do not add a new global CI regime merely for this roadmap.
-
-Common commands, where relevant:
+Expected baseline commands for implementation passes:
 
 ```text
 cargo check -p emissary-cli --no-default-features --features i2pcontrol
 cargo test -p emissary-cli --no-default-features --features i2pcontrol
 cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m061_containment
 cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m062_dependency_containment
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m063_feature_reachability
+cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 git diff --check
 ```
 
-Core tests are required only for milestones that actually modify core. M104 adds focused live interoperability; it does not require turning that environment into permanent hosted CI.
+The historical `m063_feature_reachability` test target is absent in the current checkout; preserve that limitation rather than inventing unrelated replacement scope.
 
-Existing nightly/stable rustfmt drift documented by M090-M094 must not cause formatter-only churn across audited core files. Formatting verification should use the repository's accepted toolchain policy; do not widen production diffs merely to satisfy an unrelated formatter version.
+The repository-wide nightly/stable rustfmt mismatch is a tooling issue. Do not rewrite audited core files solely for formatter churn.
 
-## 13. Documentation and closure rule
+## 14. Risks and deferred work
 
-`docs/i2pcontrol/proposal-170-support.md` must remain truthful after every milestone. Until M104 closes successfully, the top-level status remains partial support.
+### Residual Yosemite/SAM capability gaps
 
-Every milestone receives a closure record under `plans/closure/i2pcontrol-proposal-170/`. A code commit or green test suite alone is not closure.
+Risk: final full support may remain blocked if the supported dependency cannot express exact pinned session semantics.
 
-M104 may use the final statement only if the matrix and live evidence justify it:
+Response: fail closed and keep the blocker explicit. A future contained primitive plan requires current evidence; no automatic vendor/fork path.
+
+### Client identity/shared-session ownership
+
+Risk: implementing shared sessions or persistent/new client identities can create cross-tunnel ownership, identity rotation, secret persistence, and restart hazards.
+
+Response: no opportunistic implementation inside M098. Any bounded owner requires a separate registered plan if/when the residual line is reopened.
+
+### Server option security
+
+Risk: access/rate/presentation options could weaken M093 anonymity or create unbounded peer state.
+
+Response: compose with existing trusted identity/admission/filter owners; no parallel security stack.
+
+### Live-network evidence
+
+Risk: local verification may not have a functional I2P network/reference router.
+
+Response: keep M104 blocked rather than presenting process-local success as network interoperability.
+
+## 15. Full-support exit condition
+
+This roadmap closes only when M104 can truthfully record:
 
 > Emissary fully supports I2P Proposal 170 against the pinned 2026-05-20 revision.
 
-Because the proposal is open, any later upstream revision requires a new delta audit.
+That claim requires zero applicable blocked/unsupported/planned TunnelManager cells and focused live interoperability. It does not mean general I2PControl parity or upstream acceptance.
 
-## 14. Risks and mitigations
+## 16. Internal-only boundary
 
-| Risk | Mitigation |
-|---|---|
-| Full-support goal becomes excuse for broad core changes | local-first dependency order; ADR-0004; exact path budgets |
-| Option matrix hides unsupported behavior under parsing/round-trip | M095 applicability matrix; APPLY requires runtime evidence |
-| SetConfig creates arbitrary filesystem authority | confined administrative root, normalization, symlink/escape checks |
-| Transit metric repeats M049 request-history defect | dedicated periodic sampler independent of requests |
-| News fetch becomes privacy/resource hazard | bounded source/cache, explicit cadence, cancellation, failure semantics |
-| Network error is fabricated from reachability adjacency | explicit neutral canonical state only |
-| Ban getter causes new routing behavior | M103 forbids a ban algorithm solely for telemetry |
-| Security hardening regresses during option parity | M093 invariants retained; focused negative tests |
-| Proposal changes while implementation is underway | pinned 2026-05-20 contract and later delta audit |
-| Planning scope drifts into base I2PControl/upstream work | explicit non-goals and internal-only closure attestation |
+All work and writes remain internal to `eggstack/emissary`. External specifications, Yosemite, Java I2P, i2pd, issues, commits, and pull requests are read-only evidence only.
 
-## 15. Internal-only rule
-
-All implementation, planning, closure, and repository writes are internal to `eggstack/emissary`.
-
-External specifications and repositories are read-only evidence. No milestone authorizes an upstream issue, pull request, review request, merge request, contribution package, submission checklist, adoption request, branch/tag push, release, or maintainer contact.
+No upstream issue/PR/review/submission/merge/adoption request, contribution preparation, branch/tag push, release, or maintainer contact is authorized by this roadmap.

@@ -9,7 +9,7 @@ proposal_revision = "2026-05-20"
 source_url = "https://i2p.net/proposals/170-i2pcontrol-expansion.txt"
 source_sha256 = "f13ae00b886c5e72131bc5d5b138a371148d1faa6899a119a1dacb65a555e7dc"
 planning_baseline = "630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207"
-current_production_head = "5421cad7d86b9d0975048e62b3b5d63473b69c1a"
+current_production_head = "19bdf6cee79466260b3d05bcf8e17a3ed51a6c11"
 
 [contract_counts]
 router_info_total = 43

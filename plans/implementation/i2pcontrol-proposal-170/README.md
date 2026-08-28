@@ -88,9 +88,9 @@ Plans:
 
 ## M098 corrective revision
 
-M098 is now dependency-ready.
+M098 is closed as a bounded independent slice.
 
-Its first mandatory work package is a cell-level audit of every M098-owned `planned_apply` entry in `095-full-support-matrix.toml` using M097 closure evidence.
+Its completed first work package audited every M098-owned `planned_apply` entry in `095-full-support-matrix.toml` using M097 closure evidence.
 
 A cell remains M098-owned only if exact semantics can be implemented through existing accepted I2PControl client/proxy/filter/runtime ownership. Genuine primitive-dependent cells must be transferred to explicit `blocked_primitive` residual ownership before production code begins.
 
@@ -104,11 +104,11 @@ Expected independent candidates:
 
 M098 does not authorize Yosemite changes, new core APIs, dependency/lockfile changes, SOCKS protocol expansion, outproxy plugin architecture, or weakened LAN/anonymity boundaries.
 
-M098 closure must make every cell it still owns `apply`, leave residual blockers explicit, and advance M099.
+M098 closure makes every cell it still owns `apply`, leaves residual blockers explicit, and advances M099.
 
 ## M099 corrective revision
 
-M099 is not semantically blocked on M097. It is queued behind M098 only to avoid conflicting edits to the shared matrix, option validator, HTTP/filter surfaces, and registry.
+M099 is not semantically blocked on M097. It is now the current handoff after M098 completed the serialized edits to the shared matrix, option validator, HTTP/filter surfaces, and registry.
 
 Before production code, it must reconcile every M099-owned server cell plus any server-role cells transferred from M098.
 

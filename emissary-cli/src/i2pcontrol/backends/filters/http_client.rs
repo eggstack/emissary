@@ -35,12 +35,26 @@ pub enum HttpTarget {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct HttpClientPolicy {
     pub allow_user_agent: bool,
     pub allow_referer: bool,
     pub allow_accept: bool,
     pub outproxy_authorization: Option<String>,
+}
+
+impl std::fmt::Debug for HttpClientPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HttpClientPolicy")
+            .field("allow_user_agent", &self.allow_user_agent)
+            .field("allow_referer", &self.allow_referer)
+            .field("allow_accept", &self.allow_accept)
+            .field(
+                "outproxy_authorization",
+                &self.outproxy_authorization.as_ref().map(|_| "***"),
+            )
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -460,6 +474,65 @@ mod tests {
         assert!(!output.contains("Forwarded"));
         assert!(!output.contains("Proxy-Authorization"));
         assert!(!output.contains("Referer"));
+    }
+
+    #[test]
+    fn privacy_flags_forward_only_the_requested_headers() {
+        let request = request(
+            "GET http://alias.i2p/path HTTP/1.1\r\nHost: alias.i2p\r\nUser-Agent: browser\r\nReferer: http://alias.i2p/from\r\nAccept: text/plain\r\nAccept-Language: en\r\n\r\n",
+            None,
+        );
+        let target = request.target(None).unwrap();
+        assert_eq!(request.host, "alias.i2p");
+        assert!(request.headers.iter().any(|header| {
+            header.name == "referer" && header.value == "http://alias.i2p/from"
+        }));
+        assert!(referer_matches("http://alias.i2p/from", "alias.i2p"));
+        let output = String::from_utf8(
+            request
+                .serialize(
+                    "alias.i2p",
+                    &target,
+                    &HttpClientPolicy {
+                        allow_user_agent: true,
+                        allow_referer: true,
+                        allow_accept: true,
+                        outproxy_authorization: None,
+                    },
+                )
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(output.contains("User-Agent: browser\r\n"));
+        assert!(output.contains("referer: http://alias.i2p/from\r\n"), "{output}");
+        assert!(output.contains("accept: text/plain\r\n"));
+        assert!(output.contains("accept-language: en\r\n"));
+        assert!(!output.contains("Proxy-Authorization"));
+    }
+
+    #[test]
+    fn outproxy_authorization_is_destination_scoped() {
+        let request = request(
+            "GET http://alias.i2p/path HTTP/1.1\r\nHost: alias.i2p\r\n\r\n",
+            None,
+        );
+        let target = request.target(None).unwrap();
+        let output = String::from_utf8(
+            request
+                .serialize(
+                    "alias.i2p",
+                    &target,
+                    &HttpClientPolicy {
+                        allow_user_agent: false,
+                        allow_referer: false,
+                        allow_accept: false,
+                        outproxy_authorization: Some("Basic should-not-forward".to_owned()),
+                    },
+                )
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(!output.contains("Proxy-Authorization"));
     }
 
     #[test]

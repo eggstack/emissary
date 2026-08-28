@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; all twelve tunnel runtimes real; M095-M096 and M100-M103 closed; M097 closed as blocked; revised M098 is current handoff; M099 is queued behind M098; M104 remains blocked
+Status: partial Proposal 170 production support; all twelve tunnel runtimes real; M095-M096, M098, and M100-M103 closed; M097 closed as blocked; M099 is current handoff; M104 remains blocked
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -65,8 +65,8 @@ The plans have therefore been corrected in place because neither M098 nor M099 h
 | M095 | closed | exact full-support matrix and containment budget |
 | M096 | closed | all 13 AddressBook SetConfig keys operational |
 | M097 | closed as blocked | supported common session options landed; residual shared-session/SAM-wire/client-key/PrivKeyFile primitives remain blocked |
-| M098 | **ready — current handoff** | reconcile M098 cells, implement client proxy/outproxy/auth/HTTP and exact generation-local management subset independent of M097 |
-| M099 | **blocked on M098 integration order only** | reconcile server cells, implement HTTP presentation/access/filter/admission/rate subset independent of M097 |
+| M098 | **closed** | client proxy/outproxy/auth/HTTP slice applied; residual management and unsupported proxy primitives explicitly blocked |
+| M099 | **ready — current handoff** | reconcile server cells, implement HTTP presentation/access/filter/admission/rate subset independent of M097 |
 | M100 | closed | request-independent transit 15-second source |
 | M101 | closed | bounded signed router-news source |
 | M102 | closed | neutral v4/v6 network-error owner observation |

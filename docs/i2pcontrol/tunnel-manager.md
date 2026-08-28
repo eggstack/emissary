@@ -331,8 +331,8 @@ allocation. One item failing does not prevent later items from being attempted.
 The following matrix is the canonical Proposal 170 option inventory. Fields in
 the second row are parsed into typed Emissary options; fields in the third row
 are accepted, validated where the proposal gives a bound/type, and retained in
-`rawConfig` for lossless round-trip. Retention is wire/CRUD support, not runtime
-data-plane support.
+`rawConfig` for lossless round-trip. Retention is not runtime support: applicable
+client cells below are accepted only when their backend changes real behavior.
 
 M097 applies the common session controls that current Yosemite/SAM can carry on the
 actual session-creation path. `TunnelLength` (0–3), `TunnelQuantity` (1–6), and
@@ -352,14 +352,22 @@ identity semantics require. `CustomOptions` is bounded to 32 string entries with
 | Disposition | Proposal 170 fields |
 |---|---|
 | Parsed and round-tripped | `Description`, `StartOnLoad`, `TargetDestination`, `Destination`, `TargetPort`, `ReachableBy`, `Port`, `TargetHost`, `Host` |
-| Validated and retained in raw configuration | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `UseOutproxyPlugin`, `ProxyAuth`, `OutproxyAuth`, `DelayOpen`, `Reduce`, `Close`, `NewDest`, `PersistentClientKey`, `AllowInternalSSL`, `BlockAccessInProxies`, `UniqueLocalAddressPerClient`, `MultiHoming`, `CustomOptions`, `LeaseSetClientAuths` |
-| Accepted and retained in raw configuration | `SigType`, `EncType`, `ProxyList`, `ProxyUsername`, `ProxyPassword`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `SSLProxies`, `JumpList`, `ConnectDelay`, `Profile`, `ReduceCount`, `ReduceTime`, `CloseTime`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `WebsiteHostname`, `SpoofedHost`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `OptionalLookup`, `EncryptLeaseSet` |
+| Applied by accepted client proxy/filter runtimes | `ProxyList`, `ProxyAuth`, `ProxyUsername`, `ProxyPassword`, `OutproxyAuth`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `AllowUserAgent`, `AllowReferer`, `AllowAccept` |
+| Rejected before allocation as residual blockers | `UseOutproxyPlugin`, `SSLProxies`, `JumpList`, `ConnectDelay`, `Profile`, `DelayOpen`, `Reduce`, `ReduceCount`, `ReduceTime`, `Close`, `CloseTime` |
+| Accepted for a later server or non-client role | `AllowInternalSSL`, `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `UniqueLocalAddressPerClient`, `MultiHoming`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `OptionalLookup`, `EncryptLeaseSet` |
+| Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `SigType`, `EncType`, `CustomOptions`, `NewDest`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
 
 `PrivKeyFile` is part of the pinned input inventory and is retained as a redacted
 canonical path value, but start is rejected until confined import and atomic
-handoff into an I2PControl-owned key store exist. Passwords and authentication
-containers are accepted only for future backend persistence and are never
-serialized in generic responses.
+handoff into an I2PControl-owned key store exist. New `OutproxyPassword` values
+are held in the same typed redacted boundary as `ProxyPassword`; legacy raw
+compatibility values remain response-redacted. Proxy credentials are bounded, separated between the local
+listener and the configured I2P outproxy, and never serialized in canonical
+`get` output. `UseOutproxyPlugin`, `SSLProxies`, `JumpList`, and the client
+management family fail before listener/session allocation because no exact
+Emissary-owned primitive currently exists for them. `AllowInternalSSL` is not
+applicable to the accepted HTTP-only outbound client; server-role cells belong
+to M099.
 
 No field in this matrix starts a tunnel, creates a data-plane session, or
 reports a fabricated runtime state. Unsupported backends return an explicit

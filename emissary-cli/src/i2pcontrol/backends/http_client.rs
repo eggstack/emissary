@@ -384,7 +384,16 @@ fn make_handler_parts(
                         }
                     }
                 }
-                HttpTarget::Clearnet { outproxy, .. } => outproxy.destination.clone(),
+                HttpTarget::Clearnet { outproxy, .. } => {
+                    match resolve_destination(&outproxy.destination, address_book.as_ref()).await {
+                        Some(resolved) => resolved,
+                        None => {
+                            let mut stream = reader.into_inner();
+                            let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
+                            return;
+                        }
+                    }
+                }
             };
             let Ok(serialized) = request.serialize(&destination, &target, &policy) else {
                 let mut stream = reader.into_inner();
@@ -513,15 +522,12 @@ impl HttpClientTunnelBackend {
         };
         let proxy_username = raw_string(definition, "ProxyUsername")
             .or_else(|| definition.options.proxy_username.clone());
-        let proxy_password = definition.options.proxy_password.as_deref().map(str::to_owned);
-        if proxy_username.is_some() != proxy_password.is_some() {
-            return Err(BackendError::Internal {
-                message: "httpclient proxy credentials are incomplete".to_owned(),
-            });
-        }
-        let require_auth = raw_bool(definition, "ProxyAuth")?.unwrap_or(proxy_username.is_some())
+        let proxy_password = raw_secret(definition, "ProxyPassword")
+            .or_else(|| definition.options.proxy_password.as_deref().map(str::to_owned));
+        let proxy_credentials = credentials(proxy_username, proxy_password)?;
+        let require_auth = raw_bool(definition, "ProxyAuth")?.unwrap_or(proxy_credentials.is_some())
             || !bind_address.is_loopback();
-        if require_auth && proxy_username.is_none() {
+        if require_auth && proxy_credentials.is_none() {
             return Err(BackendError::Internal {
                 message: "httpclient non-loopback listeners require proxy authentication"
                     .to_owned(),
@@ -529,24 +535,23 @@ impl HttpClientTunnelBackend {
         }
         let outproxy =
             raw_string(definition, "ProxyList").as_deref().map(parse_outproxy).transpose()?;
+        let outproxy_username = raw_string(definition, "OutproxyUsername");
+        let outproxy_password = raw_secret(definition, "OutproxyPassword")
+            .or_else(|| definition.options.outproxy_password.as_deref().map(str::to_owned));
+        let outproxy_credentials = credentials(outproxy_username, outproxy_password)?;
         if raw_bool(definition, "OutproxyAuth")?.unwrap_or(false)
-            && raw_string(definition, "OutproxyUsername").is_none()
+            && outproxy_credentials.is_none()
         {
             return Err(BackendError::Internal {
                 message: "httpclient outproxy authentication is incomplete".to_owned(),
             });
         }
-        let outproxy_authorization = match (
-            raw_string(definition, "OutproxyUsername"),
-            raw_secret(definition, "OutproxyPassword"),
-        ) {
-            (Some(username), Some(password)) => Some(basic_authorization(&username, &password)),
-            (None, None) => None,
-            _ =>
-                return Err(BackendError::Internal {
-                    message: "httpclient outproxy credentials are incomplete".to_owned(),
-                }),
-        };
+        let outproxy_authorization = outproxy_credentials
+            .as_ref()
+            .map(|(username, password)| basic_authorization(username, password));
+        let (proxy_username, proxy_password) = proxy_credentials
+            .map(|(username, password)| (Some(username), Some(password)))
+            .unwrap_or((None, None));
         Ok(HttpClientConfig {
             name: definition.name.as_str().to_owned(),
             bind_address,
@@ -573,7 +578,13 @@ impl HttpClientTunnelBackend {
 }
 
 fn parse_outproxy(value: &str) -> BackendResult<OutproxyTarget> {
-    let value = value.split(',').next().unwrap_or_default().trim();
+    let value = value.trim();
+    if value.is_empty() || value.contains(',') {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type: TunnelType::HttpClient,
+            option: "ProxyList".to_owned(),
+        });
+    }
     let (destination, port) =
         super::filters::http_client::parse_authority(value).map_err(|_| {
             BackendError::Internal {
@@ -588,10 +599,34 @@ fn parse_outproxy(value: &str) -> BackendResult<OutproxyTarget> {
             message: "httpclient outproxy must be an I2P destination".to_owned(),
         });
     }
+    let port = port.unwrap_or(DEFAULT_OUTPROXY_PORT);
+    if port == 0 {
+        return Err(BackendError::Internal {
+            message: "httpclient outproxy port is invalid".to_owned(),
+        });
+    }
     Ok(OutproxyTarget {
         destination,
-        port: port.unwrap_or(DEFAULT_OUTPROXY_PORT),
+        port,
     })
+}
+
+fn credentials(
+    username: Option<String>,
+    password: Option<String>,
+) -> BackendResult<Option<(String, String)>> {
+    match (username, password) {
+        (None, None) => Ok(None),
+        (Some(username), Some(password))
+            if !username.is_empty()
+                && !password.is_empty()
+                && username.len() <= 255
+                && password.len() <= 255 =>
+            Ok(Some((username, password))),
+        _ => Err(BackendError::Internal {
+            message: "httpclient proxy credentials are invalid or incomplete".to_owned(),
+        }),
+    }
 }
 
 fn raw_string(definition: &TunnelDefinition, key: &str) -> Option<String> {
@@ -768,6 +803,33 @@ mod tests {
         assert!(matches!(
             HttpClientTunnelBackend::new(1).config(&definition),
             Err(BackendError::Internal { .. })
+        ));
+    }
+
+    #[test]
+    fn typed_outproxy_secret_is_used_without_leaking_or_accepting_lists() {
+        let mut definition = definition();
+        definition.raw_config.insert(
+            "ProxyList".to_owned(),
+            serde_json::json!("outproxy.i2p:4444"),
+        );
+        definition.raw_config.insert(
+            "OutproxyUsername".to_owned(),
+            serde_json::json!("user"),
+        );
+        definition.options.outproxy_password =
+            crate::i2pcontrol::domain::tunnel::OptionRedacted::new("outproxy-secret");
+        let config = HttpClientTunnelBackend::new(1).config(&definition).unwrap();
+        assert!(config.policy.outproxy_authorization.is_some());
+        assert!(!format!("{config:?}").contains("outproxy-secret"));
+
+        definition.raw_config.insert(
+            "ProxyList".to_owned(),
+            serde_json::json!("first.i2p:4444,second.i2p:4444"),
+        );
+        assert!(matches!(
+            HttpClientTunnelBackend::new(1).config(&definition),
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "ProxyList"
         ));
     }
 }

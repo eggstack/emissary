@@ -962,7 +962,8 @@ pub(crate) fn config_for(
         .map(|value| parse_outproxy(value, tunnel_type))
         .transpose()?;
     let outproxy_username = raw_string(definition, "OutproxyUsername");
-    let outproxy_password = raw_secret(definition, "OutproxyPassword");
+    let outproxy_password = raw_secret(definition, "OutproxyPassword")
+        .or_else(|| definition.options.outproxy_password.as_deref().map(str::to_owned));
     let outproxy_credentials = credentials(outproxy_username, outproxy_password, tunnel_type)?;
     let outproxy_auth = raw_bool(definition, "OutproxyAuth", tunnel_type)?.unwrap_or(false);
     if outproxy_auth && outproxy_credentials.is_none() {
@@ -1021,7 +1022,8 @@ fn credentials(
 }
 
 fn parse_outproxy(value: &str, tunnel_type: TunnelType) -> BackendResult<OutproxyTarget> {
-    if value.contains(',') {
+    let value = value.trim();
+    if value.is_empty() || value.contains(',') {
         return Err(BackendError::UnsupportedOption {
             tunnel_type,
             option: "ProxyList".to_owned(),
@@ -1039,9 +1041,15 @@ fn parse_outproxy(value: &str, tunnel_type: TunnelType) -> BackendResult<Outprox
             message: "socks outproxy must be an I2P destination".to_owned(),
         });
     }
+    let port = port.unwrap_or(1080);
+    if port == 0 {
+        return Err(BackendError::Internal {
+            message: format!("{} outproxy port is invalid", tunnel_type),
+        });
+    }
     Ok(OutproxyTarget {
         destination,
-        port: port.unwrap_or(1080),
+        port,
     })
 }
 

@@ -545,6 +545,13 @@ pub struct TunnelOptions {
     #[serde(skip_serializing_if = "OptionRedacted::is_none")]
     pub proxy_password: OptionRedacted,
 
+    /// Outproxy password for HTTP, CONNECT, and SOCKS client tunnels.
+    ///
+    /// This is deliberately typed and redacted so it cannot be duplicated into
+    /// the response-facing raw configuration.
+    #[serde(skip_serializing_if = "OptionRedacted::is_none")]
+    pub outproxy_password: OptionRedacted,
+
     // === IRC-specific ===
     /// IRC server address for IRC tunnels.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -615,6 +622,7 @@ impl Default for TunnelOptions {
             http_host: None,
             proxy_username: None,
             proxy_password: OptionRedacted::none(),
+            outproxy_password: OptionRedacted::none(),
             irc_server: None,
             irc_port: None,
             irc_nick: None,

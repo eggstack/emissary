@@ -1,6 +1,6 @@
 # I2PControl for Emissary
 
-Status: partial Proposal 170 support; M095-M096, M100-M103 closed; M097 blocked; M098/M099/M104 blocked
+Status: partial Proposal 170 support; M095-M096, M098, M100-M103 closed; M097 blocked; M099 ready; M104 blocked
 
 Proposal 170 remains **Open**. This documentation is pinned to the revision
 created and last updated on `2026-05-20`.

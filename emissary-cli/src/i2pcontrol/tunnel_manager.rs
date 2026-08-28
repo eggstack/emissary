@@ -1268,6 +1268,9 @@ fn extract_tunnel_options(
     if let Some(v) = params.get("ProxyPassword").and_then(|v| v.as_str()) {
         options.proxy_password = crate::i2pcontrol::domain::tunnel::OptionRedacted::new(v);
     }
+    if let Some(v) = params.get("OutproxyPassword").and_then(|v| v.as_str()) {
+        options.outproxy_password = crate::i2pcontrol::domain::tunnel::OptionRedacted::new(v);
+    }
 
     // IRC options
     if let Some(v) = params.get("i2p.tunnel.ircServer").and_then(|v| v.as_str()) {
@@ -1367,6 +1370,11 @@ fn merge_tunnel_options(existing: &TunnelOptions, new: &TunnelOptions) -> Tunnel
             new.proxy_password.clone()
         } else {
             existing.proxy_password.clone()
+        },
+        outproxy_password: if new.outproxy_password.is_some() {
+            new.outproxy_password.clone()
+        } else {
+            existing.outproxy_password.clone()
         },
         irc_server: new.irc_server.clone().or(existing.irc_server.clone()),
         irc_port: new.irc_port.or(existing.irc_port),
@@ -1534,6 +1542,7 @@ fn is_typed_secret_key(key: &str) -> bool {
     matches!(
         key,
         "ProxyPassword"
+            | "OutproxyPassword"
             | "i2p.tunnel.sslKey"
             | "i2p.tunnel.proxyPassword"
             | "i2p.tunnel.ircPassword"
@@ -2081,6 +2090,7 @@ mod tests {
                 "Type": "socks",
                 "Name": "secret-tunnel",
                 "ProxyPassword": "do-not-return",
+                "OutproxyPassword": "do-not-return-outproxy",
                 "Port": 1080
             }),
         );
@@ -2096,12 +2106,14 @@ mod tests {
         .await;
         let serialized = serde_json::to_string(&get).unwrap();
         assert!(!serialized.contains("do-not-return"));
+        assert!(!serialized.contains("do-not-return-outproxy"));
         let info = &get["result"]["info"];
         assert_eq!(info["rawConfig"]["name"], "secret-tunnel");
         assert!(info["Name"].is_null());
         assert!(info["Type"].is_null());
         assert!(info["State"].is_null());
         assert!(info["rawConfig"]["ProxyPassword"].is_null());
+        assert!(info["rawConfig"]["OutproxyPassword"].is_null());
     }
 
     #[test]

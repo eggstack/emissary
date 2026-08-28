@@ -1,6 +1,6 @@
 # M098 — Client Proxy, Management, and HTTP Option Completion
 
-Status: **ready — corrective dependency revision after M097 blocked closure**
+Status: **implemented — closed as a bounded independent slice**
 
 Source roadmap:
 

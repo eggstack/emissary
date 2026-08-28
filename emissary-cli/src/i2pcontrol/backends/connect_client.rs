@@ -415,7 +415,21 @@ fn make_handler(config: ConnectConfig) -> ClientConnectionHandler {
                             return;
                         }
                     },
-                HttpTarget::Clearnet { outproxy, .. } => outproxy.destination.clone(),
+                HttpTarget::Clearnet { outproxy, .. } => {
+                    match super::http_client::resolve_destination(
+                        &outproxy.destination,
+                        config.address_book.as_ref(),
+                    )
+                    .await
+                    {
+                        Some(resolved) => resolved,
+                        None => {
+                            let mut stream = reader.into_inner();
+                            let _ = write_error(&mut stream, 502, "Bad Gateway").await;
+                            return;
+                        }
+                    }
+                }
             };
             let remote_port = match &target {
                 HttpTarget::I2p { port, .. } => *port,
@@ -536,15 +550,12 @@ impl ConnectClientTunnelBackend {
         };
         let proxy_username = raw_string(definition, "ProxyUsername")
             .or_else(|| definition.options.proxy_username.clone());
-        let proxy_password = definition.options.proxy_password.as_deref().map(str::to_owned);
-        if proxy_username.is_some() != proxy_password.is_some() {
-            return Err(BackendError::Internal {
-                message: "connectclient proxy credentials are incomplete".to_owned(),
-            });
-        }
-        let require_auth = raw_bool(definition, "ProxyAuth")?.unwrap_or(proxy_username.is_some())
+        let proxy_password = raw_secret(definition, "ProxyPassword")
+            .or_else(|| definition.options.proxy_password.as_deref().map(str::to_owned));
+        let proxy_credentials = credentials(proxy_username, proxy_password)?;
+        let require_auth = raw_bool(definition, "ProxyAuth")?.unwrap_or(proxy_credentials.is_some())
             || !bind_address.is_loopback();
-        if require_auth && proxy_username.is_none() {
+        if require_auth && proxy_credentials.is_none() {
             return Err(BackendError::Internal {
                 message: "connectclient non-loopback listeners require proxy authentication"
                     .to_owned(),
@@ -552,17 +563,23 @@ impl ConnectClientTunnelBackend {
         }
         let outproxy =
             raw_string(definition, "ProxyList").as_deref().map(parse_outproxy).transpose()?;
-        let outproxy_authorization = match (
-            raw_string(definition, "OutproxyUsername"),
-            raw_secret(definition, "OutproxyPassword"),
-        ) {
-            (Some(username), Some(password)) => Some(basic_authorization(&username, &password)),
-            (None, None) => None,
-            _ =>
-                return Err(BackendError::Internal {
-                    message: "connectclient outproxy credentials are incomplete".to_owned(),
-                }),
-        };
+        let outproxy_username = raw_string(definition, "OutproxyUsername");
+        let outproxy_password = raw_secret(definition, "OutproxyPassword")
+            .or_else(|| definition.options.outproxy_password.as_deref().map(str::to_owned));
+        let outproxy_credentials = credentials(outproxy_username, outproxy_password)?;
+        if raw_bool(definition, "OutproxyAuth")?.unwrap_or(false)
+            && outproxy_credentials.is_none()
+        {
+            return Err(BackendError::Internal {
+                message: "connectclient outproxy authentication is incomplete".to_owned(),
+            });
+        }
+        let outproxy_authorization = outproxy_credentials
+            .as_ref()
+            .map(|(username, password)| basic_authorization(username, password));
+        let (proxy_username, proxy_password) = proxy_credentials
+            .map(|(username, password)| (Some(username), Some(password)))
+            .unwrap_or((None, None));
         Ok(ConnectConfig {
             name: definition.name.as_str().to_owned(),
             bind_address,
@@ -583,7 +600,13 @@ impl ConnectClientTunnelBackend {
 }
 
 fn parse_outproxy(value: &str) -> BackendResult<OutproxyTarget> {
-    let value = value.split(',').next().unwrap_or_default().trim();
+    let value = value.trim();
+    if value.is_empty() || value.contains(',') {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type: TunnelType::ConnectClient,
+            option: "ProxyList".to_owned(),
+        });
+    }
     let (destination, port) = parse_authority(value).map_err(|_| BackendError::Internal {
         message: "connectclient outproxy is invalid".to_owned(),
     })?;
@@ -595,10 +618,34 @@ fn parse_outproxy(value: &str) -> BackendResult<OutproxyTarget> {
             message: "connectclient outproxy must be an I2P destination".to_owned(),
         });
     }
+    let port = port.unwrap_or(DEFAULT_OUTPROXY_PORT);
+    if port == 0 {
+        return Err(BackendError::Internal {
+            message: "connectclient outproxy port is invalid".to_owned(),
+        });
+    }
     Ok(OutproxyTarget {
         destination,
-        port: port.unwrap_or(DEFAULT_OUTPROXY_PORT),
+        port,
     })
+}
+
+fn credentials(
+    username: Option<String>,
+    password: Option<String>,
+) -> BackendResult<Option<(String, String)>> {
+    match (username, password) {
+        (None, None) => Ok(None),
+        (Some(username), Some(password))
+            if !username.is_empty()
+                && !password.is_empty()
+                && username.len() <= 255
+                && password.len() <= 255 =>
+            Ok(Some((username, password))),
+        _ => Err(BackendError::Internal {
+            message: "connectclient proxy credentials are invalid or incomplete".to_owned(),
+        }),
+    }
 }
 
 fn raw_string(definition: &TunnelDefinition, key: &str) -> Option<String> {

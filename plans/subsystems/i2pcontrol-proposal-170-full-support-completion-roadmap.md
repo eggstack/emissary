@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096 and M100-M103 closed; M097 closed as blocked; revised M098 is current handoff; M104 remains blocked
+Status: active; M095-M096, M098, and M100-M103 closed; M097 closed as blocked; M099 is current handoff; M104 remains blocked
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -176,12 +176,12 @@ M095 exact matrix + containment budget              [CLOSED]
                                 |                      |
                                 v                      |
 M098 client/proxy/HTTP independent slice             |
-[READY — CURRENT HANDOFF]                            |
+[CLOSED]                                             |
   |                                                  |
   | transfers genuine primitive-dependent cells -----+
   v
 M099 server/access/throttle independent slice
-[BLOCKED ON M098 — INTEGRATION ORDER ONLY]
+[READY — CURRENT HANDOFF]
   |
   | transfers genuine LeaseSet/session/unsafe cells -+
   v                                                  |
@@ -230,7 +230,7 @@ M097's stop condition remains valid. No speculative dependency fork is authorize
 
 ### M098 — client proxy, management, and HTTP independent slice
 
-Status: ready; current handoff.
+Status: closed.
 
 Before production code, M098 must reclassify every M098-owned cell using M097 closure evidence. It implements only exact behaviors owned by existing I2PControl client/proxy/filter/runtime surfaces and transfers genuine residual blockers out of M098.
 
@@ -242,13 +242,13 @@ Expected independent work:
 - HTTP privacy/filter controls;
 - generation-local client-management behavior only where exact semantics exist.
 
-Exit: every cell still owned by M098 is `apply`; transferred blockers are explicit; no lower-layer/dependency expansion; M099 becomes current handoff.
+Exit: every cell still owned by M098 is `apply`; transferred blockers are explicit; no lower-layer/dependency expansion; M099 becomes current handoff. Met: applicable proxy/auth/privacy cells are applied and residual plugin/TLS-proxy/jump-list/management cells are named blockers.
 
 ### M099 — server access, throttle, and LeaseSet independent slice
 
-Status: blocked on M098 closure for integration order only.
+Status: ready; current handoff.
 
-After consuming M098's final matrix ownership, M099 implements server cells supported by existing accepted server/filter/admission runtime and transfers genuine residual session/LeaseSet/unsafe-owner blockers.
+M099 now consumes M098's final matrix ownership, implements server cells supported by existing accepted server/filter/admission runtime, and transfers genuine residual session/LeaseSet/unsafe-owner blockers.
 
 Expected independent work:
 

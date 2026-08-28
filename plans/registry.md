@@ -35,7 +35,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M098 ready** | M099 follows M098 for integration order; M104 remains blocked on residual option cells |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M099 ready** | M098 client slice closed; M104 remains blocked on residual option cells |
 | I2PControl Proposal 170 source/truthfulness | RouterInfo source line closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | none | current RouterInfo matrix: 42 available / 1 protocol-permitted neutral / 0 unavailable |
 | I2PControl Proposal 170 containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | none | M061/M062/M063 rules remain controlling |
 | I2PControl tunnel runtime | all 12 data planes real | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | option semantics only | do not redesign data planes for option parity |
@@ -61,10 +61,10 @@ M095 full-support matrix/containment                [CLOSED]
          |
          +------------------------------+
                                         |
-M098 client/proxy/HTTP independent slice [READY]   |
+M098 client/proxy/HTTP independent slice [CLOSED]  |
   |   transfer genuine primitive-dependent cells --+
   v
-M099 server/access/throttle independent slice       [BLOCKED ON M098 INTEGRATION ORDER]
+M099 server/access/throttle independent slice       [READY — CURRENT HANDOFF]
   |   transfer genuine LeaseSet/session/unsafe cells ----+
   v                                                       |
 residual TunnelManager blocker line                        |
@@ -76,13 +76,13 @@ residual TunnelManager blocker line                        |
 M104 live interoperability/full reclosure          [BLOCKED]
 ```
 
-## Current handoff — M098
+## Closed handoff — M098
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/098-client-proxy-management-and-http-option-completion.md`
 
-Status: **ready**.
+Status: **closed**.
 
 M098 is a corrective dependency revision, not a broader client redesign. Before production code it must reconcile every M098-owned matrix cell against the M097 closure. It may implement only cells with exact runtime semantics inside existing I2PControl client/proxy/filter ownership. Genuine M097-dependent cells are transferred to explicit `blocked_primitive` residual ownership before coding.
 
@@ -97,17 +97,19 @@ M098 does not authorize:
 - an outproxy plugin subsystem;
 - weakening LAN/DNS/anonymity boundaries.
 
-M098 closure must update the M095 matrix and advance M099 as the next handoff.
+M098 closure updated the M095 matrix and advances M099 as the next handoff. Its
+applicable proxy/auth/privacy cells are operational; residual plugin/TLS-proxy,
+jump-list, and client-management cells name their missing primitives explicitly.
 
-## Queued corrective handoff — M099
+## Current handoff — M099
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/099-server-access-throttle-and-leaseset-option-completion.md`
 
-Status: **blocked on M098 closure for integration order only**.
+Status: **ready**.
 
-M099 is no longer milestone-wide blocked on M097. After M098 closes, it must reconcile server-role matrix cells and implement the exact subset owned by existing accepted I2PControl server admission/filter/runtime paths.
+M099 is no longer milestone-wide blocked on M097. It may now reconcile server-role matrix cells and implement the exact subset owned by existing accepted I2PControl server admission/filter/runtime paths.
 
 Expected independent work includes HTTP presentation/filter policy, access lists, confined filter-file loading, connection ceilings, peer/global rates, POST limits, periods, and tunnel-local temporary denial. LeaseSet/session-security cells remain residual blockers when the current supported Yosemite/SAM path cannot implement them without downgrade.
 
@@ -157,6 +159,7 @@ M104 may not weaken the full-support definition to accommodate an external/libra
 | M095 | closed | `plans/closure/i2pcontrol-proposal-170/095-closure.md` |
 | M096 | closed | `plans/closure/i2pcontrol-proposal-170/096-closure.md` |
 | M097 | closed as blocked | `plans/closure/i2pcontrol-proposal-170/097-closure.md` |
+| M098 | closed | `plans/closure/i2pcontrol-proposal-170/098-closure.md` |
 | M100 | closed | `plans/closure/i2pcontrol-proposal-170/100-closure.md` |
 | M101 | closed | `plans/closure/i2pcontrol-proposal-170/101-closure.md` |
 | M102 | closed | `plans/closure/i2pcontrol-proposal-170/102-closure.md` |
@@ -184,8 +187,8 @@ M104 may not weaken the full-support definition to accommodate an external/libra
 
 ## Registry maintenance rules
 
-1. M098 is the only current implementation handoff.
-2. M099 remains blocked until M098 closure solely to serialize shared matrix/option/filter edits.
+1. M099 is the current implementation handoff after M098 closure.
+2. M098 residual cells remain explicitly blocked and must not be treated as implemented.
 3. M097 residual cells remain blocked and fail before allocation.
 4. Do not register a residual-primitive implementation plan until a bounded contained primitive path exists.
 5. Do not advance M104 while any applicable TunnelManager cell is `planned_apply`, `blocked_primitive`, unsupported, or unknown.

@@ -217,6 +217,72 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         }
     }
 
+    let option = |key: &str| {
+        options
+            .iter()
+            .find(|row| string_field(row, "canonical_key") == key)
+            .unwrap_or_else(|| panic!("M098 option {key} must be present"))
+    };
+    for key in [
+        "ProxyList",
+        "ProxyAuth",
+        "ProxyUsername",
+        "ProxyPassword",
+        "OutproxyAuth",
+        "OutproxyUsername",
+        "OutproxyPassword",
+        "OutproxyType",
+    ] {
+        let row = option(key);
+        let cells = row["cells"].as_array().unwrap();
+        for index in [1, 3, 4, 5] {
+            assert_eq!(cells[index].as_str(), Some("apply"), "{key} cell {index}");
+        }
+        assert_eq!(string_field(row, "completion_owner"), "M098");
+    }
+    for key in [
+        "UseOutproxyPlugin",
+        "SSLProxies",
+        "JumpList",
+    ] {
+        let row = option(key);
+        let cells = row["cells"].as_array().unwrap();
+        for index in [1, 3, 4, 5] {
+            assert_eq!(cells[index].as_str(), Some("blocked_primitive"), "{key} cell {index}");
+        }
+        assert_eq!(string_field(row, "completion_owner"), "residual-option-line");
+        assert!(!string_field(row, "blocked_primitive").is_empty());
+        assert!(!string_field(row, "blocking_milestone").is_empty());
+    }
+    for key in [
+        "ConnectDelay",
+        "Profile",
+        "DelayOpen",
+        "Reduce",
+        "ReduceCount",
+        "ReduceTime",
+        "Close",
+        "CloseTime",
+    ] {
+        let row = option(key);
+        let cells = row["cells"].as_array().unwrap();
+        for (index, cell) in cells.iter().enumerate().take(7) {
+            assert_eq!(cell.as_str(), Some("blocked_primitive"), "{key} cell {index}");
+        }
+        assert_eq!(string_field(row, "completion_owner"), "residual-option-line");
+        assert!(!string_field(row, "blocked_primitive").is_empty());
+        assert!(!string_field(row, "blocking_milestone").is_empty());
+    }
+    for key in ["AllowUserAgent", "AllowReferer", "AllowAccept"] {
+        let row = option(key);
+        let cells = row["cells"].as_array().unwrap();
+        assert_eq!(cells[1].as_str(), Some("apply"), "{key} HTTP client cell");
+        assert_eq!(cells[8].as_str(), Some("planned_apply"), "{key} HTTP server handoff");
+        assert_eq!(cells[9].as_str(), Some("planned_apply"), "{key} HTTP bidir handoff");
+    }
+    let internal_ssl = option("AllowInternalSSL");
+    assert_eq!(internal_ssl["cells"].as_array().unwrap()[1].as_str(), Some("not_applicable"));
+
     let selectors = root["contract_names"]["client_services_selectors"]
         .as_array()
         .expect("ClientServicesInfo selectors");

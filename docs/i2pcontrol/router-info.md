@@ -14,11 +14,12 @@ The `RouterInfo` method allows authenticated callers to request specific router 
 Proposal 170 addition manifest. The 121-key catalog is not counted as Proposal
 170 coverage. The machine-readable manifest declares exact nested JSON types,
 direct-presence semantics, mutation, owner, serializer, fixture, bound, and
-source disposition for every addition: 41 available, 1 protocol-permitted
-neutral, and 1 unavailable. Known-peer, active-peer, transport, tunnel, and
+source disposition for every addition: 42 available, 1 protocol-permitted
+neutral, and 0 unavailable. Known-peer, active-peer, transport, tunnel, and
 v4/v6 status/testing/error fields use bounded live owners; router news uses the
-I2PControl-owned signed XML_GZ feed, while banned peers remain unavailable
-because no canonical owner exists
+I2PControl-owned signed XML_GZ feed, while the banned-peer row is backed by an
+explicit by-design-empty capability marker because Emissary has no router-wide
+ban facility at this revision
 for those facts. The 15-second transit-bandwidth field uses a bounded
 I2PControl-owned sampler over the authoritative cumulative transit counter.
 M051's semantic adjudication confirmed that the pinned proposal does not
@@ -155,8 +156,8 @@ Available canonical fields include retained identity/info, cumulative byte
 counters, share ratio, I2PTunnel controller info, total success rate, logs,
 log clear, and all six address-book objects/lists. Clock skew is the one
 protocol-permitted neutral field and returns `null` when no estimate exists.
-Router news and banned-peer fields without an authoritative bounded source
-return the established JSON-RPC unavailable error; M026 found no adjacent
+Router news without an authoritative bounded source returns the established
+JSON-RPC unavailable error; M026 found no adjacent
   authoritative bounded owner to add, and Emissary never substitutes
 zero, false, or an empty collection.
 
@@ -165,8 +166,8 @@ zero, false, or an empty collection.
 - Clock skew: `null` when not yet determined (protocol-permitted nullable)
 - Router news: signed XML_GZ feed rendered to bounded HTML; unavailable before a
   validated generation or after seven days without a successful refresh
-- Banned peers: unavailable because Emissary has no authoritative ban-list owner;
-  an empty map is not an authorized capability-empty value
+- Banned peers: authoritative empty map because Emissary has no router-wide ban
+  facility at this revision; this does not provide ban management
 - Peer RouterInfo: `null` when no peer ID specified
 - Network status: exact string compatibility codes and Proposal 170 numeric
   status/error/testing mappings from independent v4/v6 state

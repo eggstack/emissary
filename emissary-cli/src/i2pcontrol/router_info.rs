@@ -399,6 +399,30 @@ pub struct BannedPeer {
     pub expires_at: Option<u64>,
 }
 
+/// The repository-level disposition of router-wide peer bans.
+///
+/// This is deliberately an explicit capability marker rather than an
+/// implicit empty response. Adding a substantive router-wide ban owner
+/// requires changing this marker and its exhaustive snapshot match before
+/// the production adapter can claim the new semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BannedPeerSource {
+    /// Emissary has no router-wide peer-ban facility at this revision.
+    ByDesignEmpty,
+}
+
+/// Authoritative source classification for the Proposal 170 banned-peer row.
+pub const BANNED_PEER_SOURCE: BannedPeerSource = BannedPeerSource::ByDesignEmpty;
+
+impl BannedPeerSource {
+    /// Return the bounded authoritative snapshot for this source.
+    pub fn snapshot(self) -> Vec<BannedPeer> {
+        match self {
+            Self::ByDesignEmpty => Vec::new(),
+        }
+    }
+}
+
 /// Active peer transport statistics.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default)]

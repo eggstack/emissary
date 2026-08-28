@@ -13,9 +13,9 @@ current_production_head = "19bdf6cee79466260b3d05bcf8e17a3ed51a6c11"
 
 [contract_counts]
 router_info_total = 43
-router_info_available = 41
+router_info_available = 42
 router_info_neutral = 1
-router_info_unavailable = 1
+router_info_unavailable = 0
 addressbook_setconfig = 13
 canonical_tunnel_types = 12
 canonical_tunnel_actions = 7
@@ -28,8 +28,8 @@ client_services_selectors = ["I2PTunnel", "HTTPProxy", "SOCKS", "SAM", "BOB", "I
 
 [router_info]
 canonical_key_source = "emissary-cli/src/i2pcontrol/rpc.rs::router_info_keys::PROPOSAL_170_CONTRACT"
-current_baseline = "41 available / 1 neutral / 1 unavailable"
-target_rule = "The remaining unavailable row is owned by M103; clockskew remains protocol-permitted neutral when no estimate exists."
+current_baseline = "42 available / 1 neutral / 0 unavailable"
+target_rule = "M103 owns the authoritative by-design-empty banned-peer row; clockskew remains protocol-permitted neutral when no estimate exists."
 
 [[router_info.rows]]
 key = "i2p.router.news"
@@ -420,11 +420,11 @@ non_i2pcontrol_production_path_required = false
 [[router_info.rows]]
 key = "i2p.router.netdb.bannedpeers"
 json_return_type = "map<string,map<string,object>>"
-current_disposition = "unavailable"
-production_owner_source = "ban-list"
+current_disposition = "available"
+production_owner_source = "router-ban-empty-marker"
 i2pcontrol_adapter_serializer = "serialize_banned_peers"
 evidence_plan = "plans/implementation/i2pcontrol-proposal-170/103-routerinfo-banned-peer-semantic-completion.md"
-evidence_closure = "M051/M056"
+evidence_closure = "M103"
 final_target_disposition = "available"
 owning_completion_milestone = "M103"
 non_i2pcontrol_production_path_required = false
@@ -1767,7 +1767,7 @@ path_budget_notes = "Exhaustive audit of router/transport/profile/NetDB exclusio
 
 [evidence]
 proposal_revision_verification = "Official source identifies Proposal 170 as Open, created 2026-05-20, last updated 2026-05-20; source hash recorded above."
-router_info_reconciliation = "Current source authority is 43 rows with 41 available, 1 protocol-permitted neutral, and 1 unavailable after M102; the remaining unavailable row is banned peers under M103."
+router_info_reconciliation = "Current source authority is 43 rows with 42 available, 1 protocol-permitted neutral, and 0 unavailable after M103; the banned-peer row is authoritative by-design-empty under M103."
 addressbook_reconciliation = "All 13 pinned SetConfig keys are classified; no unknown or accept_inert disposition is used."
 tunnel_option_reconciliation = "Every CANONICAL_OPTION_KEYS entry has 12 explicit cells. Apply means current backend behavior; planned_apply is assigned to M097-M099; not_applicable has a cell note; blocked_primitive names the missing primitive and milestone."
 client_services_reconciliation = "Exactly six selectors are listed; broader/base methods are outside this phase."

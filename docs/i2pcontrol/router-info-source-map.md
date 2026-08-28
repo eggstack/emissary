@@ -6,11 +6,13 @@ This is the reviewed source map for the pinned Proposal 170 revision created and
 last updated on `2026-08-28`. M027 independently revalidated the matrix against
 the external revision. The machine-readable authority is
 `router_info_keys::PROPOSAL_170_CONTRACT` in `emissary-cli/src/i2pcontrol/rpc.rs`.
-Summary: 43 total, 41 available, 1 protocol-permitted neutral, and 1 unavailable.
-M051 adjudicated the news and ban rows, M055 adjudicated the v4/v6 network-error
-rows, M100 completed the request-independent transit-15s source, and M101
-completed the authenticated bounded news source against the pinned proposal and
-read-only reference evidence. Empty values, request-local
+Summary: 43 total, 42 available, 1 protocol-permitted neutral, and 0 unavailable.
+M051's historical ban disposition remains retained for its reviewed baseline;
+M103 completed the current banned-peer row with an explicit by-design-empty
+capability source. M055 adjudicated the v4/v6 network-error rows, M100 completed
+the request-independent transit-15s source, and M101 completed the authenticated
+bounded news source against the pinned proposal and read-only reference evidence.
+Empty values, request-local
 sampling, and `0`/`No error` from an unset source are not authoritative capability
 states and are not emitted. M102 now publishes an explicit neutral network-error
 state from the existing SSU2 reachability owner; only healthy and symmetric-NAT
@@ -67,7 +69,7 @@ is read-only. Actual serialized response size is checked after assembly.
 | `i2p.router.netdb.activepeers.info` | array&lt;string&gt; | available | transport-and-live-profile-storage-inspection | `serialize_active_peer_router_infos` | `p170.netdb.active_peer_info` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.ntcp.limit` | integer | available | transport-manager-configuration | `serialize_ntcp_limit` | `p170.netdb.ntcp_limit` | — | — |
 | `i2p.router.netdb.ssu.limit` | integer | available | transport-manager-configuration | `serialize_ssu_limit` | `p170.netdb.ssu_limit` | — | — |
-| `i2p.router.netdb.bannedpeers` | map&lt;string,map&lt;string,object&gt;&gt; | unavailable | ban-list: no authoritative ban owner; empty map is not contract-proven | `serialize_banned_peers` | `p170.netdb.banned_peers.unavailable` | 10,000 / 4 MiB | — |
+| `i2p.router.netdb.bannedpeers` | map&lt;string,map&lt;string,object&gt;&gt; | available | router-ban-empty-marker: authoritative by-design-empty result; Emissary has no router-wide ban facility | `serialize_banned_peers` | `p170.netdb.banned_peers.empty_map` | 10,000 / 10 MiB | — |
 | `i2p.router.netdb.activepeers.list` | array&lt;string&gt; | available | transport-manager-inspection | `serialize_active_peer_hashes` | `p170.netdb.active_peers` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.peers.list` | array&lt;string&gt; | available | live-profile-storage-inspection | `serialize_known_peer_hashes` | `p170.netdb.peer_list` | 10,000 / 4 MiB | — |
 | `i2p.router.netdb.peers.info` | array&lt;string&gt; | available | live-profile-storage-inspection | `serialize_peer_router_infos` | `p170.netdb.peer_info` | 10,000 / 4 MiB | — |

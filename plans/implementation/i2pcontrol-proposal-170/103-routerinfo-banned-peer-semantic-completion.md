@@ -1,6 +1,6 @@
 # M103 — RouterInfo Banned-Peer Semantic Completion
 
-Status: ready; dependency M095 closed
+Status: closed; dependency M095 closed; closure: `plans/closure/i2pcontrol-proposal-170/103-closure.md`
 
 Source roadmap:
 

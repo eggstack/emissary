@@ -39,7 +39,7 @@ responses. Keep changes within `emissary-cli/src/i2pcontrol/` and its compositio
 turn the administrative API into a router lifecycle or protocol implementation.
 
 The current Proposal 170 baseline remains partial: RouterInfo is 43 additions with
-39 available, 1 protocol-permitted neutral, and 3 unavailable; non-empty AddressBook
+42 available, 1 protocol-permitted neutral, and 0 unavailable; non-empty AddressBook
 SetConfig is still rejected truthfully; and unapplied runtime options fail before
 allocation. The authoritative completion inventory is
 `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`.

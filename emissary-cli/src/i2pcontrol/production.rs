@@ -55,6 +55,7 @@ use crate::i2pcontrol::{
         NetworkStatus, PeerDirectorySnapshot, PeerDirectorySource, PeerIdentity, PeerLimits,
         RecentTransitTraffic, RouterInfoControl, TransitBytes, TransportBytes, TransportLimits,
         TunnelBuildStats, TunnelDetail, TunnelDetails, TunnelSource, TunnelSummary,
+        BANNED_PEER_SOURCE,
     },
     server_secret_store::{ServerDestinationStore, StoredDestination},
     stores::{address_book_store::AddressBookStore, tunnel_store::TunnelStore},
@@ -1624,9 +1625,7 @@ impl RouterInfoControl for ProductionRouterInfoControl {
     }
 
     async fn banned_peers(&self) -> Result<Vec<BannedPeer>, InspectionError> {
-        Err(InspectionError::Unavailable {
-            group: InspectionGroup::PeerStats,
-        })
+        Ok(BANNED_PEER_SOURCE.snapshot())
     }
 
     async fn peer_limits(&self) -> Result<PeerLimits, InspectionError> {

@@ -59,15 +59,24 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         }
         counts
     });
-    assert_eq!(counts, (41, 1, 1));
+    assert_eq!(counts, (42, 1, 0));
 
-    let expected_unavailable = BTreeSet::from(["i2p.router.netdb.bannedpeers".to_owned()]);
+    let expected_unavailable = BTreeSet::new();
     let actual_unavailable: BTreeSet<String> = router_rows
         .iter()
         .filter(|row| string_field(row, "current_disposition") == "unavailable")
         .map(|row| string_field(row, "key").to_owned())
         .collect();
     assert_eq!(actual_unavailable, expected_unavailable);
+    let banned = router_rows
+        .iter()
+        .find(|row| string_field(row, "key") == "i2p.router.netdb.bannedpeers")
+        .expect("banned-peer row must remain in the matrix");
+    assert_eq!(string_field(banned, "current_disposition"), "available");
+    assert_eq!(
+        string_field(banned, "production_owner_source"),
+        "router-ban-empty-marker"
+    );
     for row in router_rows {
         let current = string_field(row, "current_disposition");
         let target = string_field(row, "final_target_disposition");

@@ -63,11 +63,11 @@ It contains exactly 43 Proposal 170 additions and records, for each selector:
 - compatibility/base separation;
 - residual limitation.
 
-Current counts after M102:
+Current counts after M103:
 
-- 41 available;
+- 42 available;
 - 1 protocol-permitted neutral;
-- 1 unavailable.
+- 0 unavailable.
 
 The separate existing-I2PControl and Emissary compatibility inventories are not
 counted in the 43 additions.
@@ -250,7 +250,7 @@ M030 selected:
 - `blocked` when the external revision changed or required evidence cannot be
   obtained.
 
-Under the current scope and accepted 41/1/1 matrix, the expected honest status
+Under the current scope and accepted 42/1/0 matrix, the expected honest status
 is `partial Proposal 170 support`.
 
 No status implies upstream review, acceptance, certification, adoption,

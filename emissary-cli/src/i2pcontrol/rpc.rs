@@ -1303,12 +1303,11 @@ pub mod router_info_keys {
         field!(
             P170_NETDB_BANNED_PEERS,
             JsonType::ObjectMapOfObjects,
-            SourceDisposition::Unavailable {
-                owner: "ban-list",
-                reason: "no authoritative ban owner"
+            SourceDisposition::Available {
+                owner: "router-ban-empty-marker"
             },
             "serialize_banned_peers",
-            "p170.netdb.banned_peers.unavailable",
+            "p170.netdb.banned_peers.empty_map",
             Mutation::ReadOnly,
             Bound::ItemsAndBytes {
                 items: 10_000,
@@ -2059,7 +2058,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (41, 1, 1));
+        assert_eq!((available, neutral, unavailable), (42, 1, 0));
     }
 
     #[test]

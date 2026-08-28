@@ -40,9 +40,9 @@ use emissary_cli::i2pcontrol::{
         ProductionRouterInfoControl, ProductionTunnelManagerControl,
     },
     router_info::{
-        ActivePeerStats, I2PTunnelStats, InspectionError, LogSnapshot, NetworkSnapshot, PeerLimits,
-        RecentTransitTraffic, RouterInfoControl, TransitBytes, TransportBytes, TunnelBuildStats,
-        TunnelSummary,
+        ActivePeerStats, BannedPeerSource, I2PTunnelStats, InspectionError, LogSnapshot,
+        NetworkSnapshot, PeerLimits, RecentTransitTraffic, RouterInfoControl, TransitBytes,
+        TransportBytes, TunnelBuildStats, TunnelSummary, BANNED_PEER_SOURCE,
     },
     rpc,
 };
@@ -300,9 +300,8 @@ fn selector_registry_address_book_partition() {
 
 #[test]
 fn production_adapter_returns_unavailable_for_unimplemented_selectors() {
-    // The production adapter does not yet wire active peers, banned peers,
-    // peer limits, or netdb summaries. The methods must
-    // return Err(Unavailable) rather than fabricated default values.
+    // The production adapter does not yet wire active peers, peer limits, or
+    // netdb summaries. Banned peers are the explicit by-design-empty source.
     let rt = tokio::runtime::Runtime::new().unwrap();
     let ri = make_production_router_info();
     rt.block_on(async {
@@ -314,10 +313,7 @@ fn production_adapter_returns_unavailable_for_unimplemented_selectors() {
             ri.active_peers().await,
             Err(InspectionError::Unavailable { .. })
         ));
-        assert!(matches!(
-            ri.banned_peers().await,
-            Err(InspectionError::Unavailable { .. })
-        ));
+        assert!(ri.banned_peers().await.unwrap().is_empty());
         assert!(matches!(
             ri.active_peer_stats().await,
             Err(InspectionError::Unavailable { .. })
@@ -331,6 +327,13 @@ fn production_adapter_returns_unavailable_for_unimplemented_selectors() {
             Err(InspectionError::Unavailable { .. })
         ));
     });
+}
+
+#[test]
+fn banned_peer_source_is_explicitly_by_design_empty() {
+    assert_eq!(BANNED_PEER_SOURCE, BannedPeerSource::ByDesignEmpty);
+    let source = read_source("src/i2pcontrol/production.rs");
+    assert!(source.contains("BANNED_PEER_SOURCE.snapshot()"));
 }
 
 #[test]

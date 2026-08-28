@@ -685,7 +685,7 @@ fn production_router_info_returns_router_news_unavailable() {
 }
 
 #[test]
-fn production_router_info_returns_banned_peers_unavailable() {
+fn production_router_info_returns_authoritative_empty_banned_peers() {
     let metrics = make_metrics();
     let tunnel_mgr = make_tunnel_manager();
     let log_ring = Arc::new(LogRing::default());
@@ -702,12 +702,7 @@ fn production_router_info_returns_banned_peers_unavailable() {
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        assert!(matches!(
-            ri.banned_peers().await,
-            Err(InspectionError::Unavailable {
-                group: InspectionGroup::PeerStats
-            })
-        ));
+        assert_eq!(ri.banned_peers().await.unwrap().len(), 0);
     });
 }
 

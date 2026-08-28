@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; all twelve tunnel runtimes real; production tunnel security closed by M093; M095-M096 and M100-M102 closed; M097 closed as blocked; M103 ready; M098/M099/M104 remain dependency-blocked
+Status: partial Proposal 170 production support; all twelve tunnel runtimes real; production tunnel security closed by M093; M095-M096 and M100-M103 closed; M097 closed as blocked; M098/M099/M104 remain dependency-blocked
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -52,7 +52,7 @@ M091 remains the cautionary boundary case: while its plan was registered blocked
 
 The current production state remains partial, despite the new full-support plans:
 
-- RouterInfo: 43 canonical Proposal 170 additions / 41 available / 1 protocol-permitted neutral / 1 unavailable;
+- RouterInfo: 43 canonical Proposal 170 additions / 42 available / 1 protocol-permitted neutral / 0 unavailable;
 - AddressBook CRUD, `SetSubscriptions`, and all thirteen `SetConfig` keys operational within the confined AddressBook owner;
 - exactly 12 Proposal 170 tunnel types have real backends;
 - exactly 7 canonical TunnelManager actions are implemented;
@@ -76,7 +76,7 @@ Only dependency-ready plans registered in `plans/registry.md` are executable. Fu
 | M100 | **closed** | request-independent transit 15-second RouterInfo source |
 | M101 | **closed** | bounded real router-news source; closure: `plans/closure/i2pcontrol-proposal-170/101-closure.md` |
 | M102 | **closed** | minimal neutral IPv4/IPv6 network-error owner observation; wire mapping stays in I2PControl; closure: `plans/closure/i2pcontrol-proposal-170/102-closure.md` |
-| M103 | **ready** | real banned-peer owner or proven by-design-empty semantics; no new ban algorithm solely for telemetry |
+| M103 | **closed** | authoritative by-design-empty banned-peer source; no new ban algorithm solely for telemetry; closure: `plans/closure/i2pcontrol-proposal-170/103-closure.md` |
 | M104 | blocked on M097-M103 | integrated live interoperability, final matrix/security/containment reclosure, revision-pinned full-support decision |
 
 Plans:
@@ -135,7 +135,9 @@ M102 was the only currently anticipated full-support milestone requiring a small
 
 ### RouterInfo banned peers
 
-M103 must not create router ban behavior solely for telemetry. It may expose a real existing enforced ban owner, or—if exhaustive evidence proves Emissary has no possible router-wide banned state—codify authoritative by-design-empty semantics. If neither is truthful, full-support work stays blocked pending a separate maintainer architecture decision.
+M103 did not create router ban behavior solely for telemetry. Its exhaustive audit proved
+that Emissary has no router-wide banned state, so the authoritative result is the
+explicit by-design-empty capability source. This does not imply ban management.
 
 ### Final interoperability
 

@@ -21,7 +21,7 @@
 //! Implements the `RouterInfo` method with exact selector-by-presence
 //! behavior. Only requested selector keys appear in the response.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use emissary_core::inspection::NetworkErrorReason;
 
@@ -502,6 +502,14 @@ async fn assemble_response(
         } else {
             None
         };
+    let banned_peers_snapshot = if key_set.contains(rpc::router_info_keys::P170_NETDB_BANNED_PEERS)
+        || key_set.contains(rpc::router_info_keys::PEERS_BANNED)
+        || key_set.contains(rpc::router_info_keys::PEERS_BANNED_COUNT)
+    {
+        Some(router_info.banned_peers().await?)
+    } else {
+        None
+    };
     let recent_tunnel_success_rate_snapshot =
         if key_set.contains(rpc::router_info_keys::P170_NET_TUNNELS_SUCCESS_RATE) {
             Some(router_info.recent_tunnel_success_rate().await?)
@@ -824,6 +832,17 @@ async fn assemble_response(
         resolve_proposal_peer_directory(&mut result, &key_set, router_info).await?;
     }
 
+    // Proposal 170 returns a map keyed by peer hash. The source disposition
+    // check above permits this only when the source is authoritative, which
+    // includes the explicit by-design-empty production source.
+    if key_set.contains(rpc::router_info_keys::P170_NETDB_BANNED_PEERS) {
+        let banned = banned_peers_snapshot.as_deref().expect("banned peers were queried");
+        result.insert(
+            rpc::router_info_keys::P170_NETDB_BANNED_PEERS.to_string(),
+            serialize_banned_peers(banned)?,
+        );
+    }
+
     // --- Proposal 170 active peers and finite transport limits ---
     if key_set.iter().any(|key| {
         matches!(
@@ -930,7 +949,14 @@ async fn assemble_response(
 
     // --- Peer selectors ---
     if key_set.iter().any(|k| k.starts_with("i2p.router.peers.")) {
-        resolve_peer_selectors(&mut result, &key_set, router_info, peer_ri_id).await?;
+        resolve_peer_selectors(
+            &mut result,
+            &key_set,
+            router_info,
+            peer_ri_id,
+            banned_peers_snapshot.as_deref(),
+        )
+        .await?;
     }
 
     // --- Log selectors. The canonical `logs` list is string-valued; the
@@ -1456,6 +1482,7 @@ async fn resolve_peer_selectors(
     key_set: &HashSet<&str>,
     router_info: &dyn RouterInfoControl,
     peer_ri_id: Option<&str>,
+    banned_peers: Option<&[crate::i2pcontrol::router_info::BannedPeer]>,
 ) -> Result<(), InspectionError> {
     // Known peers: query once, use for both count and list
     let needs_known = key_set.contains(rpc::router_info_keys::PEERS_KNOWN_COUNT)
@@ -1532,7 +1559,7 @@ async fn resolve_peer_selectors(
     let needs_banned = key_set.contains(rpc::router_info_keys::PEERS_BANNED)
         || key_set.contains(rpc::router_info_keys::PEERS_BANNED_COUNT);
     if needs_banned {
-        let banned = router_info.banned_peers().await?;
+        let banned = banned_peers.expect("banned peers were queried");
         if key_set.contains(rpc::router_info_keys::PEERS_BANNED_COUNT) {
             result.insert(
                 rpc::router_info_keys::PEERS_BANNED_COUNT.to_string(),
@@ -1581,6 +1608,43 @@ async fn resolve_peer_selectors(
         .await?;
     }
     Ok(())
+}
+
+/// Serialize the canonical Proposal 170 banned-peer map.
+///
+/// Proposal 170 keys the outer map by peer hash and leaves the detail object
+/// extensible. The stable details exposed by Emissary are the ban reason and
+/// optional expiry. BTreeMap keeps the result deterministic; the final
+/// RouterInfo envelope applies the global serialized response bound.
+fn serialize_banned_peers(
+    banned: &[crate::i2pcontrol::router_info::BannedPeer],
+) -> Result<serde_json::Value, InspectionError> {
+    if banned.len() > MAX_BANNED_PEERS {
+        return Err(InspectionError::ResultTooLarge {
+            group: crate::i2pcontrol::router_info::InspectionGroup::PeerStats,
+            limit: MAX_BANNED_PEERS,
+        });
+    }
+
+    let mut entries = BTreeMap::new();
+    for peer in banned {
+        let details = serde_json::json!({
+            "reason": peer.reason,
+            "expiresAt": peer.expires_at,
+        });
+        if entries.insert(peer.id.clone(), details).is_some() {
+            return Err(InspectionError::InternalInvariant);
+        }
+    }
+
+    let value = serde_json::to_value(entries).map_err(|_| InspectionError::InternalInvariant)?;
+    if serde_json::to_vec(&value).map_or(true, |bytes| bytes.len() > MAX_RESPONSE_BYTES) {
+        return Err(InspectionError::ResultTooLarge {
+            group: crate::i2pcontrol::router_info::InspectionGroup::PeerStats,
+            limit: MAX_BANNED_PEERS,
+        });
+    }
+    Ok(value)
 }
 
 async fn resolve_active_peer_stats(
@@ -2023,7 +2087,10 @@ mod tests {
             &direct_request(serde_json::json!({rpc::router_info_keys::ROUTER_NEWS: false})),
         )
         .await;
-        assert_eq!(direct["result"][rpc::router_info_keys::ROUTER_NEWS], "legacy news");
+        assert_eq!(
+            direct["result"][rpc::router_info_keys::ROUTER_NEWS],
+            "legacy news"
+        );
     }
 
     #[tokio::test]
@@ -2059,7 +2126,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn direct_banned_peers_do_not_promote_fake_or_empty_values() {
+    async fn direct_banned_peers_use_the_proposal_map_shape() {
         let ri = FakeRouterInfoControl::new();
         ri.set_banned_peers(vec![BannedPeer {
             id: "peer-id".into(),
@@ -2074,8 +2141,33 @@ mod tests {
         )
         .await;
 
-        assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
-        assert!(response["result"].is_null());
+        assert_eq!(
+            response["result"][rpc::router_info_keys::P170_NETDB_BANNED_PEERS],
+            serde_json::json!({
+                "peer-id": {
+                    "reason": "test reason",
+                    "expiresAt": 123,
+                }
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_banned_peers_return_authoritative_empty_map() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_banned_peers(Vec::new());
+        let response = handle_router_info(
+            &test_state(ri),
+            &direct_request(serde_json::json!({
+                rpc::router_info_keys::P170_NETDB_BANNED_PEERS: true
+            })),
+        )
+        .await;
+
+        assert_eq!(
+            response["result"][rpc::router_info_keys::P170_NETDB_BANNED_PEERS],
+            serde_json::json!({})
+        );
     }
 
     #[tokio::test]

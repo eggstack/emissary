@@ -36,8 +36,8 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal status remains Open).
 
 | Subsystem | Status | Roadmap | Current handoff | Dependencies or blockers |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active; M095-M097 closed (M097 blocked) | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | M100-M103 | M098/M099 remain blocked on M097; M104 remains blocked on M097-M103 |
-| I2PControl Proposal 170 source/truthfulness | historical partial baseline closed through M057; successor work authorized by ADR-0004 | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | successor source work is M100-M103 under the full-support roadmap | current production matrix remains 37 available / 1 protocol-permitted neutral / 5 unavailable until owning completion milestones close |
+| I2PControl Proposal 170 full-support completion | active; M095-M096 and M100 closed (M097 blocked) | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | M101-M103 | M098/M099 remain blocked on M097; M104 remains blocked on M097-M103 |
+| I2PControl Proposal 170 source/truthfulness | historical partial baseline closed through M057; successor work authorized by ADR-0004 | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | successor source work is M101-M103 under the full-support roadmap | current production matrix is 38 available / 1 protocol-permitted neutral / 4 unavailable until owning completion milestones close |
 | I2PControl Proposal 170 containment | accepted authority; pre-M091 semantics restored by M092 | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | none | M061 source boundary and M062/M063 dependency/feature rules remain authoritative; new planning paths may be added only as exact bookkeeping entries |
 | I2PControl Proposal 170 tunnel runtime completion | functionally complete | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | no data-plane handoff | all twelve registered tunnel backends remain real; full-option semantics continue under M097-M099 without redesigning the data planes |
 | I2PControl Proposal 170 tunnel security hardening | production/security closed after M093; M094 planning cleanup closed | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | no security-corrective handoff | M093 remains current production/security authority; M088 lower-layer residual remains accepted unless new evidence directly reopens it |
@@ -56,7 +56,7 @@ M095 exact full-support matrix + containment budget     [CLOSED]
   v                  v                   v                  v
 M096 AddressBook   M097 common tunnel  M100 transit 15s   M101 router news
 SetConfig          session/key opts    source             source
-[CLOSED]           [READY]             [READY]          [READY]
+[CLOSED]           [READY]             [CLOSED]         [READY]
                        |
                        +----------------------+
                        |                      |
@@ -81,7 +81,7 @@ M097-M103 all closed ----+
                  [BLOCKED M097-M103]
 ```
 
-### Closed handoffs — M095 and M096
+### Closed handoffs — M095, M096, and M100
 
 Plan:
 
@@ -92,6 +92,8 @@ Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/095-closure.
 M095 was planning/matrix/containment-budget work and had no production-behavior authority. Its exact machine-readable inventory is now the prerequisite for the next ready handoffs.
 
 M096 closure is recorded at `plans/closure/i2pcontrol-proposal-170/096-closure.md`.
+
+M100 closure is recorded at `plans/closure/i2pcontrol-proposal-170/100-closure.md`.
 
 M095 required output includes:
 
@@ -112,7 +114,7 @@ The following plans exist for handoff continuity but are not registered as execu
 | M097 | **blocked; closed as blocked** | `plans/implementation/i2pcontrol-proposal-170/097-tunnel-common-session-and-key-option-completion.md` | common session/tunnel/key/persistence options; remaining cells await bounded Yosemite/SAM and control-plane lifecycle primitives |
 | M098 | blocked on M097 | `plans/implementation/i2pcontrol-proposal-170/098-client-proxy-management-and-http-option-completion.md` | client proxy/outproxy/auth/management/HTTP privacy options |
 | M099 | blocked on M097 | `plans/implementation/i2pcontrol-proposal-170/099-server-access-throttle-and-leaseset-option-completion.md` | server access/throttle/filter/LeaseSet options while preserving M093 security boundaries |
-| M100 | **ready** | `plans/implementation/i2pcontrol-proposal-170/100-routerinfo-transit-15s-source-completion.md` | request-independent I2PControl-owned transit 15-second sampler |
+| M100 | **closed** | `plans/implementation/i2pcontrol-proposal-170/100-routerinfo-transit-15s-source-completion.md` | request-independent I2PControl-owned transit 15-second sampler |
 | M101 | **ready** | `plans/implementation/i2pcontrol-proposal-170/101-routerinfo-news-source-completion.md` | bounded real router-news source under I2PControl |
 | M102 | **ready** | `plans/implementation/i2pcontrol-proposal-170/102-routerinfo-network-error-owner-completion.md` | minimal neutral v4/v6 network-error owner observation, wire mapping in I2PControl |
 | M103 | **ready** | `plans/implementation/i2pcontrol-proposal-170/103-routerinfo-banned-peer-semantic-completion.md` | real ban-owner snapshot or proven by-design-empty semantics; no ban engine solely for telemetry |
@@ -176,18 +178,18 @@ M088's lower-layer signed-SYN/pre-accept resource/timing residual remains accept
 
 Until the relevant new milestone closes, the current support statements remain:
 
-- RouterInfo: 43 canonical additions / 37 available / 1 protocol-permitted neutral / 5 unavailable;
+- RouterInfo: 43 canonical additions / 38 available / 1 protocol-permitted neutral / 4 unavailable;
 - AddressBook CRUD, SetSubscriptions, and all thirteen SetConfig keys operational within the confined AddressBook owner;
 - all 12 TunnelManager types and 7 canonical actions real/operational within their current option-capability sets;
 - applicable-but-unimplemented runtime options still fail before allocation rather than being persisted-and-ignored;
 - all 6 ClientServicesInfo selectors implemented;
 - full public-network/reference-router certification not yet complete.
 
-The five current unavailable RouterInfo rows are assigned to M100-M103. Historical M051/M054/M055/M056 conclusions remain correct for the production revisions they reviewed and are superseded only as new source milestones close.
+The four current unavailable RouterInfo rows are assigned to M101-M103. Historical M051/M054/M055/M056 conclusions remain correct for the production revisions they reviewed and are superseded only as new source milestones close.
 
 ## Registry maintenance rules
 
-1. M095 and M096 are closed; M097 is closed as blocked; M100-M103 are the ready/executable full-support handoffs.
+1. M095, M096, and M100 are closed; M097 is closed as blocked; M101-M103 are the ready/executable full-support handoffs.
 2. M098/M099 remain blocked on M097 and M104 remains blocked on M097-M103; existence of a plan file is not execution authority.
 3. Do not alter the current partial-support claim merely because planning exists.
 4. M093 remains the current tunnel production/security reclosure authority until a later integrated reclosure closes.

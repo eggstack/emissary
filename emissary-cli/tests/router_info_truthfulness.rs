@@ -101,7 +101,7 @@ async fn tunnel_summary_available_zero_is_success() {
 }
 
 #[tokio::test]
-async fn transit_bandwidth_15s_is_unavailable_without_request_independent_owner() {
+async fn transit_bandwidth_15s_uses_the_request_independent_owner() {
     let ri = FakeRouterInfoControl::new();
     ri.set_transit_bandwidth_15s(2048);
     let state = test_state(ri);
@@ -121,8 +121,7 @@ async fn transit_bandwidth_15s_is_unavailable_without_request_independent_owner(
     let response =
         emissary_cli::i2pcontrol::router_info_handler::handle_router_info(&state, &req).await;
 
-    assert_eq!(response["error"]["code"], -32603);
-    assert!(response["result"].is_null());
+    assert_eq!(response["result"]["i2p.router.net.bw.transit.15s"], 2048);
 }
 
 #[tokio::test]

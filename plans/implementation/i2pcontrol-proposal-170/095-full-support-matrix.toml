@@ -13,9 +13,9 @@ current_production_head = "087ee59abb5494e1413d96af8f49f96b00948a7d"
 
 [contract_counts]
 router_info_total = 43
-router_info_available = 37
+router_info_available = 38
 router_info_neutral = 1
-router_info_unavailable = 5
+router_info_unavailable = 4
 addressbook_setconfig = 13
 canonical_tunnel_types = 12
 canonical_tunnel_actions = 7
@@ -28,8 +28,8 @@ client_services_selectors = ["I2PTunnel", "HTTPProxy", "SOCKS", "SAM", "BOB", "I
 
 [router_info]
 canonical_key_source = "emissary-cli/src/i2pcontrol/rpc.rs::router_info_keys::PROPOSAL_170_CONTRACT"
-current_baseline = "37 available / 1 neutral / 5 unavailable"
-target_rule = "The five unavailable rows are owned by M100-M103; clockskew remains protocol-permitted neutral when no estimate exists."
+current_baseline = "38 available / 1 neutral / 4 unavailable"
+target_rule = "The four unavailable rows are owned by M101-M103; clockskew remains protocol-permitted neutral when no estimate exists."
 
 [[router_info.rows]]
 key = "i2p.router.news"
@@ -142,11 +142,11 @@ non_i2pcontrol_production_path_required = false
 [[router_info.rows]]
 key = "i2p.router.net.bw.transit.15s"
 json_return_type = "integer"
-current_disposition = "unavailable"
-production_owner_source = "transit-bandwidth"
+current_disposition = "available"
+production_owner_source = "i2pcontrol-transit-bandwidth-sampler"
 i2pcontrol_adapter_serializer = "serialize_transit_bandwidth_15s"
 evidence_plan = "plans/implementation/i2pcontrol-proposal-170/100-routerinfo-transit-15s-source-completion.md"
-evidence_closure = "M054/M056"
+evidence_closure = "M100"
 final_target_disposition = "available"
 owning_completion_milestone = "M100"
 non_i2pcontrol_production_path_required = false
@@ -1765,7 +1765,7 @@ path_budget_notes = "Exhaustive audit of router/transport/profile/NetDB exclusio
 
 [evidence]
 proposal_revision_verification = "Official source identifies Proposal 170 as Open, created 2026-05-20, last updated 2026-05-20; source hash recorded above."
-router_info_reconciliation = "Current source authority is 43 rows with 37 available, 1 protocol-permitted neutral, and 5 unavailable; no historical 40/1/2 count is carried forward."
+router_info_reconciliation = "Current source authority is 43 rows with 38 available, 1 protocol-permitted neutral, and 4 unavailable; no historical 40/1/2 count is carried forward."
 addressbook_reconciliation = "All 13 pinned SetConfig keys are classified; no unknown or accept_inert disposition is used."
 tunnel_option_reconciliation = "Every CANONICAL_OPTION_KEYS entry has 12 explicit cells. Apply means current backend behavior; planned_apply is assigned to M097-M099; not_applicable has a cell note; blocked_primitive names the missing primitive and milestone."
 client_services_reconciliation = "Exactly six selectors are listed; broader/base methods are outside this phase."

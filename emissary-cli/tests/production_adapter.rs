@@ -98,6 +98,9 @@ impl EventMetrics for InMemoryMetrics {
     fn transit_outbound_bytes(&self) -> u64 {
         self.transit_outbound.load(Ordering::Acquire)
     }
+    fn transit_bytes_snapshot(&self) -> Option<u64> {
+        Some(self.transit_outbound_bytes())
+    }
     fn connected_routers(&self) -> usize {
         self.connected_routers.load(Ordering::Acquire)
     }
@@ -606,7 +609,7 @@ async fn production_router_info_tcp_snapshot_returns_unavailable() {
 }
 
 #[tokio::test]
-async fn production_router_info_transit_bandwidth_15s_is_unavailable_without_owner() {
+async fn production_router_info_transit_bandwidth_15s_is_unavailable_during_warmup() {
     let metrics = make_metrics();
     let tunnel_mgr = make_tunnel_manager();
     let log_ring = Arc::new(LogRing::default());
@@ -625,9 +628,34 @@ async fn production_router_info_transit_bandwidth_15s_is_unavailable_without_own
         ri.transit_bandwidth_15s().await,
         Err(InspectionError::UnavailableReason {
             group: InspectionGroup::TrafficMetrics,
-            reason: "no request-independent rolling transit owner"
+            reason: "transit 15-second sampler warming up"
         })
     ));
+}
+
+#[tokio::test(start_paused = true)]
+async fn production_router_info_transit_bandwidth_is_request_independent() {
+    let metrics = make_metrics();
+    let tunnel_mgr = make_tunnel_manager();
+    let ri = ProductionRouterInfoControl::new(
+        String::new(),
+        "test".to_string(),
+        0.0,
+        0,
+        0,
+        metrics.clone(),
+        Arc::new(LogRing::default()),
+        tunnel_mgr,
+    );
+
+    tokio::task::yield_now().await;
+    tokio::time::advance(std::time::Duration::from_secs(1)).await;
+    tokio::task::yield_now().await;
+    metrics.transit_outbound.store(15_000, Ordering::Release);
+    tokio::time::advance(std::time::Duration::from_secs(15)).await;
+    tokio::task::yield_now().await;
+
+    assert_eq!(ri.transit_bandwidth_15s().await.unwrap(), 1_000);
 }
 
 // --- Static guards ---

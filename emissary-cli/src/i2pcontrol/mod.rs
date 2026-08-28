@@ -36,4 +36,5 @@ pub mod server_secret_store;
 pub mod service_registry;
 pub mod stores;
 pub mod tls;
+pub(crate) mod transit_sampler;
 pub mod tunnel_manager;

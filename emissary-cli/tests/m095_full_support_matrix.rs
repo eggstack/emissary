@@ -59,10 +59,9 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         }
         counts
     });
-    assert_eq!(counts, (37, 1, 5));
+    assert_eq!(counts, (38, 1, 4));
 
     let expected_unavailable = BTreeSet::from([
-        "i2p.router.net.bw.transit.15s".to_owned(),
         "i2p.router.news".to_owned(),
         "i2p.router.net.error".to_owned(),
         "i2p.router.net.error.v6".to_owned(),

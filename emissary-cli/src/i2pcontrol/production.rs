@@ -57,6 +57,7 @@ use crate::i2pcontrol::{
     },
     server_secret_store::{ServerDestinationStore, StoredDestination},
     stores::{address_book_store::AddressBookStore, tunnel_store::TunnelStore},
+    transit_sampler::TransitBandwidthSampler,
 };
 
 use emissary_core::{
@@ -405,6 +406,15 @@ pub trait EventMetrics: Send + Sync {
     fn transit_inbound_bytes(&self) -> u64;
     /// Cumulative outbound transit bytes.
     fn transit_outbound_bytes(&self) -> u64;
+    /// Read the authoritative cumulative transit counter used by the
+    /// request-independent RouterInfo sampler.
+    ///
+    /// Implementations without a real transit counter return `None`. The
+    /// default preserves the existing metrics boundary for adapters that do
+    /// not explicitly opt into the sampler.
+    fn transit_bytes_snapshot(&self) -> Option<u64> {
+        None
+    }
     /// Number of currently connected routers.
     fn connected_routers(&self) -> usize;
     /// Number of active transit tunnels.
@@ -462,6 +472,9 @@ impl<R: Runtime> EventMetrics for EventHandleMetrics<R> {
     }
     fn transit_outbound_bytes(&self) -> u64 {
         self.handle.transit_outbound_bytes()
+    }
+    fn transit_bytes_snapshot(&self) -> Option<u64> {
+        Some(self.handle.transit_outbound_bytes())
     }
     fn connected_routers(&self) -> usize {
         self.handle.connected_routers()
@@ -1346,6 +1359,7 @@ pub struct ProductionRouterInfoControl {
     configured_bandwidth_in: u64,
     configured_bandwidth_out: u64,
     metrics: Arc<dyn EventMetrics>,
+    transit_bandwidth_sampler: Option<Arc<TransitBandwidthSampler>>,
     log_ring: Arc<LogRing>,
     tunnel_manager: Arc<dyn TunnelManagerControl>,
     peer_directory: Option<Arc<dyn PeerDirectorySource>>,
@@ -1366,6 +1380,7 @@ impl ProductionRouterInfoControl {
         log_ring: Arc<LogRing>,
         tunnel_manager: Arc<dyn TunnelManagerControl>,
     ) -> Self {
+        let transit_bandwidth_sampler = TransitBandwidthSampler::start(Arc::clone(&metrics));
         Self {
             router_id_b64,
             version,
@@ -1374,6 +1389,7 @@ impl ProductionRouterInfoControl {
             configured_bandwidth_in,
             configured_bandwidth_out,
             metrics,
+            transit_bandwidth_sampler,
             log_ring,
             tunnel_manager,
             peer_directory: None,
@@ -1460,10 +1476,17 @@ impl RouterInfoControl for ProductionRouterInfoControl {
     }
 
     async fn transit_bandwidth_15s(&self) -> Result<u64, InspectionError> {
-        Err(InspectionError::UnavailableReason {
-            group: InspectionGroup::TrafficMetrics,
-            reason: "no request-independent rolling transit owner",
-        })
+        self.transit_bandwidth_sampler
+            .as_ref()
+            .ok_or(InspectionError::UnavailableReason {
+                group: InspectionGroup::TrafficMetrics,
+                reason: "no authoritative cumulative transit source",
+            })?
+            .snapshot()
+            .map_err(|reason| InspectionError::UnavailableReason {
+                group: InspectionGroup::TrafficMetrics,
+                reason,
+            })
     }
 
     async fn transit_bytes(&self) -> Result<TransitBytes, InspectionError> {

@@ -1,6 +1,6 @@
 # M100 — RouterInfo Transit 15-Second Source Completion
 
-Status: ready; dependency M095 closed
+Status: closed; closure: `plans/closure/i2pcontrol-proposal-170/100-closure.md`
 
 Source roadmap:
 

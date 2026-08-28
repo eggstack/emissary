@@ -1010,9 +1010,8 @@ pub mod router_info_keys {
         field!(
             P170_NET_BW_TRANSIT_15S,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "transit-bandwidth",
-                reason: "no request-independent rolling transit owner"
+            SourceDisposition::Available {
+                owner: "i2pcontrol-transit-bandwidth-sampler"
             },
             "serialize_transit_bandwidth_15s",
             "p170.transit_15s.bytes_per_second",
@@ -2063,7 +2062,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (37, 1, 5));
+        assert_eq!((available, neutral, unavailable), (38, 1, 4));
     }
 
     #[test]

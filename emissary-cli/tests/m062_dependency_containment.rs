@@ -392,6 +392,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m065 = is_authorized_m065_path(path);
         let authorized_m096 = is_authorized_m096_path(path);
         let authorized_m097 = is_authorized_m097_path(path);
+        let authorized_m100 = is_authorized_m100_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -399,6 +400,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m065
                 || authorized_m096
                 || authorized_m097
+                || authorized_m100
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -410,6 +412,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m065
                     || authorized_m096
                     || authorized_m097
+                    || authorized_m100
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -523,6 +526,36 @@ fn is_authorized_m097_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
             | "plans/implementation/i2pcontrol-proposal-170/097-tunnel-common-session-and-key-option-completion.md"
             | "plans/closure/i2pcontrol-proposal-170/097-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+    )
+}
+
+fn is_authorized_m100_path(path: &str) -> bool {
+    matches!(
+        path,
+        "AGENTS.md"
+            | "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/proposal-170-conformance.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/router-info-source-map.md"
+            | "docs/i2pcontrol/router-info.md"
+            | "emissary-cli/src/i2pcontrol/mod.rs"
+            | "emissary-cli/src/i2pcontrol/production.rs"
+            | "emissary-cli/src/i2pcontrol/rpc.rs"
+            | "emissary-cli/src/i2pcontrol/server.rs"
+            | "emissary-cli/src/i2pcontrol/transit_sampler.rs"
+            | "emissary-cli/tests/conformance_manifest.rs"
+            | "emissary-cli/tests/m095_full_support_matrix.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "emissary-cli/tests/m027_literal_fixtures.rs"
+            | "emissary-cli/tests/production_adapter.rs"
+            | "emissary-cli/tests/router_info_truthfulness.rs"
+            | "emissary-cli/tests/static_guards.rs"
+            | "plans/closure/i2pcontrol-proposal-170/100-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/100-routerinfo-transit-15s-source-completion.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"

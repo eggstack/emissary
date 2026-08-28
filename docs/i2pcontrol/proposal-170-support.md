@@ -405,11 +405,11 @@ M028 does not alter these sources. M029 revalidated them.
 
 ## RouterInfo
 
-Current source matrix:
+Current source matrix after M100:
 
-- 37 available;
+- 38 available;
 - 1 protocol-permitted neutral;
-- 5 unavailable.
+- 4 unavailable.
 
 Available selectors have bounded current owners. Clock skew uses `null` only
 when the protocol permits it. Unavailable selectors—including both network-error
@@ -454,7 +454,8 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M053 | closed | live ProfileStorage correction for M045 known-peer sources |
 | M054 | closed | transit-15s truthfulness correction; explicit unavailable disposition |
 | M055 | closed | network-error truthfulness correction; explicit unavailable dispositions |
-| M056 | closed | integrated reclosure; final 37 available / 1 neutral / 5 unavailable audit |
+| M056 | closed | integrated reclosure; historical final 37 available / 1 neutral / 5 unavailable audit |
+| M100 | closed | request-independent transit-15s sampler; current 38/1/4 source matrix |
 | M066–M071 | closed | real IRC, HTTP, CONNECT, SOCKS, bidirectional HTTP, and Streamr tunnel families |
 | M072 | closed after M073 | integrated twelve-type runtime reclosure |
 | M073 | closed; corrective history | generic client/server option apply-or-reject corrective; M081 closes the M075-accepted-stream regression that re-introduced the accepted-but-ignored `leaseSetEncType` |

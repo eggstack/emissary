@@ -926,6 +926,9 @@ impl EventMetrics for NoopEventMetrics {
     fn transit_outbound_bytes(&self) -> u64 {
         0
     }
+    fn transit_bytes_snapshot(&self) -> Option<u64> {
+        None
+    }
     fn connected_routers(&self) -> usize {
         0
     }

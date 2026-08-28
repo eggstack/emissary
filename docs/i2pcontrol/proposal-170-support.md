@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M093 production/security reclosure and M094 planning reconciliation closed; M095 full-support matrix closed
+Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; residual option cells and M104 live reclosure remain open
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -333,6 +333,27 @@ deadline, so active IRC sessions are not capped by total lifetime. Accepted
 streams use the same bounded peer-aware admission policy as `httpserver`, and
 the client side remains filtered for the future `socksirc` composition.
 
+## Server option completion
+
+M099 closes the independent server access/throttle slice. The generic server,
+`httpserver`, inbound `httpbidirserver`, and `ircserver` use the shared
+trusted-peer access policy and bounded admission state. HTTP presentation and
+request filtering, access lists, confined newline-delimited filter generations,
+accepted-connection ceilings, peer/aggregate rate windows, POST limits, and
+tunnel-local temporary denial are applied before local target connection or
+handler work. Filter-file generations are parsed completely beneath the
+server-owned administrative root; invalid generations do not replace a valid
+running configuration.
+
+The matrix records `AllowInternalSSL`, `UniqueLocalAddressPerClient`,
+`MultiHoming`, `EncryptLeaseSet`, `OptionalLookup`, and
+`LeaseSetClientAuths` as explicit residual blockers. No server-side TLS trust
+owner, per-client address allocator, multihoming router, or supported
+Yosemite/SAM LeaseSet key/serializer path exists in this checkout, so these
+options fail before allocation and never silently downgrade. M104 remains
+blocked until the applicable residual cells are resolved and live
+interoperability is reclosed.
+
 ## AddressBook
 
 Retained enabled-mode status: M022 established one runtime/durable authority for
@@ -352,7 +373,7 @@ M034 additionally proves the retained CRUD and subscription behavior:
   command seam.
 
 M096 operationally completes the pinned `SetConfig` surface while keeping the
-overall Proposal 170 status partial pending M097-M104:
+overall Proposal 170 status partial pending residual option cells and M104:
 
 - all thirteen keys are validated and persisted in one versioned typed runtime
   configuration;
@@ -363,7 +384,7 @@ overall Proposal 170 status partial pending M097-M104:
 - `etags`, `last_modified`, and subscriptions use configured metadata files;
 - `theme` round-trips as explicitly inert administrative metadata, with no
   frontend or router coupling;
-- failed target parsing or publication leaves the prior committed generation,
+  - failed target parsing or publication leaves the prior committed generation,
   and restart restores the durable configuration and active semantics.
 
 TunnelManager lifecycle reconciliation is operational for all twelve

@@ -29,6 +29,7 @@ pub const DEFAULT_MAX_CONCURRENT_CONNECTIONS: usize = 30;
 pub const MAX_CONCURRENT_CONNECTIONS: usize = 128;
 pub const DEFAULT_MAX_CONCURRENT_PER_PEER: usize = 8;
 pub const MAX_RATE: u64 = 1_000_000;
+pub const MAX_PERIOD: u64 = 30 * 24 * 60 * 60;
 
 const MINUTE: Duration = Duration::from_secs(60);
 const HOUR: Duration = Duration::from_secs(60 * 60);
@@ -68,6 +69,9 @@ pub struct ServerAdmissionPolicy {
     total_in_per_minute: u64,
     total_in_per_hour: u64,
     total_in_per_day: u64,
+    peer_period: Duration,
+    total_period: Duration,
+    total_ban_time: Duration,
     /// Longest historical peer-rate window, or `None` when inactive peers do
     /// not need to be retained after their final active lease drops.
     peer_history: Option<Duration>,
@@ -81,6 +85,7 @@ pub enum AdmissionPolicyError {
     InvalidMaxConcurrent,
     InvalidRate,
     IncoherentCapacity,
+    InvalidPeriod,
 }
 
 impl ServerAdmissionPolicy {
@@ -98,6 +103,9 @@ impl ServerAdmissionPolicy {
             total_in_per_minute: 50,
             total_in_per_hour: 0,
             total_in_per_day: 0,
+            peer_period: MINUTE,
+            total_period: MINUTE,
+            total_ban_time: Duration::ZERO,
             peer_history: Some(DAY),
             required_peer_entries: required_entries_for_history(
                 DAY,
@@ -119,6 +127,33 @@ impl ServerAdmissionPolicy {
         total_in_per_hour: u64,
         total_in_per_day: u64,
     ) -> Result<Self, AdmissionPolicyError> {
+        Self::new_with_periods(
+            max_concurrent_connections,
+            client_per_minute,
+            client_per_hour,
+            client_per_day,
+            total_in_per_minute,
+            total_in_per_hour,
+            total_in_per_day,
+            MINUTE,
+            MINUTE,
+            Duration::ZERO,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_periods(
+        max_concurrent_connections: u64,
+        client_per_minute: u64,
+        client_per_hour: u64,
+        client_per_day: u64,
+        total_in_per_minute: u64,
+        total_in_hour: u64,
+        total_in_day: u64,
+        peer_period: Duration,
+        total_period: Duration,
+        total_ban_time: Duration,
+    ) -> Result<Self, AdmissionPolicyError> {
         if !(1..=MAX_CONCURRENT_CONNECTIONS as u64).contains(&max_concurrent_connections) {
             return Err(AdmissionPolicyError::InvalidMaxConcurrent);
         }
@@ -127,13 +162,21 @@ impl ServerAdmissionPolicy {
             client_per_hour,
             client_per_day,
             total_in_per_minute,
-            total_in_per_hour,
-            total_in_per_day,
+            total_in_hour,
+            total_in_day,
         ]
         .iter()
         .any(|rate| *rate > MAX_RATE)
         {
             return Err(AdmissionPolicyError::InvalidRate);
+        }
+        if peer_period.is_zero()
+            || total_period.is_zero()
+            || peer_period.as_secs() > MAX_PERIOD
+            || total_period.as_secs() > MAX_PERIOD
+            || total_ban_time.as_secs() > MAX_PERIOD
+        {
+            return Err(AdmissionPolicyError::InvalidPeriod);
         }
 
         let peer_history = if client_per_day != 0 {
@@ -141,7 +184,7 @@ impl ServerAdmissionPolicy {
         } else if client_per_hour != 0 {
             Some(HOUR)
         } else if client_per_minute != 0 {
-            Some(MINUTE)
+            Some(peer_period)
         } else {
             None
         };
@@ -152,8 +195,8 @@ impl ServerAdmissionPolicy {
                 history,
                 max_concurrent,
                 total_in_per_minute,
-                total_in_per_hour,
-                total_in_per_day,
+                total_in_hour,
+                total_in_day,
             )
             .filter(|required| *required <= MAX_PEER_ENTRIES)
             .ok_or(AdmissionPolicyError::IncoherentCapacity)?,
@@ -169,8 +212,11 @@ impl ServerAdmissionPolicy {
         policy.client_per_hour = client_per_hour;
         policy.client_per_day = client_per_day;
         policy.total_in_per_minute = total_in_per_minute;
-        policy.total_in_per_hour = total_in_per_hour;
-        policy.total_in_per_day = total_in_per_day;
+        policy.total_in_per_hour = total_in_hour;
+        policy.total_in_per_day = total_in_day;
+        policy.peer_period = peer_period;
+        policy.total_period = total_period;
+        policy.total_ban_time = total_ban_time;
         policy.peer_history = peer_history;
         policy.required_peer_entries = required_peer_entries;
         Ok(policy)
@@ -194,7 +240,16 @@ impl ServerAdmissionPolicy {
         let total_in_per_minute = value("TotalInPerMinute", defaults.total_in_per_minute)?;
         let total_in_hour = value("TotalInPerHour", defaults.total_in_per_hour)?;
         let total_in_day = value("TotalInPerDay", defaults.total_in_per_day)?;
-        Self::new(
+        let period = |key: &'static str, default: Duration| {
+            raw.get(key)
+                .map(|value| value.as_u64().ok_or(key))
+                .transpose()
+                .map(|value| Duration::from_secs(value.unwrap_or(default.as_secs())))
+        };
+        let peer_period = period("PerClientPeriod", defaults.peer_period)?;
+        let total_period = period("TotalPeriod", defaults.total_period)?;
+        let total_ban_time = period("TotalBanTime", defaults.total_ban_time)?;
+        Self::new_with_periods(
             max,
             client_per_minute,
             client_per_hour,
@@ -202,11 +257,15 @@ impl ServerAdmissionPolicy {
             total_in_per_minute,
             total_in_hour,
             total_in_day,
+            peer_period,
+            total_period,
+            total_ban_time,
         )
         .map_err(|error| match error {
             AdmissionPolicyError::InvalidMaxConcurrent => "MaxConcurrentConns",
             AdmissionPolicyError::InvalidRate => "connection rate",
             AdmissionPolicyError::IncoherentCapacity => "peer-state capacity",
+            AdmissionPolicyError::InvalidPeriod => "admission period",
         })
     }
 
@@ -225,6 +284,10 @@ impl ServerAdmissionPolicy {
     /// ceiling.
     pub fn required_peer_entries(&self) -> usize {
         self.required_peer_entries
+    }
+
+    pub fn total_ban_time(&self) -> Duration {
+        self.total_ban_time
     }
 }
 
@@ -283,8 +346,12 @@ fn required_entries_for_history(
 pub struct PeerKey([u8; 32]);
 
 impl PeerKey {
-    fn from_identity(peer: &TrustedPeerIdentity) -> Self {
+    pub(super) fn from_identity(peer: &TrustedPeerIdentity) -> Self {
         Self(*peer.canonical_id())
+    }
+
+    pub(super) fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
     }
 }
 
@@ -363,14 +430,21 @@ impl Counters {
         }
     }
 
-    fn allow(&mut self, now: Instant, minute: u64, hour: u64, day: u64) -> bool {
-        self.minute.allow(now, MINUTE, minute)
+    fn allow(
+        &mut self,
+        now: Instant,
+        minute_duration: Duration,
+        minute: u64,
+        hour: u64,
+        day: u64,
+    ) -> bool {
+        self.minute.allow(now, minute_duration, minute)
             && self.hour.allow(now, HOUR, hour)
             && self.day.allow(now, DAY, day)
     }
 
-    fn record(&mut self, now: Instant) {
-        self.minute.record(now, MINUTE);
+    fn record(&mut self, now: Instant, minute_duration: Duration) {
+        self.minute.record(now, minute_duration);
         self.hour.record(now, HOUR);
         self.day.record(now, DAY);
     }
@@ -379,13 +453,14 @@ impl Counters {
         &self,
         now: Instant,
         history: Duration,
+        minute_duration: Duration,
         minute: u64,
         hour: u64,
         day: u64,
     ) -> Instant {
         let mut expiry = now + history;
         if minute != 0 {
-            expiry = expiry.max(self.minute.expires_at(MINUTE));
+            expiry = expiry.max(self.minute.expires_at(minute_duration));
         }
         if hour != 0 {
             expiry = expiry.max(self.hour.expires_at(HOUR));
@@ -415,6 +490,10 @@ struct State {
     client_per_minute: u64,
     client_per_hour: u64,
     client_per_day: u64,
+    peer_period: Duration,
+    total_period: Duration,
+    peer_bans: HashMap<PeerKey, Instant>,
+    aggregate_ban_until: Option<Instant>,
 }
 
 impl State {
@@ -429,10 +508,18 @@ impl State {
             client_per_minute: policy.client_per_minute,
             client_per_hour: policy.client_per_hour,
             client_per_day: policy.client_per_day,
+            peer_period: policy.peer_period,
+            total_period: policy.total_period,
+            peer_bans: HashMap::new(),
+            aggregate_ban_until: None,
         }
     }
 
     fn reap(&mut self, now: Instant) {
+        self.peer_bans.retain(|_, until| *until > now);
+        if self.aggregate_ban_until.is_some_and(|until| until <= now) {
+            self.aggregate_ban_until = None;
+        }
         while let Some((&(deadline, key), ())) = self.expiry_queue.first_key_value() {
             if deadline > now {
                 break;
@@ -530,6 +617,10 @@ impl ServerAdmissionState {
             return AdmissionDecision::Denied(AdmissionRejection::GlobalConcurrency);
         }
 
+        if state.aggregate_ban_until.is_some_and(|until| until > now) {
+            return AdmissionDecision::Denied(AdmissionRejection::AggregateRate);
+        }
+
         // 3. Peer-state capacity check (new peer only).
         let is_new = !state.peers.contains_key(&key);
         if is_new && state.peers.len() >= MAX_PEER_ENTRIES {
@@ -547,13 +638,20 @@ impl ServerAdmissionState {
         // 5. Peer-rate check (existing peer only; a fresh peer has zero
         // counters and therefore trivially passes any non-zero limit).
         if !is_new {
+            if state.peer_bans.get(&key).is_some_and(|until| *until > now) {
+                return AdmissionDecision::Denied(AdmissionRejection::PeerRate);
+            }
             let peer_record = state.peers.get_mut(&key).expect("peer checked above");
             if !peer_record.counters.allow(
                 now,
+                policy.peer_period,
                 policy.client_per_minute,
                 policy.client_per_hour,
                 policy.client_per_day,
             ) {
+                if !policy.total_ban_time.is_zero() {
+                    state.peer_bans.insert(key, now + policy.total_ban_time);
+                }
                 return AdmissionDecision::Denied(AdmissionRejection::PeerRate);
             }
         }
@@ -561,10 +659,14 @@ impl ServerAdmissionState {
         // 6. Aggregate-rate check.
         if !state.aggregate.allow(
             now,
+            policy.total_period,
             policy.total_in_per_minute,
             policy.total_in_per_hour,
             policy.total_in_per_day,
         ) {
+            if !policy.total_ban_time.is_zero() {
+                state.aggregate_ban_until = Some(now + policy.total_ban_time);
+            }
             return AdmissionDecision::Denied(AdmissionRejection::AggregateRate);
         }
 
@@ -593,8 +695,8 @@ impl ServerAdmissionState {
         }
         let peer_record = state.peers.get_mut(&key).expect("peer inserted above");
         peer_record.active += 1;
-        peer_record.counters.record(now);
-        state.aggregate.record(now);
+        peer_record.counters.record(now, policy.peer_period);
+        state.aggregate.record(now, policy.total_period);
         state.active += 1;
 
         #[cfg(test)]
@@ -638,6 +740,7 @@ impl Drop for AdmissionLease {
         let client_per_minute = inner.policy.client_per_minute;
         let client_per_hour = inner.policy.client_per_hour;
         let client_per_day = inner.policy.client_per_day;
+        let peer_period = inner.policy.peer_period;
         let mut state = inner.state.lock();
         state.active = state.active.saturating_sub(1);
         if let Some(peer) = state.peers.get_mut(&self.key) {
@@ -648,6 +751,7 @@ impl Drop for AdmissionLease {
                         let expires_at = peer.counters.expires_at(
                             now,
                             history,
+                            peer_period,
                             client_per_minute,
                             client_per_hour,
                             client_per_day,
@@ -813,6 +917,38 @@ mod tests {
             ServerAdmissionPolicy::from_raw_options(&huge),
             Err("connection rate")
         );
+        let invalid_period = BTreeMap::from([("PerClientPeriod".to_owned(), Value::from(0u64))]);
+        assert_eq!(
+            ServerAdmissionPolicy::from_raw_options(&invalid_period),
+            Err("admission period")
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn configured_period_and_temporary_denial_expire_monotonically() {
+        let raw = BTreeMap::from([
+            ("MaxConcurrentConns".to_owned(), Value::from(10u64)),
+            ("ClientPerMinute".to_owned(), Value::from(1u64)),
+            ("ClientPerHour".to_owned(), Value::from(0u64)),
+            ("ClientPerDay".to_owned(), Value::from(0u64)),
+            ("TotalInPerMinute".to_owned(), Value::from(100u64)),
+            ("PerClientPeriod".to_owned(), Value::from(5u64)),
+            ("TotalPeriod".to_owned(), Value::from(5u64)),
+            ("TotalBanTime".to_owned(), Value::from(10u64)),
+        ]);
+        let state = ServerAdmissionState::new(ServerAdmissionPolicy::from_raw_options(&raw).unwrap());
+        let first = peer(60);
+        let lease = match state.try_acquire(&first) {
+            AdmissionDecision::Allowed(lease) => lease,
+            other => panic!("unexpected result: {other:?}"),
+        };
+        drop(lease);
+        assert!(matches!(
+            state.try_acquire(&first),
+            AdmissionDecision::Denied(AdmissionRejection::PeerRate)
+        ));
+        tokio::time::advance(Duration::from_secs(10)).await;
+        assert!(matches!(state.try_acquire(&first), AdmissionDecision::Allowed(_)));
     }
 
     #[tokio::test(start_paused = true)]

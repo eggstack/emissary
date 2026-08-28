@@ -354,7 +354,8 @@ identity semantics require. `CustomOptions` is bounded to 32 string entries with
 | Parsed and round-tripped | `Description`, `StartOnLoad`, `TargetDestination`, `Destination`, `TargetPort`, `ReachableBy`, `Port`, `TargetHost`, `Host` |
 | Applied by accepted client proxy/filter runtimes | `ProxyList`, `ProxyAuth`, `ProxyUsername`, `ProxyPassword`, `OutproxyAuth`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `AllowUserAgent`, `AllowReferer`, `AllowAccept` |
 | Rejected before allocation as residual blockers | `UseOutproxyPlugin`, `SSLProxies`, `JumpList`, `ConnectDelay`, `Profile`, `DelayOpen`, `Reduce`, `ReduceCount`, `ReduceTime`, `Close`, `CloseTime` |
-| Accepted for a later server or non-client role | `AllowInternalSSL`, `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `UniqueLocalAddressPerClient`, `MultiHoming`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `OptionalLookup`, `EncryptLeaseSet` |
+| Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime` |
+| Rejected before allocation as residual server blockers | `AllowInternalSSL`, `UniqueLocalAddressPerClient`, `MultiHoming`, `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
 | Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `SigType`, `EncType`, `CustomOptions`, `NewDest`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
 
 `PrivKeyFile` is part of the pinned input inventory and is retained as a redacted
@@ -414,13 +415,14 @@ The `httpserver` backend additionally supports loopback-only `TargetHost`/`Host`
 referer/User-Agent policy, bounded `MaxConcurrentConns`, peer/aggregate
 `ClientPerMinute`/`ClientPerHour`/`ClientPerDay` and
 `TotalInPerMinute`/`TotalInPerHour`/`TotalInPerDay` admission, and peer-keyed
-`PostLimit`/`PostLimitTime`. Absent admission values default to 30 global
+`PostLimit`/`PostLimitTime`, confined newline-delimited `FilterFilePath`
+access generations, and bounded `PerClientPeriod`/`TotalPeriod`/`TotalBanTime`.
+Absent admission values default to 30 global
 connections, 8 concurrent connections per peer, peer rates 30/80/200 per
 minute/hour/day, and aggregate rates 50 per minute and unlimited per hour/day.
 It rejects TLS termination, compression/custom options, proxy/outproxy
-settings, `FilterFilePath`, `UniqueLocalAddressPerClient`, `MultiHoming`, and
-the underspecified `PerClientPeriod`/`TotalPeriod`/`TotalBanTime` before session
-allocation. Request proxy identity and privacy headers are stripped, trusted
+settings, `AllowInternalSSL`, `UniqueLocalAddressPerClient`, `MultiHoming`, and
+LeaseSet security options before session allocation. Request proxy identity and privacy headers are stripped, trusted
 peer identity injection is bounded to the 524-byte reference destination
 representation, and response fingerprint/provider/cache/trace headers are
 removed before forwarding. Content-Length and valid chunked framing are

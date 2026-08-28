@@ -1,6 +1,6 @@
 # Proposal 170 Conformance Matrix
 
-Status: partial Proposal 170 support; M095 aggregate matrix closed; completion handoffs remain
+Status: partial Proposal 170 support; M095-M099 aggregate/completion slices closed; residual option cells and M104 live reclosure remain
 
 The aggregate full-support planning matrix is maintained at
 `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`.
@@ -42,7 +42,10 @@ accepted by M056 after the M054/M055 corrective heads.
 
 M072 and M073 record the historical twelve-type runtime composition and its
 bounded option-truthfulness correction. The current full-support boundary is
-owned by M095's aggregate matrix and its M096-M103 completion handoffs.
+owned by M095's aggregate matrix and its M096-M103 completion handoffs. M099
+applies the independent server access, HTTP presentation/filter, admission,
+rate, POST, and tunnel-local denial cells; LeaseSet/session-security and
+unsafe server-owner cells remain explicit residual blockers.
 
 ## Retained machine-readable matrix
 

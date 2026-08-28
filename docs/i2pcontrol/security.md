@@ -49,7 +49,9 @@ The following `TunnelOptions` fields are redacted:
 
 Canonical `ProxyPassword`, `OutproxyPassword`, and `LeaseSetClientAuths` input
 is not duplicated into response-facing `rawConfig`; response serializers filter
-all sensitive keys. Canonical `PrivKeyFile` is rejected as generic key-material
+all sensitive keys. `FilterFilePath` is also redacted from ordinary canonical
+responses and is resolved only beneath the server-owned administrative root.
+Canonical `PrivKeyFile` is rejected as generic key-material
 ingress. Errors contain field names at most, never secret values.
 
 ### Logging policy

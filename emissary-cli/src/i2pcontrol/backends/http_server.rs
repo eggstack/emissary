@@ -30,8 +30,8 @@ use crate::i2pcontrol::{
     backends::{
         runtime::{
             run_accepted_server, AcceptedServerConnection, AcceptedServerHandler,
-            AcceptedServerRuntimeConfig, AcceptedServerRuntimeError, ServerAdmissionPolicy,
-            TrustedPeerIdentity,
+            AcceptedServerRuntimeConfig, AcceptedServerRuntimeError, ServerAccessPolicy,
+            ServerAdmissionPolicy, TrustedPeerIdentity,
         },
         server::SERVER_IDENTITY_KEY,
     },
@@ -63,6 +63,7 @@ struct HttpServerConfig {
     sam_tcp_port: u16,
     destination: StoredDestination,
     admission: ServerAdmissionPolicy,
+    access: ServerAccessPolicy,
     policy: HttpServerPolicy,
     post_limiter: PostLimiter,
     session_options: SessionOptions,
@@ -354,6 +355,7 @@ impl HttpServerRuntimeSupervisor {
                     sam_tcp_port: config.sam_tcp_port,
                     destination: config.destination,
                     admission: config.admission,
+                    access: config.access,
                     lease_set_enc_type: None,
                     session_options: Some(config.session_options),
                     handler,
@@ -581,8 +583,10 @@ impl HttpServerTunnelBackend {
             }
         })?;
         let website_host = configured_host(definition)?;
-        let access_list = raw_string(definition, "AccessList")?
-            .or_else(|| definition.options.access_list.clone())
+        let access_list_value = raw_string(definition, "AccessList")?
+            .or_else(|| definition.options.access_list.clone());
+        let access_list = access_list_value
+            .clone()
             .map(|value| {
                 value
                     .split(',')
@@ -600,6 +604,24 @@ impl HttpServerTunnelBackend {
                 });
             }
         };
+        let filter_file = raw_string(definition, "FilterFilePath")?;
+        if filter_file.is_some() && access_list.is_some() {
+            return Err(invalid_option("AccessList/FilterFilePath"));
+        }
+        let access = match filter_file {
+            Some(path) => ServerAccessPolicy::from_filter_file(
+                self.destinations.directory().parent().unwrap_or(self.destinations.directory()),
+                &path,
+            ),
+            None => ServerAccessPolicy::from_values(
+                Some(match access_option {
+                    AccessOption::Allow => "allow",
+                    AccessOption::Deny => "deny",
+                }),
+                access_list_value.as_deref(),
+            ),
+        }
+        .map_err(invalid_option)?;
         let admission = ServerAdmissionPolicy::from_raw_options(&definition.raw_config)
             .map_err(invalid_option)?;
         let post_limit = raw_u64(definition, "PostLimit")
@@ -620,12 +642,14 @@ impl HttpServerTunnelBackend {
             sam_tcp_port: self.sam_tcp_port,
             destination: StoredDestination::from_private(String::new()),
             admission,
+            access,
             policy: HttpServerPolicy {
                 website_host,
                 block_access_in_proxies: raw_bool(definition, "BlockAccessInProxies")?
                     .unwrap_or(false),
                 block_referers: raw_bool(definition, "BlockReferers")?.unwrap_or(false),
                 allow_referer: raw_bool(definition, "AllowReferer")?.unwrap_or(true),
+                allow_accept: raw_bool(definition, "AllowAccept")?.unwrap_or(true),
                 block_user_agents: raw_bool(definition, "BlockUserAgents")?.unwrap_or(false),
                 allow_user_agent: raw_bool(definition, "AllowUserAgent")?.unwrap_or(true),
                 user_agents: raw_string(definition, "UserAgents")?.map(|value| {
@@ -753,8 +777,10 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "AllowUserAgent",
         "BlockReferers",
         "AllowReferer",
+        "AllowAccept",
         "AccessOption",
         "AccessList",
+        "FilterFilePath",
         "MaxConcurrentConns",
         "ClientPerMinute",
         "ClientPerHour",
@@ -764,6 +790,9 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "TotalInPerDay",
         "PostLimit",
         "PostLimitTime",
+        "PerClientPeriod",
+        "TotalPeriod",
+        "TotalBanTime",
         "HostingDestination",
         "i2p.tunnel.httpHost",
         "i2p.tunnel.accessList",
@@ -793,13 +822,8 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "OutproxyPassword",
         "OutproxyType",
         "UseOutproxyPlugin",
-        "AllowAccept",
         "AllowInternalSSL",
         "UniqueLocalAddressPerClient",
-        "FilterFilePath",
-        "PerClientPeriod",
-        "TotalPeriod",
-        "TotalBanTime",
         "TunnelLength",
         "TunnelVariance",
         "TunnelQuantity",
@@ -1061,6 +1085,7 @@ mod tests {
                     block_access_in_proxies: false,
                     block_referers: false,
                     allow_referer: true,
+                    allow_accept: true,
                     block_user_agents: false,
                     allow_user_agent: true,
                     user_agents: None,
@@ -1120,6 +1145,7 @@ mod tests {
                     block_access_in_proxies: false,
                     block_referers: false,
                     allow_referer: true,
+                    allow_accept: true,
                     block_user_agents: false,
                     allow_user_agent: true,
                     user_agents: None,
@@ -1166,6 +1192,7 @@ mod tests {
                     block_access_in_proxies: false,
                     block_referers: false,
                     allow_referer: true,
+                    allow_accept: true,
                     block_user_agents: false,
                     allow_user_agent: true,
                     user_agents: None,

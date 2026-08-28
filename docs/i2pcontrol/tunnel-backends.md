@@ -213,17 +213,22 @@ support.
 | `socks`, `socksirc` | loopback/authenticated listener, SOCKS CONNECT policy and (for `socksirc`) IRC filter | BIND, UDP ASSOCIATE, arbitrary DNS, unsafe targets, custom/I2CP |
 | `connectclient` | listener/auth, strict CONNECT parsing, direct I2P or explicit I2P outproxy | unsupported methods, unsafe direct targets, unsupported proxy/outproxy modes, custom/I2CP |
 | `streamrclient` | producer destination, loopback target, UDP target/source ports, 15-second refresh | non-loopback addresses, tunnel shaping/signature/encryption, custom/I2CP |
-| `server` | loopback target/port, persistent identity, shared admission and `leaseSetEncType` | access/privacy/consumer/signature/hashcash, unsupported raw fields, custom/I2CP |
-| `httpserver` | loopback target, Host/access policy, shared admission, peer-keyed POST limiter, persistent identity | TLS, proxy/outproxy, `FilterFilePath`, `UniqueLocalAddressPerClient`, `MultiHoming`, underspecified periods/ban time, custom/I2CP |
-| `httpbidirserver` | shared filtered inbound HTTP path plus authenticated local proxy, loopback bind/target, shared admission and POST limiter | unsupported TLS/outproxy/filter/address/period options, custom/I2CP |
-| `ircserver` | bounded registration, trusted peer hostname, loopback target, shared admission, inactivity relay | IRC automation, WEBIRC/cloak/access/auth/DCC options, custom/I2CP |
+| `server` | loopback target/port, persistent identity, trusted-peer access policy, shared admission and `leaseSetEncType` | privacy/consumer/signature/hashcash, unsupported raw fields, custom/I2CP |
+| `httpserver` | loopback target, Host/access/filter policy, shared admission, peer-keyed POST limiter, persistent identity | TLS, proxy/outproxy, `UniqueLocalAddressPerClient`, `MultiHoming`, LeaseSet security, custom/I2CP |
+| `httpbidirserver` | shared filtered inbound HTTP path plus authenticated local proxy, loopback bind/target, access/filter policy, shared admission and POST limiter | unsupported TLS/outproxy/address, `UniqueLocalAddressPerClient`, `MultiHoming`, LeaseSet security, custom/I2CP |
+| `ircserver` | bounded registration, trusted peer hostname, loopback target, access/filter policy, shared admission, inactivity relay | IRC automation, WEBIRC/cloak/auth/DCC options, LeaseSet security, custom/I2CP |
 | `streamrserver` | persistent identity, loopback UDP source, ten subscribers, 60-second expiry, 1200-byte payload, bounded transport | non-loopback addresses, tunnel shaping/signature/encryption, custom/I2CP |
 
 `HostingDestination` on server definitions is published destination metadata.
 It is not a local target selector and is ignored as such by all server
-backends. `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `FilterFilePath`,
-`UniqueLocalAddressPerClient`, and `MultiHoming` remain explicitly rejected
-where the backend cannot give them authoritative semantics.
+backends. Access entries are parsed as full trusted Destinations or canonical
+52-character base32 hashes before session/listener allocation. `FilterFilePath`
+is a newline-delimited access generation confined beneath the I2PControl server
+state root; invalid reloads do not replace a valid running generation.
+`PerClientPeriod`, `TotalPeriod`, and `TotalBanTime` are bounded,
+generation-local admission controls. `UniqueLocalAddressPerClient`,
+`MultiHoming`, server-side `AllowInternalSSL`, and LeaseSet security options
+remain explicitly rejected residuals where no exact owner exists.
 
 ## Design rationale
 

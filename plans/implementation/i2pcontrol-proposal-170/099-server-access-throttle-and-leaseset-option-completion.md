@@ -1,6 +1,6 @@
 # M099 — Server Access, Throttle, and LeaseSet Option Completion
 
-Status: **blocked on M098 closure for integration order; no longer milestone-wide blocked on M097**
+Status: **closed internally against pinned revision; partial with explicit residual blockers**
 
 Source roadmap:
 

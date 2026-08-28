@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096, M098, and M100-M103 closed; M097 closed as blocked; M099 is current handoff; M104 remains blocked
+Status: active; M095-M096, M098-M103, and M099 closed; M097 closed as blocked; residual option blocker is current; M104 remains blocked
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -246,7 +246,7 @@ Exit: every cell still owned by M098 is `apply`; transferred blockers are explic
 
 ### M099 — server access, throttle, and LeaseSet independent slice
 
-Status: ready; current handoff.
+Status: closed internally against pinned revision; partial.
 
 M099 now consumes M098's final matrix ownership, implements server cells supported by existing accepted server/filter/admission runtime, and transfers genuine residual session/LeaseSet/unsafe-owner blockers.
 
@@ -262,7 +262,7 @@ Expected independent work:
 
 LeaseSet encryption/auth/session-security cells remain blocked when exact supported Yosemite/SAM semantics do not exist.
 
-Exit: every cell still owned by M099 is `apply`; no M093 security regression; residual blocker ledger exact.
+Exit: every cell still owned by M099 is `apply`; no M093 security regression; residual blocker ledger exact. Met by the M099 closure record.
 
 ### Residual option blocker line
 

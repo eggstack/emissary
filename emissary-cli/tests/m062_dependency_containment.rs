@@ -395,6 +395,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m100 = is_authorized_m100_path(path);
         let authorized_m101 = is_authorized_m101_path(path);
         let authorized_m102 = is_authorized_m102_path(path);
+        let authorized_m099 = is_authorized_m099_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -405,6 +406,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m100
                 || authorized_m101
                 || authorized_m102
+                || authorized_m099
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -419,12 +421,43 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m100
                     || authorized_m101
                     || authorized_m102
+                    || authorized_m099
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
             );
         }
     }
+}
+
+fn is_authorized_m099_path(path: &str) -> bool {
+    matches!(
+        path,
+        "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/proposal-170-conformance.md"
+            | "docs/i2pcontrol/security.md"
+            | "docs/i2pcontrol/tunnel-manager.md"
+            | "docs/i2pcontrol/tunnel-backends.md"
+            | "emissary-cli/src/i2pcontrol/backends/filters/http.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_bidir.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/irc_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/access.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/accepted_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/admission.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/mod.rs"
+            | "emissary-cli/src/i2pcontrol/backends/server.rs"
+            | "emissary-cli/src/i2pcontrol/tunnel_manager.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "emissary-cli/tests/m095_full_support_matrix.rs"
+            | "plans/closure/i2pcontrol-proposal-170/098-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/099-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+    )
 }
 
 fn is_authorized_tunnel_runtime_path(path: &str) -> bool {
@@ -723,6 +756,8 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/093-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/094-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/095-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/098-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/099-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/102-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/103-closure.md"
             | "emissary-cli/tests/m095_full_support_matrix.rs"

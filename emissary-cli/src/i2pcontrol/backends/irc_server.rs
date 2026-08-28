@@ -49,6 +49,7 @@ struct IrcServerConfig {
     sam_tcp_port: u16,
     destination: StoredDestination,
     admission: ServerAdmissionPolicy,
+    access: ServerAccessPolicy,
     session_options: SessionOptions,
 }
 
@@ -240,6 +241,7 @@ impl IrcServerRuntimeSupervisor {
                     sam_tcp_port: config.sam_tcp_port,
                     destination: config.destination,
                     admission: config.admission,
+                    access: config.access,
                     lease_set_enc_type: None,
                     session_options: Some(config.session_options),
                     handler,
@@ -260,7 +262,9 @@ impl IrcServerRuntimeSupervisor {
                     supervisor.publish_destination(&name, generation, &destination);
                     supervisor.mark_running(&name, generation)
                 } =>
-                Ok(()),
+            {
+                Ok(())
+            }
             Ok(Ok(Err(_))) | Ok(Err(_)) | Err(_) => {
                 let _ = self.stop_generation(&name, generation).await;
                 Err(BackendError::Internal {
@@ -460,11 +464,12 @@ where
                 }
                 saw_user = true;
             }
-            _ =>
+            _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "unsupported IRC registration",
-                )),
+                ))
+            }
         }
         let safe_line = if command == "USER" {
             rewrite_server_user(&line, peer_hostname).ok_or_else(|| {
@@ -622,6 +627,18 @@ impl IrcServerTunnelBackend {
         validate_raw_options(definition)?;
         let admission = ServerAdmissionPolicy::from_raw_options(&definition.raw_config)
             .map_err(invalid_option)?;
+        let access = if let Some(path) = raw_string(definition, "FilterFilePath")? {
+            ServerAccessPolicy::from_filter_file(
+                self.destinations.directory().parent().unwrap_or(self.destinations.directory()),
+                &path,
+            )
+        } else {
+            ServerAccessPolicy::from_values(
+                raw_string(definition, "AccessOption")?.as_deref(),
+                raw_string(definition, "AccessList")?.as_deref(),
+            )
+        }
+        .map_err(invalid_option)?;
         let target_host = definition
             .raw_config
             .get("TargetHost")
@@ -648,6 +665,7 @@ impl IrcServerTunnelBackend {
             sam_tcp_port: self.sam_tcp_port,
             destination: StoredDestination::from_private(String::new()),
             admission,
+            access,
             session_options: SessionOptions::default(),
         })
     }
@@ -667,6 +685,12 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "TotalInPerMinute",
         "TotalInPerHour",
         "TotalInPerDay",
+        "PerClientPeriod",
+        "TotalPeriod",
+        "TotalBanTime",
+        "AccessOption",
+        "AccessList",
+        "FilterFilePath",
     ];
     const METADATA: &[&str] = &[
         "name",
@@ -696,6 +720,14 @@ fn invalid_option(option: &str) -> BackendError {
     BackendError::Internal {
         message: format!("ircserver option {option} is invalid"),
     }
+}
+
+fn raw_string(definition: &TunnelDefinition, key: &str) -> BackendResult<Option<String>> {
+    definition
+        .raw_config
+        .get(key)
+        .map(|value| value.as_str().map(str::to_owned).ok_or_else(|| invalid_option(key)))
+        .transpose()
 }
 
 #[cfg(test)]

@@ -35,7 +35,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M099 ready** | M098 client slice closed; M104 remains blocked on residual option cells |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **residual option blocker** | M099 closed internally; M104 remains blocked on six applicable residual option families |
 | I2PControl Proposal 170 source/truthfulness | RouterInfo source line closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | none | current RouterInfo matrix: 42 available / 1 protocol-permitted neutral / 0 unavailable |
 | I2PControl Proposal 170 containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | none | M061/M062/M063 rules remain controlling |
 | I2PControl tunnel runtime | all 12 data planes real | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | option semantics only | do not redesign data planes for option parity |
@@ -64,10 +64,10 @@ M095 full-support matrix/containment                [CLOSED]
 M098 client/proxy/HTTP independent slice [CLOSED]  |
   |   transfer genuine primitive-dependent cells --+
   v
-M099 server/access/throttle independent slice       [READY — CURRENT HANDOFF]
+M099 server/access/throttle independent slice       [CLOSED INTERNALLY — PARTIAL]
   |   transfer genuine LeaseSet/session/unsafe cells ----+
   v                                                       |
-residual TunnelManager blocker line                        |
+residual TunnelManager blocker line                 [BLOCKED]
   | no plan is executable until a bounded primitive       |
   | path exists under current containment rules            |
   +--------------------------------------------------------+

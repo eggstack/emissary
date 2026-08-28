@@ -22,7 +22,7 @@ use super::{
     runtime::{
         run_accepted_server, run_client_listener, AcceptedServerRuntimeConfig,
         AcceptedServerRuntimeError, ClientListenerRuntimeConfig, ClientListenerRuntimeError,
-        ServerAdmissionPolicy,
+        ServerAccessPolicy, ServerAdmissionPolicy,
     },
     server::SERVER_IDENTITY_KEY,
     BackendError, BackendResult, BackendStatus, TunnelBackend,
@@ -50,6 +50,7 @@ struct HttpBidirConfig {
     sam_tcp_port: u16,
     destination: StoredDestination,
     admission: ServerAdmissionPolicy,
+    access: ServerAccessPolicy,
     server_policy: HttpServerPolicy,
     post_limiter: PostLimiter,
     proxy_username: Option<String>,
@@ -360,6 +361,7 @@ async fn run_composite(
             sam_tcp_port: config.sam_tcp_port,
             destination: config.destination,
             admission: config.admission,
+            access: config.access,
             lease_set_enc_type: None,
             session_options: Some(config.server_session_options),
             handler: server_handler,
@@ -536,8 +538,9 @@ impl HttpBidirServerTunnelBackend {
             })?;
         let bind_address = match definition.options.listen_interface.as_deref() {
             None => "127.0.0.1".parse().expect("loopback address is valid"),
-            Some(value) =>
-                value.parse::<IpAddr>().map_err(|_| invalid_option("ListenInterface"))?,
+            Some(value) => {
+                value.parse::<IpAddr>().map_err(|_| invalid_option("ListenInterface"))?
+            }
         };
         let proxy_username = raw_string(definition, "ProxyUsername")?
             .or_else(|| definition.options.proxy_username.clone());
@@ -567,8 +570,10 @@ impl HttpBidirServerTunnelBackend {
         {
             return Err(invalid_option("WebsiteHostname"));
         }
-        let access_list = raw_string(definition, "AccessList")?
-            .or_else(|| definition.options.access_list.clone())
+        let access_list_value = raw_string(definition, "AccessList")?
+            .or_else(|| definition.options.access_list.clone());
+        let access_list = access_list_value
+            .clone()
             .map(|value| {
                 value
                     .split(',')
@@ -582,6 +587,24 @@ impl HttpBidirServerTunnelBackend {
             Some("deny") => AccessOption::Deny,
             Some(_) => return Err(invalid_option("AccessOption")),
         };
+        let filter_file = raw_string(definition, "FilterFilePath")?;
+        if filter_file.is_some() && access_list.is_some() {
+            return Err(invalid_option("AccessList/FilterFilePath"));
+        }
+        let access = match filter_file {
+            Some(path) => ServerAccessPolicy::from_filter_file(
+                self.destinations.directory().parent().unwrap_or(self.destinations.directory()),
+                &path,
+            ),
+            None => ServerAccessPolicy::from_values(
+                Some(match access_option {
+                    AccessOption::Allow => "allow",
+                    AccessOption::Deny => "deny",
+                }),
+                access_list_value.as_deref(),
+            ),
+        }
+        .map_err(invalid_option)?;
         let admission = ServerAdmissionPolicy::from_raw_options(&definition.raw_config)
             .map_err(invalid_option)?;
         let post_limit = raw_u64(definition, "PostLimit")?.unwrap_or(0);
@@ -601,12 +624,14 @@ impl HttpBidirServerTunnelBackend {
             sam_tcp_port: self.sam_tcp_port,
             destination: StoredDestination::from_private(String::new()),
             admission,
+            access,
             server_policy: HttpServerPolicy {
                 website_host,
                 block_access_in_proxies: raw_bool(definition, "BlockAccessInProxies")?
                     .unwrap_or(false),
                 block_referers: raw_bool(definition, "BlockReferers")?.unwrap_or(false),
                 allow_referer: raw_bool(definition, "AllowReferer")?.unwrap_or(true),
+                allow_accept: raw_bool(definition, "AllowAccept")?.unwrap_or(true),
                 block_user_agents: raw_bool(definition, "BlockUserAgents")?.unwrap_or(false),
                 allow_user_agent: raw_bool(definition, "AllowUserAgent")?.unwrap_or(true),
                 user_agents: raw_string(definition, "UserAgents")?.map(|value| {
@@ -738,6 +763,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "ProxyUsername",
         "AccessOption",
         "AccessList",
+        "FilterFilePath",
         "MaxConcurrentConns",
         "ClientPerMinute",
         "ClientPerHour",
@@ -747,6 +773,9 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "TotalInPerDay",
         "PostLimit",
         "PostLimitTime",
+        "PerClientPeriod",
+        "TotalPeriod",
+        "TotalBanTime",
         "HostingDestination",
         "Description",
         "StartOnLoad",

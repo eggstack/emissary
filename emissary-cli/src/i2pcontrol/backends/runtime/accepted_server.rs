@@ -9,6 +9,7 @@ use crate::i2pcontrol::server_secret_store::StoredDestination;
 pub(super) use super::peer_identity_impl::TrustedPeerIdentity;
 
 use super::{
+    access::ServerAccessPolicy,
     admission::{AdmissionDecision, ServerAdmissionPolicy, ServerAdmissionState},
     task_group::BoundedTaskGroup,
 };
@@ -40,6 +41,7 @@ pub struct AcceptedServerRuntimeConfig {
     pub sam_tcp_port: u16,
     pub destination: StoredDestination,
     pub admission: ServerAdmissionPolicy,
+    pub access: ServerAccessPolicy,
     /// Optional I2CP lease-set encryption type for the accepted-stream session.
     ///
     /// `None` keeps the Yosemite default. M081 reserves this field for the
@@ -59,6 +61,7 @@ impl fmt::Debug for AcceptedServerRuntimeConfig {
             .field("sam_tcp_port", &self.sam_tcp_port)
             .field("destination", &self.destination)
             .field("admission", &self.admission)
+            .field("access", &self.access)
             .field("lease_set_enc_type", &self.lease_set_enc_type)
             .finish_non_exhaustive()
     }
@@ -122,6 +125,9 @@ pub async fn run_accepted_server(
                 let Some(peer) = TrustedPeerIdentity::from_stream(&stream) else {
                     continue;
                 };
+                if !config.access.allows(&peer) {
+                    continue;
+                }
                 let AdmissionDecision::Allowed(lease) = admission.try_acquire(&peer) else {
                     continue;
                 };
@@ -149,6 +155,7 @@ pub async fn run_accepted_server(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::i2pcontrol::backends::runtime::ServerAccessPolicy;
     use std::sync::atomic::{AtomicBool, Ordering};
 
     use emissary_core::crypto::base64_encode;
@@ -222,6 +229,7 @@ mod tests {
             sam_tcp_port: sam_port,
             destination: StoredDestination::from_private(base64_encode([7u8; 128])),
             admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
+            access: ServerAccessPolicy::default(),
             lease_set_enc_type: None,
             session_options: None,
             handler,
@@ -264,6 +272,7 @@ mod tests {
             sam_tcp_port: sam_port,
             destination: StoredDestination::from_private(base64_encode([7u8; 128])),
             admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
+            access: ServerAccessPolicy::default(),
             lease_set_enc_type: None,
             session_options: None,
             handler,
@@ -292,6 +301,7 @@ mod tests {
                 sam_tcp_port: 1,
                 destination: StoredDestination::from_private("private".to_owned()),
                 admission: ServerAdmissionPolicy::new(1, 0, 0, 0, 0, 0, 0).unwrap(),
+                access: ServerAccessPolicy::default(),
                 lease_set_enc_type: None,
                 session_options: None,
                 handler: Arc::new(|_| Box::pin(async {})),

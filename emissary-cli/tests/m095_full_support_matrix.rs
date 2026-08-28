@@ -240,17 +240,20 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         }
         assert_eq!(string_field(row, "completion_owner"), "M098");
     }
-    for key in [
-        "UseOutproxyPlugin",
-        "SSLProxies",
-        "JumpList",
-    ] {
+    for key in ["UseOutproxyPlugin", "SSLProxies", "JumpList"] {
         let row = option(key);
         let cells = row["cells"].as_array().unwrap();
         for index in [1, 3, 4, 5] {
-            assert_eq!(cells[index].as_str(), Some("blocked_primitive"), "{key} cell {index}");
+            assert_eq!(
+                cells[index].as_str(),
+                Some("blocked_primitive"),
+                "{key} cell {index}"
+            );
         }
-        assert_eq!(string_field(row, "completion_owner"), "residual-option-line");
+        assert_eq!(
+            string_field(row, "completion_owner"),
+            "residual-option-line"
+        );
         assert!(!string_field(row, "blocked_primitive").is_empty());
         assert!(!string_field(row, "blocking_milestone").is_empty());
     }
@@ -267,9 +270,16 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         let row = option(key);
         let cells = row["cells"].as_array().unwrap();
         for (index, cell) in cells.iter().enumerate().take(7) {
-            assert_eq!(cell.as_str(), Some("blocked_primitive"), "{key} cell {index}");
+            assert_eq!(
+                cell.as_str(),
+                Some("blocked_primitive"),
+                "{key} cell {index}"
+            );
         }
-        assert_eq!(string_field(row, "completion_owner"), "residual-option-line");
+        assert_eq!(
+            string_field(row, "completion_owner"),
+            "residual-option-line"
+        );
         assert!(!string_field(row, "blocked_primitive").is_empty());
         assert!(!string_field(row, "blocking_milestone").is_empty());
     }
@@ -277,11 +287,100 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         let row = option(key);
         let cells = row["cells"].as_array().unwrap();
         assert_eq!(cells[1].as_str(), Some("apply"), "{key} HTTP client cell");
-        assert_eq!(cells[8].as_str(), Some("planned_apply"), "{key} HTTP server handoff");
-        assert_eq!(cells[9].as_str(), Some("planned_apply"), "{key} HTTP bidir handoff");
+        assert_eq!(
+            cells[8].as_str(),
+            Some("apply"),
+            "{key} HTTP server handoff"
+        );
+        assert_eq!(cells[9].as_str(), Some("apply"), "{key} HTTP bidir handoff");
     }
     let internal_ssl = option("AllowInternalSSL");
-    assert_eq!(internal_ssl["cells"].as_array().unwrap()[1].as_str(), Some("not_applicable"));
+    assert_eq!(
+        internal_ssl["cells"].as_array().unwrap()[1].as_str(),
+        Some("not_applicable")
+    );
+
+    for key in [
+        "WebsiteHostname",
+        "SpoofedHost",
+        "BlockAccessInProxies",
+        "BlockUserAgents",
+        "UserAgents",
+        "BlockReferers",
+        "AccessOption",
+        "AccessList",
+        "FilterFilePath",
+        "MaxConcurrentConns",
+        "ClientPerMinute",
+        "ClientPerHour",
+        "ClientPerDay",
+        "TotalInPerMinute",
+        "TotalInPerHour",
+        "TotalInPerDay",
+        "PostLimit",
+        "PostLimitTime",
+        "PerClientPeriod",
+        "TotalPeriod",
+        "TotalBanTime",
+    ] {
+        let row = option(key);
+        let cells = row["cells"].as_array().unwrap();
+        assert_eq!(string_field(row, "completion_owner"), "M099", "{key} owner");
+        let expected = if matches!(
+            key,
+            "WebsiteHostname"
+                | "SpoofedHost"
+                | "BlockAccessInProxies"
+                | "BlockUserAgents"
+                | "UserAgents"
+                | "BlockReferers"
+        ) {
+            [false, true, true, false]
+        } else if key == "FilterFilePath" || key == "PostLimit" || key == "PostLimitTime" {
+            [false, true, true, true]
+        } else {
+            [true, true, true, true]
+        };
+        for (offset, should_apply) in expected.into_iter().enumerate() {
+            let index = offset + 7;
+            assert_eq!(
+                cells[index].as_str(),
+                Some(if should_apply { "apply" } else { "not_applicable" }),
+                "{key} cell {index}"
+            );
+        }
+    }
+    for key in [
+        "AllowInternalSSL",
+        "UniqueLocalAddressPerClient",
+        "MultiHoming",
+        "EncryptLeaseSet",
+        "OptionalLookup",
+        "LeaseSetClientAuths",
+    ] {
+        let row = option(key);
+        let cells = row["cells"].as_array().unwrap();
+        assert_eq!(
+            string_field(row, "completion_owner"),
+            "residual-option-line",
+            "{key} owner"
+        );
+        assert!(
+            !string_field(row, "blocked_primitive").is_empty(),
+            "{key} primitive"
+        );
+        assert!(
+            !string_field(row, "blocking_milestone").is_empty(),
+            "{key} milestone"
+        );
+        let (first, last) = match key {
+            "AllowInternalSSL" | "UniqueLocalAddressPerClient" | "MultiHoming" => (8, 9),
+            _ => (7, 11),
+        };
+        for (index, cell) in cells.iter().enumerate().skip(first).take(last - first + 1) {
+            assert_eq!(cell.as_str(), Some("blocked_primitive"), "{key} cell {index}");
+        }
+    }
 
     let selectors = root["contract_names"]["client_services_selectors"]
         .as_array()

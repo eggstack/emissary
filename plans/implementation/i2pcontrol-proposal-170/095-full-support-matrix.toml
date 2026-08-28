@@ -1286,9 +1286,9 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M098"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+completion_owner = "M099"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable"]
 cell_notes = { "client" = "This type is not an HTTP client/server filter role.", "ircclient" = "This type is not an HTTP client/server filter role.", "socks" = "This type is not an HTTP client/server filter role.", "socksirc" = "This type is not an HTTP client/server filter role.", "connectclient" = "This type is not an HTTP client/server filter role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP client/server filter role.", "ircserver" = "This type is not an HTTP client/server filter role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1300,9 +1300,9 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M098"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+completion_owner = "M099"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable"]
 cell_notes = { "client" = "This type is not an HTTP client/server filter role.", "ircclient" = "This type is not an HTTP client/server filter role.", "socks" = "This type is not an HTTP client/server filter role.", "socksirc" = "This type is not an HTTP client/server filter role.", "connectclient" = "This type is not an HTTP client/server filter role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP client/server filter role.", "ircserver" = "This type is not an HTTP client/server filter role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1314,9 +1314,9 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M098"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+completion_owner = "M099"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable"]
 cell_notes = { "client" = "This type is not an HTTP client/server filter role.", "ircclient" = "This type is not an HTTP client/server filter role.", "socks" = "This type is not an HTTP client/server filter role.", "socksirc" = "This type is not an HTTP client/server filter role.", "connectclient" = "This type is not an HTTP client/server filter role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP client/server filter role.", "ircserver" = "This type is not an HTTP client/server filter role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1328,10 +1328,12 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M098"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "This type is not an HTTP client/server filter role.", "httpclient" = "The accepted HTTP client data plane is HTTP-only; no client TLS role exists, so this is not applicable.", "ircclient" = "This type is not an HTTP client/server filter role.", "socks" = "This type is not an HTTP client/server filter role.", "socksirc" = "This type is not an HTTP client/server filter role.", "connectclient" = "This type is not an HTTP client/server filter role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP client/server filter role.", "ircserver" = "This type is not an HTTP client/server filter role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+completion_owner = "residual-option-line"
+current_or_planned_disposition = "blocked_primitive_or_not_applicable"
+blocked_primitive = "no bounded server-side TLS trust/termination owner in the supported Yosemite/I2PControl path"
+blocking_milestone = "M097"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP client/server filter role.", "httpclient" = "The accepted HTTP client data plane is HTTP-only; no client TLS role exists, so this is not applicable.", "ircclient" = "This type is not an HTTP client/server filter role.", "socks" = "This type is not an HTTP client/server filter role.", "socksirc" = "This type is not an HTTP client/server filter role.", "connectclient" = "This type is not an HTTP client/server filter role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP client/server filter role.", "httpserver" = "Blocked: no supported server-side TLS trust/termination owner.", "httpbidirserver" = "Blocked: no supported server-side TLS trust/termination owner.", "ircserver" = "This type is not an HTTP client/server filter role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
 canonical_key = "WebsiteHostname"
@@ -1343,8 +1345,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable"]
 cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1357,8 +1359,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable"]
 cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1371,8 +1373,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable"]
 cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1385,8 +1387,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable"]
 cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1399,8 +1401,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable"]
 cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1412,10 +1414,12 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+completion_owner = "residual-option-line"
+current_or_planned_disposition = "blocked_primitive_or_not_applicable"
+blocked_primitive = "no safe per-client local-address allocator in the literal-loopback server target model"
+blocking_milestone = "M099"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "httpserver" = "Blocked: no safe per-client local-address allocator.", "httpbidirserver" = "Blocked: no safe per-client local-address allocator.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
 canonical_key = "BlockReferers"
@@ -1427,8 +1431,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable"]
 cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1440,10 +1444,12 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+completion_owner = "residual-option-line"
+current_or_planned_disposition = "blocked_primitive_or_not_applicable"
+blocked_primitive = "no bounded non-request-selected multihoming/routing owner in the existing HTTP server data plane"
+blocking_milestone = "M099"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "httpserver" = "Blocked: no bounded non-request-selected multihoming/routing owner.", "httpbidirserver" = "Blocked: no bounded non-request-selected multihoming/routing owner.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
 canonical_key = "AccessOption"
@@ -1455,8 +1461,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1469,8 +1475,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1483,8 +1489,8 @@ path_bearing = true
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type does not own the accepted TCP server/admission role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1497,8 +1503,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1511,8 +1517,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1525,8 +1531,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1539,8 +1545,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1553,8 +1559,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1567,8 +1573,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1581,8 +1587,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1595,9 +1601,9 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
-cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "Generic server relays arbitrary streams and has no HTTP POST method owner.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
 canonical_key = "PostLimitTime"
@@ -1609,9 +1615,9 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
-cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "not_applicable"]
+cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "Generic server relays arbitrary streams and has no HTTP POST method owner.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
 canonical_key = "PerClientPeriod"
@@ -1623,8 +1629,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1637,8 +1643,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1651,8 +1657,8 @@ path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
 completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "not_applicable"]
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
 cell_notes = { "client" = "This type does not own the accepted TCP server/admission role.", "httpclient" = "This type does not own the accepted TCP server/admission role.", "ircclient" = "This type does not own the accepted TCP server/admission role.", "socks" = "This type does not own the accepted TCP server/admission role.", "socksirc" = "This type does not own the accepted TCP server/admission role.", "connectclient" = "This type does not own the accepted TCP server/admission role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
@@ -1664,10 +1670,12 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = true
 compatibility_aliases = []
-completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply"]
-cell_notes = { "client" = "This type does not create the server-side LeaseSet/session role for this option.", "httpclient" = "This type does not create the server-side LeaseSet/session role for this option.", "ircclient" = "This type does not create the server-side LeaseSet/session role for this option.", "socks" = "This type does not create the server-side LeaseSet/session role for this option.", "socksirc" = "This type does not create the server-side LeaseSet/session role for this option.", "connectclient" = "This type does not create the server-side LeaseSet/session role for this option.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+completion_owner = "residual-option-line"
+current_or_planned_disposition = "blocked_primitive_or_not_applicable"
+blocked_primitive = "no supported Yosemite/SAM LeaseSet confidentiality serializer or key-management path"
+blocking_milestone = "M097"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive"]
+cell_notes = { "client" = "This type does not create the server-side LeaseSet/session role for this option.", "httpclient" = "This type does not create the server-side LeaseSet/session role for this option.", "ircclient" = "This type does not create the server-side LeaseSet/session role for this option.", "socks" = "This type does not create the server-side LeaseSet/session role for this option.", "socksirc" = "This type does not create the server-side LeaseSet/session role for this option.", "connectclient" = "This type does not create the server-side LeaseSet/session role for this option.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "Blocked: no supported LeaseSet confidentiality serializer.", "httpserver" = "Blocked: no supported LeaseSet confidentiality serializer.", "httpbidirserver" = "Blocked: no supported LeaseSet confidentiality serializer.", "ircserver" = "Blocked: no supported LeaseSet confidentiality serializer.", "streamrserver" = "Blocked: no supported LeaseSet confidentiality serializer." }
 
 [[tunnel_manager.options]]
 canonical_key = "OptionalLookup"
@@ -1678,10 +1686,12 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = true
 compatibility_aliases = []
-completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply"]
-cell_notes = { "client" = "This type does not create the server-side LeaseSet/session role for this option.", "httpclient" = "This type does not create the server-side LeaseSet/session role for this option.", "ircclient" = "This type does not create the server-side LeaseSet/session role for this option.", "socks" = "This type does not create the server-side LeaseSet/session role for this option.", "socksirc" = "This type does not create the server-side LeaseSet/session role for this option.", "connectclient" = "This type does not create the server-side LeaseSet/session role for this option.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+completion_owner = "residual-option-line"
+current_or_planned_disposition = "blocked_primitive_or_not_applicable"
+blocked_primitive = "no supported Yosemite/SAM LeaseSet lookup-policy serializer"
+blocking_milestone = "M097"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive"]
+cell_notes = { "client" = "This type does not create the server-side LeaseSet/session role for this option.", "httpclient" = "This type does not create the server-side LeaseSet/session role for this option.", "ircclient" = "This type does not create the server-side LeaseSet/session role for this option.", "socks" = "This type does not create the server-side LeaseSet/session role for this option.", "socksirc" = "This type does not create the server-side LeaseSet/session role for this option.", "connectclient" = "This type does not create the server-side LeaseSet/session role for this option.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "Blocked: no supported LeaseSet lookup serializer.", "httpserver" = "Blocked: no supported LeaseSet lookup serializer.", "httpbidirserver" = "Blocked: no supported LeaseSet lookup serializer.", "ircserver" = "Blocked: no supported LeaseSet lookup serializer.", "streamrserver" = "Blocked: no supported LeaseSet lookup serializer." }
 
 [[tunnel_manager.options]]
 canonical_key = "LeaseSetClientAuths"
@@ -1692,10 +1702,12 @@ secret_bearing = true
 path_bearing = false
 identity_or_key_affecting = true
 compatibility_aliases = []
-completion_owner = "M099"
-current_or_planned_disposition = "planned_apply_or_not_applicable"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "planned_apply", "planned_apply", "planned_apply", "planned_apply", "planned_apply"]
-cell_notes = { "client" = "This type does not create the server-side LeaseSet/session role for this option.", "httpclient" = "This type does not create the server-side LeaseSet/session role for this option.", "ircclient" = "This type does not create the server-side LeaseSet/session role for this option.", "socks" = "This type does not create the server-side LeaseSet/session role for this option.", "socksirc" = "This type does not create the server-side LeaseSet/session role for this option.", "connectclient" = "This type does not create the server-side LeaseSet/session role for this option.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+completion_owner = "residual-option-line"
+current_or_planned_disposition = "blocked_primitive_or_not_applicable"
+blocked_primitive = "no supported LeaseSet client-authorization key store or session handoff"
+blocking_milestone = "M097"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive"]
+cell_notes = { "client" = "This type does not create the server-side LeaseSet/session role for this option.", "httpclient" = "This type does not create the server-side LeaseSet/session role for this option.", "ircclient" = "This type does not create the server-side LeaseSet/session role for this option.", "socks" = "This type does not create the server-side LeaseSet/session role for this option.", "socksirc" = "This type does not create the server-side LeaseSet/session role for this option.", "connectclient" = "This type does not create the server-side LeaseSet/session role for this option.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "Blocked: no LeaseSet authorization key store or handoff.", "httpserver" = "Blocked: no LeaseSet authorization key store or handoff.", "httpbidirserver" = "Blocked: no LeaseSet authorization key store or handoff.", "ircserver" = "Blocked: no LeaseSet authorization key store or handoff.", "streamrserver" = "Blocked: no LeaseSet authorization key store or handoff." }
 
 [method_inventory]
 method_scope_rule = "Only AddressBook, TunnelManager, and ClientServicesInfo are Proposal 170 methods here; broader/base methods remain separately recorded."

@@ -15,7 +15,8 @@ use super::{
     options::{validate_options, OptionValidationError, SERVER_OPTIONS},
     runtime::{
         run_accepted_server, AcceptedServerConnection, AcceptedServerHandler,
-        AcceptedServerRuntimeConfig, AcceptedServerRuntimeError, ServerAdmissionPolicy,
+        AcceptedServerRuntimeConfig, AcceptedServerRuntimeError, ServerAccessPolicy,
+        ServerAdmissionPolicy,
     },
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
@@ -59,9 +60,10 @@ struct GenericServerRuntimeConfig {
     target_port: u16,
     destination: StoredDestination,
     sam_tcp_port: u16,
-        admission: ServerAdmissionPolicy,
-        lease_set_enc_type: Option<String>,
-        session_options: SessionOptions,
+    admission: ServerAdmissionPolicy,
+    access: ServerAccessPolicy,
+    lease_set_enc_type: Option<String>,
+    session_options: SessionOptions,
 }
 
 /// Bounded, per-name runtime supervisor for control-plane server tunnels.
@@ -235,6 +237,7 @@ impl ServerRuntimeSupervisor {
                     sam_tcp_port: config.sam_tcp_port,
                     destination: config.destination,
                     admission: config.admission,
+                    access: config.access,
                     lease_set_enc_type: config.lease_set_enc_type,
                     session_options: Some(config.session_options),
                     handler,
@@ -342,7 +345,12 @@ impl ServerTunnelBackend {
     fn runtime_config(
         &self,
         definition: &TunnelDefinition,
-    ) -> BackendResult<(u16, ServerAdmissionPolicy, Option<String>)> {
+    ) -> BackendResult<(
+        u16,
+        ServerAdmissionPolicy,
+        ServerAccessPolicy,
+        Option<String>,
+    )> {
         if definition.ownership != TunnelOwnership::ControlPlane {
             return Err(BackendError::InvalidState {
                 tunnel_type: TunnelType::Server,
@@ -375,8 +383,13 @@ impl ServerTunnelBackend {
         }
         let admission = ServerAdmissionPolicy::from_raw_options(&definition.raw_config)
             .map_err(invalid_option)?;
+        let access = ServerAccessPolicy::from_values(
+            raw_string(definition, "AccessOption")?.as_deref(),
+            raw_string(definition, "AccessList")?.as_deref(),
+        )
+        .map_err(invalid_option)?;
         let lease_set_enc_type = lease_set_enc_type(definition)?;
-        Ok((port, admission, lease_set_enc_type))
+        Ok((port, admission, access, lease_set_enc_type))
     }
 }
 
@@ -398,7 +411,8 @@ impl TunnelBackend for ServerTunnelBackend {
         validate_i2cp_options(definition)?;
         validate_options(TunnelType::Server, &definition.options, SERVER_OPTIONS)
             .map_err(option_error)?;
-        let (target_port, admission, lease_set_enc_type) = self.runtime_config(definition)?;
+        let (target_port, admission, access, lease_set_enc_type) =
+            self.runtime_config(definition)?;
         let store = self.destinations.as_ref().ok_or_else(|| BackendError::Internal {
             message: "server destination store is not composed".to_string(),
         })?;
@@ -427,6 +441,7 @@ impl TunnelBackend for ServerTunnelBackend {
                 destination,
                 sam_tcp_port: self.supervisor.sam_tcp_port,
                 admission,
+                access,
                 lease_set_enc_type,
                 session_options,
             })
@@ -462,6 +477,11 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "TotalInPerMinute",
         "TotalInPerHour",
         "TotalInPerDay",
+        "PerClientPeriod",
+        "TotalPeriod",
+        "TotalBanTime",
+        "AccessOption",
+        "AccessList",
         "i2cp",
         "Port",
         "ReachableBy",
@@ -494,6 +514,14 @@ fn invalid_option(option: &str) -> BackendError {
     BackendError::Internal {
         message: format!("server option {option} is invalid"),
     }
+}
+
+fn raw_string(definition: &TunnelDefinition, key: &str) -> BackendResult<Option<String>> {
+    definition
+        .raw_config
+        .get(key)
+        .map(|value| value.as_str().map(str::to_owned).ok_or_else(|| invalid_option(key)))
+        .transpose()
 }
 
 fn make_accepted_handler(target_port: u16) -> AcceptedServerHandler {
@@ -703,7 +731,7 @@ mod tests {
         let mut def = definition("admission-options", "identity");
         def.raw_config.insert("MaxConcurrentConns".to_owned(), serde_json::json!(7));
         def.raw_config.insert("ClientPerMinute".to_owned(), serde_json::json!(11));
-        let (_, policy, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
+        let (_, policy, _, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
         assert_eq!(policy.max_concurrent_connections(), 7);
         assert!(lease_set_enc_type.is_none());
 
@@ -720,15 +748,15 @@ mod tests {
         let backend = ServerTunnelBackend::without_store(1);
         let mut def = definition("lcse-enc-type", "identity");
         def.options.i2cp_options.insert("leaseSetEncType".to_owned(), "4,0".to_owned());
-        let (_, _, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
+        let (_, _, _, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
         assert_eq!(lease_set_enc_type.as_deref(), Some("4,0"));
 
         def.options.i2cp_options.insert("leaseSetEncType".to_owned(), String::new());
-        let (_, _, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
+        let (_, _, _, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
         assert!(lease_set_enc_type.is_none());
 
         def.options.i2cp_options.remove("leaseSetEncType");
-        let (_, _, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
+        let (_, _, _, lease_set_enc_type) = backend.runtime_config(&def).unwrap();
         assert!(lease_set_enc_type.is_none());
     }
 

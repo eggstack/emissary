@@ -6,14 +6,16 @@
 #![allow(dead_code, unused_imports)]
 
 mod accepted_server;
+mod access;
 mod admission;
 mod client_listener;
-pub mod session;
 #[cfg(test)]
 pub mod peer_identity;
 mod peer_identity_impl;
+pub mod session;
 mod task_group;
 
+pub use access::{AccessOption, ServerAccessPolicy};
 pub use admission::{
     AdmissionDecision, AdmissionLease, AdmissionRejection, ServerAdmissionPolicy,
     ServerAdmissionState,

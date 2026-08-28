@@ -94,6 +94,7 @@ pub struct HttpServerPolicy {
     pub block_access_in_proxies: bool,
     pub block_referers: bool,
     pub allow_referer: bool,
+    pub allow_accept: bool,
     pub block_user_agents: bool,
     pub allow_user_agent: bool,
     pub user_agents: Option<Vec<String>>,
@@ -277,6 +278,7 @@ pub async fn read_and_sanitize_request<R: AsyncBufRead + Unpin>(
             || is_i2p_identity_header(&name)
             || (eq(&name, "referer") && (policy.block_referers || !policy.allow_referer))
             || (eq(&name, "user-agent") && (policy.block_user_agents || !policy.allow_user_agent))
+            || (eq(&name, "accept") && !policy.allow_accept)
             || eq(&name, "host")
         {
             continue;
@@ -691,6 +693,7 @@ mod tests {
             block_access_in_proxies: false,
             block_referers: false,
             allow_referer: true,
+            allow_accept: true,
             block_user_agents: false,
             allow_user_agent: true,
             user_agents: None,
@@ -923,26 +926,33 @@ mod tests {
         // A structurally valid Destination text longer than the M080
         // ingress bound must be rejected by the upstream peer-identity
         // validator, never reaching this filter as a `TrustedPeerIdentity`.
-        assert!(super::super::super::runtime::TrustedPeerIdentity::from_destination_text(
-            &"A".repeat(super::super::super::runtime::MAX_TRUSTED_DESTINATION_B64_TEXT + 1)
-        )
-        .is_none());
+        assert!(
+            super::super::super::runtime::TrustedPeerIdentity::from_destination_text(
+                &"A".repeat(super::super::super::runtime::MAX_TRUSTED_DESTINATION_B64_TEXT + 1)
+            )
+            .is_none()
+        );
     }
 
     #[tokio::test]
     async fn rejects_malformed_destination_text_before_request_construction() {
         // Empty, control-char, whitespace, and non-base64 inputs all fail
         // the structural validation upstream.
-        assert!(super::super::super::runtime::TrustedPeerIdentity::from_destination_text("")
-            .is_none());
-        assert!(super::super::super::runtime::TrustedPeerIdentity::from_destination_text(
-            "peer-destination"
-        )
-        .is_none());
-        assert!(super::super::super::runtime::TrustedPeerIdentity::from_destination_text(
-            "not valid base64!@#"
-        )
-        .is_none());
+        assert!(
+            super::super::super::runtime::TrustedPeerIdentity::from_destination_text("").is_none()
+        );
+        assert!(
+            super::super::super::runtime::TrustedPeerIdentity::from_destination_text(
+                "peer-destination"
+            )
+            .is_none()
+        );
+        assert!(
+            super::super::super::runtime::TrustedPeerIdentity::from_destination_text(
+                "not valid base64!@#"
+            )
+            .is_none()
+        );
     }
 
     #[tokio::test]

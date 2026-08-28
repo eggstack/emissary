@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; residual option cells and M104 live reclosure remain open
+Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104 closed as blocked; residual option cells remain
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -350,9 +350,10 @@ The matrix records `AllowInternalSSL`, `UniqueLocalAddressPerClient`,
 `LeaseSetClientAuths` as explicit residual blockers. No server-side TLS trust
 owner, per-client address allocator, multihoming router, or supported
 Yosemite/SAM LeaseSet key/serializer path exists in this checkout, so these
-options fail before allocation and never silently downgrade. M104 remains
-blocked until the applicable residual cells are resolved and live
-interoperability is reclosed.
+options fail before allocation and never silently downgrade. M104 is closed as
+blocked at the final verification stop condition; a future reattempt requires
+resolution of the applicable residual cells before live interoperability can be
+reclosed. See `plans/closure/i2pcontrol-proposal-170/104-closure.md`.
 
 ## AddressBook
 
@@ -373,7 +374,7 @@ M034 additionally proves the retained CRUD and subscription behavior:
   command seam.
 
 M096 operationally completes the pinned `SetConfig` surface while keeping the
-overall Proposal 170 status partial pending residual option cells and M104:
+overall Proposal 170 status partial pending residual option cells:
 
 - all thirteen keys are validated and persisted in one versioned typed runtime
   configuration;

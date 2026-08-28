@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096, M098-M103, and M099 closed; M097 closed as blocked; residual option blocker is current; M104 remains blocked
+Status: active; M095-M096, M098-M103, and M099 closed; M097 and M104 closed as blocked; residual option blocker is current
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -41,7 +41,7 @@ The current production state after M103 is:
 - unresolved common/session/key options still fail before allocation rather than being persisted-and-ignored;
 - all 6 ClientServicesInfo selectors are implemented;
 - full public-network/reference-router certification remains open;
-- full support remains blocked by TunnelManager option parity and M104 live reclosure.
+- full support remains blocked by TunnelManager option parity; M104 closed as blocked at its live-reclosure gate.
 
 M093 remains the current tunnel security authority. M088's accepted lower-layer pre-accept residual and the bounded Streamr availability limitation are not reopened merely for option parity.
 
@@ -57,7 +57,8 @@ M097 closure proved that decomposition too coarse:
 
 Therefore dependency authority is now per option cell, not per entire milestone.
 
-This correction does **not** redefine full support. Residual blocked cells still prevent M104.
+This correction does **not** redefine full support. Residual blocked cells still
+prevent a successful M104 reattempt.
 
 ## 4. Ownership boundary
 
@@ -190,7 +191,7 @@ residual option blocker line <-----------------------+
   |
   v
 M104 live interoperability + final reclosure
-[BLOCKED UNTIL ZERO RESIDUAL APPLICABLE CELLS]
+[CLOSED AS BLOCKED — ZERO RESIDUAL APPLICABLE CELLS NOT REACHED]
 ```
 
 M098 and M099 are serialized because they share matrix/option/filter artifacts. The server slice does not semantically depend on successful implementation of client behavior.
@@ -298,9 +299,12 @@ Explicit by-design-empty router-wide banned-peer source after exhaustive proof t
 
 ### M104 — full live interoperability/reclosure
 
-Status: blocked.
+Status: closed as blocked; closure: `plans/closure/i2pcontrol-proposal-170/104-closure.md`.
 
-M104 cannot start until revised M098/M099 close and every residual applicable TunnelManager cell is resolved by a separately registered closure.
+M104 reached its authorized verification stop condition after revised M098/M099
+closed, but every residual applicable TunnelManager cell is not resolved. The
+closure record preserves the partial-support disposition and no future plan is
+dependency-ready until a bounded contained primitive path exists.
 
 Exit: full integrated matrix, live data-plane evidence for all 12 tunnel families, AddressBook/RouterInfo/ClientServicesInfo validation, security/containment reclosure, and revision-pinned support statement.
 
@@ -375,7 +379,7 @@ Response: compose with existing trusted identity/admission/filter owners; no par
 
 Risk: local verification may not have a functional I2P network/reference router.
 
-Response: keep M104 blocked rather than presenting process-local success as network interoperability.
+Response: keep full support blocked rather than presenting process-local success as network interoperability.
 
 ## 15. Full-support exit condition
 

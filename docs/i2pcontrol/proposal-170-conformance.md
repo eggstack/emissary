@@ -1,6 +1,6 @@
 # Proposal 170 Conformance Matrix
 
-Status: partial Proposal 170 support; M095-M099 aggregate/completion slices closed; residual option cells and M104 live reclosure remain
+Status: partial Proposal 170 support; M095-M099 aggregate/completion slices closed; M104 closed as blocked; residual option cells remain
 
 The aggregate full-support planning matrix is maintained at
 `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`.

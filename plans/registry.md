@@ -35,7 +35,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **residual option blocker** | M099 closed internally; M104 remains blocked on six applicable residual option families |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **residual option blocker** | M104 closed as blocked; no bounded residual primitive plan is dependency-ready |
 | I2PControl Proposal 170 source/truthfulness | RouterInfo source line closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | none | current RouterInfo matrix: 42 available / 1 protocol-permitted neutral / 0 unavailable |
 | I2PControl Proposal 170 containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | none | M061/M062/M063 rules remain controlling |
 | I2PControl tunnel runtime | all 12 data planes real | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | option semantics only | do not redesign data planes for option parity |
@@ -73,7 +73,7 @@ residual TunnelManager blocker line                 [BLOCKED]
   +--------------------------------------------------------+
                                                            |
                                                            v
-M104 live interoperability/full reclosure          [BLOCKED]
+M104 live interoperability/full reclosure          [CLOSED AS BLOCKED]
 ```
 
 ## Closed handoff — M098
@@ -101,15 +101,15 @@ M098 closure updated the M095 matrix and advances M099 as the next handoff. Its
 applicable proxy/auth/privacy cells are operational; residual plugin/TLS-proxy,
 jump-list, and client-management cells name their missing primitives explicitly.
 
-## Current handoff — M099
+## Closed handoff — M099
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/099-server-access-throttle-and-leaseset-option-completion.md`
 
-Status: **ready**.
+Status: **closed internally against the pinned 2026-05-20 revision; partial**.
 
-M099 is no longer milestone-wide blocked on M097. It may now reconcile server-role matrix cells and implement the exact subset owned by existing accepted I2PControl server admission/filter/runtime paths.
+M099 reconciled server-role matrix cells and implemented the exact subset owned by existing accepted I2PControl server admission/filter/runtime paths. Its closure is recorded at `plans/closure/i2pcontrol-proposal-170/099-closure.md`.
 
 Expected independent work includes HTTP presentation/filter policy, access lists, confined filter-file loading, connection ceilings, peer/global rates, POST limits, periods, and tunnel-local temporary denial. LeaseSet/session-security cells remain residual blockers when the current supported Yosemite/SAM path cannot implement them without downgrade.
 
@@ -133,15 +133,17 @@ Named residual primitives include:
 
 No successor implementation plan for these residuals is registered now. A future plan may be written only when current repository/dependency evidence shows a bounded path that obeys containment. Current planning does **not** authorize vendoring/forking Yosemite or adding Proposal-170-shaped core APIs merely to remove blockers.
 
-## M104 readiness
+## M104 closure
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/104-full-proposal-170-live-interoperability-and-reclosure.md`
 
-Status: **blocked**.
+Status: **closed as blocked**.
 
-M104 requires:
+Closure: `plans/closure/i2pcontrol-proposal-170/104-closure.md`.
+
+M104 reached its authorized verification stop condition. It requires:
 
 - M095, M096, M100-M103 closures;
 - revised M098 closure;
@@ -150,7 +152,9 @@ M104 requires:
 - closure of any future bounded residual-option plan;
 - then focused live/reseeded/reference-router interoperability and integrated security/containment reclosure.
 
-M104 may not weaken the full-support definition to accommodate an external/library blocker.
+The final matrix still contains 164 applicable `blocked_primitive` cells, so M104
+cannot claim full support or weaken the completion definition to accommodate an
+external/library blocker. No residual implementation plan is dependency-ready.
 
 ## Recently closed full-support handoffs
 
@@ -164,6 +168,7 @@ M104 may not weaken the full-support definition to accommodate an external/libra
 | M101 | closed | `plans/closure/i2pcontrol-proposal-170/101-closure.md` |
 | M102 | closed | `plans/closure/i2pcontrol-proposal-170/102-closure.md` |
 | M103 | closed | `plans/closure/i2pcontrol-proposal-170/103-closure.md` |
+| M104 | closed as blocked | `plans/closure/i2pcontrol-proposal-170/104-closure.md` |
 
 ## Current production state
 
@@ -187,7 +192,7 @@ M104 may not weaken the full-support definition to accommodate an external/libra
 
 ## Registry maintenance rules
 
-1. M099 is the current implementation handoff after M098 closure.
+1. M104 is closed as blocked; the residual option blocker remains the current handoff.
 2. M098 residual cells remain explicitly blocked and must not be treated as implemented.
 3. M097 residual cells remain blocked and fail before allocation.
 4. Do not register a residual-primitive implementation plan until a bounded contained primitive path exists.

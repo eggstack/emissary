@@ -1,6 +1,6 @@
 # M104 — Full Proposal 170 Live Interoperability and Reclosure
 
-Status: **blocked — revised M098/M099 slices plus all residual TunnelManager blockers must close first**
+Status: **closed as blocked — residual TunnelManager primitives remain unresolved**
 
 Source roadmap:
 
@@ -46,7 +46,9 @@ M104 now requires all of the following:
 - every residual cell transferred out of M098/M099 has subsequently been resolved by a separately registered bounded plan and closure;
 - no unresolved M097 shared-session, session-wire, destination/key-lifecycle, private-key-import, or LeaseSet/session-security blocker remains.
 
-Therefore M104 remains blocked today. M098/M099 progress alone cannot make it executable while any residual blocked option exists.
+Therefore M104 reached its blocked verification stop condition. M098/M099
+progress alone cannot make it executable while any residual blocked option
+exists.
 
 This preserves the original full-support definition rather than weakening it to fit current dependency limitations.
 

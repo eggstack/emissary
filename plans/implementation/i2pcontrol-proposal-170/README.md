@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; all twelve tunnel runtimes real; M095-M096, M098-M103, and M099 closed; M097 closed as blocked; residual option blocker remains; M104 remains blocked
+Status: partial Proposal 170 production support; all twelve tunnel runtimes real; M095-M096, M098-M103, and M099 closed; M097 and M104 closed as blocked; residual option blocker remains
 
 This directory contains bounded internal implementation and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -52,7 +52,8 @@ M091 remains the cautionary boundary case: unauthorized vendored Yosemite/core/d
 - All 6 ClientServicesInfo selectors are implemented.
 - Full live/reseeded/reference-router certification remains open.
 
-Overall status remains partial until TunnelManager option parity and M104 close.
+Overall status remains partial until TunnelManager option parity and a future
+M104 reattempt can close successfully.
 
 ## Current corrective handoff sequence
 
@@ -71,7 +72,7 @@ The plans have therefore been corrected in place because neither M098 nor M099 h
 | M101 | closed | bounded signed router-news source |
 | M102 | closed | neutral v4/v6 network-error owner observation |
 | M103 | closed | authoritative by-design-empty banned-peer source |
-| M104 | blocked | final live interoperability/security/containment/full-support reclosure after zero residual option blockers |
+| M104 | closed as blocked | final live interoperability/security/containment/full-support reclosure stopped by residual option blockers |
 
 Plans:
 
@@ -142,16 +143,19 @@ There is intentionally no speculative successor implementation plan registered t
 
 A missing dependency primitive is not authority to vendor/fork Yosemite or move Proposal 170 policy into core.
 
-## M104 readiness
+## M104 closure
 
-M104 remains blocked until:
+M104 is closed as blocked because:
 
 - revised M098 closes;
 - revised M099 closes;
 - every residual applicable TunnelManager cell is subsequently resolved;
 - the matrix contains no applicable `planned_apply`, `blocked_primitive`, unsupported, or unknown cell.
 
-Only then does M104 perform live/reseeded/reference-router interoperability and integrated security/containment reclosure.
+The closure record documents the passing local/live evidence and the exact residual
+matrix. No future implementation plan is dependency-ready until a bounded contained
+primitive path exists for those residuals; only then can a new M104 attempt perform
+full live/reseeded/reference-router interoperability and integrated reclosure.
 
 ## Full-support design rules
 

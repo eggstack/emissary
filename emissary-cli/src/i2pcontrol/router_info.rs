@@ -28,6 +28,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use emissary_core::inspection::NetworkErrorReason;
 
 #[allow(dead_code)]
 const LOG_TARGET: &str = "emissary::i2pcontrol::router_info";
@@ -249,6 +250,8 @@ pub trait TunnelSource: Send + Sync {
 pub struct NetworkSnapshot {
     pub ipv4_status: NetworkStatus,
     pub ipv6_status: NetworkStatus,
+    pub ipv4_error: Option<NetworkErrorReason>,
+    pub ipv6_error: Option<NetworkErrorReason>,
     pub ipv4_testing: bool,
     pub ipv6_testing: bool,
     pub firewalled: bool,
@@ -261,6 +264,8 @@ impl Default for NetworkSnapshot {
         Self {
             ipv4_status: NetworkStatus::Unknown,
             ipv6_status: NetworkStatus::Unknown,
+            ipv4_error: None,
+            ipv6_error: None,
             ipv4_testing: false,
             ipv6_testing: false,
             firewalled: false,

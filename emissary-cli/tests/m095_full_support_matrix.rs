@@ -59,13 +59,9 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         }
         counts
     });
-    assert_eq!(counts, (39, 1, 3));
+    assert_eq!(counts, (41, 1, 1));
 
-    let expected_unavailable = BTreeSet::from([
-        "i2p.router.net.error".to_owned(),
-        "i2p.router.net.error.v6".to_owned(),
-        "i2p.router.netdb.bannedpeers".to_owned(),
-    ]);
+    let expected_unavailable = BTreeSet::from(["i2p.router.netdb.bannedpeers".to_owned()]);
     let actual_unavailable: BTreeSet<String> = router_rows
         .iter()
         .filter(|row| string_field(row, "current_disposition") == "unavailable")

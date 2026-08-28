@@ -14,11 +14,11 @@ The `RouterInfo` method allows authenticated callers to request specific router 
 Proposal 170 addition manifest. The 121-key catalog is not counted as Proposal
 170 coverage. The machine-readable manifest declares exact nested JSON types,
 direct-presence semantics, mutation, owner, serializer, fixture, bound, and
-source disposition for every addition: 39 available, 1 protocol-permitted
-neutral, and 3 unavailable. Known-peer, active-peer, transport, tunnel, and
-v4/v6 status/testing fields use bounded live owners; router news uses the
-I2PControl-owned signed XML_GZ feed, while ban and v4/v6 network-error fields
-remain unavailable because no canonical owner exists
+source disposition for every addition: 41 available, 1 protocol-permitted
+neutral, and 1 unavailable. Known-peer, active-peer, transport, tunnel, and
+v4/v6 status/testing/error fields use bounded live owners; router news uses the
+I2PControl-owned signed XML_GZ feed, while banned peers remain unavailable
+because no canonical owner exists
 for those facts. The 15-second transit-bandwidth field uses a bounded
 I2PControl-owned sampler over the authoritative cumulative transit counter.
 M051's semantic adjudication confirmed that the pinned proposal does not

@@ -1,6 +1,6 @@
 # M102 — RouterInfo Canonical Network-Error Owner Completion
 
-Status: ready; dependency M095 closed
+Status: closed; dependency M095 closed; closure: `plans/closure/i2pcontrol-proposal-170/102-closure.md`
 
 Source roadmap:
 
@@ -265,3 +265,22 @@ Create `plans/closure/i2pcontrol-proposal-170/102-closure.md` with:
 ## 16. Internal-only rule
 
 All writes remain internal to `eggstack/emissary`. External i2pd/I2P/reference code is read-only evidence. No upstream issue/PR/review/submission/merge/contribution activity is authorized.
+
+## 17. Implementation reconciliation
+
+The M095 matrix named the exact lower-layer candidate set but did not itself
+contain the field-by-field writer table required by this plan's hard gate. The
+M102 readiness audit completed that missing evidence before implementation:
+
+| Family | Neutral reason | Set event | Clear event | Source |
+|---|---|---|---|---|
+| v4 | `NoError` | existing SSU2 firewall-status event reports `Ok` | existing SSU2 firewall-status event reports `Firewalled` or `Unknown` | `TransportManager::on_firewall_status` |
+| v4 | `SymmetricNat` | existing SSU2 firewall-status event reports `SymmetricNat` | existing SSU2 firewall-status event reports `Firewalled`, `Unknown`, or `Ok` | `TransportManager::on_firewall_status` |
+| v6 | `NoError` | same existing event for IPv6 reports `Ok` | same existing event reports `Firewalled` or `Unknown` | `TransportManager::on_firewall_status` |
+| v6 | `SymmetricNat` | same existing event for IPv6 reports `SymmetricNat` | same existing event reports `Firewalled`, `Unknown`, or `Ok` | `TransportManager::on_firewall_status` |
+
+The adopted i2pd vocabulary also contains clock-skew, offline, full-cone-NAT,
+and no-descriptor reasons. No current Emissary owner can distinguish those
+conditions with the required family semantics, so no neutral variants or
+fabricated writers were added. `None` remains source-uninitialized or
+unevaluated and is unavailable at the I2PControl boundary.

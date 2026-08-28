@@ -1153,11 +1153,10 @@ pub mod router_info_keys {
         field!(
             P170_NET_ERROR,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network-error",
-                reason: "no canonical network-error owner",
+            SourceDisposition::Available {
+                owner: "network-error-state",
             },
-            "unavailable",
+            "serialize_network_error",
             "p170.error_v4.integer",
             Mutation::ReadOnly,
             Bound::None,
@@ -1166,11 +1165,10 @@ pub mod router_info_keys {
         field!(
             P170_NET_ERROR_V6,
             JsonType::Integer,
-            SourceDisposition::Unavailable {
-                owner: "network-error",
-                reason: "no canonical network-error owner",
+            SourceDisposition::Available {
+                owner: "network-error-state",
             },
-            "unavailable",
+            "serialize_network_error_v6",
             "p170.error_v6.integer",
             Mutation::ReadOnly,
             Bound::None,
@@ -2061,7 +2059,7 @@ mod tests {
             .filter(|field| matches!(field.source, SourceDisposition::Unavailable { .. }))
             .count();
 
-        assert_eq!((available, neutral, unavailable), (39, 1, 3));
+        assert_eq!((available, neutral, unavailable), (41, 1, 1));
     }
 
     #[test]

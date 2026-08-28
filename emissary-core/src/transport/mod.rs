@@ -20,6 +20,7 @@ use crate::{
     crypto::base64_encode,
     error::{DialError, QueryError},
     events::EventHandle,
+    inspection::{NetworkErrorReason, TransportInspection, TransportInspectionSnapshot},
     netdb::NetDbHandle,
     primitives::{Date, Mapping, RouterAddress, RouterId, RouterInfo, Str, TransportKind},
     router::context::RouterContext,
@@ -29,7 +30,6 @@ use crate::{
         SubsystemEvent,
     },
     transport::{metrics::*, ntcp2::Ntcp2Context, ssu2::Ssu2Context},
-    inspection::{TransportInspection, TransportInspectionSnapshot},
     Ntcp2Config, Ssu2Config,
 };
 
@@ -1005,6 +1005,14 @@ impl<R: Runtime> TransportManager<R> {
         }
     }
 
+    fn network_error_for_firewall_status(status: FirewallStatus) -> Option<NetworkErrorReason> {
+        match status {
+            FirewallStatus::Ok => Some(NetworkErrorReason::NoError),
+            FirewallStatus::SymmetricNat => Some(NetworkErrorReason::SymmetricNat),
+            FirewallStatus::Firewalled | FirewallStatus::Unknown => None,
+        }
+    }
+
     /// Handle firewall status update received from SSU2.
     fn on_firewall_status(&mut self, status: FirewallStatus, ipv4: bool) {
         tracing::debug!(
@@ -1017,9 +1025,13 @@ impl<R: Runtime> TransportManager<R> {
         if ipv4 {
             self.ipv4_info.firewall_status = status;
             self.event_handle.set_ipv4_status(status);
+            self.event_handle
+                .set_ipv4_network_error(Self::network_error_for_firewall_status(status));
         } else {
             self.ipv6_info.firewall_status = status;
             self.event_handle.set_ipv6_status(status);
+            self.event_handle
+                .set_ipv6_network_error(Self::network_error_for_firewall_status(status));
         }
     }
 
@@ -1676,6 +1688,32 @@ mod tests {
     use std::collections::VecDeque;
     use thingbuf::mpsc::channel;
     use tokio::sync::mpsc;
+
+    #[test]
+    fn firewall_status_network_error_observation_is_bounded() {
+        assert_eq!(
+            TransportManager::<MockRuntime>::network_error_for_firewall_status(FirewallStatus::Ok),
+            Some(NetworkErrorReason::NoError)
+        );
+        assert_eq!(
+            TransportManager::<MockRuntime>::network_error_for_firewall_status(
+                FirewallStatus::SymmetricNat
+            ),
+            Some(NetworkErrorReason::SymmetricNat)
+        );
+        assert_eq!(
+            TransportManager::<MockRuntime>::network_error_for_firewall_status(
+                FirewallStatus::Firewalled
+            ),
+            None
+        );
+        assert_eq!(
+            TransportManager::<MockRuntime>::network_error_for_firewall_status(
+                FirewallStatus::Unknown
+            ),
+            None
+        );
+    }
 
     fn make_transport_manager(
         ntcp2: Option<Ntcp2Config>,

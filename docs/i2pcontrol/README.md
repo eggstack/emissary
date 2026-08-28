@@ -1,6 +1,6 @@
 # I2PControl for Emissary
 
-Status: partial Proposal 170 support; M095-M096, M100, and M101 closed; M097 blocked; M102-M103 ready
+Status: partial Proposal 170 support; M095-M096, M100-M102 closed; M097 blocked; M103 ready
 
 Proposal 170 remains **Open**. This documentation is pinned to the revision
 created and last updated on `2026-05-20`.
@@ -38,15 +38,16 @@ with focused exhaustiveness coverage in
 and later owner/path budgets; it does not promote any planned cell to production
 support.
 
-The expected bounded final status remains `partial Proposal 170 support` because three
-RouterInfo additions remain unavailable. M066 through M071 close the IRC, HTTP, CONNECT,
+The expected bounded final status remains `partial Proposal 170 support` because one
+RouterInfo addition remains unavailable. M066 through M071 close the IRC, HTTP, CONNECT,
 SOCKS, bidirectional HTTP, and Streamr families. The canonical
-43-addition matrix currently contains 39 available selectors, one
-protocol-permitted neutral selector, and three unavailable selectors; the
-unavailable rows are banned peers and both network-error selectors.
+43-addition matrix currently contains 41 available selectors, one
+protocol-permitted neutral selector, and one unavailable selector: banned peers.
 M100 supplies transit bandwidth through a bounded request-independent
 I2PControl-owned sampler, and M101 supplies authenticated signed router news
-through a bounded I2PControl-owned refresh/cache task.
+through a bounded I2PControl-owned refresh/cache task. M102 supplies explicit
+neutral v4/v6 network-error state from the existing SSU2 reachability owner;
+uninitialized and firewalled families remain unavailable.
 
 ## Compile feature
 
@@ -210,7 +211,8 @@ M028 does not reopen these areas except for the AddressBook activation boundary.
 | M054 | closed | corrected M049 transit-15s truthfulness; explicit unavailable disposition |
 | M055 | closed | corrected M050 network-error truthfulness; explicit unavailable dispositions |
 | M056 | closed | integrated M049/M050/M052 reclosure; historical final 37/1/5 source matrix |
-| M100 | closed | request-independent transit-15s sampler; current 38/1/4 source matrix |
+| M100/M101 | closed | request-independent transit-15s sampler and bounded signed news source |
+| M102 | closed | explicit neutral v4/v6 network-error owner; wire mapping remains in I2PControl |
 
 ## Support dimensions
 
@@ -232,9 +234,9 @@ backend stubs are not operational coverage.
 
 The retained matrix contains:
 
-- 39 available selectors;
+- 41 available selectors;
 - 1 protocol-permitted neutral selector;
-- 3 unavailable selectors.
+- 1 unavailable selector.
 
 Unavailable selectors fail explicitly and are never substituted with zero,
 false, empty, or semantically adjacent values.

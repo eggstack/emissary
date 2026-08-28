@@ -529,7 +529,7 @@ async fn live_runtime_interoperability() {
         assert!(response["result"].is_null());
         assert!(response["error"]["message"]
             .as_str()
-            .is_some_and(|message| message.contains("no canonical network-error owner")));
+            .is_some_and(|message| message.contains("network error reason not evaluated")));
     }
 
     let transit_unavailable = protected(

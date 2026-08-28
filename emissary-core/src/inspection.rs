@@ -44,11 +44,26 @@ use spin::rwlock::RwLock;
 use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 use core::fmt;
 
+/// Neutral network error reason observed by a canonical runtime owner.
+///
+/// Only conditions that Emissary can observe without inference are represented
+/// here. Protocol-specific numeric mappings belong to the administrative
+/// adapter, not to the core inspection boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NetworkErrorReason {
+    /// A reachability evaluation completed successfully without a known error.
+    NoError,
+    /// The local endpoint was observed behind a symmetric NAT.
+    SymmetricNat,
+}
+
 /// Current, independently tracked network state for one address family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NetworkState {
     /// Reachability state observed by the transport owner.
     pub status: FirewallStatus,
+    /// An error reason only when a canonical owner has evaluated one.
+    pub error: Option<NetworkErrorReason>,
     /// Whether an existing reachability test is currently running.
     pub testing: bool,
 }
@@ -57,6 +72,7 @@ impl Default for NetworkState {
     fn default() -> Self {
         Self {
             status: FirewallStatus::Unknown,
+            error: None,
             testing: false,
         }
     }

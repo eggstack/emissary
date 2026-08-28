@@ -121,13 +121,14 @@ M055 owns the network-error truthfulness correction for M050. M056 owns the
 accepted integrated reclosure and final 43-row source audit.
 
 Expected final disposition under the authorized scope remains
-`partial Proposal 170 support` because three of the 43 RouterInfo additions lack
+`partial Proposal 170 support` because one of the 43 RouterInfo additions lacks
 bounded authoritative sources. M066 adds real filtered `ircclient` and
 `ircserver`, M067 adds filtered accepted-stream `httpserver`, M068 adds real
 `httpclient` and `connectclient`, M069 adds bounded `socks` and filtered
 `socksirc`, and M070 adds the deprecated composed `httpbidirserver`; the
-unavailable rows are banned peers and v4/v6 network-error; M100 and M101 now
-provide bounded transit-15s and signed router-news sources.
+unavailable row is banned peers; M100 and M101 provide bounded transit-15s and
+signed router-news sources, and M102 provides explicit neutral v4/v6 network-error
+state from the existing SSU2 reachability owner.
 
 ## M038 live-runtime evidence
 
@@ -405,19 +406,21 @@ M028 does not alter these sources. M029 revalidated them.
 
 ## RouterInfo
 
-Current source matrix after M101:
+Current source matrix after M102:
 
-- 39 available;
+- 41 available;
 - 1 protocol-permitted neutral;
-- 3 unavailable.
+- 1 unavailable.
 
 Available selectors have bounded current owners. Clock skew uses `null` only
 when the protocol permits it. Router news is rendered from the authenticated
 canonical XML_GZ feed by an I2PControl-owned refresh/cache task and is unavailable
 before a validated generation or after seven days of failed refreshes. Unavailable
-selectors—including both network-error selectors, for which Emissary has no canonical error owner—fail with sanitized
-errors before assembly and never return fabricated zero, false, empty, partial,
-or semantically adjacent values.
+selectors—including banned peers and an uninitialized network-error family—fail
+with sanitized errors before assembly and never return fabricated zero, false,
+empty, partial, or semantically adjacent values. Once the existing reachability
+owner records an explicit healthy or symmetric-NAT outcome, the v4/v6
+network-error selectors return the corresponding exact integer mapping.
 
 M026 found no additional in-scope authoritative source. M028/M029 do not repeat
 that audit or authorize new telemetry/core inspection.
@@ -455,9 +458,10 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M044 | closed; partial Proposal 170 support | corrected final-head independent reclosure |
 | M053 | closed | live ProfileStorage correction for M045 known-peer sources |
 | M054 | closed | transit-15s truthfulness correction; explicit unavailable disposition |
-| M055 | closed | network-error truthfulness correction; explicit unavailable dispositions |
+| M055 | closed | network-error truthfulness correction; historical unavailable dispositions |
 | M056 | closed | integrated reclosure; historical final 37 available / 1 neutral / 5 unavailable audit |
-| M100 | closed | request-independent transit-15s sampler; current 38/1/4 source matrix |
+| M100/M101 | closed | request-independent transit-15s sampler and bounded signed news source |
+| M102 | closed | explicit neutral v4/v6 network-error owner; current 41/1/1 source matrix |
 | M066–M071 | closed | real IRC, HTTP, CONNECT, SOCKS, bidirectional HTTP, and Streamr tunnel families |
 | M072 | closed after M073 | integrated twelve-type runtime reclosure |
 | M073 | closed; corrective history | generic client/server option apply-or-reject corrective; M081 closes the M075-accepted-stream regression that re-introduced the accepted-but-ignored `leaseSetEncType` |

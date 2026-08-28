@@ -23,6 +23,8 @@
 
 use std::collections::HashSet;
 
+use emissary_core::inspection::NetworkErrorReason;
+
 use crate::i2pcontrol::{
     address_book::{resolve_address_book_selectors_with_mode, RouterInfoAddressBookMode},
     router_info::{InspectionError, NetworkStatus, RouterInfoControl},
@@ -83,6 +85,20 @@ fn network_status_code(status: NetworkStatus) -> i64 {
         | NetworkStatus::FailTcp
         | NetworkStatus::FailUdp
         | NetworkStatus::FailNat => 2,
+    }
+}
+
+/// Map an explicitly evaluated neutral reason to the adopted administrative
+/// vocabulary. An absent reason means that this family has not reached a
+/// valid evaluation state and must remain unavailable; it is not code zero.
+fn network_error_code(error: Option<NetworkErrorReason>) -> Result<i64, InspectionError> {
+    match error {
+        Some(NetworkErrorReason::NoError) => Ok(0),
+        Some(NetworkErrorReason::SymmetricNat) => Ok(3),
+        None => Err(InspectionError::UnavailableReason {
+            group: crate::i2pcontrol::router_info::InspectionGroup::Network,
+            reason: "network error reason not evaluated",
+        }),
     }
 }
 
@@ -500,6 +516,8 @@ async fn assemble_response(
     let network_snapshot = if key_set.contains(rpc::router_info_keys::NET_BW_INBOUND)
         || key_set.contains(rpc::router_info_keys::NET_BW_OUTBOUND)
         || key_set.contains(rpc::router_info_keys::P170_NET_STATUS_V6)
+        || key_set.contains(rpc::router_info_keys::P170_NET_ERROR)
+        || key_set.contains(rpc::router_info_keys::P170_NET_ERROR_V6)
         || key_set.contains(rpc::router_info_keys::P170_NET_TESTING)
         || key_set.contains(rpc::router_info_keys::P170_NET_TESTING_V6)
     {
@@ -709,6 +727,18 @@ async fn assemble_response(
             result.insert(
                 rpc::router_info_keys::P170_NET_STATUS_V6.to_string(),
                 serde_json::json!(network_status_code(network.ipv6_status)),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_ERROR) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_ERROR.to_string(),
+                serde_json::json!(network_error_code(network.ipv4_error)?),
+            );
+        }
+        if key_set.contains(rpc::router_info_keys::P170_NET_ERROR_V6) {
+            result.insert(
+                rpc::router_info_keys::P170_NET_ERROR_V6.to_string(),
+                serde_json::json!(network_error_code(network.ipv6_error)?),
             );
         }
         if key_set.contains(rpc::router_info_keys::P170_NET_TESTING) {
@@ -2568,30 +2598,54 @@ mod tests {
         assert_eq!(result["i2p.router.net.testing.v6"], 0);
     }
 
+    #[test]
+    fn network_error_wire_mapping_is_exact() {
+        assert_eq!(
+            network_error_code(Some(NetworkErrorReason::NoError)).unwrap(),
+            0
+        );
+        assert_eq!(
+            network_error_code(Some(NetworkErrorReason::SymmetricNat)).unwrap(),
+            3
+        );
+    }
+
     #[tokio::test]
-    async fn network_errors_are_unavailable_without_partial_results() {
-        for request in [
-            direct_request(serde_json::json!({
-                rpc::router_info_keys::P170_NET_ERROR: false,
-            })),
-            direct_request(serde_json::json!({
-                rpc::router_info_keys::P170_NET_ERROR_V6: false,
-            })),
-            direct_request(serde_json::json!({
-                rpc::router_info_keys::P170_NET_STATUS_V6: false,
-                rpc::router_info_keys::P170_NET_TESTING: false,
-                rpc::router_info_keys::P170_NET_TESTING_V6: false,
-                rpc::router_info_keys::P170_NET_ERROR: false,
-                rpc::router_info_keys::P170_NET_ERROR_V6: false,
-            })),
-        ] {
-            let response =
-                handle_router_info(&test_state(FakeRouterInfoControl::new()), &request).await;
-            assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
-            assert!(response["result"].is_null());
-            assert!(response["error"]["message"]
-                .as_str()
-                .is_some_and(|message| message.contains("no canonical network-error owner")));
+    async fn network_error_source_uninitialized_is_not_no_error() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_network(NetworkSnapshot::default());
+        let request = direct_request(serde_json::json!({
+            rpc::router_info_keys::P170_NET_ERROR: false,
+        }));
+        let response = handle_router_info(&test_state(ri), &request).await;
+        assert_eq!(response["error"]["code"], rpc::error_codes::INTERNAL_ERROR);
+        assert!(response["result"].is_null());
+        assert!(response["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("network error reason not evaluated")));
+    }
+
+    #[tokio::test]
+    async fn network_errors_are_independent_and_reads_do_not_mutate() {
+        let ri = FakeRouterInfoControl::new();
+        ri.set_network(NetworkSnapshot {
+            ipv4_error: Some(NetworkErrorReason::NoError),
+            ipv6_error: Some(NetworkErrorReason::SymmetricNat),
+            ..Default::default()
+        });
+        let state = test_state(ri);
+        let request = direct_request(serde_json::json!({
+            rpc::router_info_keys::P170_NET_ERROR: false,
+            rpc::router_info_keys::P170_NET_ERROR_V6: false,
+        }));
+
+        for _ in 0..2 {
+            let response = handle_router_info(&state, &request).await;
+            assert_eq!(response["result"][rpc::router_info_keys::P170_NET_ERROR], 0);
+            assert_eq!(
+                response["result"][rpc::router_info_keys::P170_NET_ERROR_V6],
+                3
+            );
         }
     }
 

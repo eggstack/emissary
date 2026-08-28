@@ -13,9 +13,9 @@ current_production_head = "5421cad7d86b9d0975048e62b3b5d63473b69c1a"
 
 [contract_counts]
 router_info_total = 43
-router_info_available = 38
+router_info_available = 41
 router_info_neutral = 1
-router_info_unavailable = 4
+router_info_unavailable = 1
 addressbook_setconfig = 13
 canonical_tunnel_types = 12
 canonical_tunnel_actions = 7
@@ -28,8 +28,8 @@ client_services_selectors = ["I2PTunnel", "HTTPProxy", "SOCKS", "SAM", "BOB", "I
 
 [router_info]
 canonical_key_source = "emissary-cli/src/i2pcontrol/rpc.rs::router_info_keys::PROPOSAL_170_CONTRACT"
-current_baseline = "39 available / 1 neutral / 3 unavailable"
-target_rule = "The three unavailable rows are owned by M102-M103; clockskew remains protocol-permitted neutral when no estimate exists."
+current_baseline = "41 available / 1 neutral / 1 unavailable"
+target_rule = "The remaining unavailable row is owned by M103; clockskew remains protocol-permitted neutral when no estimate exists."
 
 [[router_info.rows]]
 key = "i2p.router.news"
@@ -274,26 +274,28 @@ non_i2pcontrol_production_path_required = false
 [[router_info.rows]]
 key = "i2p.router.net.error"
 json_return_type = "integer"
-current_disposition = "unavailable"
-production_owner_source = "network-error"
-i2pcontrol_adapter_serializer = "unavailable"
+current_disposition = "available"
+production_owner_source = "network-error-state"
+i2pcontrol_adapter_serializer = "serialize_network_error"
 evidence_plan = "plans/implementation/i2pcontrol-proposal-170/102-routerinfo-network-error-owner-completion.md"
-evidence_closure = "M055/M056"
+evidence_closure = "M102"
 final_target_disposition = "available"
 owning_completion_milestone = "M102"
 non_i2pcontrol_production_path_required = true
+path_budget_notes = "TransportManager's existing SSU2 firewall-status event records only explicit healthy or symmetric-NAT outcomes into the neutral EventHandle snapshot; unknown/firewalled states remain unevaluated."
 
 [[router_info.rows]]
 key = "i2p.router.net.error.v6"
 json_return_type = "integer"
-current_disposition = "unavailable"
-production_owner_source = "network-error"
-i2pcontrol_adapter_serializer = "unavailable"
+current_disposition = "available"
+production_owner_source = "network-error-state"
+i2pcontrol_adapter_serializer = "serialize_network_error_v6"
 evidence_plan = "plans/implementation/i2pcontrol-proposal-170/102-routerinfo-network-error-owner-completion.md"
-evidence_closure = "M055/M056"
+evidence_closure = "M102"
 final_target_disposition = "available"
 owning_completion_milestone = "M102"
 non_i2pcontrol_production_path_required = true
+path_budget_notes = "TransportManager's existing SSU2 firewall-status event records only explicit healthy or symmetric-NAT outcomes into the neutral EventHandle snapshot; unknown/firewalled states remain unevaluated."
 
 [[router_info.rows]]
 key = "i2p.router.net.testing"
@@ -1753,9 +1755,9 @@ path_budget_notes = "I2PControl-local bounded real source/cache plus the existin
 
 [[containment.budgets]]
 milestone = "M102"
-production_paths = ["emissary-core/src/events.rs", "emissary-core/src/inspection.rs", "emissary-core/src/transport/mod.rs", "emissary-cli/src/i2pcontrol/observers.rs", "emissary-cli/src/i2pcontrol/router_info.rs", "emissary-cli/src/i2pcontrol/router_info_handler.rs", "emissary-cli/src/i2pcontrol/production.rs"]
+production_paths = ["emissary-core/src/events.rs", "emissary-core/src/inspection.rs", "emissary-core/src/transport/mod.rs", "emissary-cli/src/i2pcontrol/router_info.rs", "emissary-cli/src/i2pcontrol/router_info_handler.rs", "emissary-cli/src/i2pcontrol/production.rs", "emissary-cli/src/i2pcontrol/rpc.rs"]
 non_i2pcontrol_production_path_required = true
-path_budget_notes = "Candidate paths only: M095 found no existing explicit neutral error owner, so M102 must narrow this to exact writer/owner files before code. Wire mapping remains I2PControl-local."
+path_budget_notes = "Exact final paths: the existing TransportManager SSU2 firewall-status owner writes neutral state through EventHandle; inspection/production adapters copy it; RouterInfo handler and contract own availability and integer mapping. No new task/probe or transport decision consumes the state."
 
 [[containment.budgets]]
 milestone = "M103"
@@ -1765,7 +1767,7 @@ path_budget_notes = "Exhaustive audit of router/transport/profile/NetDB exclusio
 
 [evidence]
 proposal_revision_verification = "Official source identifies Proposal 170 as Open, created 2026-05-20, last updated 2026-05-20; source hash recorded above."
-router_info_reconciliation = "Current source authority is 43 rows with 39 available, 1 protocol-permitted neutral, and 3 unavailable; no historical 40/1/2 count is carried forward."
+router_info_reconciliation = "Current source authority is 43 rows with 41 available, 1 protocol-permitted neutral, and 1 unavailable after M102; the remaining unavailable row is banned peers under M103."
 addressbook_reconciliation = "All 13 pinned SetConfig keys are classified; no unknown or accept_inert disposition is used."
 tunnel_option_reconciliation = "Every CANONICAL_OPTION_KEYS entry has 12 explicit cells. Apply means current backend behavior; planned_apply is assigned to M097-M099; not_applicable has a cell note; blocked_primitive names the missing primitive and milestone."
 client_services_reconciliation = "Exactly six selectors are listed; broader/base methods are outside this phase."

@@ -381,20 +381,29 @@ fn network_error_rows_require_an_authoritative_owner() {
             .expect("network-error selector must remain in the canonical contract");
         assert!(matches!(
             row.source,
-            rpc::router_info_keys::SourceDisposition::Unavailable { .. }
+            rpc::router_info_keys::SourceDisposition::Available { .. }
         ));
+        assert_eq!(row.source.owner(), "network-error-state");
         assert_eq!(
-            row.source.reason(),
-            Some("no canonical network-error owner")
+            row.serializer,
+            if key == rpc::router_info_keys::P170_NET_ERROR {
+                "serialize_network_error"
+            } else {
+                "serialize_network_error_v6"
+            }
         );
-        assert_eq!(row.serializer, "unavailable");
     }
 
-    assert!(!handler.contains("fn network_error_code"));
-    assert!(!handler.contains("NetworkErrorReason"));
-    assert!(!events.contains("set_ipv4_network_error"));
-    assert!(!events.contains("set_ipv6_network_error"));
-    assert!(!inspection.contains("NetworkErrorReason"));
+    assert!(handler.contains("fn network_error_code"));
+    assert!(handler.contains("NetworkErrorReason::NoError"));
+    assert!(events.contains("set_ipv4_network_error"));
+    assert!(events.contains("set_ipv6_network_error"));
+    assert!(inspection.contains("enum NetworkErrorReason"));
+    for core_source in [&events, &inspection] {
+        assert!(!core_source.contains("Proposal 170"));
+        assert!(!core_source.contains("jsonrpc"));
+        assert!(!core_source.contains("i2p.router.net.error"));
+    }
 }
 
 #[test]

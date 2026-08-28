@@ -6,13 +6,15 @@ This is the reviewed source map for the pinned Proposal 170 revision created and
 last updated on `2026-08-28`. M027 independently revalidated the matrix against
 the external revision. The machine-readable authority is
 `router_info_keys::PROPOSAL_170_CONTRACT` in `emissary-cli/src/i2pcontrol/rpc.rs`.
-Summary: 43 total, 39 available, 1 protocol-permitted neutral, and 3 unavailable.
+Summary: 43 total, 41 available, 1 protocol-permitted neutral, and 1 unavailable.
 M051 adjudicated the news and ban rows, M055 adjudicated the v4/v6 network-error
 rows, M100 completed the request-independent transit-15s source, and M101
 completed the authenticated bounded news source against the pinned proposal and
 read-only reference evidence. Empty values, request-local
 sampling, and `0`/`No error` from an unset source are not authoritative capability
-states and are not emitted.
+states and are not emitted. M102 now publishes an explicit neutral network-error
+state from the existing SSU2 reachability owner; only healthy and symmetric-NAT
+outcomes are representable, while uninitialized/firewalled states remain unavailable.
 The table below is intentionally one row per canonical addition. Base selectors and
 the nested `Selector` compatibility form are not counted in those totals.
 
@@ -53,8 +55,8 @@ is read-only. Actual serialized response size is checked after assembly.
 | `i2p.router.net.tunnels.client.outbound` | integer | available | tunnel-inspection | `serialize_client_outbound` | `p170.client_outbound.count` | — | — |
 | `i2p.router.net.tunnels.client.info.list` | array&lt;object&gt; | available | tunnel-inspection | `serialize_client_info_list` | `p170.client_info.rows` | 10,000 / 4 MiB | — |
 | `i2p.router.net.status.v6` | integer | available | network-state: live v6 reachability status | `serialize_network_status_v6` | `p170.status_v6.integer` | — | — |
-| `i2p.router.net.error` | integer | unavailable | network-error: no canonical network-error owner | `unavailable` | `p170.error_v4.integer` | — | — |
-| `i2p.router.net.error.v6` | integer | unavailable | network-error: no canonical network-error owner | `unavailable` | `p170.error_v6.integer` | — | — |
+| `i2p.router.net.error` | integer | available | network-error-state: explicit v4 SSU2 reachability result; uninitialized/firewalled remains unavailable | `serialize_network_error` | `p170.error_v4.integer` | — | — |
+| `i2p.router.net.error.v6` | integer | available | network-error-state: explicit v6 SSU2 reachability result; uninitialized/firewalled remains unavailable | `serialize_network_error_v6` | `p170.error_v6.integer` | — | — |
 | `i2p.router.net.testing` | integer | available | network-state: active v4 reachability test | `serialize_network_testing` | `p170.testing_v4.integer` | — | — |
 | `i2p.router.net.testing.v6` | integer | available | network-state: active v6 reachability test | `serialize_network_testing_v6` | `p170.testing_v6.integer` | — | — |
 | `i2p.router.net.tunnels.successrate` | number | available | tunnel-build-metrics: ordered reference EWMA | `serialize_tunnel_success_rate` | `p170.success_rate.recent.percent` | — | — |

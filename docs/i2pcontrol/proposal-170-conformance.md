@@ -63,11 +63,11 @@ It contains exactly 43 Proposal 170 additions and records, for each selector:
 - compatibility/base separation;
 - residual limitation.
 
-Current counts after M101:
+Current counts after M102:
 
-- 39 available;
+- 41 available;
 - 1 protocol-permitted neutral;
-- 3 unavailable.
+- 1 unavailable.
 
 The separate existing-I2PControl and Emissary compatibility inventories are not
 counted in the 43 additions.
@@ -197,8 +197,9 @@ Retained M025/M026 evidence covers:
 M028 does not alter this matrix. M029 revalidated the earlier counts and focused
 fixtures after the AddressBook feature-boundary correction. M054/M055 corrected
 three previously overclaimed rows, M056 independently accepted the historical
-37/1/5 integrated matrix, and M100 promoted transit-15s after request-independent
-sampler evidence.
+37/1/5 integrated matrix, M100/M101 promoted transit-15s and router-news, and
+M102 promoted the two network-error rows from explicit neutral v4/v6 state while
+retaining truthful uninitialized semantics.
 
 M035 additionally proves that direct and nested request modes are distinct:
 the nested base inventories use legacy serializers, while direct Proposal 170
@@ -249,7 +250,7 @@ M030 selected:
 - `blocked` when the external revision changed or required evidence cannot be
   obtained.
 
-Under the current scope and accepted 38/1/4 matrix, the expected honest status
+Under the current scope and accepted 41/1/1 matrix, the expected honest status
 is `partial Proposal 170 support`.
 
 No status implies upstream review, acceptance, certification, adoption,

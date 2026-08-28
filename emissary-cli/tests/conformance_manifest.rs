@@ -583,7 +583,7 @@ fn router_info_contract_manifest_has_exact_types_and_source_counts() {
             .iter()
             .filter(|row| matches!(row.source, SourceDisposition::Available { .. }))
             .count(),
-        39
+        41
     );
     assert_eq!(
         contract
@@ -597,7 +597,7 @@ fn router_info_contract_manifest_has_exact_types_and_source_counts() {
             .iter()
             .filter(|row| matches!(row.source, SourceDisposition::Unavailable { .. }))
             .count(),
-        3
+        1
     );
     assert!(contract.iter().all(|row| row.direct_presence && !row.fixture.is_empty()));
 }
@@ -618,7 +618,7 @@ fn router_info_source_map_documents_every_canonical_key_once() {
         );
     }
     assert!(source_map
-        .contains("43 total, 39 available, 1 protocol-permitted neutral, and 3 unavailable"));
+        .contains("43 total, 41 available, 1 protocol-permitted neutral, and 1 unavailable"));
 }
 
 #[test]

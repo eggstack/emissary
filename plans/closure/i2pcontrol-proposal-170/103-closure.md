@@ -15,8 +15,8 @@ implementation baseline)
 
 Implementation commits:
 
-- implementation commit containing the M103 code, matrix, tests, and planning updates
-  (recorded by the surrounding git history)
+- `1cd9577` — implement the authoritative by-design-empty banned-peer source,
+  canonical map serializer, tests, matrix/docs updates, and planning reconciliation
 
 Review date: 2026-08-28.
 

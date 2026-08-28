@@ -719,6 +719,8 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/102-routerinfo-network-error-owner-completion.md"
             | "plans/implementation/i2pcontrol-proposal-170/103-routerinfo-banned-peer-semantic-completion.md"
             | "plans/implementation/i2pcontrol-proposal-170/104-full-proposal-170-live-interoperability-and-reclosure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/105-residual-tunnel-option-primitive-audit.md"
+            | "plans/implementation/i2pcontrol-proposal-170/105-residual-option-audit.toml"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-roadmap.md"
@@ -760,6 +762,9 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/099-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/102-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/103-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/104-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/105-closure.md"
+            | "emissary-cli/tests/m105_residual_option_audit.rs"
             | "emissary-cli/tests/m095_full_support_matrix.rs"
             | "emissary-cli/tests/m062_dependency_containment.rs"
     )

@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; all twelve tunnel runtimes real; M095-M096 and M098-M103 closed, M099 closed internally/partial, M097 and M104 closed as blocked; **M105 residual primitive/applicability audit is ready**
+Status: partial Proposal 170 production support; all twelve tunnel runtimes real; M095-M096 and M098-M103 closed, M099 closed internally/partial, M097 and M104 closed as blocked, M105 closed; **M106 DelayOpen client-listener handoff is ready**
 
 This directory contains bounded internal implementation, audit, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -77,7 +77,8 @@ Overall status remains partial until every applicable blocked cell is resolved a
 | M102 | closed | neutral v4/v6 network-error owner observation |
 | M103 | closed | authoritative by-design-empty banned-peer source |
 | M104 | closed as blocked | final live interoperability/security/containment/full-support reclosure stopped by 164 residual option blockers |
-| M105 | **ready** | exhaustive residual primitive, applicability, ownership, and security audit; no production behavior |
+| M105 | **closed** | exhaustive residual primitive, applicability, ownership, and security audit; no production behavior |
+| M106 | **ready** | six TCP-client `DelayOpen` cells through the existing I2PControl client-listener owner |
 
 Plans:
 
@@ -93,9 +94,10 @@ Plans:
 - `104-full-proposal-170-live-interoperability-and-reclosure.md`
 - `105-residual-tunnel-option-primitive-audit.md`
 
-## M105 — current ready audit
+## M105 — closed audit
 
-M105 is the only current dependency-ready handoff.
+M105 is closed. It preserved all 164 production blockers and identified one
+bounded successor.
 
 It audits all 164 M104 `blocked_primitive` cells and creates:
 
@@ -114,7 +116,16 @@ M105 is evidence-only. It does not change production behavior, M095 support disp
 
 Each residual record must name exact Proposal/reference semantics, current Emissary owner/blocker, actual Yosemite/SAM wire support where relevant, security/anonymity impact, exact candidate paths where a contained implementation may exist, and one bounded audit disposition.
 
-The closure may recommend multiple future groupings, but it may register at most one next dependency-ready implementation handoff. If no bounded path exists, the residual line remains blocked.
+The closure registered exactly one dependency-ready successor: M106 for six
+TCP-style client families. Streamr `DelayOpen` is semantic-blocked, and the
+other residual groups remain deferred.
+
+## M106 — current ready implementation
+
+`106-delay-open-client-listener.md` is the sole current ready handoff. It is
+confined to the existing I2PControl client-listener owner and must not change
+Yosemite, core/util crates, dependencies, Streamr behavior, or the production
+support counts until its own closure evidence is complete.
 
 ## Residual families under M105
 

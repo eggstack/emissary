@@ -1,6 +1,6 @@
 # M105 — Residual TunnelManager Option Primitive and Applicability Audit
 
-Status: **ready**
+Status: **closed**
 
 Class: invariant / infrastructure audit; no production behavior
 

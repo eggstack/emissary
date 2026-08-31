@@ -1,0 +1,115 @@
+use std::{collections::BTreeSet, fs, path::PathBuf};
+
+use toml::Value;
+
+fn planning_file(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../plans/implementation/i2pcontrol-proposal-170")
+        .join(name)
+}
+
+fn string<'a>(value: &'a Value, key: &str) -> &'a str {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| panic!("missing string field {key}"))
+}
+
+fn main() {}
+
+#[test]
+fn audit_covers_the_exact_m104_residual_inventory() {
+    let matrix: Value = toml::from_str(
+        &fs::read_to_string(planning_file("095-full-support-matrix.toml")).unwrap(),
+    )
+    .unwrap();
+    let audit: Value = toml::from_str(
+        &fs::read_to_string(planning_file("105-residual-option-audit.toml")).unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(string(&audit["audit"], "milestone"), "M105");
+    assert_eq!(string(&audit["audit"], "status"), "closed");
+    assert_eq!(string(&audit["audit"], "input_disposition"), "blocked_primitive");
+    assert_eq!(audit["audit"]["record_count"].as_integer(), Some(164));
+    assert_eq!(audit["audit"]["m095_matrix_sha256"].as_str(), Some("fcc7d21dd886cd96ac614507abba5e3cfc806cee942ebbb09eb387e1a60078ac"));
+
+    let tunnel_types = matrix["contract_names"]["canonical_tunnel_types"]
+        .as_array()
+        .unwrap();
+    let options = matrix["tunnel_manager"]["options"].as_array().unwrap();
+    let expected: BTreeSet<(String, String)> = options
+        .iter()
+        .flat_map(|row| {
+            let key = string(row, "canonical_key").to_owned();
+            row["cells"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .enumerate()
+                .filter(|(_, cell)| cell.as_str() == Some("blocked_primitive"))
+                .map(move |(index, _)| {
+                    (
+                        key.clone(),
+                        tunnel_types[index].as_str().unwrap().to_owned(),
+                    )
+                })
+        })
+        .collect();
+
+    let allowed = BTreeSet::from([
+        "i2pcontrol_local_candidate",
+        "neutral_owner_candidate",
+        "dependency_blocked",
+        "architecture_decision_required",
+        "not_applicable_candidate",
+        "semantic_blocked",
+    ]);
+    let cells = audit["cells"].as_array().unwrap();
+    assert_eq!(cells.len(), 164);
+
+    let mut actual = BTreeSet::new();
+    for cell in cells {
+        let identity = (
+            string(cell, "canonical_option").to_owned(),
+            string(cell, "tunnel_type").to_owned(),
+        );
+        assert!(actual.insert(identity), "duplicate audit cell");
+        assert_eq!(cell["applicable_under_pinned_contract"].as_bool(), Some(true));
+        assert!(!string(cell, "pinned_semantic_summary").is_empty());
+        assert!(!string(cell, "current_m095_blocker").is_empty());
+        assert!(!string(cell, "current_emissary_owner").is_empty());
+        assert!(!string(cell, "current_yosemite_sam_primitive_or_wire_path").is_empty());
+        assert!(!string(cell, "reference_implementation_behavior").is_empty());
+        assert!(!string(cell, "required_runtime_effect").is_empty());
+        assert!(!string(cell, "security_anonymity_implications").is_empty());
+        assert!(!string(cell, "persistence_key_secret_path_implications").is_empty());
+
+        let disposition = string(cell, "audit_disposition");
+        assert!(allowed.contains(disposition), "invalid audit disposition");
+        let paths = cell["exact_candidate_production_paths"].as_array().unwrap();
+        if disposition == "i2pcontrol_local_candidate"
+            || disposition == "neutral_owner_candidate"
+        {
+            assert!(!string(cell, "candidate_implementation_owner").is_empty());
+            assert!(!paths.is_empty(), "candidate must name exact production paths");
+        }
+        if disposition == "dependency_blocked" {
+            assert!(cell["dependency_or_cargo_lock_change_required"].as_bool() == Some(true));
+            assert!(string(cell, "current_yosemite_sam_primitive_or_wire_path").len() > 20);
+        }
+        if disposition == "not_applicable_candidate" {
+            assert!(string(cell, "applicability_evidence").contains("affirmative"));
+        }
+        if disposition == "semantic_blocked" {
+            assert!(
+                string(cell, "reference_implementation_behavior").contains("unresolved")
+                    || string(cell, "reference_implementation_behavior").contains("define")
+                    || string(cell, "reference_implementation_behavior").contains("definition")
+                    || string(cell, "reference_implementation_behavior").contains("speculative")
+            );
+        }
+    }
+
+    assert_eq!(actual, expected);
+}

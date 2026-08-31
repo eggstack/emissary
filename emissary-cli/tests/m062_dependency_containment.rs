@@ -721,6 +721,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/104-full-proposal-170-live-interoperability-and-reclosure.md"
             | "plans/implementation/i2pcontrol-proposal-170/105-residual-tunnel-option-primitive-audit.md"
             | "plans/implementation/i2pcontrol-proposal-170/105-residual-option-audit.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/106-delay-open-client-listener.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-roadmap.md"

@@ -765,6 +765,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/103-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/104-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/105-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/106-closure.md"
             | "emissary-cli/tests/m105_residual_option_audit.rs"
             | "emissary-cli/tests/m095_full_support_matrix.rs"
             | "emissary-cli/tests/m062_dependency_containment.rs"

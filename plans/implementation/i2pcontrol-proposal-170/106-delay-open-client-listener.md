@@ -1,6 +1,6 @@
 # M106 — DelayOpen Client-Listener Lifecycle
 
-Status: **ready**
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/106-closure.md`
 
 Class: capability / infrastructure
 

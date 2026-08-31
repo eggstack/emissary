@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096 and M098-M103 closed, M099 closed internally/partial, M097 and M104 closed as blocked, M105 closed; **M106 DelayOpen client-listener handoff is current**
+Status: active; M095-M096 and M098-M103 closed, M099 closed internally/partial, M097 and M104 closed as blocked, M105-M106 closed; no successor is currently dependency-ready
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -46,7 +46,7 @@ The current production state at the M105 baseline is:
 - full public-network/reference-router certification remains open;
 - M104 closed as blocked because the final reviewed TunnelManager matrix still contains 164 applicable residual cells.
 
-M104's reviewed matrix totals are:
+M104's reviewed matrix totals were:
 
 - 70 canonical option rows × 12 canonical types = 840 cells;
 - 218 `apply`;
@@ -228,7 +228,7 @@ M105 residual primitive/applicability audit          |
   |                                                  |
   v                                                  |
 M106 DelayOpen client-listener lifecycle             |
-[READY — SIX TCP CLIENT FAMILIES; STREAMR EXCLUDED] |
+[CLOSED — SIX TCP CLIENT FAMILIES; STREAMR EXCLUDED] |
 ```
 
 ## 10. Milestone status and exit conditions
@@ -352,22 +352,25 @@ Exit conditions:
 
 M105 closed with one dependency-ready successor: M106, limited to `DelayOpen`
 for the six TCP-style client families. Streamr `DelayOpen` remains
-`semantic_blocked`; the other 158 residual cells remain deferred, and all 164
-cells remain `blocked_primitive` in the production matrix until later work
-actually lands.
+`semantic_blocked`. M106 subsequently applied the six TCP-client cells; the
+other 158 residual cells remain deferred or blocked in the production matrix.
 
 ### M106 — DelayOpen client-listener lifecycle
 
-Status: **ready; current handoff**.
+Status: **closed**.
 
 Plan:
 
 `plans/implementation/i2pcontrol-proposal-170/106-delay-open-client-listener.md`
 
+Closure:
+
+`plans/closure/i2pcontrol-proposal-170/106-closure.md`
+
 M106 is a bounded I2PControl-local implementation slice for six TCP-style
-client families. It does not authorize Streamr, Yosemite, core, util,
-dependency, or full-support matrix changes beyond its eventual six-cell
-reclosure.
+client families. It applied lazy first-local-use session creation through the
+existing listener owner and did not authorize Streamr, Yosemite, core, util,
+or dependency changes. No other future plan became dependency-ready.
 
 ## 11. M105 residual families
 

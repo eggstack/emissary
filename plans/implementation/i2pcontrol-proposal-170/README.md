@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; all twelve tunnel runtimes real; M095-M096 and M098-M103 closed, M099 closed internally/partial, M097 and M104 closed as blocked, M105 closed; **M106 DelayOpen client-listener handoff is ready**
+Status: partial Proposal 170 production support; all twelve tunnel runtimes real; M095-M096 and M098-M103 closed, M099 closed internally/partial, M097 and M104 closed as blocked, M105 and **M106 closed**; 224 apply / 158 blocked / 458 not-applicable TunnelManager cells remain
 
 This directory contains bounded internal implementation, audit, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -54,10 +54,10 @@ M091 remains the cautionary boundary case: unauthorized vendored Yosemite/core/d
 - All 6 ClientServicesInfo selectors are implemented.
 - Full live/reseeded/reference-router certification remains open.
 
-M104's final reviewed TunnelManager matrix contains:
+The current M095 matrix after M106 contains:
 
-- 218 `apply`;
-- 164 applicable `blocked_primitive`;
+- 224 `apply`;
+- 158 applicable `blocked_primitive`;
 - 458 `not_applicable`;
 - 0 `planned_apply`, unknown, unsupported, or accept-inert cells.
 
@@ -78,7 +78,7 @@ Overall status remains partial until every applicable blocked cell is resolved a
 | M103 | closed | authoritative by-design-empty banned-peer source |
 | M104 | closed as blocked | final live interoperability/security/containment/full-support reclosure stopped by 164 residual option blockers |
 | M105 | **closed** | exhaustive residual primitive, applicability, ownership, and security audit; no production behavior |
-| M106 | **ready** | six TCP-client `DelayOpen` cells through the existing I2PControl client-listener owner |
+| M106 | **closed** | six TCP-client `DelayOpen` cells through the existing I2PControl client-listener owner; closure recorded |
 
 Plans:
 
@@ -93,6 +93,7 @@ Plans:
 - `103-routerinfo-banned-peer-semantic-completion.md`
 - `104-full-proposal-170-live-interoperability-and-reclosure.md`
 - `105-residual-tunnel-option-primitive-audit.md`
+- `106-delay-open-client-listener.md`
 
 ## M105 — closed audit
 
@@ -120,12 +121,13 @@ The closure registered exactly one dependency-ready successor: M106 for six
 TCP-style client families. Streamr `DelayOpen` is semantic-blocked, and the
 other residual groups remain deferred.
 
-## M106 — current ready implementation
+## M106 — closed implementation
 
-`106-delay-open-client-listener.md` is the sole current ready handoff. It is
-confined to the existing I2PControl client-listener owner and must not change
-Yosemite, core/util crates, dependencies, Streamr behavior, or the production
-support counts until its own closure evidence is complete.
+`106-delay-open-client-listener.md` is closed by
+`plans/closure/i2pcontrol-proposal-170/106-closure.md`. It implemented the
+bounded lazy session owner for the six TCP-client families through the existing
+I2PControl client-listener owner. Streamr remains excluded and all other
+residual options remain blocked or deferred.
 
 ## Residual families under M105
 
@@ -157,7 +159,7 @@ M104 is closed as blocked. Its closure:
 
 `plans/closure/i2pcontrol-proposal-170/104-closure.md`
 
-records passing bounded local/live evidence but correctly refuses full support because 164 applicable TunnelManager cells remain blocked.
+records passing bounded local/live evidence but correctly refuses full support because 164 applicable TunnelManager cells remained blocked at the M104 review point.
 
 A future M104 reattempt requires:
 

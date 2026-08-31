@@ -213,6 +213,7 @@ impl ClientRuntimeSupervisor {
         &self,
         config: ClientTunnelRuntimeConfig,
         session_options: SessionOptions,
+        delay_open: bool,
     ) -> BackendResult<()> {
         let (generation, cancellation) = self.reserve(&config)?;
         let ready_config = config.clone();
@@ -236,6 +237,7 @@ impl ClientRuntimeSupervisor {
                     destination_port: ready_config.destination_port.unwrap_or(0),
                     sam_tcp_port: ready_config.sam_tcp_port,
                     max_connections: 1,
+                    delay_open,
                     session_options,
                     handler: std::sync::Arc::new(|_, _| Box::pin(async {})),
                 },
@@ -259,7 +261,7 @@ impl ClientRuntimeSupervisor {
         self.set_task(&name, generation, task);
 
         match tokio::time::timeout(START_TIMEOUT, listener_ready_rx).await {
-            Ok(Ok(Ok(_))) =>
+            Ok(Ok(Ok(_))) => {
                 if self.mark_running(&name, generation) {
                     Ok(())
                 } else {
@@ -267,7 +269,8 @@ impl ClientRuntimeSupervisor {
                     Err(BackendError::Internal {
                         message: "client tunnel runtime exited during start".to_string(),
                     })
-                },
+                }
+            }
             Ok(Ok(Err(_))) => {
                 let _ = self.stop_generation(&name, generation).await;
                 Err(BackendError::Internal {
@@ -383,6 +386,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "i2p.tunnel.clientDestPort",
         "i2p.tunnel.listenInterface",
         "i2p.tunnel.listenPort",
+        "DelayOpen",
     ];
     const METADATA: &[&str] = &[
         "name",
@@ -441,7 +445,13 @@ impl TunnelBackend for ClientTunnelBackend {
             false,
             DestinationKind::Transient,
         )?;
-        self.supervisor.start(config, session_options).await
+        self.supervisor
+            .start(
+                config,
+                session_options,
+                definition.options.delay_open.unwrap_or(false),
+            )
+            .await
     }
 
     async fn stop(&self, definition: &TunnelDefinition) -> BackendResult<()> {

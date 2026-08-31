@@ -378,6 +378,7 @@ async fn run_composite(
             destination_port: 80,
             sam_tcp_port: config.sam_tcp_port,
             session_options: config.client_session_options,
+            delay_open: false,
             max_connections: MAX_CONNECTIONS,
             handler: client_handler,
         },

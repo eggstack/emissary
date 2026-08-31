@@ -1081,6 +1081,9 @@ fn insert_typed_canonical_options(
     if let Some(value) = def.options.listen_port {
         insert("Port", serde_json::json!(value), raw_config);
     }
+    if let Some(value) = def.options.delay_open {
+        insert("DelayOpen", serde_json::json!(value), raw_config);
+    }
     if let Some(value) = def.options.shared {
         insert("Shared", serde_json::json!(value), raw_config);
     }
@@ -1158,6 +1161,9 @@ fn extract_tunnel_options(
     // Common session options
     if let Some(v) = params.get("Shared").and_then(|v| v.as_bool()) {
         options.shared = Some(v);
+    }
+    if let Some(v) = params.get("DelayOpen").and_then(|v| v.as_bool()) {
+        options.delay_open = Some(v);
     }
     if let Some(v) = params.get("UseSSL").and_then(|v| v.as_bool()) {
         options.use_ssl = Some(v);
@@ -1344,6 +1350,7 @@ fn merge_tunnel_options(existing: &TunnelOptions, new: &TunnelOptions) -> Tunnel
         listen_port: new.listen_port.or(existing.listen_port),
         access_list: new.access_list.clone().or(existing.access_list.clone()),
         allowplaintext: new.allowplaintext.or(existing.allowplaintext),
+        delay_open: new.delay_open.or(existing.delay_open),
         shared: new.shared.or(existing.shared),
         use_ssl: new.use_ssl.or(existing.use_ssl),
         tunnel_length: new.tunnel_length.or(existing.tunnel_length),
@@ -1961,7 +1968,8 @@ mod tests {
                 "Type": "client",
                 "Name": "canonical-tunnel",
                 "Port": 1234,
-                "TunnelLength": 2
+                "TunnelLength": 2,
+                "DelayOpen": true
             }),
         );
         let resp = handle_tunnel_manager(&state, &create).await;
@@ -1987,6 +1995,7 @@ mod tests {
                 assert_eq!(info["status"], "stopped");
                 assert_eq!(info["rawConfig"]["name"], "canonical-tunnel");
                 assert_eq!(info["rawConfig"]["type"], "client");
+                assert_eq!(info["rawConfig"]["DelayOpen"], true);
                 assert!(info["Name"].is_null());
                 assert!(info["Type"].is_null());
                 assert!(info["State"].is_null());

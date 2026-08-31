@@ -19,7 +19,6 @@ use super::{
     options::{validate_options, OptionValidationError, CONNECT_CLIENT_OPTIONS},
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
-use yosemite::SessionOptions;
 use crate::i2pcontrol::{
     address_book_runtime::RuntimeAddressBookHandle,
     backends::runtime::{
@@ -28,6 +27,7 @@ use crate::i2pcontrol::{
     },
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
 };
+use yosemite::SessionOptions;
 
 const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -112,6 +112,7 @@ struct ConnectConfig {
     require_auth: bool,
     outproxy_authorization: Option<String>,
     address_book: Option<Arc<RuntimeAddressBookHandle>>,
+    delay_open: bool,
     session_options: SessionOptions,
 }
 
@@ -269,6 +270,7 @@ impl RuntimeSupervisor {
                     destination_port: 1,
                     sam_tcp_port: config.sam_tcp_port,
                     session_options: config.session_options,
+                    delay_open: config.delay_open,
                     max_connections: MAX_CONNECTIONS,
                     handler,
                 },
@@ -398,7 +400,7 @@ fn make_handler(config: ConnectConfig) -> ClientConnectionHandler {
                 return;
             };
             let destination = match &mut target {
-                HttpTarget::I2p { destination, .. } =>
+                HttpTarget::I2p { destination, .. } => {
                     match super::http_client::resolve_destination(
                         destination,
                         config.address_book.as_ref(),
@@ -414,7 +416,8 @@ fn make_handler(config: ConnectConfig) -> ClientConnectionHandler {
                             let _ = write_error(&mut stream, 502, "Bad Gateway").await;
                             return;
                         }
-                    },
+                    }
+                }
                 HttpTarget::Clearnet { outproxy, .. } => {
                     match super::http_client::resolve_destination(
                         &outproxy.destination,
@@ -553,7 +556,8 @@ impl ConnectClientTunnelBackend {
         let proxy_password = raw_secret(definition, "ProxyPassword")
             .or_else(|| definition.options.proxy_password.as_deref().map(str::to_owned));
         let proxy_credentials = credentials(proxy_username, proxy_password)?;
-        let require_auth = raw_bool(definition, "ProxyAuth")?.unwrap_or(proxy_credentials.is_some())
+        let require_auth = raw_bool(definition, "ProxyAuth")?
+            .unwrap_or(proxy_credentials.is_some())
             || !bind_address.is_loopback();
         if require_auth && proxy_credentials.is_none() {
             return Err(BackendError::Internal {
@@ -567,8 +571,7 @@ impl ConnectClientTunnelBackend {
         let outproxy_password = raw_secret(definition, "OutproxyPassword")
             .or_else(|| definition.options.outproxy_password.as_deref().map(str::to_owned));
         let outproxy_credentials = credentials(outproxy_username, outproxy_password)?;
-        if raw_bool(definition, "OutproxyAuth")?.unwrap_or(false)
-            && outproxy_credentials.is_none()
+        if raw_bool(definition, "OutproxyAuth")?.unwrap_or(false) && outproxy_credentials.is_none()
         {
             return Err(BackendError::Internal {
                 message: "connectclient outproxy authentication is incomplete".to_owned(),
@@ -594,6 +597,7 @@ impl ConnectClientTunnelBackend {
             require_auth,
             outproxy_authorization,
             address_book: self.address_book.clone(),
+            delay_open: definition.options.delay_open.unwrap_or(false),
             session_options: SessionOptions::default(),
         })
     }
@@ -624,10 +628,7 @@ fn parse_outproxy(value: &str) -> BackendResult<OutproxyTarget> {
             message: "connectclient outproxy port is invalid".to_owned(),
         });
     }
-    Ok(OutproxyTarget {
-        destination,
-        port,
-    })
+    Ok(OutproxyTarget { destination, port })
 }
 
 fn credentials(
@@ -641,7 +642,9 @@ fn credentials(
                 && !password.is_empty()
                 && username.len() <= 255
                 && password.len() <= 255 =>
-            Ok(Some((username, password))),
+        {
+            Ok(Some((username, password)))
+        }
         _ => Err(BackendError::Internal {
             message: "connectclient proxy credentials are invalid or incomplete".to_owned(),
         }),
@@ -689,6 +692,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "OutproxyType",
         "Description",
         "StartOnLoad",
+        "DelayOpen",
     ];
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {

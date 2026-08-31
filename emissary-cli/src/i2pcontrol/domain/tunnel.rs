@@ -457,6 +457,10 @@ pub struct TunnelOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allowplaintext: Option<bool>,
 
+    /// Whether the client session uses a delayed first-open lifecycle.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delay_open: Option<bool>,
+
     // === Common Proposal 170 session options ===
     /// Whether compatible client definitions may share one I2CP session.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -601,6 +605,7 @@ impl Default for TunnelOptions {
             listen_port: None,
             access_list: None,
             allowplaintext: None,
+            delay_open: None,
             shared: None,
             use_ssl: None,
             tunnel_length: None,
@@ -907,6 +912,17 @@ mod tests {
         let json1 = serde_json::to_string(&opts).unwrap();
         let json2 = serde_json::to_string(&opts).unwrap();
         assert_eq!(json1, json2);
+    }
+
+    #[test]
+    fn tunnel_options_delay_open_roundtrips_losslessly() {
+        let opts = TunnelOptions {
+            delay_open: Some(true),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&opts).unwrap();
+        assert_eq!(json["delay_open"], serde_json::json!(true));
+        assert_eq!(serde_json::from_value::<TunnelOptions>(json).unwrap(), opts);
     }
 
     #[test]

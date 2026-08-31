@@ -269,6 +269,14 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
     ] {
         let row = option(key);
         let cells = row["cells"].as_array().unwrap();
+        if key == "DelayOpen" {
+            for (index, cell) in cells.iter().enumerate().take(6) {
+                assert_eq!(cell.as_str(), Some("apply"), "{key} cell {index}");
+            }
+            assert!(string_field(row, "completion_owner").starts_with("M106"));
+            assert_eq!(cells[6].as_str(), Some("blocked_primitive"));
+            continue;
+        }
         for (index, cell) in cells.iter().enumerate().take(7) {
             assert_eq!(
                 cell.as_str(),
@@ -345,7 +353,11 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
             let index = offset + 7;
             assert_eq!(
                 cells[index].as_str(),
-                Some(if should_apply { "apply" } else { "not_applicable" }),
+                Some(if should_apply {
+                    "apply"
+                } else {
+                    "not_applicable"
+                }),
                 "{key} cell {index}"
             );
         }
@@ -378,7 +390,11 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
             _ => (7, 11),
         };
         for (index, cell) in cells.iter().enumerate().skip(first).take(last - first + 1) {
-            assert_eq!(cell.as_str(), Some("blocked_primitive"), "{key} cell {index}");
+            assert_eq!(
+                cell.as_str(),
+                Some("blocked_primitive"),
+                "{key} cell {index}"
+            );
         }
     }
 

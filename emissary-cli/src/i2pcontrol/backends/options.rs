@@ -147,7 +147,10 @@ pub fn validate_common_options(
     tunnel_type: TunnelType,
     options: &TunnelOptions,
 ) -> Result<(), OptionValidationError> {
-    let is_streamr = matches!(tunnel_type, TunnelType::StreamrClient | TunnelType::StreamrServer);
+    let is_streamr = matches!(
+        tunnel_type,
+        TunnelType::StreamrClient | TunnelType::StreamrServer
+    );
 
     // These fields are represented canonically, but the current Yosemite
     // dependency does not carry them to the SAM SESSION CREATE wire. Keep
@@ -157,7 +160,10 @@ pub fn validate_common_options(
         (options.shared.is_some(), "Shared"),
         (options.use_ssl.is_some(), "UseSSL"),
         (options.tunnel_variance.is_some(), "TunnelVariance"),
-        (options.tunnel_backup_quantity.is_some(), "TunnelBackupQuantity"),
+        (
+            options.tunnel_backup_quantity.is_some(),
+            "TunnelBackupQuantity",
+        ),
         (options.sig_type.is_some(), "SigType"),
         (!options.custom_options.is_empty(), "CustomOptions"),
         (options.priv_key_file.is_some(), "PrivKeyFile"),
@@ -218,7 +224,7 @@ fn is_common_runtime_field(field: &str) -> bool {
 pub const CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &["TargetDestination", "ListenPort"],
     &[],
-    &["TargetPort", "ListenInterface"],
+    &["TargetPort", "ListenInterface", "DelayOpen"],
     CustomOptionPolicy::Reject,
     CustomOptionPolicy::Reject,
 );
@@ -245,7 +251,7 @@ pub const SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
 pub const IRC_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &["TargetDestination", "ListenPort"],
     &[],
-    &["TargetPort", "ListenInterface"],
+    &["TargetPort", "ListenInterface", "DelayOpen"],
     CustomOptionPolicy::Reject,
     CustomOptionPolicy::Reject,
 );
@@ -263,7 +269,12 @@ pub const IRC_SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
 pub const HTTP_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &["ListenPort"],
     &[],
-    &["ListenInterface", "ProxyUsername", "ProxyPassword"],
+    &[
+        "ListenInterface",
+        "ProxyUsername",
+        "ProxyPassword",
+        "DelayOpen",
+    ],
     CustomOptionPolicy::Reject,
     CustomOptionPolicy::Reject,
 );
@@ -291,7 +302,12 @@ pub const HTTP_BIDIR_SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::ne
 pub const CONNECT_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &["ListenPort"],
     &[],
-    &["ListenInterface", "ProxyUsername", "ProxyPassword"],
+    &[
+        "ListenInterface",
+        "ProxyUsername",
+        "ProxyPassword",
+        "DelayOpen",
+    ],
     CustomOptionPolicy::Reject,
     CustomOptionPolicy::Reject,
 );
@@ -302,7 +318,12 @@ pub const CONNECT_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
 pub const SOCKS_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &["ListenPort"],
     &[],
-    &["ListenInterface", "ProxyUsername", "ProxyPassword"],
+    &[
+        "ListenInterface",
+        "ProxyUsername",
+        "ProxyPassword",
+        "DelayOpen",
+    ],
     CustomOptionPolicy::Reject,
     CustomOptionPolicy::Reject,
 );
@@ -342,15 +363,22 @@ fn present_runtime_fields(options: &TunnelOptions) -> Vec<&'static str> {
         ("AccessList", options.access_list.is_some()),
         ("AllowPlaintext", options.allowplaintext.is_some()),
         ("Shared", options.shared.is_some()),
+        ("DelayOpen", options.delay_open.is_some()),
         ("UseSSL", options.use_ssl.is_some()),
         ("TunnelLength", options.tunnel_length.is_some()),
         ("TunnelVariance", options.tunnel_variance.is_some()),
         ("TunnelQuantity", options.tunnel_quantity.is_some()),
-        ("TunnelBackupQuantity", options.tunnel_backup_quantity.is_some()),
+        (
+            "TunnelBackupQuantity",
+            options.tunnel_backup_quantity.is_some(),
+        ),
         ("SigType", options.sig_type.is_some()),
         ("EncType", options.enc_type.is_some()),
         ("NewDest", options.new_dest.is_some()),
-        ("PersistentClientKey", options.persistent_client_key.is_some()),
+        (
+            "PersistentClientKey",
+            options.persistent_client_key.is_some(),
+        ),
         ("PrivKeyFile", options.priv_key_file.is_some()),
         ("HostingDestination", options.hosting_destination.is_some()),
         ("IsPrivate", options.is_private.is_some()),
@@ -398,6 +426,39 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "client requires option TargetDestination"
+        );
+    }
+
+    #[test]
+    fn delay_open_is_supported_only_by_tcp_client_families() {
+        for (tunnel_type, capabilities) in [
+            (TunnelType::Client, CLIENT_OPTIONS),
+            (TunnelType::HttpClient, HTTP_CLIENT_OPTIONS),
+            (TunnelType::IrcClient, IRC_CLIENT_OPTIONS),
+            (TunnelType::Socks, SOCKS_OPTIONS),
+            (TunnelType::SocksIrc, SOCKS_IRC_OPTIONS),
+            (TunnelType::ConnectClient, CONNECT_CLIENT_OPTIONS),
+        ] {
+            let options = TunnelOptions {
+                delay_open: Some(true),
+                target_destination: matches!(tunnel_type, TunnelType::Client | TunnelType::IrcClient)
+                    .then(|| "destination".to_owned()),
+                listen_port: Some(0),
+                ..Default::default()
+            };
+            assert!(validate_options(tunnel_type, &options, capabilities).is_ok());
+        }
+        let options = TunnelOptions {
+            delay_open: Some(true),
+            target_destination: Some("destination".to_owned()),
+            target_port: Some(80),
+            ..Default::default()
+        };
+        let error = validate_options(TunnelType::StreamrClient, &options, STREAMR_CLIENT_OPTIONS)
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "streamrclient does not support option DelayOpen"
         );
     }
 

@@ -21,7 +21,6 @@ use super::{
     options::{validate_options, OptionValidationError, HTTP_CLIENT_OPTIONS},
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
-use yosemite::SessionOptions;
 use crate::i2pcontrol::{
     address_book_runtime::{RuntimeAddressBookHandle, RuntimeAddressBookType},
     backends::runtime::{
@@ -30,6 +29,7 @@ use crate::i2pcontrol::{
     },
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
 };
+use yosemite::SessionOptions;
 
 const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -49,6 +49,7 @@ struct HttpClientConfig {
     require_auth: bool,
     policy: HttpClientPolicy,
     address_book: Option<Arc<RuntimeAddressBookHandle>>,
+    delay_open: bool,
     session_options: SessionOptions,
 }
 
@@ -207,6 +208,7 @@ impl RuntimeSupervisor {
                     destination_port: 80,
                     sam_tcp_port: config.sam_tcp_port,
                     session_options: config.session_options,
+                    delay_open: config.delay_open,
                     max_connections: MAX_CONNECTIONS,
                     handler,
                 },
@@ -525,7 +527,8 @@ impl HttpClientTunnelBackend {
         let proxy_password = raw_secret(definition, "ProxyPassword")
             .or_else(|| definition.options.proxy_password.as_deref().map(str::to_owned));
         let proxy_credentials = credentials(proxy_username, proxy_password)?;
-        let require_auth = raw_bool(definition, "ProxyAuth")?.unwrap_or(proxy_credentials.is_some())
+        let require_auth = raw_bool(definition, "ProxyAuth")?
+            .unwrap_or(proxy_credentials.is_some())
             || !bind_address.is_loopback();
         if require_auth && proxy_credentials.is_none() {
             return Err(BackendError::Internal {
@@ -539,8 +542,7 @@ impl HttpClientTunnelBackend {
         let outproxy_password = raw_secret(definition, "OutproxyPassword")
             .or_else(|| definition.options.outproxy_password.as_deref().map(str::to_owned));
         let outproxy_credentials = credentials(outproxy_username, outproxy_password)?;
-        if raw_bool(definition, "OutproxyAuth")?.unwrap_or(false)
-            && outproxy_credentials.is_none()
+        if raw_bool(definition, "OutproxyAuth")?.unwrap_or(false) && outproxy_credentials.is_none()
         {
             return Err(BackendError::Internal {
                 message: "httpclient outproxy authentication is incomplete".to_owned(),
@@ -572,6 +574,7 @@ impl HttpClientTunnelBackend {
                 outproxy_authorization,
             },
             address_book: self.address_book.clone(),
+            delay_open: definition.options.delay_open.unwrap_or(false),
             session_options: SessionOptions::default(),
         })
     }
@@ -605,10 +608,7 @@ fn parse_outproxy(value: &str) -> BackendResult<OutproxyTarget> {
             message: "httpclient outproxy port is invalid".to_owned(),
         });
     }
-    Ok(OutproxyTarget {
-        destination,
-        port,
-    })
+    Ok(OutproxyTarget { destination, port })
 }
 
 fn credentials(
@@ -622,7 +622,9 @@ fn credentials(
                 && !password.is_empty()
                 && username.len() <= 255
                 && password.len() <= 255 =>
-            Ok(Some((username, password))),
+        {
+            Ok(Some((username, password)))
+        }
         _ => Err(BackendError::Internal {
             message: "httpclient proxy credentials are invalid or incomplete".to_owned(),
         }),
@@ -676,6 +678,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "BlockReferers",
         "Description",
         "StartOnLoad",
+        "DelayOpen",
     ];
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
@@ -813,10 +816,9 @@ mod tests {
             "ProxyList".to_owned(),
             serde_json::json!("outproxy.i2p:4444"),
         );
-        definition.raw_config.insert(
-            "OutproxyUsername".to_owned(),
-            serde_json::json!("user"),
-        );
+        definition
+            .raw_config
+            .insert("OutproxyUsername".to_owned(), serde_json::json!("user"));
         definition.options.outproxy_password =
             crate::i2pcontrol::domain::tunnel::OptionRedacted::new("outproxy-secret");
         let config = HttpClientTunnelBackend::new(1).config(&definition).unwrap();

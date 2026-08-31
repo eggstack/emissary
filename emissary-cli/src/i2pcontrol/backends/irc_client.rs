@@ -11,7 +11,6 @@ use super::{
     options::{validate_options, OptionValidationError, IRC_CLIENT_OPTIONS},
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
-use yosemite::SessionOptions;
 use crate::i2pcontrol::{
     backends::runtime::{
         run_client_listener, ClientConnectionHandler, ClientListenerRuntimeConfig,
@@ -19,6 +18,7 @@ use crate::i2pcontrol::{
     },
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
 };
+use yosemite::SessionOptions;
 
 const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -33,6 +33,7 @@ struct IrcClientConfig {
     destination: String,
     destination_port: u16,
     sam_tcp_port: u16,
+    delay_open: bool,
     session_options: SessionOptions,
 }
 
@@ -215,6 +216,7 @@ impl IrcClientRuntimeSupervisor {
                     destination: config.destination,
                     destination_port: config.destination_port,
                     sam_tcp_port: config.sam_tcp_port,
+                    delay_open: config.delay_open,
                     session_options: config.session_options,
                     max_connections: MAX_CONNECTIONS,
                     handler,
@@ -323,6 +325,7 @@ impl IrcClientTunnelBackend {
             destination: destination.to_owned(),
             destination_port: definition.options.target_port.unwrap_or(0),
             sam_tcp_port: self.sam_tcp_port,
+            delay_open: definition.options.delay_open.unwrap_or(false),
             session_options: SessionOptions::default(),
         })
     }

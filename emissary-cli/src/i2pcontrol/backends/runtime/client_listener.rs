@@ -9,7 +9,7 @@ use futures::{future::BoxFuture, FutureExt};
 use parking_lot::Mutex;
 use tokio::{
     net::{TcpListener, TcpStream},
-    sync::{oneshot, watch},
+    sync::{mpsc, oneshot, watch, OnceCell},
 };
 use yosemite::{style, Session, SessionOptions, StreamOptions};
 
@@ -22,10 +22,84 @@ const DEFAULT_MAX_CONNECTIONS: usize = 128;
 pub type ClientConnectionHandler =
     Arc<dyn Fn(TcpStream, ClientStreamConnector) -> BoxFuture<'static, ()> + Send + Sync>;
 
+type SharedSession = Arc<Mutex<Session<style::Stream>>>;
+
+/// Owns exactly one session for one listener generation.
+///
+/// Delayed generations leave the cell empty until a handler asks for the
+/// session. `OnceCell` serializes concurrent first users, while the
+/// generation cancellation receiver makes a cancelled setup deterministic.
+struct ClientSessionOwner {
+    session: OnceCell<Result<SharedSession, ClientListenerRuntimeError>>,
+    session_options: SessionOptions,
+    cancellation: watch::Receiver<bool>,
+    setup_failed: mpsc::UnboundedSender<()>,
+}
+
+impl ClientSessionOwner {
+    fn delayed(
+        session_options: SessionOptions,
+        cancellation: watch::Receiver<bool>,
+        setup_failed: mpsc::UnboundedSender<()>,
+    ) -> Self {
+        Self {
+            session: OnceCell::const_new(),
+            session_options,
+            cancellation,
+            setup_failed,
+        }
+    }
+
+    fn eager(
+        session: Session<style::Stream>,
+        cancellation: watch::Receiver<bool>,
+        setup_failed: mpsc::UnboundedSender<()>,
+    ) -> Self {
+        let cell = OnceCell::const_new();
+        let _ = cell.set(Ok(Arc::new(Mutex::new(session))));
+        Self {
+            session: cell,
+            session_options: SessionOptions::default(),
+            cancellation,
+            setup_failed,
+        }
+    }
+
+    async fn get(&self) -> Result<SharedSession, ClientListenerRuntimeError> {
+        let cancellation = self.cancellation.clone();
+        let session_options = self.session_options.clone();
+        let result = self
+            .session
+            .get_or_init(|| async move {
+                tokio::select! {
+                    biased;
+                    _ = cancellation_won(cancellation) => Err(ClientListenerRuntimeError::SessionSetup),
+                    result = Session::<style::Stream>::new(session_options) => result
+                        .map(|session| Arc::new(Mutex::new(session)))
+                        .map_err(|_| ClientListenerRuntimeError::SessionSetup),
+                }
+            })
+            .await;
+        match result {
+            Ok(session) => Ok(Arc::clone(session)),
+            Err(error) => {
+                let _ = self.setup_failed.send(());
+                Err(error.clone())
+            }
+        }
+    }
+}
+
+async fn cancellation_won(mut cancellation: watch::Receiver<bool>) {
+    if !*cancellation.borrow() {
+        let _ = cancellation.changed().await;
+    }
+}
+
 /// The narrow session capability exposed to a client protocol handler.
 #[derive(Clone)]
 pub struct ClientStreamConnector {
-    session: Arc<Mutex<Session<style::Stream>>>,
+    session: Arc<ClientSessionOwner>,
     destination: Arc<str>,
     destination_port: u16,
 }
@@ -42,8 +116,7 @@ impl fmt::Debug for ClientStreamConnector {
 impl ClientStreamConnector {
     /// Open one outbound stream without holding the session mutex across I/O.
     pub async fn connect(&self) -> Result<yosemite::Stream, ClientListenerRuntimeError> {
-        self.connect_to(self.destination.as_ref(), self.destination_port)
-            .await
+        self.connect_to(self.destination.as_ref(), self.destination_port).await
     }
 
     /// Open one outbound stream to a request-selected I2P destination without
@@ -53,8 +126,9 @@ impl ClientStreamConnector {
         destination: &str,
         destination_port: u16,
     ) -> Result<yosemite::Stream, ClientListenerRuntimeError> {
+        let session = self.session.get().await?;
         let future = {
-            let mut session = self.session.lock();
+            let mut session = session.lock();
             session.connect_detached_with_options(
                 destination,
                 StreamOptions {
@@ -77,6 +151,7 @@ pub struct ClientListenerRuntimeConfig {
     pub destination_port: u16,
     pub sam_tcp_port: u16,
     pub max_connections: usize,
+    pub delay_open: bool,
     pub session_options: SessionOptions,
     pub handler: ClientConnectionHandler,
 }
@@ -91,6 +166,7 @@ impl fmt::Debug for ClientListenerRuntimeConfig {
             .field("destination_port", &self.destination_port)
             .field("sam_tcp_port", &self.sam_tcp_port)
             .field("max_connections", &self.max_connections)
+            .field("delay_open", &self.delay_open)
             .finish_non_exhaustive()
     }
 }
@@ -114,18 +190,23 @@ pub async fn run_client_listener(
     mut cancellation: watch::Receiver<bool>,
     ready: oneshot::Sender<Result<SocketAddr, ClientListenerRuntimeError>>,
 ) -> Result<(), ClientListenerRuntimeError> {
-    let session = tokio::select! {
-        _ = cancellation.changed() => {
-            let _ = ready.send(Err(ClientListenerRuntimeError::SessionSetup));
-            return Ok(());
-        }
-        result = Session::<style::Stream>::new(config.session_options.clone()) => match result {
-            Ok(session) => session,
-            Err(_) => {
+    let (setup_failed, mut setup_failed_rx) = mpsc::unbounded_channel();
+    let eager_session = if config.delay_open {
+        None
+    } else {
+        Some(tokio::select! {
+            _ = cancellation.changed() => {
                 let _ = ready.send(Err(ClientListenerRuntimeError::SessionSetup));
-                return Err(ClientListenerRuntimeError::SessionSetup);
+                return Ok(());
             }
-        },
+            result = Session::<style::Stream>::new(config.session_options.clone()) => match result {
+                Ok(session) => session,
+                Err(_) => {
+                    let _ = ready.send(Err(ClientListenerRuntimeError::SessionSetup));
+                    return Err(ClientListenerRuntimeError::SessionSetup);
+                }
+            },
+        })
     };
 
     let listener = match TcpListener::bind(SocketAddr::new(config.bind_address, config.port)).await
@@ -137,8 +218,14 @@ pub async fn run_client_listener(
         }
     };
     let local_address = listener.local_addr().map_err(|_| ClientListenerRuntimeError::Bind)?;
+    let session = Arc::new(match eager_session {
+        Some(session) => ClientSessionOwner::eager(session, cancellation.clone(), setup_failed),
+        None => {
+            ClientSessionOwner::delayed(config.session_options, cancellation.clone(), setup_failed)
+        }
+    });
     let connector = ClientStreamConnector {
-        session: Arc::new(Mutex::new(session)),
+        session,
         destination: Arc::from(config.destination),
         destination_port: config.destination_port,
     };
@@ -148,8 +235,16 @@ pub async fn run_client_listener(
     let mut tasks = BoundedTaskGroup::new(max_connections);
 
     loop {
+        if *cancellation.borrow() {
+            break;
+        }
         tokio::select! {
+            biased;
             _ = cancellation.changed() => break,
+            Some(()) = setup_failed_rx.recv() => {
+                tasks.drain(STOP_TIMEOUT).await;
+                return Err(ClientListenerRuntimeError::SessionSetup);
+            }
             result = listener.accept() => {
                 let Ok((stream, _)) = result else { break };
                 let handler = Arc::clone(&handler);
@@ -194,7 +289,10 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::{
+        io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+        sync::Notify,
+    };
 
     async fn fake_sam() -> (u16, tokio::task::JoinHandle<()>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -230,6 +328,99 @@ mod tests {
         (port, task)
     }
 
+    async fn counting_fake_sam() -> (
+        u16,
+        tokio::task::JoinHandle<()>,
+        Arc<AtomicUsize>,
+        Arc<AtomicUsize>,
+    ) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let hellos = Arc::new(AtomicUsize::new(0));
+        let session_creates = Arc::new(AtomicUsize::new(0));
+        let hellos_for_task = Arc::clone(&hellos);
+        let session_creates_for_task = Arc::clone(&session_creates);
+        let task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let hellos = Arc::clone(&hellos_for_task);
+                let session_creates = Arc::clone(&session_creates_for_task);
+                tokio::spawn(async move {
+                    let (read_half, mut write_half) = stream.into_split();
+                    let mut reader = BufReader::new(read_half);
+                    let mut line = String::new();
+                    loop {
+                        line.clear();
+                        if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                            break;
+                        }
+                        if line.starts_with("HELLO") {
+                            hellos.fetch_add(1, Ordering::AcqRel);
+                        } else if line.starts_with("SESSION CREATE") {
+                            session_creates.fetch_add(1, Ordering::AcqRel);
+                        }
+                        let response = if line.starts_with("HELLO") {
+                            "HELLO REPLY RESULT=OK VERSION=3.3\n"
+                        } else if line.starts_with("SESSION CREATE") {
+                            "SESSION STATUS RESULT=OK DESTINATION=client-destination\n"
+                        } else {
+                            "STREAM STATUS RESULT=OK\n"
+                        };
+                        if write_half.write_all(response.as_bytes()).await.is_err() {
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+        (port, task, hellos, session_creates)
+    }
+
+    async fn gated_fake_sam(
+        started: Arc<Notify>,
+        release: Arc<Notify>,
+    ) -> (u16, tokio::task::JoinHandle<()>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let started = Arc::clone(&started);
+                let release = Arc::clone(&release);
+                tokio::spawn(async move {
+                    let (read_half, mut write_half) = stream.into_split();
+                    let mut reader = BufReader::new(read_half);
+                    let mut line = String::new();
+                    loop {
+                        line.clear();
+                        if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                            break;
+                        }
+                        if line.starts_with("HELLO") {
+                            started.notify_one();
+                            release.notified().await;
+                        }
+                        let response = if line.starts_with("HELLO") {
+                            "HELLO REPLY RESULT=OK VERSION=3.3\n"
+                        } else if line.starts_with("SESSION CREATE") {
+                            "SESSION STATUS RESULT=OK DESTINATION=client-destination\n"
+                        } else {
+                            "STREAM STATUS RESULT=OK\n"
+                        };
+                        if write_half.write_all(response.as_bytes()).await.is_err() {
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+        (port, task)
+    }
+
     fn config(
         sam_tcp_port: u16,
         handler: ClientConnectionHandler,
@@ -243,6 +434,7 @@ mod tests {
             destination_port: 8080,
             sam_tcp_port,
             max_connections,
+            delay_open: false,
             session_options: SessionOptions {
                 samv3_tcp_port: sam_tcp_port,
                 nickname: "client-listener".to_owned(),
@@ -345,5 +537,184 @@ mod tests {
             ready_rx.await.unwrap(),
             Err(ClientListenerRuntimeError::SessionSetup)
         );
+    }
+
+    #[tokio::test]
+    async fn delayed_listener_binds_without_sam_until_first_connection() {
+        let (sam_port, sam_task, hellos, session_creates) = counting_fake_sam().await;
+        let handler: ClientConnectionHandler = Arc::new(|stream, connector| {
+            Box::pin(async move {
+                let _ = connector.connect().await;
+                drop(stream);
+            })
+        });
+        let mut runtime_config = config(sam_port, handler, 2);
+        runtime_config.delay_open = true;
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (ready_tx, ready_rx) = oneshot::channel();
+        let runtime = tokio::spawn(run_client_listener(runtime_config, cancel_rx, ready_tx));
+        let address = ready_rx.await.unwrap().unwrap();
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        assert_eq!(hellos.load(Ordering::Acquire), 0);
+        assert_eq!(session_creates.load(Ordering::Acquire), 0);
+
+        drop(TcpStream::connect(address).await.unwrap());
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while session_creates.load(Ordering::Acquire) < 1 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(session_creates.load(Ordering::Acquire), 1);
+        cancel_tx.send(true).unwrap();
+        assert!(runtime.await.unwrap().is_ok());
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn concurrent_first_connections_create_one_session() {
+        let (sam_port, sam_task, _hellos, session_creates) = counting_fake_sam().await;
+        let handler: ClientConnectionHandler = Arc::new(|stream, connector| {
+            Box::pin(async move {
+                let _ = connector.connect().await;
+                drop(stream);
+            })
+        });
+        let mut runtime_config = config(sam_port, handler, 2);
+        runtime_config.delay_open = true;
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (ready_tx, ready_rx) = oneshot::channel();
+        let runtime = tokio::spawn(run_client_listener(runtime_config, cancel_rx, ready_tx));
+        let address = ready_rx.await.unwrap().unwrap();
+        let _first = TcpStream::connect(address).await.unwrap();
+        let _second = TcpStream::connect(address).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while session_creates.load(Ordering::Acquire) < 1 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        assert_eq!(session_creates.load(Ordering::Acquire), 1);
+        cancel_tx.send(true).unwrap();
+        assert!(runtime.await.unwrap().is_ok());
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn cancellation_before_first_connection_does_not_create_session() {
+        let (sam_port, sam_task, hellos, session_creates) = counting_fake_sam().await;
+        let handler: ClientConnectionHandler = Arc::new(|_, _| Box::pin(async {}));
+        let mut runtime_config = config(sam_port, handler, 1);
+        runtime_config.delay_open = true;
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (ready_tx, ready_rx) = oneshot::channel();
+        let runtime = tokio::spawn(run_client_listener(runtime_config, cancel_rx, ready_tx));
+        ready_rx.await.unwrap().unwrap();
+        cancel_tx.send(true).unwrap();
+        assert!(runtime.await.unwrap().is_ok());
+        assert_eq!(hellos.load(Ordering::Acquire), 0);
+        assert_eq!(session_creates.load(Ordering::Acquire), 0);
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn cancellation_during_lazy_setup_returns_deterministic_setup_error() {
+        let started = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        let (sam_port, sam_task) = gated_fake_sam(Arc::clone(&started), Arc::clone(&release)).await;
+        let (error_tx, error_rx) = oneshot::channel();
+        let error_tx = Arc::new(Mutex::new(Some(error_tx)));
+        let handler: ClientConnectionHandler = Arc::new(move |stream, connector| {
+            let error_tx = Arc::clone(&error_tx);
+            Box::pin(async move {
+                let result = connector.connect().await;
+                let _ = error_tx.lock().take().map(|sender| {
+                    sender.send(matches!(
+                        result,
+                        Err(ClientListenerRuntimeError::SessionSetup)
+                    ))
+                });
+                drop(stream);
+            })
+        });
+        let mut runtime_config = config(sam_port, handler, 1);
+        runtime_config.delay_open = true;
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (ready_tx, ready_rx) = oneshot::channel();
+        let runtime = tokio::spawn(run_client_listener(runtime_config, cancel_rx, ready_tx));
+        let address = ready_rx.await.unwrap().unwrap();
+        let _stream = TcpStream::connect(address).await.unwrap();
+        started.notified().await;
+        cancel_tx.send(true).unwrap();
+        release.notify_one();
+        assert!(error_rx.await.unwrap());
+        assert!(runtime.await.unwrap().is_ok());
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn failed_lazy_setup_fails_the_generation() {
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (error_tx, error_rx) = oneshot::channel();
+        let error_tx = Arc::new(Mutex::new(Some(error_tx)));
+        let handler: ClientConnectionHandler = Arc::new(move |stream, connector| {
+            let error_tx = Arc::clone(&error_tx);
+            Box::pin(async move {
+                let result = connector.connect().await;
+                let _ = error_tx.lock().take().map(|sender| {
+                    sender.send(matches!(
+                        result,
+                        Err(ClientListenerRuntimeError::SessionSetup)
+                    ))
+                });
+                drop(stream);
+            })
+        });
+        let mut runtime_config = config(1, handler, 1);
+        runtime_config.delay_open = true;
+        let (ready_tx, ready_rx) = oneshot::channel();
+        let runtime = tokio::spawn(run_client_listener(runtime_config, cancel_rx, ready_tx));
+        let address = ready_rx.await.unwrap().unwrap();
+        drop(TcpStream::connect(address).await.unwrap());
+        assert!(error_rx.await.unwrap());
+        assert_eq!(
+            runtime.await.unwrap(),
+            Err(ClientListenerRuntimeError::SessionSetup)
+        );
+        drop(cancel_tx);
+    }
+
+    #[tokio::test]
+    async fn restarted_generation_does_not_reuse_the_prior_session() {
+        let (sam_port, sam_task, _hellos, session_creates) = counting_fake_sam().await;
+        for expected in [1, 2] {
+            let handler: ClientConnectionHandler = Arc::new(|stream, connector| {
+                Box::pin(async move {
+                    let _ = connector.connect().await;
+                    drop(stream);
+                })
+            });
+            let mut runtime_config = config(sam_port, handler, 1);
+            runtime_config.delay_open = true;
+            let (cancel_tx, cancel_rx) = watch::channel(false);
+            let (ready_tx, ready_rx) = oneshot::channel();
+            let runtime = tokio::spawn(run_client_listener(runtime_config, cancel_rx, ready_tx));
+            let address = ready_rx.await.unwrap().unwrap();
+            assert_eq!(session_creates.load(Ordering::Acquire), expected - 1);
+            drop(TcpStream::connect(address).await.unwrap());
+            tokio::time::timeout(Duration::from_secs(1), async {
+                while session_creates.load(Ordering::Acquire) < expected {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+            cancel_tx.send(true).unwrap();
+            assert!(runtime.await.unwrap().is_ok());
+        }
+        sam_task.abort();
     }
 }

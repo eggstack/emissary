@@ -1142,12 +1142,12 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "residual-option-line"
-current_or_planned_disposition = "blocked_primitive_or_not_applicable"
-cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "blocked on the generation-local destination/session opening boundary.", "httpclient" = "blocked on the generation-local destination/session opening boundary.", "ircclient" = "blocked on the generation-local destination/session opening boundary.", "socks" = "blocked on the generation-local destination/session opening boundary.", "socksirc" = "blocked on the generation-local destination/session opening boundary.", "connectclient" = "blocked on the generation-local destination/session opening boundary.", "streamrclient" = "blocked on the generation-local destination/session opening boundary.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
-blocked_primitive = "generation-local client destination/session opening boundary"
-blocking_milestone = "M097"
+completion_owner = "M106 for TCP clients; residual-option-line for Streamr"
+current_or_planned_disposition = "apply_or_blocked_primitive_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "M106: binds before lazy generation-local session creation and creates one session at first local connection.", "httpclient" = "M106: binds before lazy generation-local session creation and creates one session at first local connection.", "ircclient" = "M106: binds before lazy generation-local session creation and creates one session at first local connection.", "socks" = "M106: binds before lazy generation-local session creation and creates one session at first local connection.", "socksirc" = "M106: binds before lazy generation-local session creation and creates one session at first local connection.", "connectclient" = "M106: binds before lazy generation-local session creation and creates one session at first local connection.", "streamrclient" = "Streamr has no pinned first-local-client-socket event; the TCP DelayOpen meaning remains semantic-blocked and is not applied.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+blocked_primitive = "Streamr has no pinned first-local-client-socket event for DelayOpen"
+blocking_milestone = "deferred semantic decision"
 
 [[tunnel_manager.options]]
 canonical_key = "Reduce"

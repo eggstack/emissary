@@ -21,7 +21,6 @@ use super::{
     options::{validate_options, OptionCapabilities, OptionValidationError, SOCKS_OPTIONS},
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
-use yosemite::SessionOptions;
 use crate::i2pcontrol::{
     address_book_runtime::RuntimeAddressBookHandle,
     backends::runtime::{
@@ -30,6 +29,7 @@ use crate::i2pcontrol::{
     },
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
 };
+use yosemite::SessionOptions;
 
 pub(crate) const NEGOTIATION_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_NEGOTIATION_BYTES: usize = 8 * 1024;
@@ -283,12 +283,13 @@ async fn negotiate_v5<R: AsyncRead + AsyncWrite + Unpin>(
                     std::str::from_utf8(&username),
                     std::str::from_utf8(&password),
                 ) {
-                    (Ok(username), Ok(password)) =>
+                    (Ok(username), Ok(password)) => {
                         crate::i2pcontrol::auth::compare_passwords(username, expected_user)
                             && crate::i2pcontrol::auth::compare_passwords(
                                 password,
                                 expected_password,
-                            ),
+                            )
+                    }
                     _ => false,
                 }
             }
@@ -449,6 +450,7 @@ pub(crate) struct SocksConfig {
     pub(crate) outproxy_credentials: Option<(String, String)>,
     pub(crate) address_book: Option<Arc<RuntimeAddressBookHandle>>,
     pub(crate) require_auth: bool,
+    pub(crate) delay_open: bool,
     pub(crate) session_options: SessionOptions,
 }
 
@@ -538,8 +540,9 @@ async fn connect_target(
     route: TargetRoute,
 ) -> Result<yosemite::Stream, ()> {
     match route {
-        TargetRoute::Direct { destination, port } =>
-            connector.connect_to(&destination, port).await.map_err(|_| ()),
+        TargetRoute::Direct { destination, port } => {
+            connector.connect_to(&destination, port).await.map_err(|_| ())
+        }
         TargetRoute::Outproxy {
             destination,
             port,
@@ -813,6 +816,7 @@ impl SocksRuntimeSupervisor {
                     destination_port: 1,
                     sam_tcp_port: config.sam_tcp_port,
                     session_options: config.session_options,
+                    delay_open: config.delay_open,
                     max_connections: MAX_CONNECTIONS,
                     handler,
                 },
@@ -995,6 +999,7 @@ pub(crate) fn config_for(
         outproxy_credentials,
         address_book,
         require_auth,
+        delay_open: definition.options.delay_open.unwrap_or(false),
         session_options: SessionOptions::default(),
     })
 }
@@ -1011,7 +1016,9 @@ fn credentials(
                 && !password.is_empty()
                 && username.len() <= MAX_FIELD_BYTES
                 && password.len() <= MAX_FIELD_BYTES =>
-            Ok(Some((username, password))),
+        {
+            Ok(Some((username, password)))
+        }
         _ => Err(BackendError::Internal {
             message: format!(
                 "{} proxy credentials are invalid or incomplete",
@@ -1047,10 +1054,7 @@ fn parse_outproxy(value: &str, tunnel_type: TunnelType) -> BackendResult<Outprox
             message: format!("{} outproxy port is invalid", tunnel_type),
         });
     }
-    Ok(OutproxyTarget {
-        destination,
-        port,
-    })
+    Ok(OutproxyTarget { destination, port })
 }
 
 fn raw_string(definition: &TunnelDefinition, key: &str) -> Option<String> {
@@ -1103,6 +1107,7 @@ fn validate_raw_options(
         "OutproxyType",
         "Description",
         "StartOnLoad",
+        "DelayOpen",
     ];
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
@@ -1185,12 +1190,12 @@ impl TunnelBackend for SocksTunnelBackend {
 
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
         let mut config = config_for(
-                    definition,
-                    TunnelType::Socks,
-                    self.sam_tcp_port,
-                    self.address_book.clone(),
-                    SOCKS_OPTIONS,
-                )?;
+            definition,
+            TunnelType::Socks,
+            self.sam_tcp_port,
+            self.address_book.clone(),
+            SOCKS_OPTIONS,
+        )?;
         config.session_options = super::runtime::session::build_session_options(
             definition,
             self.sam_tcp_port,
@@ -1232,6 +1237,7 @@ mod tests {
             outproxy_credentials: None,
             address_book: None,
             require_auth,
+            delay_open: false,
             session_options: SessionOptions::default(),
         }
     }

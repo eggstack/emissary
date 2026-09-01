@@ -18,8 +18,8 @@
 
 use std::{
     fs,
-    io::Write,
     io::BufReader,
+    io::Write,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -34,7 +34,7 @@ use tokio_rustls::rustls::{
 use tracing;
 
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 
 use super::errors::I2pControlError;
 
@@ -119,6 +119,9 @@ pub fn load_or_generate_managed_tls(
     ensure_managed_directory(&cert_dir)?;
     let cert_exists = validate_managed_file(&cert_path, "certificate")?;
     let key_exists = validate_managed_file(&key_path, "private key")?;
+    if key_exists {
+        ensure_managed_private_key_permissions(&key_path)?;
+    }
 
     // Try to load existing certificate material
     if cert_exists && key_exists {
@@ -208,23 +211,42 @@ fn ensure_managed_directory(path: &Path) -> Result<(), I2pControlError> {
     };
 
     if !existed {
-        fs::create_dir_all(path).map_err(|e| {
-            I2pControlError::Tls(format!("Failed to create cert directory: {e}"))
-        })?;
-        let metadata = fs::symlink_metadata(path).map_err(|e| {
-            I2pControlError::Tls(format!("Failed to inspect cert directory: {e}"))
-        })?;
-        if metadata.file_type().is_symlink() || !metadata.is_dir() {
-            return Err(I2pControlError::Tls(
-                "Managed TLS certificate directory is not a regular directory".into(),
-            ));
-        }
-        #[cfg(unix)]
-        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(|e| {
-            I2pControlError::Tls(format!("Failed to restrict cert directory permissions: {e}"))
-        })?;
+        fs::create_dir_all(path)
+            .map_err(|e| I2pControlError::Tls(format!("Failed to create cert directory: {e}")))?;
+    }
+
+    #[cfg(unix)]
+    restrict_managed_directory_permissions(path)?;
+
+    validate_managed_directory(path)?;
+    Ok(())
+}
+
+fn validate_managed_directory(path: &Path) -> Result<(), I2pControlError> {
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|e| I2pControlError::Tls(format!("Failed to inspect cert directory: {e}")))?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(I2pControlError::Tls(
+            "Managed TLS certificate directory is not a regular directory".into(),
+        ));
+    }
+    #[cfg(unix)]
+    if metadata.permissions().mode() & 0o777 != 0o700 {
+        return Err(I2pControlError::Tls(
+            "Managed TLS certificate directory permissions are not owner-only".into(),
+        ));
     }
     Ok(())
+}
+
+#[cfg(unix)]
+fn restrict_managed_directory_permissions(path: &Path) -> Result<(), I2pControlError> {
+    fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(|e| {
+        I2pControlError::Tls(format!(
+            "Failed to restrict cert directory permissions: {e}"
+        ))
+    })?;
+    validate_managed_directory(path)
 }
 
 fn validate_managed_file(path: &Path, label: &str) -> Result<bool, I2pControlError> {
@@ -249,6 +271,42 @@ fn validate_managed_file(path: &Path, label: &str) -> Result<bool, I2pControlErr
     }
 }
 
+fn ensure_managed_private_key_permissions(path: &Path) -> Result<(), I2pControlError> {
+    if !validate_managed_file(path, "private key")? {
+        return Ok(());
+    }
+
+    #[cfg(unix)]
+    {
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).map_err(|e| {
+            I2pControlError::Tls(format!("Failed to restrict managed TLS private key: {e}"))
+        })?;
+        let metadata = fs::symlink_metadata(path).map_err(|e| {
+            I2pControlError::Tls(format!("Failed to inspect managed TLS private key: {e}"))
+        })?;
+        if metadata.file_type().is_symlink()
+            || !metadata.is_file()
+            || metadata.permissions().mode() & 0o777 != 0o600
+        {
+            return Err(I2pControlError::Tls(
+                "Managed TLS private key permissions are not owner-only".into(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn open_managed_file(path: &Path, label: &str) -> Result<fs::File, std::io::Error> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    if label == "private key" {
+        options.mode(0o600);
+    }
+    options.open(path)
+}
+
 fn write_managed_file(path: &Path, bytes: &[u8], label: &str) -> Result<(), I2pControlError> {
     let _ = validate_managed_file(path, label)?;
     let temporary = path.with_extension("tmp");
@@ -263,20 +321,15 @@ fn write_managed_file(path: &Path, bytes: &[u8], label: &str) -> Result<(), I2pC
         })?;
     }
 
-    let mut file = fs::OpenOptions::new();
-    file.write(true).create_new(true);
-    let mut file = file.open(&temporary).map_err(|e| {
-        I2pControlError::Tls(format!("Failed to create managed TLS {label}: {e}"))
-    })?;
+    let mut file = open_managed_file(&temporary, label)
+        .map_err(|e| I2pControlError::Tls(format!("Failed to create managed TLS {label}: {e}")))?;
     file.write_all(bytes).map_err(|e| {
         let _ = fs::remove_file(&temporary);
         I2pControlError::Tls(format!("Failed to write managed TLS {label}: {e}"))
     })?;
-    #[cfg(unix)]
     if label == "private key" {
-        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600)).map_err(|e| {
+        ensure_managed_private_key_permissions(&temporary).inspect_err(|_| {
             let _ = fs::remove_file(&temporary);
-            I2pControlError::Tls(format!("Failed to restrict managed TLS private key: {e}"))
         })?;
     }
     file.sync_all().map_err(|e| {
@@ -410,12 +463,56 @@ mod tests {
             .mode()
             & 0o777;
         assert_eq!(mode, 0o600);
-        let directory_mode = fs::metadata(dir.path().join(MANAGED_CERT_DIR))
-            .unwrap()
-            .permissions()
-            .mode()
-            & 0o777;
+        let directory_mode =
+            fs::metadata(dir.path().join(MANAGED_CERT_DIR)).unwrap().permissions().mode() & 0o777;
         assert_eq!(directory_mode, 0o700);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn permissive_managed_material_is_repaired_and_reused() {
+        let dir = tempdir().unwrap();
+        let cert_dir = dir.path().join(MANAGED_CERT_DIR);
+        load_or_generate_managed_tls(dir.path()).unwrap();
+        let cert_before = fs::read(cert_dir.join(CERT_FILE)).unwrap();
+        let key_before = fs::read(cert_dir.join(KEY_FILE)).unwrap();
+
+        fs::set_permissions(&cert_dir, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::set_permissions(cert_dir.join(KEY_FILE), fs::Permissions::from_mode(0o644)).unwrap();
+
+        load_or_generate_managed_tls(dir.path()).unwrap();
+        assert_eq!(fs::read(cert_dir.join(CERT_FILE)).unwrap(), cert_before);
+        assert_eq!(fs::read(cert_dir.join(KEY_FILE)).unwrap(), key_before);
+        assert_eq!(
+            fs::metadata(&cert_dir).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        assert_eq!(
+            fs::metadata(cert_dir.join(KEY_FILE)).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+
+        let cert_after_repair = fs::read(cert_dir.join(CERT_FILE)).unwrap();
+        let key_after_repair = fs::read(cert_dir.join(KEY_FILE)).unwrap();
+        load_or_generate_managed_tls(dir.path()).unwrap();
+        assert_eq!(
+            fs::read(cert_dir.join(CERT_FILE)).unwrap(),
+            cert_after_repair
+        );
+        assert_eq!(fs::read(cert_dir.join(KEY_FILE)).unwrap(), key_after_repair);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn managed_private_key_requests_owner_only_mode_at_creation() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join(KEY_FILE);
+        let _file = open_managed_file(&path, "private key").unwrap();
+
+        assert_eq!(
+            fs::metadata(path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
     }
 
     #[cfg(unix)]

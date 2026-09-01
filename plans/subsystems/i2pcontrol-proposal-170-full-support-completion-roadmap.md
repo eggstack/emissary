@@ -22,7 +22,7 @@ Canonical/internal authority:
 - M061/M062/M063 containment authority;
 - M093 current tunnel security reclosure;
 - M095 machine-readable full-support matrix;
-- M097-M107 closure evidence.
+- M097-M108 closure evidence.
 
 ## 1. Purpose
 
@@ -32,7 +32,7 @@ The workstream is Proposal 170 only. It is not general I2PControl parity and it 
 
 ## 2. Current production state
 
-The current production state after M107 is:
+The current production state after M108 is:
 
 - RouterInfo: 43 canonical additions / 42 available / 1 protocol-permitted neutral / 0 unavailable;
 - AddressBook CRUD, subscriptions, all 13 `SetConfig` keys, and independent cross-book shadowing semantics operational under the confined AddressBook owner;
@@ -45,7 +45,7 @@ The current production state after M107 is:
 - all 6 ClientServicesInfo selectors are implemented;
 - API version `1` is the sole accepted Authenticate version;
 - M107 fresh managed TLS material is restrictive on Unix, fails closed on managed symlink/non-regular paths, and covers `localhost`, `127.0.0.1`, and `::1`;
-- M108 repairs pre-M107 managed TLS permissions on Unix before managed reads and uses create-time owner-only private-key modes;
+- M108 repaired pre-M107 managed TLS permissions on Unix before managed reads and uses create-time owner-only private-key modes;
 - unsupported residual options fail before allocation rather than being persisted-and-ignored;
 - full public-network/reference-router certification remains open;
 - M104 remains closed as blocked because applicable TunnelManager residual cells remain.
@@ -110,7 +110,7 @@ A review of M107 implementation/closure found one narrower security gap:
 - fresh managed directory/key final modes are restrictive, but an existing regular `i2pcontrol-certs/` directory or `key.pem` created before M107 is reused without tightening its Unix mode;
 - the private-key temporary file is created with ordinary `OpenOptions` semantics and restricted to `0600` only after secret bytes have been written.
 
-This is an upgrade-path confidentiality issue in the existing I2PControl TLS owner. It requires no new dependency, router-core seam, protocol change, certificate parser, or TunnelManager work. M108 is therefore dependency-ready as a bounded corrective pass.
+This was an upgrade-path confidentiality issue in the existing I2PControl TLS owner. It required no new dependency, router-core seam, protocol change, certificate parser, or TunnelManager work. M108 was therefore dependency-ready as a bounded corrective pass and subsequently closed at implementation head `0a5e8c9`.
 
 ## 4. Ownership boundary
 
@@ -134,7 +134,7 @@ A future production change outside `i2pcontrol` is allowed only when all are tru
 6. M061 containment is not widened implicitly;
 7. a registered successor plan explicitly authorizes it.
 
-M102's existing network-error observation is the deliberate full-support lower-layer exception already accepted. M108 authorizes no new lower-layer production path.
+M102's existing network-error observation is the deliberate full-support lower-layer exception already accepted. M108 introduced no new lower-layer production path.
 
 ### Dependency rule
 
@@ -223,7 +223,7 @@ Final closure requires:
 
 Parser acceptance, persistence without runtime effect, fail-before-allocation rejection, or an audit-candidate classification is not final `apply` evidence.
 
-M108 does not change any TunnelManager matrix row or cell.
+M108 did not change any TunnelManager matrix row or cell.
 
 ## 9. Current dependency graph
 
@@ -462,7 +462,7 @@ Implementation difficulty alone is not evidence that a cell is `not_applicable`.
 
 ## 12. Security and anonymity requirements
 
-All future work, including M108, must preserve:
+All future work must preserve the security and anonymity requirements established through M108:
 
 - trusted Yosemite-derived peer identity;
 - bounded transactional server admission;
@@ -515,7 +515,7 @@ cargo fmt --all -- --check
 git diff --check
 ```
 
-M108 adds focused legacy-directory/key permission-repair, byte-stability/restart, create-time `0600`, and retained M107 symlink/SAN evidence as specified in its plan. M095/M105 counts must not change.
+M108 closure added focused legacy-directory/key permission-repair, byte-stability/restart, create-time `0600`, and retained M107 symlink/SAN evidence as specified in its plan. M095/M105 counts must not change.
 
 The historical `m063_feature_reachability` test target is absent in the current checkout; preserve that limitation rather than inventing unrelated replacement scope.
 
@@ -569,7 +569,7 @@ Response: this roadmap remains Proposal 170-only and explicitly does not expand 
 
 Risk: long-lived bearer tokens increase the impact of token disclosure.
 
-Response: current documentation exposes an expired-token error but this review established no normative expiration interval. Do not invent policy inside M108. A future security-hardening decision may define one separately if maintainers want it.
+Response: current documentation exposes an expired-token error but this review established no normative expiration interval. M108 did not invent such a policy. A future security-hardening decision may define one separately if maintainers want it.
 
 ### AddressBook filesystem examples
 

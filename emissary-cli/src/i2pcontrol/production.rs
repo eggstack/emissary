@@ -1328,18 +1328,18 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn start(&self, name: &str) -> Result<String, String> {
+        let _lifecycle = self.lifecycle_lock(name).await;
         if self.startup.get(name)?.is_some() {
             return self.startup_action(name, StartupTunnelAction::Start).await;
         }
-        let _lifecycle = self.lifecycle_lock(name).await;
         self.start_locked(name).await
     }
 
     async fn stop(&self, name: &str) -> Result<String, String> {
+        let _lifecycle = self.lifecycle_lock(name).await;
         if self.startup.get(name)?.is_some() {
             return self.startup_action(name, StartupTunnelAction::Stop).await;
         }
-        let _lifecycle = self.lifecycle_lock(name).await;
         let def = {
             let store = self.inner.lock().await;
             store
@@ -1355,10 +1355,10 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn restart(&self, name: &str) -> Result<String, String> {
+        let _lifecycle = self.lifecycle_lock(name).await;
         if self.startup.get(name)?.is_some() {
             return self.startup_action(name, StartupTunnelAction::Restart).await;
         }
-        let _lifecycle = self.lifecycle_lock(name).await;
         let definition = {
             let store = self.inner.lock().await;
             store

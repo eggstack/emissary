@@ -1,10 +1,10 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096 and M098-M103 closed, M099 closed internally/partial, M097 and M104 closed as blocked, M105-M106 closed; **M107 ready**
+Status: active; M095-M096, M098-M103, and M107 closed, M099 closed internally/partial, M097 and M104 closed as blocked, M105-M106 closed
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
-Current post-M106 planning baseline: `06a697006b7b7733587aafed166f438561552193` — M106 closed; post-closure conformance/security review identified the bounded M107 corrective pass.
+Current post-M107 planning baseline: `27a0376` — M107 closed; 158 applicable TunnelManager residual cells remain blocked.
 
 Pinned external authority:
 
@@ -359,11 +359,15 @@ M106 applied lazy first-local-use session creation through the existing I2PContr
 
 ### M107 — I2PControl conformance and managed-TLS corrective pass
 
-Status: **ready**.
+Status: **closed**.
 
 Plan:
 
 `plans/implementation/i2pcontrol-proposal-170/107-i2pcontrol-conformance-and-managed-tls-corrective-pass.md`
+
+Closure:
+
+`plans/closure/i2pcontrol-proposal-170/107-closure.md`
 
 Class: corrective capability/security.
 
@@ -372,6 +376,10 @@ M107 corrects exactly three post-M106 defects through existing I2PControl-local 
 - accept only normative I2PControl API version `1` and reject API `2` with `-32006` before token issuance;
 - permit valid cross-book hostname shadowing while preserving independent books, current deterministic effective precedence, persistence, and M096 confinement;
 - harden managed TLS key file type/permissions and generate loopback-valid SANs for `localhost`, `127.0.0.1`, and `::1` using existing dependencies.
+
+M107 closed at implementation head `27a0376`. It unblocks no future plan:
+M104 remains closed as blocked by the 158 applicable TunnelManager residual
+cells, and no new primitive or semantic evidence changes that dependency state.
 
 Hard dependencies: M093, M096, M106 closure evidence and the current repository baseline.
 

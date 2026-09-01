@@ -1,6 +1,6 @@
 # M107 — I2PControl Conformance and Managed-TLS Corrective Pass
 
-Status: **ready**
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/107-closure.md`
 
 Class: corrective capability / security
 
@@ -18,6 +18,7 @@ Corrective authority and predecessor evidence:
 Repository baseline:
 
 - `06a697006b7b7733587aafed166f438561552193` — `docs(i2pcontrol): close M106 DelayOpen handoff`
+- Implementation head: `27a0376` — `fix(i2pcontrol): close M107 conformance corrective pass`
 
 Pinned Proposal 170 authority:
 

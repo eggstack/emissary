@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; all twelve tunnel runtimes real; M095-M096 and M098-M103 closed, M099 closed internally/partial, M097 and M104 closed as blocked, M105-M106 closed; **M107 ready**; 224 apply / 158 blocked / 458 not-applicable TunnelManager cells remain
+Status: partial Proposal 170 production support; all twelve tunnel runtimes real; M095-M096, M098-M103, and M107 closed, M099 closed internally/partial, M097 and M104 closed as blocked, M105-M106 closed; 224 apply / 158 blocked / 458 not-applicable TunnelManager cells remain
 
 This directory contains bounded internal implementation, audit, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -52,7 +52,7 @@ M091 remains the cautionary boundary case: unauthorized vendored Yosemite/core/d
 - M099 applied the bounded server presentation/access/filter/admission/rate subset.
 - Remaining primitive-dependent option cells fail before allocation rather than being ignored or reported as applied.
 - All 6 ClientServicesInfo selectors are implemented.
-- M107 is a corrective control-plane pass for API-version negotiation, AddressBook shadowing, and managed TLS; it does not change TunnelManager support counts.
+- M107 corrected API 1-only negotiation, AddressBook shadowing, and managed TLS; it did not change TunnelManager support counts.
 - Full live/reseeded/reference-router certification remains open.
 
 The current M095 matrix after M106 contains:
@@ -80,7 +80,7 @@ Overall status remains partial until every applicable blocked cell is resolved a
 | M104 | closed as blocked | final live interoperability/security/containment/full-support reclosure stopped by residual option blockers |
 | M105 | closed | exhaustive residual primitive, applicability, ownership, and security audit; no production behavior |
 | M106 | closed | six TCP-client `DelayOpen` cells through the existing I2PControl client-listener owner; closure recorded |
-| M107 | **ready** | post-M106 corrective pass: API 1-only negotiation, AddressBook cross-book shadowing, managed TLS key/SAN hardening; no matrix change |
+| M107 | closed | post-M106 corrective pass: API 1-only negotiation, AddressBook cross-book shadowing, managed TLS key/SAN hardening; no matrix change |
 
 Plans:
 
@@ -98,9 +98,11 @@ Plans:
 - `106-delay-open-client-listener.md`
 - `107-i2pcontrol-conformance-and-managed-tls-corrective-pass.md`
 
-## M107 — ready corrective implementation
+## M107 — closed corrective implementation
 
-`107-i2pcontrol-conformance-and-managed-tls-corrective-pass.md` is the sole current implementation handoff.
+`107-i2pcontrol-conformance-and-managed-tls-corrective-pass.md` is closed by
+`plans/closure/i2pcontrol-proposal-170/107-closure.md` against implementation
+head `27a0376`. No successor implementation handoff is currently registered.
 
 It is based on the post-M106 review against the pinned Proposal 170 text, current API 1 documentation, rejected API 2 proposal, and I2P naming semantics. It corrects exactly three bounded defects already owned by I2PControl:
 

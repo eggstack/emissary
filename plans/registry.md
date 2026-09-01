@@ -35,7 +35,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M107 ready** | post-M106 API-version/AddressBook/TLS corrective pass; 158 TunnelManager residual cells remain independently blocked |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | none | M107 closed at `27a0376`; M104 remains closed as blocked with 158 TunnelManager residual cells |
 | I2PControl Proposal 170 source/truthfulness | RouterInfo source line closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | none | current RouterInfo matrix: 42 available / 1 protocol-permitted neutral / 0 unavailable |
 | I2PControl Proposal 170 containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M107 regression scope | M061/M062/M063 rules remain controlling; M107 authorizes no lower-layer production path |
 | I2PControl tunnel runtime | all 12 data planes real | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | option semantics only | do not redesign data planes for M107 or residual option parity |
@@ -43,7 +43,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 
 ## Current full-support sequence
 
-M104 reached the final residual gate and closed as blocked. M105 audited the 164 blocked cells, and M106 implemented the only dependency-ready residual subset: six TCP-client `DelayOpen` cells. Production is now 224 `apply`, 158 `blocked_primitive`, and 458 `not_applicable` cells.
+M104 reached the final residual gate and closed as blocked. M105 audited the 164 blocked cells, and M106 implemented the only dependency-ready residual subset: six TCP-client `DelayOpen` cells. M107 then corrected three independent control-plane defects without touching the TunnelManager inventory. Production is now 224 `apply`, 158 `blocked_primitive`, and 458 `not_applicable` cells.
 
 A post-M106 review found three independent correctness/security defects in already-implemented I2PControl behavior. Those defects have existing I2PControl-local owners and do not change the TunnelManager matrix. M107 is therefore the sole current dependency-ready corrective handoff.
 
@@ -85,17 +85,17 @@ M106 DelayOpen client-listener lifecycle             |
        matrix unchanged: 224 apply / 158 blocked / 458 N/A
 ```
 
-## Ready handoff — M107
+## Closed handoff — M107
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/107-i2pcontrol-conformance-and-managed-tls-corrective-pass.md`
 
-Status: **ready**.
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/107-closure.md`.
 
-Baseline:
+Implementation head:
 
-- `06a697006b7b7733587aafed166f438561552193` — M106 closure head.
+- `27a0376` — `fix(i2pcontrol): close M107 conformance corrective pass`.
 
 M107 corrects exactly three post-M106 findings using existing owners under `emissary-cli/src/i2pcontrol/**`:
 

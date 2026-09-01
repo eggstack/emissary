@@ -73,6 +73,8 @@ use emissary_core::{
     FirewallStatus,
 };
 
+use crate::tunnel_client::{StartupTunnelAction, StartupTunnelLifecycleHandle, StartupTunnelState};
+
 /// Maximum number of startup and control-plane tunnel definitions exposed by
 /// one logical inventory.
 pub const MAX_TUNNEL_INVENTORY: usize = 1000;
@@ -96,17 +98,15 @@ impl<R: Runtime> LivePeerDirectorySource<R> {
 impl<R: Runtime + Sync> PeerDirectorySource for LivePeerDirectorySource<R> {
     fn snapshot(&self) -> Result<PeerDirectorySnapshot, InspectionError> {
         let snapshot = self.inspection.snapshot(self.max_items).map_err(|error| match error {
-            PeerDirectoryInspectionError::ItemLimitExceeded { limit } => {
+            PeerDirectoryInspectionError::ItemLimitExceeded { limit } =>
                 InspectionError::ResultTooLarge {
                     group: InspectionGroup::PeerList,
                     limit,
-                }
-            }
-            PeerDirectoryInspectionError::IncompleteEntry => {
+                },
+            PeerDirectoryInspectionError::IncompleteEntry =>
                 InspectionError::TemporarilyUnavailable {
                     group: InspectionGroup::PeerLookup,
-                }
-            }
+                },
         })?;
 
         let mut peer_ids = Vec::with_capacity(snapshot.entries.len());
@@ -145,12 +145,11 @@ impl LiveActivePeerSource {
 impl ActivePeerSource for LiveActivePeerSource {
     fn snapshot(&self) -> Result<ActivePeerSnapshot, InspectionError> {
         let snapshot = self.inspection.snapshot(self.max_items).map_err(|error| match error {
-            TransportInspectionError::ItemLimitExceeded { limit } => {
+            TransportInspectionError::ItemLimitExceeded { limit } =>
                 InspectionError::ResultTooLarge {
                     group: InspectionGroup::PeerList,
                     limit,
-                }
-            }
+                },
         })?;
         Ok(ActivePeerSnapshot {
             peer_ids: snapshot.connected_peer_ids,
@@ -263,6 +262,7 @@ pub struct StartupServerConfig {
 #[derive(Clone, Default)]
 pub struct StartupTunnelInventory {
     definitions: Arc<RwLock<BTreeMap<String, TunnelDefinition>>>,
+    lifecycle: Option<StartupTunnelLifecycleHandle>,
 }
 
 impl StartupTunnelInventory {
@@ -289,7 +289,32 @@ impl StartupTunnelInventory {
 
         Ok(Self {
             definitions: Arc::new(RwLock::new(definitions)),
+            lifecycle: None,
         })
+    }
+
+    /// Attach the neutral runtime owner used by the application composition.
+    pub fn with_lifecycle(mut self, lifecycle: StartupTunnelLifecycleHandle) -> Self {
+        self.lifecycle = Some(lifecycle);
+        self
+    }
+
+    fn runtime_state(
+        &self,
+        name: &str,
+    ) -> Option<crate::i2pcontrol::domain::tunnel::TunnelRuntimeState> {
+        match self.lifecycle.as_ref()?.state(name).ok().flatten()? {
+            StartupTunnelState::Starting =>
+                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Starting),
+            StartupTunnelState::Running =>
+                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Running),
+            StartupTunnelState::Stopping =>
+                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopping),
+            StartupTunnelState::Stopped =>
+                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopped),
+            StartupTunnelState::Failed =>
+                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Failed),
+        }
     }
 
     /// Return startup definitions in deterministic name order.
@@ -298,7 +323,16 @@ impl StartupTunnelInventory {
             .definitions
             .read()
             .map_err(|_| "startup tunnel inventory lock poisoned".to_string())?;
-        Ok(definitions.values().cloned().collect())
+        Ok(definitions
+            .values()
+            .cloned()
+            .map(|mut definition| {
+                if let Some(state) = self.runtime_state(definition.name.as_str()) {
+                    definition.runtime_state = state;
+                }
+                definition
+            })
+            .collect())
     }
 
     /// Return one startup definition by its exact configured name.
@@ -307,7 +341,12 @@ impl StartupTunnelInventory {
             .definitions
             .read()
             .map_err(|_| "startup tunnel inventory lock poisoned".to_string())?;
-        Ok(definitions.get(name).cloned())
+        Ok(definitions.get(name).cloned().map(|mut definition| {
+            if let Some(state) = self.runtime_state(name) {
+                definition.runtime_state = state;
+            }
+            definition
+        }))
     }
 
     /// Publish the actual destination exposed by a running server tunnel.
@@ -957,7 +996,7 @@ impl ProductionTunnelManagerControl {
 
     async fn start_locked(&self, name: &str) -> Result<String, String> {
         if self.startup.get(name)?.is_some() {
-            return Err("startup-managed tunnel lifecycle is externally managed".into());
+            return self.startup_action(name, StartupTunnelAction::Start).await;
         }
         let definition = {
             let store = self.inner.lock().await;
@@ -993,11 +1032,21 @@ impl ProductionTunnelManagerControl {
                 }
                 Ok("ok".to_string())
             }
-            Err(BackendError::NotImplemented { tunnel_type }) => {
-                Ok(format!("error - {} not implemented", tunnel_type.as_str()))
-            }
+            Err(BackendError::NotImplemented { tunnel_type }) =>
+                Ok(format!("error - {} not implemented", tunnel_type.as_str())),
             Err(error) => Ok(format!("error - {error}")),
         }
+    }
+
+    async fn startup_action(
+        &self,
+        name: &str,
+        action: StartupTunnelAction,
+    ) -> Result<String, String> {
+        let Some(lifecycle) = self.startup.lifecycle.as_ref() else {
+            return Err("startup-managed tunnel lifecycle is externally managed".into());
+        };
+        lifecycle.apply(name, action).await.map(|()| "ok".to_string())
     }
 
     async fn with_runtime_state(&self, mut definition: TunnelDefinition) -> TunnelDefinition {
@@ -1033,9 +1082,7 @@ impl ProductionTunnelManagerControl {
                                 .ok()
                                 .flatten()
                                 .is_some() =>
-                        {
-                            Some(public.to_string())
-                        }
+                            Some(public.to_string()),
                         _ => None,
                     }
                 };
@@ -1281,15 +1328,18 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn start(&self, name: &str) -> Result<String, String> {
+        if self.startup.get(name)?.is_some() {
+            return self.startup_action(name, StartupTunnelAction::Start).await;
+        }
         let _lifecycle = self.lifecycle_lock(name).await;
         self.start_locked(name).await
     }
 
     async fn stop(&self, name: &str) -> Result<String, String> {
-        let _lifecycle = self.lifecycle_lock(name).await;
         if self.startup.get(name)?.is_some() {
-            return Err("startup-managed tunnel lifecycle is externally managed".into());
+            return self.startup_action(name, StartupTunnelAction::Stop).await;
         }
+        let _lifecycle = self.lifecycle_lock(name).await;
         let def = {
             let store = self.inner.lock().await;
             store
@@ -1305,10 +1355,10 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn restart(&self, name: &str) -> Result<String, String> {
-        let _lifecycle = self.lifecycle_lock(name).await;
         if self.startup.get(name)?.is_some() {
-            return Err("startup-managed tunnel lifecycle is externally managed".into());
+            return self.startup_action(name, StartupTunnelAction::Restart).await;
         }
+        let _lifecycle = self.lifecycle_lock(name).await;
         let definition = {
             let store = self.inner.lock().await;
             store

@@ -397,6 +397,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m102 = is_authorized_m102_path(path);
         let authorized_m099 = is_authorized_m099_path(path);
         let authorized_m107 = is_authorized_m107_path(path);
+        let authorized_m109 = is_authorized_m109_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -409,6 +410,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m102
                 || authorized_m099
                 || authorized_m107
+                || authorized_m109
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -425,6 +427,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m102
                     || authorized_m099
                     || authorized_m107
+                    || authorized_m109
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -482,6 +485,23 @@ fn is_authorized_m107_path(path: &str) -> bool {
             | "emissary-cli/tests/m062_dependency_containment.rs"
             | "plans/closure/i2pcontrol-proposal-170/107-closure.md"
             | "plans/implementation/i2pcontrol-proposal-170/107-i2pcontrol-conformance-and-managed-tls-corrective-pass.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+    )
+}
+
+fn is_authorized_m109_path(path: &str) -> bool {
+    matches!(
+        path,
+        "emissary-cli/src/main.rs"
+            | "emissary-cli/src/tunnel/client.rs"
+            | "emissary-cli/src/tunnel/server.rs"
+            | "emissary-cli/src/i2pcontrol/production.rs"
+            | "emissary-cli/src/i2pcontrol/tunnel_manager.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/109-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/109-startup-managed-tunnel-action-semantics-corrective.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"

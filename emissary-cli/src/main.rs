@@ -55,8 +55,7 @@ mod logger;
 mod proxy;
 mod tools;
 mod tunnel;
-#[cfg(feature = "i2pcontrol")]
-use crate::tunnel::client as tunnel_client;
+pub use crate::tunnel::client as tunnel_client;
 #[cfg(feature = "i2pcontrol")]
 use crate::tunnel::server as tunnel_server;
 mod ui;
@@ -233,6 +232,11 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
         &startup_servers,
     )
     .map_err(|error| anyhow!("invalid startup tunnel inventory: {error}"))?;
+    #[cfg(feature = "i2pcontrol")]
+    let startup_tunnel_lifecycle = tunnel_client::StartupTunnelLifecycleHandle::new();
+    #[cfg(feature = "i2pcontrol")]
+    let startup_tunnel_inventory =
+        startup_tunnel_inventory.with_lifecycle(startup_tunnel_lifecycle.clone());
     #[cfg(feature = "i2pcontrol")]
     let server_inventory_for_observer = startup_tunnel_inventory.clone();
     #[cfg(feature = "i2pcontrol")]
@@ -525,20 +529,41 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
             });
         }
 
-        // start client and server tunnels
-        tokio::spawn(
-            ClientTunnelManager::new(client_tunnels, client_tunnel_options, address.port()).run(),
-        );
-        tokio::spawn(
-            ServerTunnelManager::new(
-                server_tunnels,
-                address.port(),
-                path.clone(),
-                server_destination_observer,
-            )
-            .await
-            .run(),
-        );
+        // Start client and server tunnels. With I2PControl enabled both
+        // managers register neutral lifecycle controllers first; without it
+        // the historical shared client/session startup path is unchanged.
+        #[cfg(feature = "i2pcontrol")]
+        let client_manager = ClientTunnelManager::new_with_lifecycle(
+            client_tunnels,
+            client_tunnel_options,
+            address.port(),
+            startup_tunnel_lifecycle.clone(),
+        )
+        .map_err(|error| anyhow!("invalid startup client lifecycle: {error}"))?;
+        #[cfg(not(feature = "i2pcontrol"))]
+        let client_manager =
+            ClientTunnelManager::new(client_tunnels, client_tunnel_options, address.port());
+        tokio::spawn(client_manager.run());
+
+        #[cfg(feature = "i2pcontrol")]
+        let server_manager = ServerTunnelManager::new_with_lifecycle(
+            server_tunnels,
+            address.port(),
+            path.clone(),
+            server_destination_observer,
+            startup_tunnel_lifecycle,
+        )
+        .await
+        .map_err(|error| anyhow!("invalid startup server lifecycle: {error}"))?;
+        #[cfg(not(feature = "i2pcontrol"))]
+        let server_manager = ServerTunnelManager::new(
+            server_tunnels,
+            address.port(),
+            path.clone(),
+            server_destination_observer,
+        )
+        .await;
+        tokio::spawn(server_manager.run());
 
         address_book_handle
     } else {

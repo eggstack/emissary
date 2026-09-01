@@ -18,7 +18,10 @@
 
 #![allow(dead_code)]
 
-use crate::config::{I2cpOptions, ServerTunnelConfig};
+use crate::{
+    config::{I2cpOptions, ServerTunnelConfig},
+    tunnel_client::{StartupTunnelAction, StartupTunnelController, StartupTunnelState},
+};
 
 use yosemite::{style, DestinationKind, RouterApi, Session, SessionOptions};
 
@@ -47,6 +50,7 @@ pub type DestinationObserver = Arc<dyn Fn(&str, &str) + Send + Sync>;
 ///
 /// The destination is private session material. This type deliberately has no
 /// `Debug` implementation so accidental diagnostics cannot print it.
+#[derive(Clone)]
 pub struct ServerTunnelRuntimeConfig {
     /// Diagnostic session nickname.
     pub name: String,
@@ -143,6 +147,174 @@ pub async fn run_single_server(
     }
 }
 
+struct ServerTunnelRuntimeState {
+    state: StartupTunnelState,
+    generation: u64,
+    cancellation: Option<tokio::sync::watch::Sender<bool>>,
+    task: Option<tokio::task::JoinHandle<()>>,
+}
+
+/// Lifecycle controller for one startup server tunnel. The private
+/// destination remains inside this controller and is never returned by the
+/// neutral lifecycle API.
+pub struct ServerTunnelLifecycleController {
+    config: ServerTunnelRuntimeConfig,
+    destination_observer: Option<DestinationObserver>,
+    state: Arc<tokio::sync::Mutex<ServerTunnelRuntimeState>>,
+    operation: Arc<tokio::sync::Mutex<()>>,
+}
+
+impl ServerTunnelLifecycleController {
+    /// Create a controller for one already-loaded startup server definition.
+    pub fn new(
+        config: ServerTunnelRuntimeConfig,
+        destination_observer: Option<DestinationObserver>,
+    ) -> Self {
+        Self {
+            config,
+            destination_observer,
+            state: Arc::new(tokio::sync::Mutex::new(ServerTunnelRuntimeState {
+                state: StartupTunnelState::Stopped,
+                generation: 0,
+                cancellation: None,
+                task: None,
+            })),
+            operation: Arc::new(tokio::sync::Mutex::new(())),
+        }
+    }
+
+    async fn stop_generation(&self) -> Result<(), String> {
+        let (cancellation, task) = {
+            let mut state = self.state.lock().await;
+            if state.state == StartupTunnelState::Stopped {
+                return Ok(());
+            }
+            state.state = StartupTunnelState::Stopping;
+            (state.cancellation.take(), state.task.take())
+        };
+        if let Some(cancellation) = cancellation {
+            let _ = cancellation.send(true);
+        }
+        if let Some(mut task) = task {
+            tokio::select! {
+                result = &mut task => match result {
+                    Ok(()) => {}
+                    Err(_) => return self.mark_failed("server runtime task panicked").await,
+                },
+                _ = tokio::time::sleep(STARTUP_LIFECYCLE_TIMEOUT) => {
+                    task.abort();
+                    let _ = task.await;
+                    return self.mark_failed("server tunnel stop timed out").await;
+                }
+            }
+        }
+        self.state.lock().await.state = StartupTunnelState::Stopped;
+        Ok(())
+    }
+
+    async fn mark_failed(&self, message: &str) -> Result<(), String> {
+        self.state.lock().await.state = StartupTunnelState::Failed;
+        Err(message.to_string())
+    }
+}
+
+impl StartupTunnelController for ServerTunnelLifecycleController {
+    fn apply<'a>(
+        &'a self,
+        action: StartupTunnelAction,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + 'a>> {
+        Box::pin(async move {
+            let _operation = self.operation.lock().await;
+            self.apply_inner(action).await
+        })
+    }
+
+    fn state(&self) -> StartupTunnelState {
+        self.state
+            .try_lock()
+            .map(|state| state.state)
+            .unwrap_or(StartupTunnelState::Starting)
+    }
+}
+
+impl ServerTunnelLifecycleController {
+    async fn apply_inner(&self, action: StartupTunnelAction) -> Result<(), String> {
+        if matches!(
+            action,
+            StartupTunnelAction::Stop | StartupTunnelAction::Restart
+        ) {
+            self.stop_generation().await?;
+        }
+        if matches!(action, StartupTunnelAction::Stop) {
+            return Ok(());
+        }
+
+        let (cancellation, ready_receiver, generation) = {
+            let mut state = self.state.lock().await;
+            if state.state == StartupTunnelState::Running {
+                return Ok(());
+            }
+            if state.state == StartupTunnelState::Starting {
+                return Err("startup tunnel is already starting".to_string());
+            }
+            if state.state == StartupTunnelState::Failed {
+                if state.task.as_ref().is_some_and(|task| !task.is_finished()) {
+                    return Err("startup tunnel cleanup is still in progress".to_string());
+                }
+                state.task = None;
+            }
+            state.generation = state.generation.wrapping_add(1);
+            state.state = StartupTunnelState::Starting;
+            let (cancellation, _) = tokio::sync::watch::channel(false);
+            let (ready_sender, ready_receiver) = tokio::sync::oneshot::channel();
+            let config = self.config.clone();
+            let observer = self.destination_observer.clone();
+            let state_ref = Arc::clone(&self.state);
+            let generation = state.generation;
+            let task_cancellation = cancellation.clone();
+            let task = tokio::spawn(async move {
+                let result = run_single_server(
+                    config,
+                    task_cancellation.subscribe(),
+                    ready_sender,
+                    observer,
+                )
+                .await;
+                let mut state = state_ref.lock().await;
+                if state.generation == generation && state.state != StartupTunnelState::Failed {
+                    state.state = if result.is_ok() {
+                        StartupTunnelState::Stopped
+                    } else {
+                        StartupTunnelState::Failed
+                    };
+                    state.cancellation = None;
+                }
+            });
+            state.cancellation = Some(cancellation.clone());
+            state.task = Some(task);
+            (cancellation, ready_receiver, generation)
+        };
+
+        match tokio::time::timeout(STARTUP_LIFECYCLE_TIMEOUT, ready_receiver).await {
+            Ok(Ok(Ok(()))) => {
+                let mut state = self.state.lock().await;
+                if state.generation == generation {
+                    state.state = StartupTunnelState::Running;
+                }
+                Ok(())
+            }
+            Ok(Ok(Err(error))) => self.mark_failed(&error).await,
+            Ok(Err(_)) => self.mark_failed("server tunnel failed before readiness").await,
+            Err(_) => {
+                let _ = cancellation.send(true);
+                self.mark_failed("server tunnel readiness timed out").await
+            }
+        }
+    }
+}
+
+const STARTUP_LIFECYCLE_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// Logging target for the file.
 const LOG_TARGET: &str = "emissary::server-tunnel";
 
@@ -180,6 +352,9 @@ pub struct ServerTunnelManager {
 
     /// Optional passive destination publication callback.
     destination_observer: Option<DestinationObserver>,
+
+    /// Optional lifecycle owner used by the I2PControl composition seam.
+    lifecycle: Option<crate::tunnel_client::StartupTunnelLifecycleHandle>,
 }
 
 impl ServerTunnelManager {
@@ -190,6 +365,36 @@ impl ServerTunnelManager {
         base_path: PathBuf,
         destination_observer: Option<DestinationObserver>,
     ) -> Self {
+        Self::new_inner(configs, sam_tcp_port, base_path, destination_observer, None)
+            .await
+            .expect("uncontrolled startup server manager construction cannot fail")
+    }
+
+    /// Create a server manager with neutral startup lifecycle control.
+    pub async fn new_with_lifecycle(
+        configs: Vec<ServerTunnelConfig>,
+        sam_tcp_port: u16,
+        base_path: PathBuf,
+        destination_observer: Option<DestinationObserver>,
+        lifecycle: crate::tunnel_client::StartupTunnelLifecycleHandle,
+    ) -> Result<Self, String> {
+        Self::new_inner(
+            configs,
+            sam_tcp_port,
+            base_path,
+            destination_observer,
+            Some(lifecycle),
+        )
+        .await
+    }
+
+    async fn new_inner(
+        configs: Vec<ServerTunnelConfig>,
+        sam_tcp_port: u16,
+        base_path: PathBuf,
+        destination_observer: Option<DestinationObserver>,
+        lifecycle: Option<crate::tunnel_client::StartupTunnelLifecycleHandle>,
+    ) -> Result<Self, String> {
         let mut tunnels = Vec::<Arc<TunnelConfig>>::new();
         let mut router_api = RouterApi::new(sam_tcp_port);
 
@@ -228,10 +433,32 @@ impl ServerTunnelManager {
             }
         }
 
-        Self {
+        if let Some(lifecycle) = lifecycle.as_ref() {
+            for tunnel in &tunnels {
+                lifecycle.register(
+                    tunnel.name.clone(),
+                    Arc::new(ServerTunnelLifecycleController::new(
+                        ServerTunnelRuntimeConfig {
+                            name: tunnel.name.clone(),
+                            port: tunnel.port,
+                            destination: tunnel.destination.clone(),
+                            sam_tcp_port: tunnel.sam_tcp_port,
+                            lease_set_enc_type: tunnel
+                                .i2cp
+                                .as_ref()
+                                .and_then(|options| options.lease_set_enc_type.clone()),
+                        },
+                        destination_observer.clone(),
+                    )),
+                )?;
+            }
+        }
+
+        Ok(Self {
             tunnels,
             destination_observer,
-        }
+            lifecycle,
+        })
     }
 
     /// Attempt to load destination from `path` and if it does't exist, call router over SAMv3 to
@@ -334,6 +561,11 @@ impl ServerTunnelManager {
     /// Run the event loop of [`ServerTunnelManager`].
     pub async fn run(self) {
         if self.tunnels.is_empty() {
+            return;
+        }
+
+        if let Some(lifecycle) = self.lifecycle {
+            lifecycle.start_all().await;
             return;
         }
 
@@ -444,6 +676,74 @@ mod tests {
             "startup runtime must remain owned and alive"
         );
         runtime.abort();
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn startup_server_lifecycle_publishes_and_restarts_without_exposing_secret() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let sam_port = listener.local_addr().unwrap().port();
+        let sam_task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                tokio::spawn(async move {
+                    let (read_half, mut write_half) = stream.into_split();
+                    let mut reader = BufReader::new(read_half);
+                    let mut line = String::new();
+                    loop {
+                        line.clear();
+                        if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                            break;
+                        }
+                        let response = if line.starts_with("HELLO") {
+                            "HELLO REPLY RESULT=OK VERSION=3.3\n"
+                        } else if line.starts_with("SESSION CREATE") {
+                            "SESSION STATUS DESTINATION=public-destination\n"
+                        } else {
+                            "STREAM STATUS RESULT=OK\n"
+                        };
+                        if write_half.write_all(response.as_bytes()).await.is_err() {
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+        let observed = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let observed_for_callback = Arc::clone(&observed);
+        let observer: DestinationObserver = Arc::new(move |name, destination| {
+            observed_for_callback
+                .lock()
+                .unwrap()
+                .push((name.to_string(), destination.to_string()));
+        });
+        let controller = ServerTunnelLifecycleController::new(
+            ServerTunnelRuntimeConfig {
+                name: "startup-server".to_string(),
+                port: 0,
+                destination: "private-destination-secret".to_string(),
+                sam_tcp_port: sam_port,
+                lease_set_enc_type: None,
+            },
+            Some(observer),
+        );
+
+        controller.apply(StartupTunnelAction::Start).await.unwrap();
+        assert_eq!(controller.state(), StartupTunnelState::Running);
+        controller.apply(StartupTunnelAction::Stop).await.unwrap();
+        assert_eq!(controller.state(), StartupTunnelState::Stopped);
+        controller.apply(StartupTunnelAction::Restart).await.unwrap();
+        assert_eq!(controller.state(), StartupTunnelState::Running);
+        controller.apply(StartupTunnelAction::Stop).await.unwrap();
+        assert_eq!(controller.state(), StartupTunnelState::Stopped);
+        assert_eq!(observed.lock().unwrap().len(), 2);
+        assert!(observed
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|(_, destination)| destination == "public-destination"));
         sam_task.abort();
     }
 

@@ -1,10 +1,10 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096, M098-M103, and M107 closed, M099 closed internally/partial, M097 and M104 closed as blocked, M105-M106 closed, M108 ready
+Status: active; M095-M096, M098-M108 closed, M099 closed internally/partial, M097 and M104 closed as blocked; no dependency-ready successor
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
-Current corrective planning baseline: `612a584f6e3b5ab1cb60ebeff1d58ab2aff50bf1` — M108 registered; 158 applicable TunnelManager residual cells remain independently blocked.
+Current corrective planning baseline: `0a5e8c9` — M108 implementation head; 158 applicable TunnelManager residual cells remain independently blocked.
 
 Pinned external authority:
 
@@ -45,7 +45,7 @@ The current production state after M107 is:
 - all 6 ClientServicesInfo selectors are implemented;
 - API version `1` is the sole accepted Authenticate version;
 - M107 fresh managed TLS material is restrictive on Unix, fails closed on managed symlink/non-regular paths, and covers `localhost`, `127.0.0.1`, and `::1`;
-- pre-M107 managed TLS material may still retain permissive Unix modes until M108 repairs the upgrade path;
+- M108 repairs pre-M107 managed TLS permissions on Unix before managed reads and uses create-time owner-only private-key modes;
 - unsupported residual options fail before allocation rather than being persisted-and-ignored;
 - full public-network/reference-router certification remains open;
 - M104 remains closed as blocked because applicable TunnelManager residual cells remain.
@@ -267,13 +267,13 @@ M107 post-M106 conformance/fresh-TLS corrective      [CLOSED]
   |
   | legacy managed-permission gap
   v
-M108 managed TLS upgrade-permission corrective       [READY]
+M108 managed TLS upgrade-permission corrective       [CLOSED]
   |
-  +--> no residual-option successor implied
+  +--> no dependency-ready successor
        matrix remains 224 apply / 158 blocked / 458 N/A
 ```
 
-M108 follows M107 as a security-corrective repository-baseline dependency, not as a residual-option dependency. It may close without changing the M104 residual gate.
+M108 followed M107 as a security-corrective repository-baseline dependency, not as a residual-option dependency. It closed without changing the M104 residual gate, and no future plan is unblocked by this corrective pass.
 
 ## 10. Milestone status and exit conditions
 
@@ -401,23 +401,29 @@ M107 closed at implementation head `27a0376` and changed no TunnelManager suppor
 
 ### M108 — managed TLS upgrade-permission corrective pass
 
-Status: **ready**.
+Status: **closed**.
 
 Plan:
 
 `plans/implementation/i2pcontrol-proposal-170/108-managed-tls-upgrade-permission-corrective-pass.md`
 
+Closure:
+
+`plans/closure/i2pcontrol-proposal-170/108-closure.md`
+
 Class: corrective capability/security.
 
-M108 is limited to the existing I2PControl managed TLS owner and planning-state reconciliation. It must:
+M108 was limited to the existing I2PControl managed TLS owner and planning-state reconciliation. It:
 
 - restrict and revalidate an existing managed `i2pcontrol-certs/` directory to `0700` on Unix before managed child material is read, or fail initialization;
 - restrict and revalidate an existing regular managed private key to `0600` before key bytes are read, or fail initialization;
 - create the private-key temporary file with requested Unix mode `0600` at inode creation through the standard library rather than relying on post-write chmod as the first confidentiality boundary;
 - preserve valid managed certificate/key bytes across permission-only repair and restart;
 - preserve explicit operator TLS ownership unchanged;
-- reconcile stale M107 ready/current/pending text in the implementation README and this roadmap during implementation/closure;
+- reconcile stale pre-M108 planning state in the implementation README, registry, and this roadmap;
 - leave the M095 matrix exactly `224 apply / 158 blocked_primitive / 458 not_applicable`.
+
+Implementation head: `0a5e8c9` — `fix(i2pcontrol): repair managed TLS upgrade permissions`.
 
 Hard dependency: M107 closure at `27a0376` and current repository baseline.
 
@@ -432,7 +438,7 @@ Exit conditions:
 - planning state no longer describes M107 as ready/current/pending;
 - external research remains read-only and all repository writes remain internal.
 
-M108 does not unblock or constitute a future M104 reattempt.
+M108 did not unblock or constitute a future M104 reattempt.
 
 ## 11. Residual TunnelManager families
 

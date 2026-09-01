@@ -1,6 +1,6 @@
 # M108 — Managed TLS Upgrade-Permission Corrective Pass
 
-Status: **ready**
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/108-closure.md`
 
 Class: corrective capability / security
 
@@ -16,6 +16,7 @@ Corrective authority and predecessor evidence:
 Repository baseline:
 
 - `a108b1b62f3ad9d79fe455ccf3910f96d7a5e06f` — `plans(i2pcontrol): close M107 corrective pass`
+- Implementation head: `0a5e8c9` — `fix(i2pcontrol): repair managed TLS upgrade permissions`
 
 Pinned Proposal 170 authority:
 

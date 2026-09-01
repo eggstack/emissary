@@ -758,6 +758,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md"
             | "plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "plans/closure/i2pcontrol-proposal-170/108-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/062-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/063-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/066-closure.md"

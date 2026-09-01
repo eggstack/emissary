@@ -33,7 +33,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M109 ready** | close startup-visible lifecycle/`All=true` semantics, then closure decides M110 readiness |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | none | M109 closed; M110 remains blocked on bounded shared-session/key ownership evidence |
 | I2PControl Proposal 170 source/truthfulness | RouterInfo source line closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | none | 42 available / 1 neutral / 0 unavailable |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M109 exact neutral CLI-tunnel seam only | M061/M062/M063 remain controlling |
 | I2PControl tunnel runtime | all 12 data planes real | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | action/option semantics only | do not redesign data planes for parity |
@@ -56,7 +56,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 M108 managed TLS upgrade corrective                 [CLOSED]
   |
   v
-M109 startup-managed action semantics               [READY — SOLE REGISTERED HANDOFF]
+M109 startup-managed action semantics               [CLOSED]
   |
   v
 M110 shared session + destination/key ownership     [ROADMAP ONLY / BLOCKED]
@@ -75,15 +75,15 @@ M113 server presentation + LeaseSet residuals       [ROADMAP ONLY / BLOCKED]
 M114 live/reference final reclosure                 [ROADMAP ONLY / BLOCKED]
 ```
 
-Per `plans/003-planning-process.md`, only M109 is registered for execution. M110-M114 plan files exist for bounded future handoff definition but are not active/ready and MUST NOT be executed until a predecessor closure updates this registry.
+Per `plans/003-planning-process.md`, M109 is closed. M110-M114 plan files exist for bounded future handoff definition but are not active/ready and MUST NOT be executed until their predecessor and primitive gates are satisfied.
 
-## Ready handoff — M109
+## Recently closed handoff — M109
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/109-startup-managed-tunnel-action-semantics-corrective.md`
 
-Status: **ready**.
+Status: **closed**.
 
 Baseline:
 
@@ -116,7 +116,7 @@ M109 MUST NOT:
 - weaken M093 security/anonymity bounds;
 - interact with upstream repositories/maintainers.
 
-M109 closure must leave M095 exactly `224 / 158 / 458` and decide whether M110 is actually dependency-ready.
+M109 closure leaves M095 exactly `224 / 158 / 458` and records that M110 is not yet dependency-ready.
 
 ## Roadmap-defined future plans — NOT registered for execution
 
@@ -170,12 +170,13 @@ A cell may move to `apply` only with real request→runtime evidence. A cell may
 | M106 | closed | `plans/closure/i2pcontrol-proposal-170/106-closure.md` |
 | M107 | closed | `plans/closure/i2pcontrol-proposal-170/107-closure.md` |
 | M108 | closed | `plans/closure/i2pcontrol-proposal-170/108-closure.md` |
+| M109 | closed | `plans/closure/i2pcontrol-proposal-170/109-closure.md` |
 
 M093 remains the current tunnel production/security authority. M092 remains authority for removal of the unauthorized M091 Yosemite/core/vendor delta.
 
 ## Registry maintenance rules
 
-1. M109 is the sole dependency-ready implementation handoff.
+1. M109 is closed; no successor is dependency-ready.
 2. M110-M114 are roadmap/indexed only and MUST NOT be executed until this registry marks the specific plan ready.
 3. M109 does not change the `224 / 158 / 458` option matrix.
 4. Do not reattempt final reclosure while any applicable option cell is blocked/planned/unsupported/unknown/inert.

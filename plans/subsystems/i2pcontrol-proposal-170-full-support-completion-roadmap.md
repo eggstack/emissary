@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096 and M098-M108 closed, M097/M104 closed as blocked; **M109 ready and sole registered implementation handoff**; M110-M114 roadmap-defined and blocked on predecessor/primitive evidence
+Status: active; M095-M096 and M098-M109 closed, M097/M104 closed as blocked; M110-M114 roadmap-defined and blocked on predecessor/primitive evidence
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -62,7 +62,7 @@ Current M095 matrix:
 
 Two independent completion gates remain:
 
-1. **Action/inventory semantics:** startup-configured generic tunnels are visible to TunnelManager but named lifecycle rejects them and canonical `All=true` skips them. M109 owns the bounded corrective.
+1. **Action/inventory semantics:** startup-configured generic tunnels are visible to TunnelManager with named lifecycle and canonical `All=true` semantics. M109 closed this bounded corrective.
 2. **Residual option semantics:** 158 applicable option/type cells still lack truthful runtime primitives. M110-M113 partition those residuals by actual ownership/security domain.
 
 Full public/reseeded/reference-router certification remains open and belongs only to M114 after the first two gates are closed.
@@ -106,7 +106,7 @@ Any future production change outside I2PControl is allowed only when all are tru
 6. M061/M062 containment is amended explicitly rather than implicitly;
 7. a registered plan authorizes the exact change.
 
-M102's neutral network-error observation and M109's proposed neutral startup lifecycle handle are the models. Neither creates a general license for core changes.
+M102's neutral network-error observation and M109's neutral startup lifecycle handle are the models. Neither creates a general license for core changes.
 
 ### Dependency rule
 
@@ -183,7 +183,7 @@ These are planning ownership partitions, not promises that every cell will becom
 M108 managed TLS corrective                         [CLOSED]
   |
   v
-M109 startup-managed action semantics               [READY / SOLE REGISTERED HANDOFF]
+M109 startup-managed action semantics               [CLOSED]
   |
   v
 M110 shared session + destination/key ownership     [PROPOSED / BLOCKED]
@@ -202,7 +202,7 @@ M113 server presentation + LeaseSet residuals       [PROPOSED / BLOCKED]
 M114 live/reference interoperability + reclosure    [PROPOSED / BLOCKED]
 ```
 
-Only the next dependency-ready plan is registered in `plans/registry.md`, per planning governance. M110-M114 are indexed here and in the implementation README but are not active handoffs.
+Only the next dependency-ready plan is registered in `plans/registry.md`, per planning governance. M110-M114 are indexed here and in the implementation README but are not active handoffs; no successor is ready after M109 closure.
 
 ## 8. M109 — startup-managed tunnel action semantics
 
@@ -210,7 +210,7 @@ Plan:
 
 `plans/implementation/i2pcontrol-proposal-170/109-startup-managed-tunnel-action-semantics-corrective.md`
 
-Status: **ready**.
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/109-closure.md`.
 
 Objective:
 
@@ -223,7 +223,7 @@ Objective:
 
 Expected non-I2PControl production paths are limited to `emissary-cli/src/tunnel/client.rs`, `emissary-cli/src/tunnel/server.rs`, and `emissary-cli/src/main.rs`. No core/util/dependency change is authorized.
 
-M109 does not change M095 option counts.
+M109 does not change M095 option counts. Its closure records that M110 remains blocked pending its independent ownership and accepted-Yosemite primitive gates.
 
 Exit conditions are those in the plan. If correct edit/delete semantics require a competing durable overlay or `router.toml` rewrite, M109 stops and opens a separately numbered corrective instead of widening silently.
 
@@ -388,9 +388,9 @@ The known stable/nightly rustfmt mismatch remains a tooling issue. Run and recor
 
 Per `plans/003-planning-process.md`:
 
-- M109 is the sole registry-ready implementation plan;
+- M109 is closed and no successor is registry-ready;
 - M110-M114 remain roadmap/indexed but unregistered as active handoffs;
-- M109 closure decides whether M110 is truly dependency-ready;
+- M109 closure records whether M110 is truly dependency-ready;
 - each later closure decides the next transition;
 - blocked plans may not be executed simply because their files exist;
 - material deviations require plan/ADR correction before code changes;

@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; M109 is the sole dependency-ready handoff; M110-M114 are roadmap-defined and blocked; current TunnelManager matrix remains `224 apply / 158 blocked_primitive / 458 not_applicable`
+Status: partial Proposal 170 production support; M109 is closed; M110-M114 remain roadmap-defined and blocked; current TunnelManager matrix remains `224 apply / 158 blocked_primitive / 458 not_applicable`
 
 This directory contains bounded internal implementation, audit, corrective, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -48,7 +48,7 @@ No standalone crate split, router-core API, dependency fork, hosted CI expansion
 - API 1-only authentication and M107/M108 managed TLS hardening are operational.
 - M097/M098/M099/M106 applied bounded option subsets with real runtime effects.
 - Unsupported residual options fail before allocation.
-- Startup-configured generic tunnels are visible to TunnelManager but currently have incomplete canonical lifecycle/`All=true` semantics; M109 owns this corrective.
+- Startup-configured generic tunnels are visible to TunnelManager with truthful canonical lifecycle and `All=true` semantics; M109 is closed.
 - Full public/reseeded/reference-router certification remains open.
 
 Current M095 matrix:
@@ -78,7 +78,7 @@ Official status remains **partial Proposal 170 support** until M114 closes succe
 | M106 | closed | six TCP-client DelayOpen cells |
 | M107 | closed | API1/AddressBook/fresh managed-TLS corrective |
 | M108 | closed | managed TLS upgrade-permission corrective |
-| **M109** | **ready / registered** | startup-managed named lifecycle + `All=true` action semantics; edit/delete contract disposition |
+| **M109** | **closed** | startup-managed named lifecycle + `All=true` action semantics; edit/delete contract disposition |
 | M110 | proposed / blocked | shared client sessions + destination/key/PrivKeyFile ownership; up to 31 cells |
 | M111 | proposed / dependency-blocked | real Yosemite SAM session-wire option transport; up to 44 cells |
 | M112 | proposed / blocked | client proxy and session-lifecycle residuals; up to 62 cells |
@@ -96,7 +96,7 @@ Plans added for the post-M108 closure line:
 
 Per `plans/003-planning-process.md`, only M109 is registered as an executable handoff. The existence of M110-M114 files does not make them ready; their status/readiness gates are normative.
 
-## M109 — current handoff
+## M109 — closed handoff
 
 M109 corrects the action/inventory gap without touching the option matrix.
 
@@ -113,6 +113,8 @@ Required outcome:
 - M095 remains `224 / 158 / 458`.
 
 M109 must directly resolve whether pinned Proposal/reference semantics require edit/delete mutability for startup-origin visible definitions. If safe full mutation would require `router.toml` rewriting or a competing durable overlay, it stops and opens a separately numbered architecture/capability corrective rather than widening implicitly.
+
+Closure: `plans/closure/i2pcontrol-proposal-170/109-closure.md`.
 
 ## Residual option ownership after M109
 

@@ -1,6 +1,6 @@
 # M109 — Startup-Managed Tunnel Action Semantics Corrective
 
-Status: **ready**
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/109-closure.md`
 
 Class: corrective capability / lifecycle / containment
 

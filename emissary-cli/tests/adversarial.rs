@@ -220,7 +220,7 @@ fn large_string_in_params() {
         "jsonrpc": "2.0",
         "method": "Authenticate",
         "params": {
-            "API": 2,
+            "API": 1,
             "Password": large_string
         },
         "id": 1
@@ -332,7 +332,7 @@ fn error_response_with_data() {
 #[test]
 fn success_response_has_exact_structure() {
     let resp =
-        rpc::JsonRpcSuccess::new(rpc::RequestId::Number(1), json!({"Token": "abc", "API": 2}));
+        rpc::JsonRpcSuccess::new(rpc::RequestId::Number(1), json!({"Token": "abc", "API": 1}));
     let json = serde_json::to_value(&resp).unwrap();
     let obj = json.as_object().unwrap();
 
@@ -353,8 +353,8 @@ fn api_version_1_accepted() {
 }
 
 #[test]
-fn api_version_2_accepted() {
-    assert!(emissary_cli::i2pcontrol::auth::validate_api_version(2));
+fn api_version_2_rejected() {
+    assert!(!emissary_cli::i2pcontrol::auth::validate_api_version(2));
 }
 
 #[test]
@@ -577,7 +577,7 @@ fn canary_not_in_error_with_data() {
 
 #[test]
 fn token_not_in_parse_error_messages() {
-    let body = r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Password":"my-secret-token"},"id":1}"#;
+    let body = r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":1,"Password":"my-secret-token"},"id":1}"#;
     let result = rpc::parse_request(body);
     if let Err(err) = result {
         let msg = err.error.message.to_lowercase();
@@ -1080,7 +1080,7 @@ async fn tls_connection_bound_enforced() {
         &connector,
         addr,
         "Authenticate",
-        serde_json::json!({"API": 2, "Password": "testpass"}),
+        serde_json::json!({"API": 1, "Password": "testpass"}),
     )
     .await
     .unwrap();
@@ -1116,7 +1116,7 @@ async fn tls_client_authenticates_and_dispatches() {
         &connector,
         addr,
         "Authenticate",
-        serde_json::json!({"API": 2, "Password": "testpass"}),
+        serde_json::json!({"API": 1, "Password": "testpass"}),
     )
     .await
     .unwrap();
@@ -1186,7 +1186,7 @@ async fn plaintext_rejected_by_tls_server() {
         let body = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "Authenticate",
-            "params": {"API": 2, "Password": "testpass"},
+            "params": {"API": 1, "Password": "testpass"},
             "id": 1,
         });
         let body_str = body.to_string();

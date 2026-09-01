@@ -396,6 +396,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m101 = is_authorized_m101_path(path);
         let authorized_m102 = is_authorized_m102_path(path);
         let authorized_m099 = is_authorized_m099_path(path);
+        let authorized_m107 = is_authorized_m107_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -407,6 +408,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m101
                 || authorized_m102
                 || authorized_m099
+                || authorized_m107
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -422,6 +424,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m101
                     || authorized_m102
                     || authorized_m099
+                    || authorized_m107
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -454,6 +457,31 @@ fn is_authorized_m099_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/098-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/099-closure.md"
             | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+    )
+}
+
+fn is_authorized_m107_path(path: &str) -> bool {
+    matches!(
+        path,
+        "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/address-book.md"
+            | "emissary-cli/src/i2pcontrol/address_book_runtime.rs"
+            | "emissary-cli/src/i2pcontrol/auth.rs"
+            | "emissary-cli/src/i2pcontrol/production.rs"
+            | "emissary-cli/src/i2pcontrol/rpc.rs"
+            | "emissary-cli/src/i2pcontrol/server.rs"
+            | "emissary-cli/src/i2pcontrol/tls.rs"
+            | "emissary-cli/tests/adversarial.rs"
+            | "emissary-cli/tests/fixtures/mod.rs"
+            | "emissary-cli/tests/golden_fixtures.rs"
+            | "emissary-cli/tests/i2pcontrol.rs"
+            | "emissary-cli/tests/i2pcontrol_live_runtime.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/107-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/107-i2pcontrol-conformance-and-managed-tls-corrective-pass.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"

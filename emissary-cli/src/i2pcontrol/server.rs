@@ -1464,16 +1464,17 @@ mod tests {
             &state,
             &request(
                 rpc::methods::AUTHENTICATE,
-                serde_json::json!({"API": 2, "Password": "testpass"}),
+                serde_json::json!({"API": 1, "Password": "testpass"}),
                 Some(RequestId::Number(7)),
             ),
         )
         .await;
 
-        assert_eq!(response["result"]["API"], 2);
+        assert_eq!(response["result"]["API"], 1);
         assert!(response["result"]["API"].is_number());
         assert!(response["result"]["Token"].is_string());
         assert!(!response["result"]["Token"].as_str().unwrap().is_empty());
+        assert_eq!(state.token_service().count(), 1);
     }
 
     #[tokio::test]
@@ -1484,7 +1485,7 @@ mod tests {
             &state,
             &request(
                 rpc::methods::AUTHENTICATE,
-                serde_json::json!({"API": 2}),
+                serde_json::json!({"API": 1}),
                 Some(RequestId::Number(1)),
             ),
         )
@@ -1530,7 +1531,7 @@ mod tests {
             &state,
             &request(
                 rpc::methods::AUTHENTICATE,
-                serde_json::json!({"API": 2, "Password": "wrong-secret"}),
+                serde_json::json!({"API": 1, "Password": "wrong-secret"}),
                 Some(RequestId::Number(4)),
             ),
         )
@@ -1543,12 +1544,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn unsupported_api_version_does_not_issue_a_token() {
+        let state = I2pControlState::new_test("testpass".to_string());
+        let response = handle_authenticate(
+            &state,
+            &request(
+                rpc::methods::AUTHENTICATE,
+                serde_json::json!({"API": 2, "Password": "testpass"}),
+                Some(RequestId::Number(5)),
+            ),
+        )
+        .await;
+
+        assert_eq!(response["error"]["code"], rpc::error_codes::UNSUPPORTED_API_VERSION);
+        assert_eq!(state.token_service().count(), 0);
+    }
+
+    #[tokio::test]
     async fn failed_authentication_is_bounded_and_throttled() {
         let state = I2pControlState::new_test("testpass".to_string());
         let source = Some("127.0.0.1:7650".parse().unwrap());
         let wrong = request(
             rpc::methods::AUTHENTICATE,
-            serde_json::json!({"API": 2, "Password": "wrong"}),
+            serde_json::json!({"API": 1, "Password": "wrong"}),
             Some(RequestId::Number(1)),
         );
 
@@ -1569,12 +1587,12 @@ mod tests {
         let source = Some("127.0.0.1:7651".parse().unwrap());
         let wrong = request(
             rpc::methods::AUTHENTICATE,
-            serde_json::json!({"API": 2, "Password": "wrong"}),
+            serde_json::json!({"API": 1, "Password": "wrong"}),
             Some(RequestId::Number(1)),
         );
         let correct = request(
             rpc::methods::AUTHENTICATE,
-            serde_json::json!({"API": 2, "Password": "testpass"}),
+            serde_json::json!({"API": 1, "Password": "testpass"}),
             Some(RequestId::Number(2)),
         );
         let _ = handle_authenticate_with_source(&state, &wrong, source).await;
@@ -1588,12 +1606,12 @@ mod tests {
         let state = I2pControlState::new_test("testpass".to_string());
         let wrong = request(
             rpc::methods::AUTHENTICATE,
-            serde_json::json!({"API": 2, "Password": "wrong"}),
+            serde_json::json!({"API": 1, "Password": "wrong"}),
             Some(RequestId::Number(1)),
         );
         let correct = request(
             rpc::methods::AUTHENTICATE,
-            serde_json::json!({"API": 2, "Password": "testpass"}),
+            serde_json::json!({"API": 1, "Password": "testpass"}),
             Some(RequestId::Number(2)),
         );
         let first_port = Some("127.0.0.1:10001".parse().unwrap());
@@ -1697,7 +1715,7 @@ mod tests {
             State(Arc::clone(&state)),
             HeaderMap::new(),
             Extension("127.0.0.1:7650".parse().unwrap()),
-            r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Password":"testpass"}}"#
+            r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":1,"Password":"testpass"}}"#
                 .to_string(),
         )
         .await;
@@ -1708,7 +1726,7 @@ mod tests {
             State(Arc::clone(&state)),
             HeaderMap::new(),
             Extension("127.0.0.1:7650".parse().unwrap()),
-            r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Password":"wrong"}}"#
+            r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":1,"Password":"wrong"}}"#
                 .to_string(),
         )
         .await;

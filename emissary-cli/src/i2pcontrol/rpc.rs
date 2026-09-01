@@ -490,7 +490,7 @@ pub mod address_book_requests {
 /// Authenticate request parameters.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuthenticateParams {
-    /// API version. Must be 1 or 2.
+    /// API version. Emissary supports I2PControl API version 1.
     #[serde(rename = "API")]
     pub api: Option<i32>,
 
@@ -1867,7 +1867,7 @@ mod tests {
 
     #[test]
     fn parse_valid_request() {
-        let body = r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":2,"Password":"secret"},"id":1}"#;
+        let body = r#"{"jsonrpc":"2.0","method":"Authenticate","params":{"API":1,"Password":"secret"},"id":1}"#;
         let req = parse_request(body).unwrap();
         assert_eq!(req.jsonrpc, "2.0");
         assert_eq!(req.method, "Authenticate");
@@ -2234,7 +2234,7 @@ mod tests {
     fn serialize_success_response() {
         let resp = JsonRpcSuccess::new(
             RequestId::Number(1),
-            serde_json::json!({"Token": "abc", "API": 2}),
+            serde_json::json!({"Token": "abc", "API": 1}),
         );
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"jsonrpc\":\"2.0\""));

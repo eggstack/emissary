@@ -7,7 +7,7 @@ pub fn valid_authenticate_request(id: Value) -> Value {
         "jsonrpc": "2.0",
         "method": "Authenticate",
         "params": {
-            "API": 2,
+            "API": 1,
             "Password": "test-password"
         },
         "id": id
@@ -95,7 +95,7 @@ pub fn string_id() -> Value {
         "jsonrpc": "2.0",
         "method": "Authenticate",
         "params": {
-            "API": 2,
+            "API": 1,
             "Password": "test-password"
         },
         "id": "abc-123"
@@ -123,7 +123,7 @@ pub fn wrong_username() -> Value {
         "jsonrpc": "2.0",
         "method": "Authenticate",
         "params": {
-            "API": 2,
+            "API": 1,
             "Username": "legacy-client",
             "Password": "test-password"
         },
@@ -138,7 +138,7 @@ pub fn wrong_password() -> Value {
         "jsonrpc": "2.0",
         "method": "Authenticate",
         "params": {
-            "API": 2,
+            "API": 1,
             "Password": "wrong-password"
         },
         "id": 1
@@ -152,7 +152,7 @@ pub fn missing_auth_fields() -> Value {
         "jsonrpc": "2.0",
         "method": "Authenticate",
         "params": {
-            "API": 2
+            "API": 1
         },
         "id": 1
     })

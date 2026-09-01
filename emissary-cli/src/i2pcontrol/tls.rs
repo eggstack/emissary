@@ -18,6 +18,7 @@
 
 use std::{
     fs,
+    io::Write,
     io::BufReader,
     path::{Path, PathBuf},
     sync::Arc,
@@ -31,6 +32,9 @@ use tokio_rustls::rustls::{
     ServerConfig,
 };
 use tracing;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 use super::errors::I2pControlError;
 
@@ -112,8 +116,12 @@ pub fn load_or_generate_managed_tls(
     let cert_path = cert_dir.join(CERT_FILE);
     let key_path = cert_dir.join(KEY_FILE);
 
+    ensure_managed_directory(&cert_dir)?;
+    let cert_exists = validate_managed_file(&cert_path, "certificate")?;
+    let key_exists = validate_managed_file(&key_path, "private key")?;
+
     // Try to load existing certificate material
-    if cert_path.exists() && key_path.exists() {
+    if cert_exists && key_exists {
         match load_certs(&cert_path).and_then(|certs| load_key(&key_path).map(|key| (certs, key))) {
             Ok(result) => {
                 tracing::info!(
@@ -142,14 +150,18 @@ fn generate_managed_tls(
     cert_path: &Path,
     key_path: &Path,
 ) -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>), I2pControlError> {
-    // Create directory if it doesn't exist
-    fs::create_dir_all(cert_dir)
-        .map_err(|e| I2pControlError::Tls(format!("Failed to create cert directory: {e}")))?;
+    ensure_managed_directory(cert_dir)?;
+    validate_managed_file(cert_path, "certificate")?;
+    validate_managed_file(key_path, "private key")?;
 
     let key_pair = KeyPair::generate()
         .map_err(|e| I2pControlError::Tls(format!("Failed to generate key pair: {e}")))?;
 
-    let mut params = CertificateParams::new(vec!["localhost".to_string()])
+    let mut params = CertificateParams::new(vec![
+        "localhost".to_string(),
+        "127.0.0.1".to_string(),
+        "::1".to_string(),
+    ])
         .map_err(|e| I2pControlError::Tls(format!("Failed to create cert params: {e}")))?;
 
     params.distinguished_name.push(rcgen::DnType::CommonName, "Emissary I2PControl");
@@ -162,13 +174,11 @@ fn generate_managed_tls(
     let key_der = PrivateKeyDer::try_from(key_pair.serialize_der())
         .map_err(|e| I2pControlError::Tls(format!("Failed to serialize key: {e}")))?;
 
-    // Write certificate as DER
-    fs::write(cert_path, cert.der())
-        .map_err(|e| I2pControlError::Tls(format!("Failed to write certificate: {e}")))?;
-
-    // Write private key as DER
-    fs::write(key_path, key_pair.serialize_der())
-        .map_err(|e| I2pControlError::Tls(format!("Failed to write private key: {e}")))?;
+    // Publish each file through a same-directory temporary file. Renaming a temporary file
+    // replaces a regular target without following a target symlink, while the explicit checks
+    // reject pre-existing links and special files before any managed material is read or changed.
+    write_managed_file(cert_path, cert.der(), "certificate")?;
+    write_managed_file(key_path, &key_pair.serialize_der(), "private key")?;
 
     tracing::info!(
         target: LOG_TARGET,
@@ -177,6 +187,118 @@ fn generate_managed_tls(
     );
 
     Ok((vec![cert_der], key_der))
+}
+
+fn ensure_managed_directory(path: &Path) -> Result<(), I2pControlError> {
+    let existed = match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            if metadata.file_type().is_symlink() || !metadata.is_dir() {
+                return Err(I2pControlError::Tls(
+                    "Managed TLS certificate directory is not a regular directory".into(),
+                ));
+            }
+            true
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+        Err(error) => {
+            return Err(I2pControlError::Tls(format!(
+                "Failed to inspect managed TLS certificate directory: {error}"
+            )))
+        }
+    };
+
+    if !existed {
+        fs::create_dir_all(path).map_err(|e| {
+            I2pControlError::Tls(format!("Failed to create cert directory: {e}"))
+        })?;
+        let metadata = fs::symlink_metadata(path).map_err(|e| {
+            I2pControlError::Tls(format!("Failed to inspect cert directory: {e}"))
+        })?;
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return Err(I2pControlError::Tls(
+                "Managed TLS certificate directory is not a regular directory".into(),
+            ));
+        }
+        #[cfg(unix)]
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(|e| {
+            I2pControlError::Tls(format!("Failed to restrict cert directory permissions: {e}"))
+        })?;
+    }
+    Ok(())
+}
+
+fn validate_managed_file(path: &Path, label: &str) -> Result<bool, I2pControlError> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            if metadata.file_type().is_symlink() {
+                return Err(I2pControlError::Tls(format!(
+                    "Managed TLS {label} path is a symlink"
+                )));
+            }
+            if !metadata.is_file() {
+                return Err(I2pControlError::Tls(format!(
+                    "Managed TLS {label} path is not a regular file"
+                )));
+            }
+            Ok(true)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(I2pControlError::Tls(format!(
+            "Failed to inspect managed TLS {label}: {error}"
+        ))),
+    }
+}
+
+fn write_managed_file(path: &Path, bytes: &[u8], label: &str) -> Result<(), I2pControlError> {
+    let _ = validate_managed_file(path, label)?;
+    let temporary = path.with_extension("tmp");
+    if let Ok(metadata) = fs::symlink_metadata(&temporary) {
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(I2pControlError::Tls(format!(
+                "Managed TLS {label} temporary path is not a regular file"
+            )));
+        }
+        fs::remove_file(&temporary).map_err(|e| {
+            I2pControlError::Tls(format!("Failed to replace managed TLS {label}: {e}"))
+        })?;
+    }
+
+    let mut file = fs::OpenOptions::new();
+    file.write(true).create_new(true);
+    let mut file = file.open(&temporary).map_err(|e| {
+        I2pControlError::Tls(format!("Failed to create managed TLS {label}: {e}"))
+    })?;
+    file.write_all(bytes).map_err(|e| {
+        let _ = fs::remove_file(&temporary);
+        I2pControlError::Tls(format!("Failed to write managed TLS {label}: {e}"))
+    })?;
+    #[cfg(unix)]
+    if label == "private key" {
+        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600)).map_err(|e| {
+            let _ = fs::remove_file(&temporary);
+            I2pControlError::Tls(format!("Failed to restrict managed TLS private key: {e}"))
+        })?;
+    }
+    file.sync_all().map_err(|e| {
+        let _ = fs::remove_file(&temporary);
+        I2pControlError::Tls(format!("Failed to sync managed TLS {label}: {e}"))
+    })?;
+    if let Err(error) = validate_managed_file(path, label) {
+        let _ = fs::remove_file(&temporary);
+        return Err(error);
+    }
+    #[cfg(not(unix))]
+    if fs::symlink_metadata(path).is_ok() {
+        fs::remove_file(path).map_err(|e| {
+            let _ = fs::remove_file(&temporary);
+            I2pControlError::Tls(format!("Failed to replace managed TLS {label}: {e}"))
+        })?;
+    }
+    fs::rename(&temporary, path).map_err(|e| {
+        let _ = fs::remove_file(&temporary);
+        I2pControlError::Tls(format!("Failed to publish managed TLS {label}: {e}"))
+    })?;
+    Ok(())
 }
 
 /// Load certificates from a file (tries DER first, then PEM).
@@ -273,5 +395,93 @@ mod tests {
             private_key: None,
         };
         assert!(c2.is_explicit());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn managed_private_key_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        load_or_generate_managed_tls(dir.path()).unwrap();
+        let mode = fs::metadata(dir.path().join(MANAGED_CERT_DIR).join(KEY_FILE))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o600);
+        let directory_mode = fs::metadata(dir.path().join(MANAGED_CERT_DIR))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(directory_mode, 0o700);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn managed_symlinks_fail_closed_without_touching_targets() {
+        use std::os::unix::fs::symlink;
+
+        for (file, target_name) in [(KEY_FILE, "outside-key"), (CERT_FILE, "outside-cert")] {
+            let dir = tempdir().unwrap();
+            let cert_dir = dir.path().join(MANAGED_CERT_DIR);
+            fs::create_dir_all(&cert_dir).unwrap();
+            let target = dir.path().join(target_name);
+            fs::write(&target, b"operator material").unwrap();
+            symlink(&target, cert_dir.join(file)).unwrap();
+
+            let error = load_or_generate_managed_tls(dir.path()).unwrap_err();
+            assert!(error.to_string().contains("symlink"));
+            assert_eq!(fs::read(target).unwrap(), b"operator material");
+        }
+    }
+
+    #[tokio::test]
+    async fn managed_certificate_validates_all_loopback_server_names() {
+        use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+        use tokio::net::TcpListener;
+        use tokio_rustls::rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
+        use tokio_rustls::{TlsAcceptor, TlsConnector};
+
+        let dir = tempdir().unwrap();
+        let (certs, key) = load_or_generate_managed_tls(dir.path()).unwrap();
+        let server_config = Arc::new(
+            ServerConfig::builder_with_provider(Arc::new(ring::default_provider()))
+                .with_safe_default_protocol_versions()
+                .unwrap()
+                .with_no_client_auth()
+                .with_single_cert(certs.clone(), key)
+                .unwrap(),
+        );
+        let mut roots = RootCertStore::empty();
+        roots.add(certs[0].clone()).unwrap();
+        let client_config = Arc::new(
+            ClientConfig::builder_with_provider(Arc::new(ring::default_provider()))
+                .with_safe_default_protocol_versions()
+                .unwrap()
+                .with_root_certificates(roots)
+                .with_no_client_auth(),
+        );
+
+        for server_name in [
+            ServerName::try_from("localhost").unwrap(),
+            ServerName::IpAddress(IpAddr::V4(Ipv4Addr::LOCALHOST).into()),
+            ServerName::IpAddress(IpAddr::V6(Ipv6Addr::LOCALHOST).into()),
+        ] {
+            let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let acceptor = TlsAcceptor::from(Arc::clone(&server_config));
+            let server = tokio::spawn(async move {
+                let (stream, _) = listener.accept().await.unwrap();
+                acceptor.accept(stream).await.unwrap();
+            });
+            let connector = TlsConnector::from(Arc::clone(&client_config));
+            connector
+                .connect(server_name, tokio::net::TcpStream::connect(address).await.unwrap())
+                .await
+                .unwrap();
+            server.await.unwrap();
+        }
     }
 }

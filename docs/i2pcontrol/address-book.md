@@ -27,8 +27,10 @@ semantics, with `theme` retained as inert metadata.
 
 When I2PControl is enabled, successful entry mutations must be committed by one
 runtime control owner and immediately visible to normal destination lookup.
-Runtime precedence remains private, local, router, then published. A hostname
-collision across books is rejected rather than silently changing precedence.
+Runtime precedence remains private, local, router, then published. The same
+valid hostname may intentionally appear in multiple independent books; normal
+lookup deterministically uses the first matching book in that order, while
+typed list and lookup operations retain each book's own entry.
 When enabled, the runtime owner is authoritative for both Base32 and Base64
 lookup; a missing owner entry never falls through to a stale legacy destination
 file. Published entries always contain validated full Base64 destinations.
@@ -182,7 +184,7 @@ complete bounded state with:
 - last-known-good rollback copy;
 - serialized mutation ownership;
 - current/backup recovery;
-- deterministic collision handling.
+  - deterministic cross-book shadowing and precedence handling.
 
 Former I2PControl administrative generations may be one-time migration input
 only when no runtime control authority exists. They must never remain a second

@@ -147,7 +147,7 @@ fn token_service_clear() {
 #[test]
 fn api_version_valid() {
     assert!(emissary_cli::i2pcontrol::auth::validate_api_version(1));
-    assert!(emissary_cli::i2pcontrol::auth::validate_api_version(2));
+    assert!(!emissary_cli::i2pcontrol::auth::validate_api_version(2));
     assert!(!emissary_cli::i2pcontrol::auth::validate_api_version(0));
     assert!(!emissary_cli::i2pcontrol::auth::validate_api_version(3));
 }
@@ -300,7 +300,7 @@ fn tls_recovers_from_invalid_material() {
 fn jsonrpc_success_response_serializes() {
     let resp = emissary_cli::i2pcontrol::rpc::JsonRpcSuccess::new(
         emissary_cli::i2pcontrol::rpc::RequestId::Number(1),
-        json!({"Token": "abc", "API": 2}),
+        json!({"Token": "abc", "API": 1}),
     );
     let json = serde_json::to_string(&resp).unwrap();
     assert!(json.contains("\"jsonrpc\":\"2.0\""));

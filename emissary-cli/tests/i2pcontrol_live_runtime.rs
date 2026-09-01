@@ -204,7 +204,7 @@ async fn authenticate(client: &reqwest::Client, endpoint: &str, id: u64, passwor
         endpoint,
         id,
         "Authenticate",
-        json!({"API": 2, "Password": password}),
+        json!({"API": 1, "Password": password}),
     )
     .await;
     result(&response)
@@ -276,7 +276,7 @@ async fn live_runtime_interoperability() {
                     "jsonrpc": "2.0",
                     "id": 1,
                     "method": "Authenticate",
-                    "params": {"API": 2, "Password": password.clone()}
+                    "params": {"API": 1, "Password": password.clone()}
                 })
                 .to_string(),
             )
@@ -297,7 +297,7 @@ async fn live_runtime_interoperability() {
         &endpoint,
         2,
         "Authenticate",
-        json!({"API": 2, "Password": "wrong"}),
+        json!({"API": 1, "Password": "wrong"}),
     )
     .await;
     assert_eq!(wrong["error"]["code"], json!(-32001));
@@ -801,7 +801,7 @@ async fn live_runtime_interoperability() {
                     "jsonrpc": "2.0",
                     "id": 26,
                     "method": "Authenticate",
-                    "params": {"API": 2, "Password": password.clone()}
+                    "params": {"API": 1, "Password": password.clone()}
                 })
                 .to_string(),
             )

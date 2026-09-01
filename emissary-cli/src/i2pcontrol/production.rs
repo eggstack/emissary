@@ -1763,10 +1763,8 @@ mod tests {
             },
         )
         .await;
-        ProductionAddressBookControl::new(control.clone(), legacy_dir)
-            .load()
-            .await
-            .unwrap();
+        let adapter = ProductionAddressBookControl::new(control.clone(), legacy_dir);
+        adapter.load().await.unwrap();
         assert_eq!(
             control.runtime_list(RuntimeAddressBookType::Private).await.unwrap().len(),
             1
@@ -1824,17 +1822,17 @@ mod tests {
             },
         )
         .await;
-        ProductionAddressBookControl::new(control.clone(), legacy_dir)
-            .load()
-            .await
-            .unwrap();
+        let adapter = ProductionAddressBookControl::new(control.clone(), legacy_dir);
+        adapter.load().await.unwrap();
         assert!(control.runtime_configuration().await.unwrap().is_empty());
     }
 
     #[tokio::test]
-    async fn legacy_address_book_migration_rejects_hostname_collisions() {
+    async fn legacy_address_book_migration_preserves_cross_book_shadowing() {
         let base = tempfile::tempdir().unwrap().keep();
         let legacy_dir = base.join("addressbooks");
+        let published_destination = valid_destination(3);
+        let private_destination = valid_destination(2);
         tokio::fs::create_dir_all(base.join("addressbook")).await.unwrap();
         tokio::fs::write(
             base.join("addressbook/addresses"),
@@ -1845,7 +1843,7 @@ mod tests {
         tokio::fs::create_dir_all(base.join("addressbook/destinations")).await.unwrap();
         tokio::fs::write(
             base.join("addressbook/destinations/collision.i2p.txt"),
-            valid_destination(3),
+            &published_destination,
         )
         .await
         .unwrap();
@@ -1854,7 +1852,7 @@ mod tests {
         legacy
             .add(
                 AdministrativeAddressBookType::Private,
-                AddressBookEntry::new("collision.i2p", valid_destination(2)),
+                AddressBookEntry::new("collision.i2p", private_destination.clone()),
             )
             .await
             .unwrap();
@@ -1867,12 +1865,53 @@ mod tests {
             },
         )
         .await;
-        let error = ProductionAddressBookControl::new(control.clone(), legacy_dir)
-            .load()
-            .await
-            .unwrap_err();
-        assert!(error.contains("collision"));
-        assert!(control.runtime_list(RuntimeAddressBookType::Private).await.unwrap().is_empty());
+        let adapter = ProductionAddressBookControl::new(control.clone(), legacy_dir);
+        adapter.load().await.unwrap();
+        assert_eq!(
+            control
+                .runtime_lookup(RuntimeAddressBookType::Private, "collision.i2p")
+                .await
+                .unwrap()
+                .unwrap()
+                .destination,
+            private_destination
+        );
+        assert_eq!(
+            control
+                .runtime_lookup(RuntimeAddressBookType::Published, "collision.i2p")
+                .await
+                .unwrap()
+                .unwrap()
+                .destination,
+            published_destination
+        );
+        assert_eq!(
+            control.owner.resolve_base64("collision.i2p"),
+            Some(private_destination)
+        );
+        let selectors = crate::i2pcontrol::address_book::resolve_address_book_selectors(
+            &adapter,
+            &[
+                crate::i2pcontrol::rpc::router_info_keys::ADDRESS_BOOK_PRIVATE,
+                crate::i2pcontrol::rpc::router_info_keys::ADDRESS_BOOK_PUBLISHED,
+            ],
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            selectors[crate::i2pcontrol::rpc::router_info_keys::ADDRESS_BOOK_PRIVATE]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            selectors[crate::i2pcontrol::rpc::router_info_keys::ADDRESS_BOOK_PUBLISHED]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[tokio::test]

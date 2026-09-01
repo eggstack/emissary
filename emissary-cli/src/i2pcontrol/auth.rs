@@ -227,9 +227,9 @@ fn generate_token() -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect::<String>()
 }
 
-/// Validate the API version. Accepts 1 or 2.
+/// Validate the API version. Emissary implements I2PControl API version 1.
 pub fn validate_api_version(version: i32) -> bool {
-    version == 1 || version == 2
+    version == 1
 }
 
 /// Compare passwords with the reviewed `subtle` primitive.
@@ -303,12 +303,12 @@ mod tests {
     #[test]
     fn validate_api_version_valid() {
         assert!(validate_api_version(1));
-        assert!(validate_api_version(2));
     }
 
     #[test]
     fn validate_api_version_invalid() {
         assert!(!validate_api_version(0));
+        assert!(!validate_api_version(2));
         assert!(!validate_api_version(3));
         assert!(!validate_api_version(-1));
     }

@@ -403,13 +403,9 @@ pub(crate) fn validate_runtime_snapshot(state: &RuntimeAddressBookSnapshot) -> R
     if total_entries > MAX_LEGACY_DESTINATION_ENTRIES {
         return Err("address book state exceeds its entry limit".to_string());
     }
-    let mut hostnames = std::collections::BTreeSet::new();
     for book in books {
         for (hostname, entry) in book {
             validate_runtime_entry(hostname, entry)?;
-            if !hostnames.insert(hostname) {
-                return Err("address book state contains a hostname collision".to_string());
-            }
         }
     }
     Ok(())
@@ -426,7 +422,6 @@ fn validate_loadable_snapshot(state: &RuntimeAddressBookSnapshot) -> Result<(), 
     if total_entries > MAX_LEGACY_DESTINATION_ENTRIES {
         return Err("address book state exceeds its entry limit".to_string());
     }
-    let mut hostnames = std::collections::BTreeSet::new();
     for (book, published) in books {
         for (hostname, entry) in book {
             if published && !is_valid_full_destination(&entry.destination) {
@@ -441,9 +436,6 @@ fn validate_loadable_snapshot(state: &RuntimeAddressBookSnapshot) -> Result<(), 
                 }
             } else {
                 validate_runtime_entry(hostname, entry)?;
-            }
-            if !hostnames.insert(hostname) {
-                return Err("address book state contains a hostname collision".to_string());
             }
         }
     }
@@ -1335,18 +1327,6 @@ impl RuntimeAddressBookHandle {
                 if state.book(book_type).contains_key(&entry.hostname) {
                     return Err("address book entry already exists".to_string());
                 }
-                let occupied_elsewhere = [
-                    RuntimeAddressBookType::Private,
-                    RuntimeAddressBookType::Local,
-                    RuntimeAddressBookType::Router,
-                    RuntimeAddressBookType::Published,
-                ]
-                .into_iter()
-                .filter(|book| *book != book_type)
-                .any(|book| state.book(book).contains_key(&entry.hostname));
-                if occupied_elsewhere {
-                    return Err("address book hostname collision".to_string());
-                }
                 state.book_mut(book_type).insert(entry.hostname.clone(), entry);
                 Ok(())
             })
@@ -1706,5 +1686,117 @@ mod tests {
             .await
             .is_err());
         assert_eq!(handle.runtime_configuration().await.unwrap(), initial);
+    }
+
+    #[tokio::test]
+    async fn cross_book_shadowing_is_typed_persistent_and_precedence_ordered() {
+        use emissary_core::crypto::{base64_encode, SigningPrivateKey};
+        use emissary_util::runtime::tokio::Runtime as TokioRuntime;
+
+        fn destination(seed: u8) -> String {
+            let key = SigningPrivateKey::from_bytes(&[seed; 32]).unwrap();
+            base64_encode(
+                emissary_core::primitives::Destination::new::<TokioRuntime>(key.public())
+                    .serialize(),
+            )
+        }
+
+        let base = tempfile::tempdir().unwrap().keep();
+        let (_manager, handle) = new_controlled_manager(
+            base.clone(),
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        let private_destination = destination(21);
+        let local_destination = destination(22);
+        let mut private = BTreeMap::new();
+        private.insert(
+            "shadow.i2p".to_string(),
+            RuntimeAddressBookEntry {
+                hostname: "shadow.i2p".to_string(),
+                destination: private_destination.clone(),
+            },
+        );
+        let mut local = BTreeMap::new();
+        local.insert(
+            "shadow.i2p".to_string(),
+            RuntimeAddressBookEntry {
+                hostname: "shadow.i2p".to_string(),
+                destination: local_destination.clone(),
+            },
+        );
+        let root = handle.owner.path.clone();
+        tokio::fs::write(root.join("private.json"), serde_json::to_vec(&private).unwrap())
+            .await
+            .unwrap();
+        tokio::fs::write(root.join("local.json"), serde_json::to_vec(&local).unwrap())
+            .await
+            .unwrap();
+        handle
+            .runtime_set_configuration(config(&[
+                ("private_addressbook", "private.json"),
+                ("local_addressbook", "local.json"),
+            ]))
+            .await
+            .unwrap();
+
+        assert_eq!(handle.runtime_list(RuntimeAddressBookType::Private).await.unwrap().len(), 1);
+        assert_eq!(handle.runtime_list(RuntimeAddressBookType::Local).await.unwrap().len(), 1);
+        assert_eq!(
+            handle
+                .runtime_lookup(RuntimeAddressBookType::Private, "shadow.i2p")
+                .await
+                .unwrap()
+                .unwrap()
+                .destination,
+            private_destination
+        );
+        assert_eq!(
+            handle
+                .runtime_lookup(RuntimeAddressBookType::Local, "shadow.i2p")
+                .await
+                .unwrap()
+                .unwrap()
+                .destination,
+            local_destination
+        );
+        assert_eq!(handle.owner.resolve_base64("shadow.i2p"), Some(private_destination));
+
+        drop(handle);
+        let (_manager, restarted) = new_controlled_manager(
+            base,
+            AddressBookConfig {
+                default: None,
+                subscriptions: None,
+            },
+        )
+        .await;
+        assert_eq!(restarted.runtime_list(RuntimeAddressBookType::Private).await.unwrap().len(), 1);
+        assert_eq!(restarted.runtime_list(RuntimeAddressBookType::Local).await.unwrap().len(), 1);
+        let private_after_restart = restarted
+            .runtime_lookup(RuntimeAddressBookType::Private, "shadow.i2p")
+            .await
+            .unwrap()
+            .unwrap()
+            .destination;
+        assert_eq!(
+            restarted.owner.resolve_base64("shadow.i2p"),
+            Some(private_after_restart)
+        );
+        let local_after_restart = restarted
+            .runtime_lookup(RuntimeAddressBookType::Local, "shadow.i2p")
+            .await
+            .unwrap()
+            .unwrap()
+            .destination;
+        assert!(restarted
+            .runtime_delete(RuntimeAddressBookType::Private, "shadow.i2p")
+            .await
+            .unwrap());
+        assert_eq!(restarted.owner.resolve_base64("shadow.i2p"), Some(local_after_restart));
+        assert_eq!(restarted.runtime_list(RuntimeAddressBookType::Local).await.unwrap().len(), 1);
     }
 }

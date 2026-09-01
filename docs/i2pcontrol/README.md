@@ -1,6 +1,6 @@
 # I2PControl for Emissary
 
-Status: partial Proposal 170 support; M095-M096, M098-M103 closed; M097 and M104 closed as blocked; residual option blocker remains
+Status: partial Proposal 170 support; M095-M096, M098-M103, and M107 closed; M097 and M104 closed as blocked; residual option blocker remains
 
 Proposal 170 remains **Open**. This documentation is pinned to the revision
 created and last updated on `2026-05-20`.
@@ -114,20 +114,27 @@ I2PControl is served over HTTPS.
    `<base_path>/i2pcontrol-certs/`.
 3. Managed material is generated only when I2PControl starts, is written
    atomically, remains stable across restart, and is regenerated when invalid.
+   The generated certificate covers `localhost`, `127.0.0.1`, and `::1`; on
+   Unix, the managed private key is owner-only (`0600`) and the managed
+   directory is owner-only (`0700`) when created. Managed symlinks and other
+   non-regular paths fail closed. Explicit certificate and key paths retain
+   their operator-owned behavior.
 
 There is no plaintext HTTP fallback.
 
 ## Authentication
 
-`Authenticate` accepts `API` and `Password`, returns an opaque string `Token`
-and numeric `API`, and protected requests put the token in `params.Token`.
+`Authenticate` accepts API version `1` in `API` and a `Password`, returns an
+opaque string `Token` and numeric `API`, and protected requests put the token
+in `params.Token`. Rejected API version `2` returns `-32006` and does not issue
+a token.
 
 ```json
 {
   "jsonrpc": "2.0",
   "method": "Authenticate",
   "params": {
-    "API": 2,
+    "API": 1,
     "Password": "your-password"
   },
   "id": 1
@@ -142,7 +149,7 @@ Success:
   "id": 1,
   "result": {
     "Token": "hex-encoded-token",
-    "API": 2
+    "API": 1
   }
 }
 ```

@@ -42,7 +42,7 @@ fn fixture_authenticate_request_structure() {
         "jsonrpc": "2.0",
         "method": "Authenticate",
         "params": {
-            "API": 2,
+            "API": 1,
             "Password": "fixture-password-REDACTED"
         },
         "id": 1
@@ -51,7 +51,7 @@ fn fixture_authenticate_request_structure() {
     assert_eq!(parsed.method, "Authenticate");
     assert!(parsed.params.is_some());
     let params = parsed.params.unwrap();
-    assert_eq!(params.get("API"), Some(&json!(2)));
+    assert_eq!(params.get("API"), Some(&json!(1)));
     assert!(!params.contains_key("Username"));
     assert!(params.get("Password").is_some());
 }
@@ -63,7 +63,7 @@ fn fixture_authenticate_success_envelope() {
         "id": 1,
         "result": {
             "Token": "fixture-token-REDACTED",
-            "API": 2
+            "API": 1
         }
     });
     // Envelope must have exactly jsonrpc, id, result — no extra keys

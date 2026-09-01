@@ -20,9 +20,20 @@ expected = "byte-identical to baseline"
 baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
 [allowed_production_paths]
+# The M062 test consumes this list as an exact-path allowlist in addition to its
+# named production-path helpers. The six M109-M114 entries below are planning
+# documents only; they do not authorize any production path, dependency, or
+# lockfile change. Future execution still requires registry readiness and the
+# exact production-path authority stated by each plan.
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",
+  "plans/implementation/i2pcontrol-proposal-170/109-startup-managed-tunnel-action-semantics-corrective.md",
+  "plans/implementation/i2pcontrol-proposal-170/110-shared-client-session-and-destination-key-ownership-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/111-sam-session-wire-option-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/112-client-proxy-and-session-lifecycle-residual-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/113-server-presentation-address-routing-and-leaseset-residual-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/114-full-proposal-170-live-interoperability-and-final-reclosure.md",
 ]
 
 [prohibited_production_paths]

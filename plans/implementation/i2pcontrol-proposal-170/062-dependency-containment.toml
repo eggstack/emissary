@@ -21,10 +21,12 @@ baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its
-# named production-path helpers. The eight M109-M116 entries below are planning
+# named production-path helpers. The ten M109-M118 entries below are planning
 # documents only; they do not authorize any production path, dependency, or
 # lockfile change. Future execution still requires registry readiness and the
-# exact production-path authority stated by each plan.
+# exact production-path authority stated by each plan. ADR-0005 authorizes an
+# I2PControl-only exact-revision Yosemite fork strategy, but M117 must amend
+# direct-dependency/lockfile evidence when that dependency actually lands.
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",
@@ -36,6 +38,8 @@ root_manifests = [
   "plans/implementation/i2pcontrol-proposal-170/114-full-proposal-170-live-interoperability-and-final-reclosure.md",
   "plans/implementation/i2pcontrol-proposal-170/115-m109-runtime-disable-and-lifecycle-truthfulness-corrective-pass.md",
   "plans/implementation/i2pcontrol-proposal-170/116-m110-shared-session-and-newdest-corrective-pass.md",
+  "plans/implementation/i2pcontrol-proposal-170/117-internal-yosemite-fork-pin-and-i2pcontrol-adapter-integration.md",
+  "plans/implementation/i2pcontrol-proposal-170/118-neutral-sam-tunnel-pool-variance-backup-capability.md",
 ]
 
 [prohibited_production_paths]

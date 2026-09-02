@@ -11,11 +11,11 @@ use std::{
 
 use parking_lot::Mutex;
 use tokio::sync::{broadcast, mpsc, oneshot, Notify};
-use yosemite::{style, DatagramOptions, DestinationKind, Session, SessionOptions};
+use yosemite_i2pcontrol::{style, DatagramOptions, DestinationKind, Session, SessionOptions};
 
 use super::super::{options::validate_common_options, BackendError, BackendResult};
 use crate::i2pcontrol::client_secret_store::ClientDestinationStore;
-use crate::i2pcontrol::domain::tunnel::{TunnelDefinition, TunnelType};
+use crate::i2pcontrol::domain::tunnel::{TunnelDefinition, TunnelOptions, TunnelType};
 
 type StreamSession = Arc<Mutex<Session<style::Stream>>>;
 
@@ -558,7 +558,44 @@ pub fn build_session_options(
     }
     options.lease_set_enc_type = enc_type;
 
+    apply_session_wire_options(&mut options, &definition.options, definition.tunnel_type)?;
+
     Ok(options)
+}
+
+/// Apply the generic Yosemite session-wire settings that are already modeled
+/// by the I2PControl domain. The common validator currently keeps these
+/// Proposal cells fail-closed until M111/M118 provide their complete semantic
+/// evidence; keeping this adapter ready here prevents a second SAM command
+/// path when that gate closes.
+pub(crate) fn apply_session_wire_options(
+    options: &mut SessionOptions,
+    tunnel_options: &TunnelOptions,
+    tunnel_type: TunnelType,
+) -> BackendResult<()> {
+    if let Some(value) = tunnel_options.tunnel_variance {
+        options.inbound_len_variance = value as isize;
+        options.outbound_len_variance = value as isize;
+    }
+    if let Some(value) = tunnel_options.tunnel_backup_quantity {
+        options.inbound_backup_quantity = value as usize;
+        options.outbound_backup_quantity = value as usize;
+    }
+    if let Some(value) = &tunnel_options.sig_type {
+        options.signature_type = value.parse::<u16>().map_err(|_| BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "SigType".to_owned(),
+        })?;
+    }
+    for (key, value) in &tunnel_options.custom_options {
+        options.add_session_option(key.clone(), value.clone()).map_err(|_| {
+            BackendError::UnsupportedOption {
+                tunnel_type,
+                option: "CustomOptions".to_owned(),
+            }
+        })?;
+    }
+    Ok(())
 }
 
 fn validate_encryption_type(tunnel_type: TunnelType, value: &str) -> BackendResult<()> {
@@ -610,6 +647,10 @@ mod tests {
         StartIntent, TunnelName, TunnelOptions, TunnelOwnership, TunnelRuntimeState,
     };
     use std::collections::BTreeMap;
+    use tokio::{
+        io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+        sync::oneshot,
+    };
 
     fn definition() -> TunnelDefinition {
         TunnelDefinition {
@@ -666,6 +707,94 @@ mod tests {
     }
 
     #[test]
+    fn generic_session_wire_adapter_maps_closed_yosemite_fields_without_fallback() {
+        let mut definition = definition();
+        definition.options.tunnel_variance = Some(-2);
+        definition.options.tunnel_backup_quantity = Some(3);
+        definition.options.sig_type = Some("11".to_owned());
+        definition
+            .options
+            .custom_options
+            .insert("i2cp.custom".to_owned(), "safe-value".to_owned());
+
+        let mut options = SessionOptions::default();
+        apply_session_wire_options(&mut options, &definition.options, definition.tunnel_type)
+            .unwrap();
+
+        assert_eq!(options.inbound_len_variance, -2);
+        assert_eq!(options.outbound_len_variance, -2);
+        assert_eq!(options.inbound_backup_quantity, 3);
+        assert_eq!(options.outbound_backup_quantity, 3);
+        assert_eq!(options.signature_type, 11);
+        assert_eq!(options.additional_options[0].key(), "i2cp.custom");
+    }
+
+    #[test]
+    fn generic_session_wire_adapter_rejects_invalid_signature_without_defaulting() {
+        let mut definition = definition();
+        definition.options.sig_type = Some("not-a-signature".to_owned());
+        let mut options = SessionOptions::default();
+
+        assert!(matches!(
+            apply_session_wire_options(&mut options, &definition.options, definition.tunnel_type),
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "SigType"
+        ));
+        assert_eq!(options.signature_type, 7);
+    }
+
+    #[tokio::test]
+    async fn generic_session_wire_adapter_reaches_fork_session_create_serializer() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (command_tx, command_rx) = oneshot::channel();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let (read_half, mut write_half) = stream.into_split();
+            let mut reader = BufReader::new(read_half);
+            let mut line = String::new();
+            reader.read_line(&mut line).await.unwrap();
+            assert_eq!(line, "HELLO VERSION\n");
+            write_half
+                .write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n")
+                .await
+                .unwrap();
+            line.clear();
+            reader.read_line(&mut line).await.unwrap();
+            command_tx.send(line).unwrap();
+            write_half
+                .write_all(b"SESSION STATUS RESULT=OK DESTINATION=local\n")
+                .await
+                .unwrap();
+        });
+
+        let mut definition = definition();
+        definition.options.tunnel_variance = Some(-2);
+        definition.options.tunnel_backup_quantity = Some(3);
+        definition.options.sig_type = Some("11".to_owned());
+        definition
+            .options
+            .custom_options
+            .insert("i2cp.custom".to_owned(), "safe-value".to_owned());
+        let mut options = SessionOptions {
+            samv3_tcp_port: port,
+            nickname: "adapter-test".to_owned(),
+            ..Default::default()
+        };
+        apply_session_wire_options(&mut options, &definition.options, definition.tunnel_type)
+            .unwrap();
+
+        let _session = Session::<style::Stream>::new(options).await.unwrap();
+        let command = command_rx.await.unwrap();
+        assert!(command.contains("inbound.lengthVariance=-2"));
+        assert!(command.contains("inbound.backupQuantity=3"));
+        assert!(command.contains("outbound.lengthVariance=-2"));
+        assert!(command.contains("outbound.backupQuantity=3"));
+        assert!(command.contains("SIGNATURE_TYPE=11"));
+        assert!(command.contains("i2cp.custom=safe-value"));
+        server.await.unwrap();
+    }
+
+    #[test]
     fn compatibility_key_includes_session_settings_and_identity_without_exposing_it() {
         let first = SessionOptions {
             inbound_len: 2,
@@ -678,6 +807,13 @@ mod tests {
         same.nickname = "different-name".to_owned();
         let mut different = first.clone();
         different.outbound_len = 4;
+        let mut different_wire = first.clone();
+        different_wire.signature_type = 11;
+        different_wire.inbound_len_variance = -2;
+        different_wire.outbound_backup_quantity = 3;
+        different_wire
+            .add_session_option("i2cp.custom".to_owned(), "safe-value".to_owned())
+            .unwrap();
         let mut different_identity = first.clone();
         different_identity.destination = DestinationKind::Persistent {
             private_key: "b3RoZXIta2V5".to_owned(),
@@ -685,6 +821,7 @@ mod tests {
         let first_key = compatibility_key(&first, "stream");
         assert_eq!(first_key, compatibility_key(&same, "stream"));
         assert_ne!(first_key, compatibility_key(&different, "stream"));
+        assert_ne!(first_key, compatibility_key(&different_wire, "stream"));
         assert_ne!(first_key, compatibility_key(&different_identity, "stream"));
         let debug = format!("{first_key:?}");
         let display = format!("{first_key}");

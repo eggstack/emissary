@@ -30,7 +30,7 @@ use crate::i2pcontrol::{
     },
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
 };
-use yosemite::SessionOptions;
+use yosemite_i2pcontrol::SessionOptions;
 
 pub(crate) const NEGOTIATION_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_NEGOTIATION_BYTES: usize = 8 * 1024;
@@ -539,7 +539,7 @@ async fn target_route(request: &SocksRequest, config: &SocksConfig) -> Result<Ta
 async fn connect_target(
     connector: &ClientStreamConnector,
     route: TargetRoute,
-) -> Result<yosemite::Stream, ()> {
+) -> Result<yosemite_i2pcontrol::Stream, ()> {
     match route {
         TargetRoute::Direct { destination, port } => {
             connector.connect_to(&destination, port).await.map_err(|_| ())

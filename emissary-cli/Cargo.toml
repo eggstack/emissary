@@ -50,6 +50,7 @@ toml = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 yosemite = { workspace = true }
+yosemite-i2pcontrol = { package = "yosemite", git = "https://github.com/eggstack/yosemite", rev = "8026f5b424fc178d683e63555335f8b33e0aba04", features = ["async-extra"], optional = true }
 dioxus = { version = "=0.7.3", optional = true }
 dioxus-core = { version = "=0.7.3", optional = true }
 dioxus-liveview = { version = "=0.7.3", features = ["axum"], optional = true }
@@ -64,5 +65,5 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["ring",
 [features]
 default = ["ui"]
 ui = ["dioxus/desktop", "dioxus/liveview", "dioxus-liveview", "axum"]
-i2pcontrol = ["axum", "axum/json", "http", "hyper", "hyper-util", "rcgen", "rustls-pemfile", "tokio-rustls", "tower", "tower-http", "async-trait", "serde_json", "dep:subtle"]
+i2pcontrol = ["axum", "axum/json", "http", "hyper", "hyper-util", "rcgen", "rustls-pemfile", "tokio-rustls", "tower", "tower-http", "async-trait", "serde_json", "dep:subtle", "dep:yosemite-i2pcontrol"]
 metrics = ["emissary-util/metrics"]

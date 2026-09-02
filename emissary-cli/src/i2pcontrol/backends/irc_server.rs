@@ -15,7 +15,7 @@ use tokio::{
     net::TcpStream,
     task::JoinHandle,
 };
-use yosemite::{DestinationKind, SessionOptions};
+use yosemite_i2pcontrol::{DestinationKind, SessionOptions};
 
 use super::{
     filters::irc::{command_and_params, normalize_line, read_bounded_line, rewrite_server_user},

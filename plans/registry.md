@@ -41,7 +41,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M118 ready** | M118 neutral router capability may execute now; M117 waits for Yosemite Y001/Y002 closure |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M117 active** | M117 is executing against closed Yosemite Y001/Y002; M118 remains independently ready |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M062 regression authority | ADR-0005 permits only optional I2PControl-owned exact-revision fork alias; no global patch/vendor/path dependency |
 | I2PControl tunnel security | closed at M093 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | regression authority | M118 must preserve tunnel anonymity/resource boundaries |
 
@@ -82,11 +82,11 @@ variance + backups              SESSION CREATE surface
   |                             v
   |                         Yosemite Y002
   |                         signature DEST GENERATE
-  |                         [BLOCKED ON Y001]
+  |                         [CLOSED]
   |                             |
   |                             v
   |                         M117 exact fork alias/adoption
-  |                         [BLOCKED ON Y001/Y002]
+  |                         [ACTIVE; PIN 8026f5b]
   |                             |
   +--------------+--------------+
                  |
@@ -106,7 +106,19 @@ M114 live/reference final reclosure                  [ROADMAP / BLOCKED]
 
 M110-M114 identifiers remain stable; later corrective/dependency milestones are inserted without renumbering historical plans.
 
-## Current Emissary handoff — M118
+## Current Emissary handoff — M117
+
+Plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/117-internal-yosemite-fork-pin-and-i2pcontrol-adapter-integration.md`
+
+Status: **active**.
+
+Yosemite Y001 and Y002 are closed in `eggstack/yosemite`. M117 pins the exact Y002
+implementation revision `8026f5b424fc178d683e63555335f8b33e0aba04`, which contains Y001,
+and is limited to the I2PControl feature-owned adapter boundary.
+
+## Independently ready Emissary handoff — M118
 
 Plan:
 
@@ -128,13 +140,13 @@ Authorized production paths are limited to:
 
 M118 changes no I2PControl production code and must not alter M095 counts. Exact reference semantics, standby/failover behavior, zero-hop limits, cancellation, and build bounds are closure requirements. If correct backup behavior requires broader core redesign, that slice remains blocked rather than approximated.
 
-## Registered dependency blocker — M117
+## M117 dependency gate — satisfied
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/117-internal-yosemite-fork-pin-and-i2pcontrol-adapter-integration.md`
 
-Status: **blocked** on Yosemite Y001 + Y002 closure and an exact reviewed fork commit containing those closures.
+Status: **satisfied** by Yosemite Y001/Y002 closure and the exact reviewed fork commit above.
 
 M117 will not replace the workspace Yosemite dependency. It may add only an optional `yosemite-i2pcontrol` package alias in `emissary-cli`, exact-revision pinned and feature-owned, then migrate I2PControl-only imports/use sites.
 
@@ -193,8 +205,8 @@ M093 remains tunnel production/security regression authority. M092 remains histo
 
 ## Registry maintenance rules
 
-1. M118 is the sole dependency-ready Emissary implementation handoff.
-2. M117 remains blocked until Yosemite Y001/Y002 close and this registry explicitly promotes it.
+1. M117 is the current active Emissary implementation handoff; M118 remains independently ready.
+2. M117's Yosemite dependency gate is closed at the exact pinned revision above.
 3. Yosemite Y001 is separately ready only in `eggstack/yosemite`; Emissary agents must not implement it in this repository.
 4. M111-M114 must not execute until their named gates close and the specific plan is promoted.
 5. Treat `248 / 134 / 458` as the current closed matrix; prerequisite infrastructure does not alter it.

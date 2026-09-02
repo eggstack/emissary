@@ -153,11 +153,11 @@ impl ClientDestinationStore {
                 (self.import_reference(reference).await?, Some(reference.to_owned()))
             }
         } else if new_destination {
-            generate_private_key(sam_tcp_port).await?
+            generate_private_key(sam_tcp_port, options.sig_type.as_deref()).await?
         } else if persistent {
             match existing {
                 Some(entry) => (entry.private_key, entry.import_reference),
-                None => generate_private_key(sam_tcp_port).await?,
+                None => generate_private_key(sam_tcp_port, options.sig_type.as_deref()).await?,
             }
         } else {
             let mut state = self.state.lock().await;
@@ -379,12 +379,26 @@ impl ClientDestinationStore {
     }
 }
 
-async fn generate_private_key(sam_tcp_port: u16) -> Result<(String, Option<String>), String> {
-    let (_, private_key) = yosemite::RouterApi::new(sam_tcp_port)
-        .generate_destination()
-        .await
+async fn generate_private_key(
+    sam_tcp_port: u16,
+    signature_type: Option<&str>,
+) -> Result<(String, Option<String>), String> {
+    let router = yosemite_i2pcontrol::RouterApi::new(sam_tcp_port);
+    let generated = match signature_type {
+        Some(value) => router
+            .generate_destination_with_signature_type(parse_signature_type(value)?)
+            .await,
+        None => router.generate_destination().await,
+    };
+    let (_, private_key) = generated
         .map_err(|_| "client destination generation failed".to_string())?;
     Ok((private_key, None))
+}
+
+fn parse_signature_type(value: &str) -> Result<u16, String> {
+    value
+        .parse::<u16>()
+        .map_err(|_| "SigType must be an unsigned 16-bit integer".to_owned())
 }
 
 fn validate_private_key(value: &str) -> Result<(), String> {
@@ -460,6 +474,10 @@ mod tests {
     use crate::i2pcontrol::domain::tunnel::{
         StartIntent, TunnelName, TunnelOptions, TunnelOwnership, TunnelRuntimeState, TunnelType,
     };
+    use tokio::{
+        io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+        sync::oneshot,
+    };
 
     fn definition(name: &str) -> TunnelDefinition {
         TunnelDefinition {
@@ -520,6 +538,57 @@ mod tests {
             .await
             .unwrap();
         definition.options.priv_key_file = Some("directory.key".to_owned());
+        assert!(store.stage(&definition, 7656).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn generated_identity_uses_selected_signature_type_without_fallback() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (command_tx, command_rx) = oneshot::channel();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let (read_half, mut write_half) = stream.into_split();
+            let mut reader = BufReader::new(read_half);
+            let mut line = String::new();
+            reader.read_line(&mut line).await.unwrap();
+            assert_eq!(line, "HELLO VERSION\n");
+            write_half
+                .write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n")
+                .await
+                .unwrap();
+            line.clear();
+            reader.read_line(&mut line).await.unwrap();
+            command_tx.send(line).unwrap();
+            write_half
+                .write_all(b"DEST REPLY PUB=destination PRIV=cHJpdmF0ZQ==\n")
+                .await
+                .unwrap();
+        });
+
+        let directory = tempfile::tempdir().unwrap();
+        let store = ClientDestinationStore::new(directory.path());
+        let mut definition = definition("selected-signature");
+        definition.options.persistent_client_key = Some(true);
+        definition.options.sig_type = Some("11".to_owned());
+        store.stage(&definition, port).await.unwrap();
+
+        assert_eq!(command_rx.await.unwrap(), "DEST GENERATE SIGNATURE_TYPE=11\n");
+        assert_eq!(
+            store.active("selected-signature").await.unwrap().unwrap().as_str(),
+            "cHJpdmF0ZQ=="
+        );
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn generated_identity_rejects_invalid_signature_without_defaulting() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = ClientDestinationStore::new(directory.path());
+        let mut definition = definition("invalid-signature");
+        definition.options.persistent_client_key = Some(true);
+        definition.options.sig_type = Some("not-a-number".to_owned());
+
         assert!(store.stage(&definition, 7656).await.is_err());
     }
 }

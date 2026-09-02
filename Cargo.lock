@@ -1984,7 +1984,8 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
- "yosemite",
+ "yosemite 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "yosemite 0.7.0 (git+https://github.com/eggstack/yosemite?rev=8026f5b424fc178d683e63555335f8b33e0aba04)",
 ]
 
 [[package]]
@@ -2030,7 +2031,7 @@ dependencies = [
  "tracing-subscriber",
  "uint",
  "x25519-dalek",
- "yosemite",
+ "yosemite 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "zeroize",
 ]
 
@@ -5330,7 +5331,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "yosemite",
+ "yosemite 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -7942,6 +7943,19 @@ name = "yosemite"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6bf3692263d7a9258016f5468c5cf5301b06189d7bc4c97b014b69022659871"
+dependencies = [
+ "futures",
+ "nom",
+ "rand 0.8.5",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "yosemite"
+version = "0.7.0"
+source = "git+https://github.com/eggstack/yosemite?rev=8026f5b424fc178d683e63555335f8b33e0aba04#8026f5b424fc178d683e63555335f8b33e0aba04"
 dependencies = [
  "futures",
  "nom",

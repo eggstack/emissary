@@ -9,7 +9,7 @@ use tokio::{
     net::TcpStream,
     task::JoinHandle,
 };
-use yosemite::{DestinationKind, SessionOptions};
+use yosemite_i2pcontrol::{DestinationKind, SessionOptions};
 
 use super::{
     options::{validate_options, OptionValidationError, SERVER_OPTIONS},

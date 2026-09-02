@@ -36,7 +36,7 @@ use crate::{
     i2pcontrol::client_secret_store::ClientDestinationStore,
     tunnel_client::{ClientRuntimeError, ClientTunnelRuntimeConfig},
 };
-use yosemite::SessionOptions;
+use yosemite_i2pcontrol::SessionOptions;
 
 const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);

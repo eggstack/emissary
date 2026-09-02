@@ -9,7 +9,7 @@ use std::{collections::HashMap, net::IpAddr, sync::Arc, time::Duration};
 use futures::FutureExt;
 use parking_lot::Mutex;
 use tokio::task::JoinHandle;
-use yosemite::{DestinationKind, SessionOptions};
+use yosemite_i2pcontrol::{DestinationKind, SessionOptions};
 
 use super::{
     filters::{

@@ -9,7 +9,8 @@
 //! * only the `i2pcontrol` feature activates the optional `subtle` dependency;
 //! * the forbidden root features (`default`, `ui`, `metrics`) cannot transitively activate the
 //!   optional `subtle` dependency through local feature composition;
-//! * `Cargo.lock` is unchanged relative to the M062 fork baseline.
+//! * the I2PControl-only Yosemite fork is optional, exact-revision pinned, and feature-owned;
+//! * the lockfile retains ordinary registry Yosemite and records the exact fork source.
 //!
 //! The guard is intentionally semantic rather than comment-text based so that a
 //! future regression in dependency ownership fails closed. The transitive helper
@@ -35,6 +36,7 @@ struct DependencyManifest {
     forbidden_activations: toml::Value,
     workspace_dependencies: toml::Value,
     lockfile: Lockfile,
+    fork_dependency: ForkDependency,
     allowed_production_paths: AllowedPaths,
     prohibited_production_paths: ProhibitedPaths,
     dependency_rule: DependencyRule,
@@ -45,6 +47,18 @@ struct DependencyManifest {
 struct Lockfile {
     expected: String,
     baseline_commit: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ForkDependency {
+    alias: String,
+    package: String,
+    source: String,
+    revision: String,
+    owner: String,
+    owning_feature: String,
+    features: Vec<String>,
+    optional: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -115,7 +129,10 @@ fn manifest_is_well_formed_and_self_consistent() {
         manifest.upstream_baseline,
         "9b43484a21d5a1291c4881cdae62a36c527f8c0f"
     );
-    assert_eq!(manifest.lockfile.expected, "byte-identical to baseline");
+    assert_eq!(
+        manifest.lockfile.expected,
+        "ordinary registry Yosemite plus exact optional git fork package when i2pcontrol is enabled"
+    );
     assert_eq!(
         manifest.lockfile.baseline_commit,
         "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
@@ -167,6 +184,20 @@ fn manifest_is_well_formed_and_self_consistent() {
         manifest.dependency_rule.crate_name_absence_not_required,
         "manifest must record that crate-name absence is not an acceptance gate"
     );
+    assert_eq!(manifest.fork_dependency.alias, "yosemite-i2pcontrol");
+    assert_eq!(manifest.fork_dependency.package, "yosemite");
+    assert_eq!(
+        manifest.fork_dependency.source,
+        "https://github.com/eggstack/yosemite"
+    );
+    assert_eq!(
+        manifest.fork_dependency.revision,
+        "8026f5b424fc178d683e63555335f8b33e0aba04"
+    );
+    assert_eq!(manifest.fork_dependency.owner, "emissary-cli");
+    assert_eq!(manifest.fork_dependency.owning_feature, "i2pcontrol");
+    assert_eq!(manifest.fork_dependency.features, ["async-extra"]);
+    assert!(manifest.fork_dependency.optional);
 }
 
 #[test]
@@ -244,6 +275,140 @@ fn emissary_cli_owns_subtle_locally_as_optional_with_no_default_features() {
         manifest_entry.get("optional").and_then(|v| v.as_bool()),
         Some(true)
     );
+}
+
+#[test]
+fn i2pcontrol_yosemite_alias_is_optional_and_exactly_pinned() {
+    let manifest = load_manifest();
+    let raw = std::fs::read_to_string(workspace_root().join("emissary-cli/Cargo.toml"))
+        .expect("emissary-cli manifest");
+    let parsed: toml::Value = toml::from_str(&raw).expect("valid emissary-cli manifest");
+    let dependency = parsed
+        .get("dependencies")
+        .and_then(|dependencies| dependencies.get("yosemite-i2pcontrol"))
+        .and_then(toml::Value::as_table)
+        .expect("I2PControl Yosemite alias must be a dependency table");
+    assert_eq!(
+        dependency.get("package").and_then(toml::Value::as_str),
+        Some("yosemite")
+    );
+    assert_eq!(
+        dependency.get("git").and_then(toml::Value::as_str),
+        Some("https://github.com/eggstack/yosemite")
+    );
+    assert_eq!(
+        dependency.get("rev").and_then(toml::Value::as_str),
+        Some(manifest.fork_dependency.revision.as_str())
+    );
+    assert!(dependency.get("branch").is_none());
+    assert!(dependency.get("tag").is_none());
+    assert!(dependency.get("path").is_none());
+    assert_eq!(
+        dependency.get("optional").and_then(toml::Value::as_bool),
+        Some(true)
+    );
+    assert_eq!(
+        dependency
+            .get("features")
+            .and_then(toml::Value::as_array)
+            .map(|features| features.iter().filter_map(toml::Value::as_str).collect::<Vec<_>>()),
+        Some(vec!["async-extra"])
+    );
+
+    let features = parsed.get("features").and_then(toml::Value::as_table).expect("features table");
+    let graph = LocalFeatureGraph::from_features_value(&toml::Value::Table(features.clone()));
+    assert!(graph.transitively_activates("i2pcontrol", "yosemite-i2pcontrol"));
+    for feature in ["default", "ui", "metrics"] {
+        assert!(
+            !graph.transitively_activates(feature, "yosemite-i2pcontrol"),
+            "{feature} must not activate the I2PControl-only Yosemite alias"
+        );
+    }
+}
+
+#[test]
+fn ordinary_workspace_yosemite_remains_registry_owned() {
+    let raw = std::fs::read_to_string(workspace_root().join("Cargo.toml"))
+        .expect("root workspace manifest");
+    let parsed: toml::Value = toml::from_str(&raw).expect("valid root workspace manifest");
+    let dependency = parsed
+        .get("workspace")
+        .and_then(|workspace| workspace.get("dependencies"))
+        .and_then(|dependencies| dependencies.get("yosemite"))
+        .and_then(toml::Value::as_table)
+        .expect("workspace Yosemite dependency");
+    assert_eq!(
+        dependency.get("version").and_then(toml::Value::as_str),
+        Some("0.7.0")
+    );
+    assert!(dependency.get("git").is_none());
+    assert!(dependency.get("path").is_none());
+    assert!(dependency.get("branch").is_none());
+    assert!(dependency.get("tag").is_none());
+    assert_eq!(
+        dependency
+            .get("features")
+            .and_then(toml::Value::as_array)
+            .map(|features| features.iter().filter_map(toml::Value::as_str).collect::<Vec<_>>()),
+        Some(vec!["async-extra"])
+    );
+}
+
+#[test]
+fn fork_alias_is_feature_isolated_in_cargo_tree() {
+    let disabled = Command::new("cargo")
+        .args([
+            "tree",
+            "-p",
+            "emissary-cli",
+            "--no-default-features",
+            "--edges",
+            "normal",
+        ])
+        .current_dir(workspace_root())
+        .output()
+        .expect("feature-disabled cargo tree");
+    assert!(
+        disabled.status.success(),
+        "feature-disabled cargo tree failed"
+    );
+    let disabled = String::from_utf8_lossy(&disabled.stdout);
+    assert!(!disabled.contains("github.com/eggstack/yosemite"));
+
+    let enabled = Command::new("cargo")
+        .args([
+            "tree",
+            "-p",
+            "emissary-cli",
+            "--no-default-features",
+            "--features",
+            "i2pcontrol",
+            "--edges",
+            "normal",
+        ])
+        .current_dir(workspace_root())
+        .output()
+        .expect("I2PControl cargo tree");
+    assert!(enabled.status.success(), "I2PControl cargo tree failed");
+    let enabled = String::from_utf8_lossy(&enabled.stdout);
+    assert!(enabled.contains("github.com/eggstack/yosemite"));
+    assert!(enabled.contains("yosemite v0.7.0"));
+}
+
+#[test]
+fn fork_imports_are_contained_to_i2pcontrol_source() {
+    let output = Command::new("rg")
+        .args(["-l", "yosemite_i2pcontrol", "emissary-cli/src"])
+        .current_dir(workspace_root())
+        .output()
+        .expect("fork import search");
+    assert!(output.status.success(), "fork import search failed");
+    for path in String::from_utf8_lossy(&output.stdout).lines() {
+        assert!(
+            path.starts_with("emissary-cli/src/i2pcontrol/"),
+            "fork alias escaped the I2PControl source boundary: {path}"
+        );
+    }
 }
 
 #[test]
@@ -344,25 +509,41 @@ fn m061_source_boundary_files_remain_unchanged() {
 }
 
 #[test]
-fn lockfile_is_byte_identical_to_fork_baseline() {
+fn lockfile_records_registry_and_exact_fork_yosemite_sources() {
     let manifest = load_manifest();
-    let diff = Command::new("git")
-        .args([
-            "diff",
-            "--name-only",
-            &manifest.lockfile.baseline_commit,
-            "--",
-            "Cargo.lock",
-        ])
-        .current_dir(workspace_root())
-        .output()
-        .expect("git diff Cargo.lock");
-    assert!(diff.status.success(), "git diff Cargo.lock failed");
-
-    let changed = String::from_utf8_lossy(&diff.stdout).trim().to_owned();
+    assert_eq!(
+        manifest.lockfile.baseline_commit,
+        "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
+    );
+    let raw = std::fs::read_to_string(workspace_root().join("Cargo.lock")).expect("Cargo.lock");
+    let lock: toml::Value = toml::from_str(&raw).expect("valid Cargo.lock");
+    let packages = lock
+        .get("package")
+        .and_then(toml::Value::as_array)
+        .expect("Cargo.lock package array");
+    let yosemite = packages
+        .iter()
+        .filter(|package| package.get("name").and_then(toml::Value::as_str) == Some("yosemite"))
+        .collect::<Vec<_>>();
     assert!(
-        changed.is_empty(),
-        "M062 must not change Cargo.lock relative to the fork baseline; changed: {changed}"
+        yosemite.iter().any(|package| {
+            package.get("source").and_then(toml::Value::as_str).is_some_and(|source| {
+                source.starts_with("registry+https://github.com/rust-lang/crates.io-index")
+            })
+        }),
+        "ordinary registry Yosemite package is missing from Cargo.lock"
+    );
+    let expected_source = format!(
+        "git+{}?rev={}#{}",
+        manifest.fork_dependency.source,
+        manifest.fork_dependency.revision,
+        manifest.fork_dependency.revision
+    );
+    assert!(
+        yosemite.iter().any(|package| {
+            package.get("source").and_then(toml::Value::as_str) == Some(expected_source.as_str())
+        }),
+        "exact Yosemite fork source/revision is missing from Cargo.lock"
     );
 }
 
@@ -401,6 +582,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m115 = is_authorized_m115_path(path);
         let authorized_m110 = is_authorized_m110_path(path);
         let authorized_m116 = is_authorized_m116_path(path);
+        let authorized_m117 = is_authorized_m117_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -417,6 +599,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m115
                 || authorized_m110
                 || authorized_m116
+                || authorized_m117
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -437,12 +620,43 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m115
                     || authorized_m110
                     || authorized_m116
+                    || authorized_m117
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
             );
         }
     }
+}
+
+fn is_authorized_m117_path(path: &str) -> bool {
+    matches!(
+        path,
+        "Cargo.lock"
+            | "emissary-cli/Cargo.toml"
+            | "emissary-cli/src/i2pcontrol/backends/client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/connect_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_bidir.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/irc_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/irc_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/accepted_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/peer_identity_impl.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/session.rs"
+            | "emissary-cli/src/i2pcontrol/backends/server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/socks.rs"
+            | "emissary-cli/src/i2pcontrol/backends/streamr.rs"
+            | "emissary-cli/src/i2pcontrol/client_secret_store.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/117-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/117-internal-yosemite-fork-pin-and-i2pcontrol-adapter-integration.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+    )
 }
 
 fn is_authorized_m116_path(path: &str) -> bool {
@@ -805,6 +1019,7 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/adrs/ADR-0001-proposal-170-contract-and-stub-boundary.md"
             | "plans/adrs/ADR-0003-proposal-170-tunnel-runtime-completion-and-filter-boundary.md"
             | "plans/adrs/ADR-0004-pinned-full-proposal-170-completion-boundary.md"
+            | "plans/adrs/ADR-0005-internal-yosemite-fork-dependency-boundary.md"
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-surface-containment.md"
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
             | "plans/implementation/i2pcontrol-proposal-170/063-m062-closure-and-feature-guard-corrective.md"

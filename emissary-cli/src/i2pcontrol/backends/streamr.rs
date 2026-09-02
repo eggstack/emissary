@@ -19,7 +19,7 @@ use tokio::{
     sync::{oneshot, watch},
     task::JoinHandle,
 };
-use yosemite::{style, DatagramOptions, DestinationKind, Session, SessionOptions};
+use yosemite_i2pcontrol::{style, DatagramOptions, DestinationKind, Session, SessionOptions};
 
 use emissary_core::{
     crypto::{base32_encode, base64_decode},

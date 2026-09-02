@@ -16,7 +16,7 @@ use tokio::{
     task::JoinHandle,
     time::Instant,
 };
-use yosemite::{DestinationKind, SessionOptions};
+use yosemite_i2pcontrol::{DestinationKind, SessionOptions};
 
 use super::{
     filters::http::{

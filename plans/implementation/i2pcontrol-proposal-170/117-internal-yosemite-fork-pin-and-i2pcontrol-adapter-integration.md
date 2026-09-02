@@ -1,6 +1,6 @@
 # M117 — Internal Yosemite Fork Pin and I2PControl Adapter Integration
 
-Status: **proposed / dependency-blocked**
+Status: **active**
 
 Class: dependency integration / containment / capability plumbing
 

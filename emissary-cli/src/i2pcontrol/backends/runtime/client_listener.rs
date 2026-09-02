@@ -11,7 +11,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::{mpsc, oneshot, watch, OnceCell},
 };
-use yosemite::{style, Session, SessionOptions, StreamOptions};
+use yosemite_i2pcontrol::{style, Session, SessionOptions, StreamOptions};
 
 use super::task_group::BoundedTaskGroup;
 use super::session::{SharedClientSessionRegistry, SharedStreamSessionLease};
@@ -180,7 +180,7 @@ impl fmt::Debug for ClientStreamConnector {
 
 impl ClientStreamConnector {
     /// Open one outbound stream without holding the session mutex across I/O.
-    pub async fn connect(&self) -> Result<yosemite::Stream, ClientListenerRuntimeError> {
+    pub async fn connect(&self) -> Result<yosemite_i2pcontrol::Stream, ClientListenerRuntimeError> {
         self.connect_to(self.destination.as_ref(), self.destination_port).await
     }
 
@@ -190,7 +190,7 @@ impl ClientStreamConnector {
         &self,
         destination: &str,
         destination_port: u16,
-    ) -> Result<yosemite::Stream, ClientListenerRuntimeError> {
+    ) -> Result<yosemite_i2pcontrol::Stream, ClientListenerRuntimeError> {
         let session = self.session.get().await?;
         let future = {
             let mut session = session.lock();

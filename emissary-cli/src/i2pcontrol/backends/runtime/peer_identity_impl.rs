@@ -19,7 +19,7 @@ use emissary_core::{
     crypto::{base64_decode, base64_encode},
     primitives::Destination,
 };
-use yosemite::Stream;
+use yosemite_i2pcontrol::Stream;
 
 /// Hard upper bound on the textual base64 representation that may be accepted
 /// at the trusted boundary. The repository's `Destination::parse` accepts both

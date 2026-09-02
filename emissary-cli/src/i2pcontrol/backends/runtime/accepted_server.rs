@@ -2,7 +2,7 @@ use std::{fmt, sync::Arc, time::Duration};
 
 use futures::{future::BoxFuture, FutureExt};
 use tokio::sync::{oneshot, watch};
-use yosemite::{style, DestinationKind, Session, SessionOptions, Stream};
+use yosemite_i2pcontrol::{style, DestinationKind, Session, SessionOptions, Stream};
 
 use crate::i2pcontrol::server_secret_store::StoredDestination;
 

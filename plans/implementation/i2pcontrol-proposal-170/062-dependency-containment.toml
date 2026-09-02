@@ -21,7 +21,7 @@ baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its
-# named production-path helpers. The seven M109-M115 entries below are planning
+# named production-path helpers. The eight M109-M116 entries below are planning
 # documents only; they do not authorize any production path, dependency, or
 # lockfile change. Future execution still requires registry readiness and the
 # exact production-path authority stated by each plan.
@@ -35,6 +35,7 @@ root_manifests = [
   "plans/implementation/i2pcontrol-proposal-170/113-server-presentation-address-routing-and-leaseset-residual-completion.md",
   "plans/implementation/i2pcontrol-proposal-170/114-full-proposal-170-live-interoperability-and-final-reclosure.md",
   "plans/implementation/i2pcontrol-proposal-170/115-m109-runtime-disable-and-lifecycle-truthfulness-corrective-pass.md",
+  "plans/implementation/i2pcontrol-proposal-170/116-m110-shared-session-and-newdest-corrective-pass.md",
 ]
 
 [prohibited_production_paths]

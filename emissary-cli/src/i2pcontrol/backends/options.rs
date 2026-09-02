@@ -156,9 +156,10 @@ pub fn validate_common_options(
     // dependency does not carry them to the SAM SESSION CREATE wire. Keep
     // them fail-closed until a supported primitive exists; accepting them
     // here would make a persisted option look applied when it is not.
+    if options.use_ssl.is_some() {
+        return Err(common_unsupported(tunnel_type, "UseSSL"));
+    }
     for (present, field) in [
-        (options.shared.is_some(), "Shared"),
-        (options.use_ssl.is_some(), "UseSSL"),
         (options.tunnel_variance.is_some(), "TunnelVariance"),
         (
             options.tunnel_backup_quantity.is_some(),
@@ -166,7 +167,23 @@ pub fn validate_common_options(
         ),
         (options.sig_type.is_some(), "SigType"),
         (!options.custom_options.is_empty(), "CustomOptions"),
-        (options.priv_key_file.is_some(), "PrivKeyFile"),
+        (
+            options.priv_key_file.is_some()
+                && !matches!(
+                    tunnel_type,
+                    TunnelType::Client
+                        | TunnelType::HttpClient
+                        | TunnelType::IrcClient
+                        | TunnelType::Socks
+                        | TunnelType::SocksIrc
+                        | TunnelType::ConnectClient
+                        | TunnelType::Server
+                        | TunnelType::HttpServer
+                        | TunnelType::HttpBidirServer
+                        | TunnelType::IrcServer
+                ),
+            "PrivKeyFile",
+        ),
     ] {
         if present {
             return Err(common_unsupported(tunnel_type, field));
@@ -182,13 +199,15 @@ pub fn validate_common_options(
             return Err(common_unsupported(tunnel_type, field));
         }
     }
-    // NewDest and PersistentClientKey require a control-plane-owned client
-    // destination store and lifecycle authority. They remain explicit
-    // blocked cells until that authority is implemented.
-    if options.new_dest.is_some() {
+    // NewDest, PersistentClientKey, and Shared are meaningful only for the
+    // control-plane client families and are applied by the bounded owner.
+    if options.shared.is_some() && !tunnel_type.is_client() {
+        return Err(common_unsupported(tunnel_type, "Shared"));
+    }
+    if options.new_dest.is_some() && !tunnel_type.is_client() {
         return Err(common_unsupported(tunnel_type, "NewDest"));
     }
-    if options.persistent_client_key.is_some() {
+    if options.persistent_client_key.is_some() && !tunnel_type.is_client() {
         return Err(common_unsupported(tunnel_type, "PersistentClientKey"));
     }
 

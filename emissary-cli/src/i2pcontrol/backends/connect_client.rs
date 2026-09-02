@@ -21,8 +21,9 @@ use super::{
 };
 use crate::i2pcontrol::{
     address_book_runtime::RuntimeAddressBookHandle,
+    client_secret_store::ClientDestinationStore,
     backends::runtime::{
-        run_client_listener, ClientConnectionHandler, ClientListenerRuntimeConfig,
+        ClientConnectionHandler, ClientListenerRuntimeConfig,
         ClientListenerRuntimeError,
     },
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
@@ -252,7 +253,12 @@ impl RuntimeSupervisor {
         }
     }
 
-    async fn start(&self, config: ConnectConfig) -> BackendResult<()> {
+    async fn start(
+        &self,
+        config: ConnectConfig,
+        shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+        shared: bool,
+    ) -> BackendResult<()> {
         let name = config.name.clone();
         let (generation, cancellation) = self.reserve(&name)?;
         let map = Arc::clone(&self.inner);
@@ -261,7 +267,7 @@ impl RuntimeSupervisor {
         let handler = make_handler(config.clone());
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
-            let result = std::panic::AssertUnwindSafe(run_client_listener(
+            let result = std::panic::AssertUnwindSafe(super::runtime::run_client_listener_with_shared_session(
                 ClientListenerRuntimeConfig {
                     name: config.name,
                     bind_address: config.bind_address,
@@ -276,6 +282,8 @@ impl RuntimeSupervisor {
                 },
                 ready_cancellation.clone(),
                 ready_tx,
+                shared_registry,
+                shared,
             ))
             .catch_unwind()
             .await
@@ -506,6 +514,8 @@ pub struct ConnectClientTunnelBackend {
     supervisor: RuntimeSupervisor,
     sam_tcp_port: u16,
     address_book: Option<Arc<RuntimeAddressBookHandle>>,
+    shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+    client_destinations: Option<ClientDestinationStore>,
 }
 
 impl std::fmt::Debug for ConnectClientTunnelBackend {
@@ -522,11 +532,23 @@ impl ConnectClientTunnelBackend {
             supervisor: RuntimeSupervisor::new(),
             sam_tcp_port,
             address_book: None,
+            shared_registry: None,
+            client_destinations: None,
         }
     }
 
     pub fn with_address_book(mut self, address_book: Arc<RuntimeAddressBookHandle>) -> Self {
         self.address_book = Some(address_book);
+        self
+    }
+
+    pub(crate) fn with_client_runtime(
+        mut self,
+        shared_registry: Arc<super::runtime::session::SharedClientSessionRegistry>,
+        client_destinations: ClientDestinationStore,
+    ) -> Self {
+        self.shared_registry = Some(shared_registry);
+        self.client_destinations = Some(client_destinations);
         self
     }
 
@@ -693,6 +715,10 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "Description",
         "StartOnLoad",
         "DelayOpen",
+        "Shared",
+        "NewDest",
+        "PersistentClientKey",
+        "PrivKeyFile",
     ];
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
@@ -740,13 +766,19 @@ impl TunnelBackend for ConnectClientTunnelBackend {
     }
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
         let mut config = self.config(definition)?;
-        config.session_options = super::runtime::session::build_session_options(
+        config.session_options = super::runtime::session::build_client_session_options(
             definition,
             self.sam_tcp_port,
-            false,
-            yosemite::DestinationKind::Transient,
-        )?;
-        self.supervisor.start(config).await
+            self.client_destinations.as_ref(),
+        )
+        .await?;
+        self.supervisor
+            .start(
+                config,
+                self.shared_registry.clone(),
+                definition.options.shared.unwrap_or(false),
+            )
+            .await
     }
     async fn stop(&self, definition: &TunnelDefinition) -> BackendResult<()> {
         self.supervisor.stop(definition.name.as_str()).await

@@ -23,8 +23,9 @@ use super::{
 };
 use crate::i2pcontrol::{
     address_book_runtime::RuntimeAddressBookHandle,
+    client_secret_store::ClientDestinationStore,
     backends::runtime::{
-        run_client_listener, ClientConnectionHandler, ClientListenerRuntimeConfig,
+        ClientConnectionHandler, ClientListenerRuntimeConfig,
         ClientListenerRuntimeError, ClientStreamConnector,
     },
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
@@ -797,7 +798,13 @@ impl SocksRuntimeSupervisor {
         }
     }
 
-    pub(crate) async fn start(&self, config: SocksConfig, mode: PayloadMode) -> BackendResult<()> {
+    pub(crate) async fn start(
+        &self,
+        config: SocksConfig,
+        mode: PayloadMode,
+        shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+        shared: bool,
+    ) -> BackendResult<()> {
         let name = config.name.clone();
         let (generation, cancellation) = self.reserve(&name)?;
         let map = Arc::clone(&self.inner);
@@ -807,7 +814,7 @@ impl SocksRuntimeSupervisor {
         let handler = make_handler(config.clone(), mode);
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
-            let result = std::panic::AssertUnwindSafe(run_client_listener(
+            let result = std::panic::AssertUnwindSafe(super::runtime::run_client_listener_with_shared_session(
                 ClientListenerRuntimeConfig {
                     name: config.name,
                     bind_address: config.bind_address,
@@ -822,6 +829,8 @@ impl SocksRuntimeSupervisor {
                 },
                 ready_cancellation.clone(),
                 ready_tx,
+                shared_registry,
+                shared,
             ))
             .catch_unwind()
             .await
@@ -1108,6 +1117,10 @@ fn validate_raw_options(
         "Description",
         "StartOnLoad",
         "DelayOpen",
+        "Shared",
+        "NewDest",
+        "PersistentClientKey",
+        "PrivKeyFile",
     ];
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
@@ -1157,6 +1170,8 @@ pub struct SocksTunnelBackend {
     supervisor: SocksRuntimeSupervisor,
     sam_tcp_port: u16,
     address_book: Option<Arc<RuntimeAddressBookHandle>>,
+    shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+    client_destinations: Option<ClientDestinationStore>,
 }
 
 impl fmt::Debug for SocksTunnelBackend {
@@ -1173,11 +1188,23 @@ impl SocksTunnelBackend {
             supervisor: SocksRuntimeSupervisor::new(TunnelType::Socks),
             sam_tcp_port,
             address_book: None,
+            shared_registry: None,
+            client_destinations: None,
         }
     }
 
     pub fn with_address_book(mut self, address_book: Arc<RuntimeAddressBookHandle>) -> Self {
         self.address_book = Some(address_book);
+        self
+    }
+
+    pub(crate) fn with_client_runtime(
+        mut self,
+        shared_registry: Arc<super::runtime::session::SharedClientSessionRegistry>,
+        client_destinations: ClientDestinationStore,
+    ) -> Self {
+        self.shared_registry = Some(shared_registry);
+        self.client_destinations = Some(client_destinations);
         self
     }
 }
@@ -1196,13 +1223,20 @@ impl TunnelBackend for SocksTunnelBackend {
             self.address_book.clone(),
             SOCKS_OPTIONS,
         )?;
-        config.session_options = super::runtime::session::build_session_options(
+        config.session_options = super::runtime::session::build_client_session_options(
             definition,
             self.sam_tcp_port,
-            false,
-            yosemite::DestinationKind::Transient,
-        )?;
-        self.supervisor.start(config, PayloadMode::Raw).await
+            self.client_destinations.as_ref(),
+        )
+        .await?;
+        self.supervisor
+            .start(
+                config,
+                PayloadMode::Raw,
+                self.shared_registry.clone(),
+                definition.options.shared.unwrap_or(false),
+            )
+            .await
     }
 
     async fn stop(&self, definition: &TunnelDefinition) -> BackendResult<()> {
@@ -1375,12 +1409,18 @@ mod tests {
             runtime_config.sam_tcp_port = sam_port;
             runtime_config.session_options.samv3_tcp_port = sam_port;
             runtime_config.session_options.nickname = name.to_owned();
-            supervisor.start(runtime_config.clone(), mode).await.unwrap();
+            supervisor
+                .start(runtime_config.clone(), mode, None, false)
+                .await
+                .unwrap();
             assert_eq!(supervisor.inspect(name).0, TunnelRuntimeState::Running);
-            assert!(supervisor.start(runtime_config.clone(), mode).await.is_err());
+            assert!(supervisor
+                .start(runtime_config.clone(), mode, None, false)
+                .await
+                .is_err());
             supervisor.stop(name).await.unwrap();
             assert_eq!(supervisor.inspect(name).0, TunnelRuntimeState::Stopped);
-            supervisor.start(runtime_config, mode).await.unwrap();
+            supervisor.start(runtime_config, mode, None, false).await.unwrap();
             supervisor.stop(name).await.unwrap();
         }
         sam_task.abort();

@@ -32,6 +32,11 @@ allowed_audit_dispositions = ["i2pcontrol_local_candidate","neutral_owner_candid
 successor_ready = true
 successor_plan = "M106-delay-open-client-listener.md"
 successor_scope = "DelayOpen only; six TCP client-family cells; existing I2PControl client-listener owner; no dependency/core change"
+post_m110_matrix_apply_cells = 255
+post_m110_matrix_blocked_primitive_cells = 127
+post_m110_matrix_not_applicable_cells = 458
+post_m110_completed_cell_count = 31
+post_m110_completion_ledger = "plans/implementation/i2pcontrol-proposal-170/110-completion-ledger.toml"
 
 [[cells]]
 canonical_option = "Shared"

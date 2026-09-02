@@ -30,6 +30,7 @@ use super::{
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
 use crate::i2pcontrol::{
+    client_secret_store::ClientDestinationStore,
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
     server_secret_store::{ServerDestinationStore, StoredDestination},
 };
@@ -44,7 +45,7 @@ pub const MAX_TRANSPORT_PACKET: usize = 0xfff;
 /// Application payload cap kept below the raw datagram transport ceiling.
 pub const MAX_STREAMR_PAYLOAD: usize = 1200;
 /// Maximum number of active consumers for one producer.
-pub const MAX_SUBSCRIBERS: usize = 10;
+pub const MAX_SUBSCRIBERS: usize = 16;
 /// Largest textual representation of a reference I2P destination.
 ///
 /// The core destination parser accepts at most 391 serialized bytes, which is
@@ -65,7 +66,8 @@ struct StreamrClientConfig {
     producer: String,
     local_target: SocketAddr,
     source_port: u16,
-    sam_tcp_port: u16,
+    session_options: SessionOptions,
+    shared: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -335,20 +337,44 @@ async fn run_streamr_client(
     config: StreamrClientConfig,
     mut cancellation: watch::Receiver<bool>,
     ready: oneshot::Sender<Result<(), String>>,
+    shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+    shared: bool,
 ) -> bool {
-    let mut session = tokio::select! {
-        _ = cancellation.changed() => {
-            let _ = ready.send(Err("streamr client session setup cancelled".to_owned()));
-            return true;
+    let shared_lease = if shared {
+        let Some(registry) = shared_registry else {
+            let _ = ready.send(Err("streamr shared session owner unavailable".to_owned()));
+            return false;
+        };
+        match tokio::select! {
+            _ = cancellation.changed() => None,
+            result = registry.acquire_datagram(config.session_options.clone()) =>
+                match result {
+                    Ok(lease) => Some(lease),
+                    Err(_) => {
+                        let _ = ready.send(Err("streamr client session setup failed".to_owned()));
+                        return false;
+                    }
+                },
+        } {
+            Some(lease) => Some(lease),
+            None => {
+                let _ = ready.send(Err("streamr client session setup cancelled".to_owned()));
+                return true;
+            }
         }
-        result = Session::<style::Repliable>::new(SessionOptions {
-            samv3_tcp_port: config.sam_tcp_port,
-            nickname: config.name.clone(),
-            publish: false,
-            from_port: config.source_port,
-            ..Default::default()
-        }) => match result {
-            Ok(session) => session,
+    } else {
+        None
+    };
+    let session = match shared_lease.as_ref() {
+        Some(lease) => Arc::clone(&lease.session),
+        None => match tokio::select! {
+            _ = cancellation.changed() => {
+                let _ = ready.send(Err("streamr client session setup cancelled".to_owned()));
+                return true;
+            }
+            result = Session::<style::Repliable>::new(config.session_options.clone()) => result,
+        } {
+            Ok(session) => super::runtime::session::SharedDatagramSession::spawn(session),
             Err(_) => {
                 let _ = ready.send(Err("streamr client session setup failed".to_owned()));
                 return false;
@@ -363,7 +389,7 @@ async fn run_streamr_client(
         }
     };
     let _ = ready.send(Ok(()));
-    let mut receive_buffer = vec![0u8; MAX_TRANSPORT_PACKET];
+    let mut events = session.subscribe();
     let mut refresh = tokio::time::interval(SUBSCRIPTION_REFRESH);
     refresh.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
@@ -372,7 +398,8 @@ async fn run_streamr_client(
             _ = cancellation.changed() => {
                 let _ = tokio::time::timeout(
                     UNSUBSCRIBE_TIMEOUT,
-                    session.send_to_with_options(
+                    send_datagram(
+                        session.as_ref(),
                         &[1],
                         &config.producer,
                         DatagramOptions { from_port: config.source_port, ..Default::default() },
@@ -381,20 +408,35 @@ async fn run_streamr_client(
                 return true;
             }
             _ = refresh.tick() => {
-                let _ = session.send_to_with_options(
+                let _ = send_datagram(
+                    session.as_ref(),
                     &[0],
                     &config.producer,
                     DatagramOptions { from_port: config.source_port, ..Default::default() },
                 ).await;
             }
-            result = session.recv_from(&mut receive_buffer) => {
-                let Ok((length, _peer)) = result else { return false; };
-                if payload_is_forwardable(length) {
-                    let _ = output.send_to(&receive_buffer[..length], config.local_target).await;
+            result = events.recv() => {
+                let event = match result {
+                    Ok(event) => event,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => return false,
+                };
+                if payload_is_forwardable(event.payload.len()) {
+                    let _peer = event.peer;
+                    let _ = output.send_to(&event.payload, config.local_target).await;
                 }
             }
         }
     }
+}
+
+async fn send_datagram(
+    session: &super::runtime::session::SharedDatagramSession,
+    payload: &[u8],
+    destination: &str,
+    options: DatagramOptions,
+) -> Result<(), String> {
+    session.send_to_with_options(payload, destination, options).await
 }
 
 async fn run_streamr_server(
@@ -476,6 +518,8 @@ async fn run_streamr_server(
 pub struct StreamrClientTunnelBackend {
     supervisor: StreamrRuntimeSupervisor,
     sam_tcp_port: u16,
+    shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+    client_destinations: Option<ClientDestinationStore>,
 }
 
 impl StreamrClientTunnelBackend {
@@ -483,7 +527,19 @@ impl StreamrClientTunnelBackend {
         Self {
             supervisor: StreamrRuntimeSupervisor::new(TunnelType::StreamrClient),
             sam_tcp_port,
+            shared_registry: None,
+            client_destinations: None,
         }
+    }
+
+    pub(crate) fn with_client_runtime(
+        mut self,
+        shared_registry: Arc<super::runtime::session::SharedClientSessionRegistry>,
+        client_destinations: ClientDestinationStore,
+    ) -> Self {
+        self.shared_registry = Some(shared_registry);
+        self.client_destinations = Some(client_destinations);
+        self
     }
 
     fn config(&self, definition: &TunnelDefinition) -> BackendResult<StreamrClientConfig> {
@@ -523,12 +579,15 @@ impl StreamrClientTunnelBackend {
             producer: producer.to_owned(),
             local_target: SocketAddr::new(target_host, target_port),
             source_port: definition.options.listen_port.unwrap_or(0),
-            sam_tcp_port: self.sam_tcp_port,
+            session_options: SessionOptions::default(),
+            shared: definition.options.shared.unwrap_or(false),
         })
     }
 
     async fn start_config(&self, config: StreamrClientConfig) -> BackendResult<()> {
         let name = config.name.clone();
+        let shared_registry = self.shared_registry.clone();
+        let shared = config.shared;
         let (generation, cancellation) = self.supervisor.reserve(&name)?;
         let map = Arc::clone(&self.supervisor.inner);
         let task_name = name.clone();
@@ -539,6 +598,8 @@ impl StreamrClientTunnelBackend {
                 config,
                 ready_cancellation.clone(),
                 ready_tx,
+                shared_registry,
+                shared,
             ))
             .catch_unwind()
             .await
@@ -570,7 +631,14 @@ impl TunnelBackend for StreamrClientTunnelBackend {
     }
 
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
-        self.start_config(self.config(definition)?).await
+        let mut config = self.config(definition)?;
+        config.session_options = super::runtime::session::build_client_session_options(
+            definition,
+            self.sam_tcp_port,
+            self.client_destinations.as_ref(),
+        )
+        .await?;
+        self.start_config(config).await
     }
 
     async fn stop(&self, definition: &TunnelDefinition) -> BackendResult<()> {

@@ -26,7 +26,8 @@ pub use accepted_server::{
     AcceptedServerRuntimeConfig, AcceptedServerRuntimeError,
 };
 pub use client_listener::{
-    run_client_listener, run_generic_client, ClientConnectionHandler, ClientListenerRuntimeConfig,
-    ClientListenerRuntimeError, ClientStreamConnector,
+    run_client_listener, run_generic_client, run_generic_client_with_shared_session,
+    run_client_listener_with_shared_session, ClientConnectionHandler,
+    ClientListenerRuntimeConfig, ClientListenerRuntimeError, ClientStreamConnector,
 };
 pub use peer_identity_impl::{TrustedPeerIdentity, MAX_TRUSTED_DESTINATION_B64_TEXT};

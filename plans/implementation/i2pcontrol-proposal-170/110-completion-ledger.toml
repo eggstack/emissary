@@ -1,0 +1,41 @@
+# M110 machine-readable completion ledger.
+# This is evidence for the M095 current matrix; M105 remains the historical
+# 164-cell input audit and is reconciled by its post-M110 delta fields.
+
+[completion]
+version = 1
+milestone = "M110"
+status = "closed"
+proposal_number = 170
+proposal_revision = "2026-05-20"
+matrix_before_apply = 224
+matrix_before_blocked_primitive = 158
+matrix_before_not_applicable = 458
+matrix_after_apply = 255
+matrix_after_blocked_primitive = 127
+matrix_after_not_applicable = 458
+completed_cell_count = 31
+remaining_applicable_residual_count = 127
+matrix = "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+historical_audit = "plans/implementation/i2pcontrol-proposal-170/105-residual-option-audit.toml"
+closure = "plans/closure/i2pcontrol-proposal-170/110-closure.md"
+
+[ownership]
+session_registry = "emissary-cli/src/i2pcontrol/backends/runtime/session.rs::SharedClientSessionRegistry"
+stream_listener_owner = "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"
+client_secret_store = "emissary-cli/src/i2pcontrol/client_secret_store.rs"
+composition = "emissary-cli/src/i2pcontrol/production.rs"
+accepted_yosemite_api = "yosemite 0.7.0 public SessionOptions, DestinationKind::Persistent, and detached stream creation"
+
+[cells]
+shared = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient", "streamrclient"]
+new_dest = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient", "streamrclient"]
+persistent_client_key = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient", "streamrclient"]
+priv_key_file = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient", "server", "httpserver", "httpbidirserver", "ircserver"]
+
+[verification]
+shared_stream_owner = "client_listener shared-listeners-retain-one-session-until-last-listener-stops"
+shared_datagram_owner = "streamr client uses SharedDatagramSession actor with bounded command/event channels"
+compatibility = "runtime/session.rs compatibility_key includes session settings and private-identity fingerprint"
+identity_restart = "client_secret_store imported-identity-is-confined-atomic-and-restart-safe"
+path_safety = "client_secret_store import-rejects-escape-and-unsafe-file-types"

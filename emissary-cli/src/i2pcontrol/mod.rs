@@ -21,6 +21,7 @@ pub mod address_book_runtime;
 pub mod auth;
 pub mod backends;
 pub mod client_services;
+pub(crate) mod client_secret_store;
 pub mod control_plane;
 pub mod domain;
 pub mod errors;

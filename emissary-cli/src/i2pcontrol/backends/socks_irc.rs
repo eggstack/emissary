@@ -12,6 +12,7 @@ use super::{
 };
 use crate::i2pcontrol::{
     address_book_runtime::RuntimeAddressBookHandle,
+    client_secret_store::ClientDestinationStore,
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelType},
 };
 
@@ -21,6 +22,8 @@ pub struct SocksIrcTunnelBackend {
     supervisor: SocksRuntimeSupervisor,
     sam_tcp_port: u16,
     address_book: Option<Arc<RuntimeAddressBookHandle>>,
+    shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+    client_destinations: Option<ClientDestinationStore>,
 }
 
 impl fmt::Debug for SocksIrcTunnelBackend {
@@ -37,11 +40,23 @@ impl SocksIrcTunnelBackend {
             supervisor: SocksRuntimeSupervisor::new(TunnelType::SocksIrc),
             sam_tcp_port,
             address_book: None,
+            shared_registry: None,
+            client_destinations: None,
         }
     }
 
     pub fn with_address_book(mut self, address_book: Arc<RuntimeAddressBookHandle>) -> Self {
         self.address_book = Some(address_book);
+        self
+    }
+
+    pub(crate) fn with_client_runtime(
+        mut self,
+        shared_registry: Arc<super::runtime::session::SharedClientSessionRegistry>,
+        client_destinations: ClientDestinationStore,
+    ) -> Self {
+        self.shared_registry = Some(shared_registry);
+        self.client_destinations = Some(client_destinations);
         self
     }
 }
@@ -69,13 +84,20 @@ impl TunnelBackend for SocksIrcTunnelBackend {
             self.address_book.clone(),
             SOCKS_IRC_OPTIONS,
         )?;
-        config.session_options = super::runtime::session::build_session_options(
+        config.session_options = super::runtime::session::build_client_session_options(
             definition,
             self.sam_tcp_port,
-            false,
-            yosemite::DestinationKind::Transient,
-        )?;
-        self.supervisor.start(config, PayloadMode::Irc).await
+            self.client_destinations.as_ref(),
+        )
+        .await?;
+        self.supervisor
+            .start(
+                config,
+                PayloadMode::Irc,
+                self.shared_registry.clone(),
+                definition.options.shared.unwrap_or(false),
+            )
+            .await
     }
 
     async fn stop(&self, definition: &TunnelDefinition) -> BackendResult<()> {

@@ -7,7 +7,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 use emissary_core::crypto::base64_decode;
@@ -23,6 +23,8 @@ const MAX_STORE_SIZE: usize = 1024 * 1024;
 const MAX_ENTRIES: usize = 1000;
 const MAX_ID_LENGTH: usize = 128;
 const MAX_SECRET_LENGTH: usize = 64 * 1024;
+const IMPORT_DIRECTORY: &str = "server-key-imports";
+const MAX_REFERENCE_LENGTH: usize = 256;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct SecretEnvelope {
@@ -145,6 +147,48 @@ impl ServerDestinationStore {
         self.publish(&entries).await?;
         self.state.lock().await.entries = entries;
         Ok(())
+    }
+
+    /// Import private destination material from the confined administrative
+    /// import root. The returned value is only intended for an immediate
+    /// subsequent `put`; runtime use never follows the external file.
+    pub async fn import_reference(&self, reference: &str) -> Result<StoredDestination, String> {
+        validate_reference(reference)?;
+        let import_root = self
+            .root
+            .parent()
+            .ok_or_else(|| "server destination store has no administrative root".to_string())?
+            .join(IMPORT_DIRECTORY);
+        tokio::fs::create_dir_all(&import_root)
+            .await
+            .map_err(|_| "server private-key import root is unavailable".to_string())?;
+        let metadata = tokio::fs::symlink_metadata(&import_root)
+            .await
+            .map_err(|_| "server private-key import root is unavailable".to_string())?;
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return Err("server private-key import root is not a directory".to_string());
+        }
+        let path = import_root.join(reference);
+        reject_symlink_components(&import_root, &path).await?;
+        let metadata = tokio::fs::symlink_metadata(&path)
+            .await
+            .map_err(|_| "server private-key import is unavailable".to_string())?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err("server private-key import is not a regular file".to_string());
+        }
+        if metadata.len() as usize > MAX_SECRET_LENGTH {
+            return Err("server private-key import is oversized".to_string());
+        }
+        let value = String::from_utf8(
+            tokio::fs::read(path)
+                .await
+                .map_err(|_| "server private-key import could not be read".to_string())?,
+        )
+        .map_err(|_| "server private-key import is not valid text".to_string())?
+        .trim()
+        .to_owned();
+        validate_destination(&value)?;
+        Ok(StoredDestination::from_private(value))
     }
 
     /// Remove one identity after its owning definition has been removed.
@@ -320,6 +364,43 @@ fn validate_entries(entries: &BTreeMap<String, String>) -> Result<(), String> {
     for (identity, destination) in entries {
         validate_identity(identity)?;
         validate_destination(destination)?;
+    }
+    Ok(())
+}
+
+fn validate_reference(reference: &str) -> Result<(), String> {
+    if reference.is_empty()
+        || reference.len() > MAX_REFERENCE_LENGTH
+        || reference.starts_with('/')
+        || reference.contains('\\')
+        || reference.chars().any(char::is_control)
+    {
+        return Err("PrivKeyFile must be a safe relative import reference".to_string());
+    }
+    if Path::new(reference).components().any(|component| {
+        matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_))
+    }) {
+        return Err("PrivKeyFile must not escape the server import root".to_string());
+    }
+    Ok(())
+}
+
+async fn reject_symlink_components(root: &Path, path: &Path) -> Result<(), String> {
+    let relative = path
+        .strip_prefix(root)
+        .map_err(|_| "server private-key import escapes its root".to_string())?;
+    let mut current = root.to_path_buf();
+    for component in relative.components() {
+        let Component::Normal(component) = component else {
+            return Err("server private-key import path is invalid".to_string());
+        };
+        current.push(component);
+        if tokio::fs::symlink_metadata(&current)
+            .await
+            .is_ok_and(|metadata| metadata.file_type().is_symlink())
+        {
+            return Err("server private-key import contains a symlink".to_string());
+        }
     }
     Ok(())
 }

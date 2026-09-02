@@ -26,16 +26,17 @@ use tokio::task::JoinHandle;
 
 use super::{
     options::{validate_options, OptionValidationError, CLIENT_OPTIONS},
-    runtime::{run_generic_client, ClientListenerRuntimeConfig, ClientListenerRuntimeError},
+    runtime::{ClientListenerRuntimeConfig, ClientListenerRuntimeError},
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
 use crate::{
     i2pcontrol::domain::tunnel::{
         TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType,
     },
+    i2pcontrol::client_secret_store::ClientDestinationStore,
     tunnel_client::{ClientRuntimeError, ClientTunnelRuntimeConfig},
 };
-use yosemite::{DestinationKind, SessionOptions};
+use yosemite::SessionOptions;
 
 const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STOP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -61,6 +62,8 @@ struct RuntimeMap {
 pub struct ClientRuntimeSupervisor {
     inner: Arc<Mutex<RuntimeMap>>,
     sam_tcp_port: u16,
+    shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+    client_destinations: Option<ClientDestinationStore>,
 }
 
 impl ClientRuntimeSupervisor {
@@ -69,7 +72,19 @@ impl ClientRuntimeSupervisor {
         Self {
             inner: Arc::new(Mutex::new(RuntimeMap::default())),
             sam_tcp_port,
+            shared_registry: None,
+            client_destinations: None,
         }
+    }
+
+    pub(crate) fn with_client_runtime(
+        mut self,
+        shared_registry: Arc<super::runtime::session::SharedClientSessionRegistry>,
+        client_destinations: ClientDestinationStore,
+    ) -> Self {
+        self.shared_registry = Some(shared_registry);
+        self.client_destinations = Some(client_destinations);
+        self
     }
 
     fn reserve(
@@ -214,6 +229,8 @@ impl ClientRuntimeSupervisor {
         config: ClientTunnelRuntimeConfig,
         session_options: SessionOptions,
         delay_open: bool,
+        shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+        shared: bool,
     ) -> BackendResult<()> {
         let (generation, cancellation) = self.reserve(&config)?;
         let ready_config = config.clone();
@@ -223,7 +240,7 @@ impl ClientRuntimeSupervisor {
         let task_name = name.clone();
         let (listener_ready_tx, listener_ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
-            let result = std::panic::AssertUnwindSafe(run_generic_client(
+            let result = std::panic::AssertUnwindSafe(super::runtime::run_generic_client_with_shared_session(
                 ClientListenerRuntimeConfig {
                     name: ready_config.name,
                     bind_address: ready_config
@@ -243,6 +260,8 @@ impl ClientRuntimeSupervisor {
                 },
                 ready_cancellation.clone(),
                 listener_ready_tx,
+                shared_registry,
+                shared,
             ))
             .catch_unwind()
             .await
@@ -331,6 +350,17 @@ impl ClientTunnelBackend {
         }
     }
 
+    pub(crate) fn with_client_runtime(
+        mut self,
+        shared_registry: Arc<super::runtime::session::SharedClientSessionRegistry>,
+        client_destinations: ClientDestinationStore,
+    ) -> Self {
+        self.supervisor = self
+            .supervisor
+            .with_client_runtime(shared_registry, client_destinations);
+        self
+    }
+
     fn config(&self, definition: &TunnelDefinition) -> BackendResult<ClientTunnelRuntimeConfig> {
         if definition.ownership != TunnelOwnership::ControlPlane {
             return Err(BackendError::InvalidState {
@@ -387,6 +417,10 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "i2p.tunnel.listenInterface",
         "i2p.tunnel.listenPort",
         "DelayOpen",
+        "Shared",
+        "NewDest",
+        "PersistentClientKey",
+        "PrivKeyFile",
     ];
     const METADATA: &[&str] = &[
         "name",
@@ -439,17 +473,19 @@ impl TunnelBackend for ClientTunnelBackend {
 
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
         let config = self.config(definition)?;
-        let session_options = super::runtime::session::build_session_options(
+        let session_options = super::runtime::session::build_client_session_options(
             definition,
             self.supervisor.sam_tcp_port,
-            false,
-            DestinationKind::Transient,
-        )?;
+            self.supervisor.client_destinations.as_ref(),
+        )
+        .await?;
         self.supervisor
             .start(
                 config,
                 session_options,
                 definition.options.delay_open.unwrap_or(false),
+                self.supervisor.shared_registry.clone(),
+                definition.options.shared.unwrap_or(false),
             )
             .await
     }

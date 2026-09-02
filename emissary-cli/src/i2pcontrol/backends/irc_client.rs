@@ -12,8 +12,9 @@ use super::{
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
 use crate::i2pcontrol::{
+    client_secret_store::ClientDestinationStore,
     backends::runtime::{
-        run_client_listener, ClientConnectionHandler, ClientListenerRuntimeConfig,
+        ClientConnectionHandler, ClientListenerRuntimeConfig,
         ClientListenerRuntimeError,
     },
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
@@ -192,7 +193,12 @@ impl IrcClientRuntimeSupervisor {
         }
     }
 
-    async fn start(&self, config: IrcClientConfig) -> BackendResult<()> {
+    async fn start(
+        &self,
+        config: IrcClientConfig,
+        shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+        shared: bool,
+    ) -> BackendResult<()> {
         let name = config.name.clone();
         let (generation, cancellation) = self.reserve(&name)?;
         let map = Arc::clone(&self.inner);
@@ -208,7 +214,7 @@ impl IrcClientRuntimeSupervisor {
         });
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
-            let result = std::panic::AssertUnwindSafe(run_client_listener(
+            let result = std::panic::AssertUnwindSafe(super::runtime::run_client_listener_with_shared_session(
                 ClientListenerRuntimeConfig {
                     name: config.name,
                     bind_address: config.bind_address,
@@ -223,6 +229,8 @@ impl IrcClientRuntimeSupervisor {
                 },
                 ready_cancellation.clone(),
                 ready_tx,
+                shared_registry,
+                shared,
             ))
             .catch_unwind()
             .await
@@ -276,6 +284,8 @@ impl IrcClientRuntimeSupervisor {
 pub struct IrcClientTunnelBackend {
     supervisor: IrcClientRuntimeSupervisor,
     sam_tcp_port: u16,
+    shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+    client_destinations: Option<ClientDestinationStore>,
 }
 
 impl IrcClientTunnelBackend {
@@ -283,7 +293,19 @@ impl IrcClientTunnelBackend {
         Self {
             supervisor: IrcClientRuntimeSupervisor::new(),
             sam_tcp_port,
+            shared_registry: None,
+            client_destinations: None,
         }
+    }
+
+    pub(crate) fn with_client_runtime(
+        mut self,
+        shared_registry: Arc<super::runtime::session::SharedClientSessionRegistry>,
+        client_destinations: ClientDestinationStore,
+    ) -> Self {
+        self.shared_registry = Some(shared_registry);
+        self.client_destinations = Some(client_destinations);
+        self
     }
 
     fn config(&self, definition: &TunnelDefinition) -> BackendResult<IrcClientConfig> {
@@ -367,13 +389,19 @@ impl TunnelBackend for IrcClientTunnelBackend {
 
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
         let mut config = self.config(definition)?;
-        config.session_options = super::runtime::session::build_session_options(
+        config.session_options = super::runtime::session::build_client_session_options(
             definition,
             self.sam_tcp_port,
-            false,
-            yosemite::DestinationKind::Transient,
-        )?;
-        self.supervisor.start(config).await
+            self.client_destinations.as_ref(),
+        )
+        .await?;
+        self.supervisor
+            .start(
+                config,
+                self.shared_registry.clone(),
+                definition.options.shared.unwrap_or(false),
+            )
+            .await
     }
 
     async fn stop(&self, definition: &TunnelDefinition) -> BackendResult<()> {

@@ -492,6 +492,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "Name",
         "Type",
         "Description",
+        "PrivKeyFile",
         "StartOnLoad",
         "Action",
     ];

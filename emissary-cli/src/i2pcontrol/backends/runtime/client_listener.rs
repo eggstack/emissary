@@ -14,6 +14,7 @@ use tokio::{
 use yosemite::{style, Session, SessionOptions, StreamOptions};
 
 use super::task_group::BoundedTaskGroup;
+use super::session::{SharedClientSessionRegistry, SharedStreamSessionLease};
 
 const STOP_TIMEOUT: Duration = Duration::from_secs(5);
 const DEFAULT_MAX_CONNECTIONS: usize = 128;
@@ -24,16 +25,28 @@ pub type ClientConnectionHandler =
 
 type SharedSession = Arc<Mutex<Session<style::Stream>>>;
 
+struct SessionResource {
+    session: SharedSession,
+    _shared_lease: Option<SharedStreamSessionLease>,
+}
+
+enum EagerSession {
+    Local(Box<Session<style::Stream>>),
+    Shared(SharedStreamSessionLease),
+}
+
 /// Owns exactly one session for one listener generation.
 ///
 /// Delayed generations leave the cell empty until a handler asks for the
 /// session. `OnceCell` serializes concurrent first users, while the
 /// generation cancellation receiver makes a cancelled setup deterministic.
 struct ClientSessionOwner {
-    session: OnceCell<Result<SharedSession, ClientListenerRuntimeError>>,
+    session: OnceCell<Result<SessionResource, ClientListenerRuntimeError>>,
     session_options: SessionOptions,
     cancellation: watch::Receiver<bool>,
     setup_failed: mpsc::UnboundedSender<()>,
+    shared_registry: Option<Arc<SharedClientSessionRegistry>>,
+    shared: bool,
 }
 
 impl ClientSessionOwner {
@@ -41,12 +54,16 @@ impl ClientSessionOwner {
         session_options: SessionOptions,
         cancellation: watch::Receiver<bool>,
         setup_failed: mpsc::UnboundedSender<()>,
+        shared_registry: Option<Arc<SharedClientSessionRegistry>>,
+        shared: bool,
     ) -> Self {
         Self {
             session: OnceCell::const_new(),
             session_options,
             cancellation,
             setup_failed,
+            shared_registry,
+            shared,
         }
     }
 
@@ -54,34 +71,82 @@ impl ClientSessionOwner {
         session: Session<style::Stream>,
         cancellation: watch::Receiver<bool>,
         setup_failed: mpsc::UnboundedSender<()>,
+        shared_lease: Option<SharedStreamSessionLease>,
     ) -> Self {
         let cell = OnceCell::const_new();
-        let _ = cell.set(Ok(Arc::new(Mutex::new(session))));
+        let session = shared_lease
+            .as_ref()
+            .map_or_else(|| Arc::new(Mutex::new(session)), |lease| Arc::clone(&lease.session));
+        let _ = cell.set(Ok(SessionResource {
+            session,
+            _shared_lease: shared_lease,
+        }));
         Self {
             session: cell,
             session_options: SessionOptions::default(),
             cancellation,
             setup_failed,
+            shared_registry: None,
+            shared: false,
+        }
+    }
+
+    fn eager_shared(
+        lease: SharedStreamSessionLease,
+        cancellation: watch::Receiver<bool>,
+        setup_failed: mpsc::UnboundedSender<()>,
+    ) -> Self {
+        let cell = OnceCell::const_new();
+        let _ = cell.set(Ok(SessionResource {
+            session: Arc::clone(&lease.session),
+            _shared_lease: Some(lease),
+        }));
+        Self {
+            session: cell,
+            session_options: SessionOptions::default(),
+            cancellation,
+            setup_failed,
+            shared_registry: None,
+            shared: false,
         }
     }
 
     async fn get(&self) -> Result<SharedSession, ClientListenerRuntimeError> {
         let cancellation = self.cancellation.clone();
         let session_options = self.session_options.clone();
+        let shared_registry = self.shared_registry.clone();
+        let shared = self.shared;
         let result = self
             .session
             .get_or_init(|| async move {
-                tokio::select! {
+                let resource = tokio::select! {
                     biased;
                     _ = cancellation_won(cancellation) => Err(ClientListenerRuntimeError::SessionSetup),
-                    result = Session::<style::Stream>::new(session_options) => result
-                        .map(|session| Arc::new(Mutex::new(session)))
-                        .map_err(|_| ClientListenerRuntimeError::SessionSetup),
-                }
+                    result = async {
+                        if shared {
+                            let Some(registry) = shared_registry else {
+                                return Err("shared client session owner unavailable".to_string());
+                            };
+                            registry.acquire_stream(session_options).await
+                                .map(|lease| SessionResource {
+                                    session: Arc::clone(&lease.session),
+                                    _shared_lease: Some(lease),
+                                })
+                        } else {
+                            Session::<style::Stream>::new(session_options).await
+                                .map(|session| SessionResource {
+                                    session: Arc::new(Mutex::new(session)),
+                                    _shared_lease: None,
+                                })
+                                .map_err(|_| "client session setup failed".to_string())
+                        }
+                    } => result.map_err(|_| ClientListenerRuntimeError::SessionSetup),
+                };
+                resource
             })
             .await;
         match result {
-            Ok(session) => Ok(Arc::clone(session)),
+            Ok(resource) => Ok(Arc::clone(&resource.session)),
             Err(error) => {
                 let _ = self.setup_failed.send(());
                 Err(error.clone())
@@ -187,8 +252,19 @@ pub enum ClientListenerRuntimeError {
 /// Own a local listener and one outbound Yosemite streaming session until cancelled.
 pub async fn run_client_listener(
     config: ClientListenerRuntimeConfig,
+    cancellation: watch::Receiver<bool>,
+    ready: oneshot::Sender<Result<SocketAddr, ClientListenerRuntimeError>>,
+) -> Result<(), ClientListenerRuntimeError> {
+    run_client_listener_with_shared_session(config, cancellation, ready, None, false).await
+}
+
+/// Run a client listener using a shared session owner when requested.
+pub async fn run_client_listener_with_shared_session(
+    config: ClientListenerRuntimeConfig,
     mut cancellation: watch::Receiver<bool>,
     ready: oneshot::Sender<Result<SocketAddr, ClientListenerRuntimeError>>,
+    shared_registry: Option<Arc<SharedClientSessionRegistry>>,
+    shared: bool,
 ) -> Result<(), ClientListenerRuntimeError> {
     let (setup_failed, mut setup_failed_rx) = mpsc::unbounded_channel();
     let eager_session = if config.delay_open {
@@ -199,7 +275,22 @@ pub async fn run_client_listener(
                 let _ = ready.send(Err(ClientListenerRuntimeError::SessionSetup));
                 return Ok(());
             }
-            result = Session::<style::Stream>::new(config.session_options.clone()) => match result {
+            result = async {
+                if shared {
+                    let Some(registry) = shared_registry.as_ref() else {
+                        return Err(());
+                    };
+                    registry
+                        .acquire_stream(config.session_options.clone())
+                        .await
+                        .map(EagerSession::Shared)
+                        .map_err(|_| ())
+                } else {
+                    Session::<style::Stream>::new(config.session_options.clone()).await
+                        .map_err(|_| ())
+                        .map(|session| EagerSession::Local(Box::new(session)))
+                }
+            } => match result {
                 Ok(session) => session,
                 Err(_) => {
                     let _ = ready.send(Err(ClientListenerRuntimeError::SessionSetup));
@@ -219,9 +310,20 @@ pub async fn run_client_listener(
     };
     let local_address = listener.local_addr().map_err(|_| ClientListenerRuntimeError::Bind)?;
     let session = Arc::new(match eager_session {
-        Some(session) => ClientSessionOwner::eager(session, cancellation.clone(), setup_failed),
+        Some(EagerSession::Shared(lease)) => {
+            ClientSessionOwner::eager_shared(lease, cancellation.clone(), setup_failed)
+        }
+        Some(EagerSession::Local(session)) => {
+            ClientSessionOwner::eager(*session, cancellation.clone(), setup_failed, None)
+        },
         None => {
-            ClientSessionOwner::delayed(config.session_options, cancellation.clone(), setup_failed)
+            ClientSessionOwner::delayed(
+                config.session_options,
+                cancellation.clone(),
+                setup_failed,
+                shared_registry,
+                shared,
+            )
         }
     });
     let connector = ClientStreamConnector {
@@ -273,6 +375,17 @@ pub async fn run_generic_client(
     cancellation: watch::Receiver<bool>,
     ready: oneshot::Sender<Result<SocketAddr, ClientListenerRuntimeError>>,
 ) -> Result<(), ClientListenerRuntimeError> {
+    run_generic_client_with_shared_session(config, cancellation, ready, None, false).await
+}
+
+/// Run the generic client through the shared-session-aware listener owner.
+pub async fn run_generic_client_with_shared_session(
+    config: ClientListenerRuntimeConfig,
+    cancellation: watch::Receiver<bool>,
+    ready: oneshot::Sender<Result<SocketAddr, ClientListenerRuntimeError>>,
+    shared_registry: Option<Arc<SharedClientSessionRegistry>>,
+    shared: bool,
+) -> Result<(), ClientListenerRuntimeError> {
     let handler: ClientConnectionHandler = Arc::new(|mut local, connector| {
         Box::pin(async move {
             if let Ok(mut remote) = connector.connect().await {
@@ -281,7 +394,8 @@ pub async fn run_generic_client(
         })
     });
     let config = ClientListenerRuntimeConfig { handler, ..config };
-    run_client_listener(config, cancellation, ready).await
+    run_client_listener_with_shared_session(config, cancellation, ready, shared_registry, shared)
+        .await
 }
 
 #[cfg(test)]
@@ -600,6 +714,42 @@ mod tests {
         assert_eq!(session_creates.load(Ordering::Acquire), 1);
         cancel_tx.send(true).unwrap();
         assert!(runtime.await.unwrap().is_ok());
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn shared_listeners_retain_one_session_until_last_listener_stops() {
+        let (sam_port, sam_task, _hellos, session_creates) = counting_fake_sam().await;
+        let registry = Arc::new(SharedClientSessionRegistry::new());
+        let handler: ClientConnectionHandler = Arc::new(|_, _| Box::pin(async {}));
+        let (first_cancel, first_rx) = watch::channel(false);
+        let (first_ready, first_ready_rx) = oneshot::channel();
+        let first = tokio::spawn(run_client_listener_with_shared_session(
+            config(sam_port, Arc::clone(&handler), 1),
+            first_rx,
+            first_ready,
+            Some(Arc::clone(&registry)),
+            true,
+        ));
+        first_ready_rx.await.unwrap().unwrap();
+
+        let (second_cancel, second_rx) = watch::channel(false);
+        let (second_ready, second_ready_rx) = oneshot::channel();
+        let second = tokio::spawn(run_client_listener_with_shared_session(
+            config(sam_port, handler, 1),
+            second_rx,
+            second_ready,
+            Some(registry),
+            true,
+        ));
+        second_ready_rx.await.unwrap().unwrap();
+        assert_eq!(session_creates.load(Ordering::Acquire), 1);
+
+        first_cancel.send(true).unwrap();
+        assert!(first.await.unwrap().is_ok());
+        assert!(!second.is_finished());
+        second_cancel.send(true).unwrap();
+        assert!(second.await.unwrap().is_ok());
         sam_task.abort();
     }
 

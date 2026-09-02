@@ -23,6 +23,7 @@ use crate::i2pcontrol::{
     address_book_runtime::RuntimeAddressBookHandle,
     domain::tunnel::{TunnelType, ALL_TUNNEL_ACTIONS, ALL_TUNNEL_TYPES},
     server_secret_store::ServerDestinationStore,
+    client_secret_store::ClientDestinationStore,
 };
 
 /// An exhaustive tunnel backend registry.
@@ -188,14 +189,44 @@ pub fn create_production_registry_with_server_store_and_address_book(
     server_store: ServerDestinationStore,
     address_book: Option<Arc<RuntimeAddressBookHandle>>,
 ) -> Result<TunnelBackendRegistry, RegistryError> {
-    let client =
-        Arc::new(super::client::ClientTunnelBackend::new(sam_tcp_port)) as Arc<dyn TunnelBackend>;
+    create_production_registry_with_runtime(
+        sam_tcp_port,
+        server_store,
+        address_book,
+        None,
+        None,
+    )
+}
+
+/// Create the production registry with the bounded client identity/session
+/// owners composed by the I2PControl control plane.
+pub(crate) fn create_production_registry_with_runtime(
+    sam_tcp_port: u16,
+    server_store: ServerDestinationStore,
+    address_book: Option<Arc<RuntimeAddressBookHandle>>,
+    shared_sessions: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
+    client_destinations: Option<ClientDestinationStore>,
+) -> Result<TunnelBackendRegistry, RegistryError> {
+    let client = {
+        let backend = super::client::ClientTunnelBackend::new(sam_tcp_port);
+        let backend = match (shared_sessions.clone(), client_destinations.clone()) {
+            (Some(shared), Some(destinations)) => backend.with_client_runtime(shared, destinations),
+            _ => backend,
+        };
+        Arc::new(backend) as Arc<dyn TunnelBackend>
+    };
     let server = Arc::new(super::server::ServerTunnelBackend::new(
         sam_tcp_port,
         server_store.clone(),
     )) as Arc<dyn TunnelBackend>;
-    let irc_client = Arc::new(super::irc_client::IrcClientTunnelBackend::new(sam_tcp_port))
-        as Arc<dyn TunnelBackend>;
+    let irc_client = {
+        let backend = super::irc_client::IrcClientTunnelBackend::new(sam_tcp_port);
+        let backend = match (shared_sessions.clone(), client_destinations.clone()) {
+            (Some(shared), Some(destinations)) => backend.with_client_runtime(shared, destinations),
+            _ => backend,
+        };
+        Arc::new(backend) as Arc<dyn TunnelBackend>
+    };
     let irc_server = Arc::new(super::irc_server::IrcServerTunnelBackend::new(
         sam_tcp_port,
         server_store.clone(),
@@ -209,29 +240,56 @@ pub fn create_production_registry_with_server_store_and_address_book(
         server_store.clone(),
         address_book.clone(),
     )) as Arc<dyn TunnelBackend>;
-    let http_client = Arc::new(match address_book.clone() {
+    let http_client_backend = match address_book.clone() {
         Some(address_book) => super::http_client::HttpClientTunnelBackend::new(sam_tcp_port)
             .with_address_book(address_book),
         None => super::http_client::HttpClientTunnelBackend::new(sam_tcp_port),
-    }) as Arc<dyn TunnelBackend>;
-    let connect_client = Arc::new(match address_book.clone() {
+    };
+    let http_client_backend = match (shared_sessions.clone(), client_destinations.clone()) {
+        (Some(shared), Some(destinations)) =>
+            http_client_backend.with_client_runtime(shared, destinations),
+        _ => http_client_backend,
+    };
+    let http_client = Arc::new(http_client_backend) as Arc<dyn TunnelBackend>;
+    let connect_client_backend = match address_book.clone() {
         Some(address_book) => super::connect_client::ConnectClientTunnelBackend::new(sam_tcp_port)
             .with_address_book(address_book),
         None => super::connect_client::ConnectClientTunnelBackend::new(sam_tcp_port),
-    }) as Arc<dyn TunnelBackend>;
-    let socks = Arc::new(match address_book.clone() {
+    };
+    let connect_client_backend = match (shared_sessions.clone(), client_destinations.clone()) {
+        (Some(shared), Some(destinations)) =>
+            connect_client_backend.with_client_runtime(shared, destinations),
+        _ => connect_client_backend,
+    };
+    let connect_client = Arc::new(connect_client_backend) as Arc<dyn TunnelBackend>;
+    let socks_backend = match address_book.clone() {
         Some(address_book) =>
             super::socks::SocksTunnelBackend::new(sam_tcp_port).with_address_book(address_book),
         None => super::socks::SocksTunnelBackend::new(sam_tcp_port),
-    }) as Arc<dyn TunnelBackend>;
-    let socks_irc = Arc::new(match address_book {
+    };
+    let socks_backend = match (shared_sessions.clone(), client_destinations.clone()) {
+        (Some(shared), Some(destinations)) => socks_backend.with_client_runtime(shared, destinations),
+        _ => socks_backend,
+    };
+    let socks = Arc::new(socks_backend) as Arc<dyn TunnelBackend>;
+    let socks_irc_backend = match address_book {
         Some(address_book) => super::socks_irc::SocksIrcTunnelBackend::new(sam_tcp_port)
             .with_address_book(address_book),
         None => super::socks_irc::SocksIrcTunnelBackend::new(sam_tcp_port),
-    }) as Arc<dyn TunnelBackend>;
-    let streamr_client = Arc::new(super::streamr::StreamrClientTunnelBackend::new(
-        sam_tcp_port,
-    )) as Arc<dyn TunnelBackend>;
+    };
+    let socks_irc_backend = match (shared_sessions.clone(), client_destinations.clone()) {
+        (Some(shared), Some(destinations)) =>
+            socks_irc_backend.with_client_runtime(shared, destinations),
+        _ => socks_irc_backend,
+    };
+    let socks_irc = Arc::new(socks_irc_backend) as Arc<dyn TunnelBackend>;
+    let streamr_client_backend = super::streamr::StreamrClientTunnelBackend::new(sam_tcp_port);
+    let streamr_client_backend = match (shared_sessions, client_destinations) {
+        (Some(shared), Some(destinations)) =>
+            streamr_client_backend.with_client_runtime(shared, destinations),
+        _ => streamr_client_backend,
+    };
+    let streamr_client = Arc::new(streamr_client_backend) as Arc<dyn TunnelBackend>;
     let streamr_server = Arc::new(super::streamr::StreamrServerTunnelBackend::new(
         sam_tcp_port,
         server_store,

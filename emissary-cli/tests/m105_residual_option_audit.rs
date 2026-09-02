@@ -130,8 +130,44 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         .collect();
     assert_eq!(candidates.len(), 6);
     assert_eq!(actual.len(), 164);
-    assert_eq!(
-        current_blocked,
-        actual.difference(&candidates).cloned().collect()
-    );
+    let m110_completed = BTreeSet::from([
+        ("Shared", "client"),
+        ("Shared", "httpclient"),
+        ("Shared", "ircclient"),
+        ("Shared", "socks"),
+        ("Shared", "socksirc"),
+        ("Shared", "connectclient"),
+        ("Shared", "streamrclient"),
+        ("NewDest", "client"),
+        ("NewDest", "httpclient"),
+        ("NewDest", "ircclient"),
+        ("NewDest", "socks"),
+        ("NewDest", "socksirc"),
+        ("NewDest", "connectclient"),
+        ("NewDest", "streamrclient"),
+        ("PersistentClientKey", "client"),
+        ("PersistentClientKey", "httpclient"),
+        ("PersistentClientKey", "ircclient"),
+        ("PersistentClientKey", "socks"),
+        ("PersistentClientKey", "socksirc"),
+        ("PersistentClientKey", "connectclient"),
+        ("PersistentClientKey", "streamrclient"),
+        ("PrivKeyFile", "client"),
+        ("PrivKeyFile", "httpclient"),
+        ("PrivKeyFile", "ircclient"),
+        ("PrivKeyFile", "socks"),
+        ("PrivKeyFile", "socksirc"),
+        ("PrivKeyFile", "connectclient"),
+        ("PrivKeyFile", "server"),
+        ("PrivKeyFile", "httpserver"),
+        ("PrivKeyFile", "httpbidirserver"),
+        ("PrivKeyFile", "ircserver"),
+    ]);
+    assert_eq!(m110_completed.len(), 31);
+    let expected = actual
+        .difference(&candidates)
+        .filter(|cell| !m110_completed.contains(&(cell.0.as_str(), cell.1.as_str())))
+        .cloned()
+        .collect();
+    assert_eq!(current_blocked, expected);
 }

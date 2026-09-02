@@ -779,6 +779,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "TotalBanTime",
         "HostingDestination",
         "Description",
+        "PrivKeyFile",
         "StartOnLoad",
     ];
     const METADATA: &[&str] = &["name", "type", "Name", "Type", "Action"];

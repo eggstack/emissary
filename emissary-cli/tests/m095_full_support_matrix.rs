@@ -212,8 +212,8 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
             }
         }
         if string_field(row, "canonical_key") == "PrivKeyFile" {
-            assert_eq!(string_field(row, "blocking_milestone"), "M097");
-            assert!(string_field(row, "blocked_primitive").contains("private-key import"));
+            assert_eq!(string_field(row, "completion_owner"), "M110");
+            assert_eq!(cells[6].as_str(), Some("not_applicable"));
         }
     }
 

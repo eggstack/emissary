@@ -1,6 +1,6 @@
 # M117 — Internal Yosemite Fork Pin and I2PControl Adapter Integration
 
-Status: **active**
+Status: **closed**
 
 Class: dependency integration / containment / capability plumbing
 
@@ -225,3 +225,7 @@ Stop if:
 ## 14. Closure evidence
 
 Require exact Yosemite SHA/diff, Cargo source/provenance evidence, dependency-tree feature isolation, changed-path list, fork API reachability tests, shared-session compatibility evidence, M061/M062 results, broad verification outcomes, unresolved findings, M111 readiness decision, and internal-only attestation.
+
+Implementation commit: `22c893a` (`feat(i2pcontrol): adopt pinned Yosemite fork adapter`).
+
+Closure record: `plans/closure/i2pcontrol-proposal-170/117-closure.md`.

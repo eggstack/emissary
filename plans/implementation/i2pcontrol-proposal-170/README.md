@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; M109, M115, M110, and M116 are closed; M111-M114 remain roadmap-defined and blocked; M095 currently records `248 apply / 134 blocked_primitive / 458 not_applicable`
+Status: partial Proposal 170 production support; M109, M115, M110, M116, and M117 are closed; M111-M114 remain roadmap-defined and blocked; M095 currently records `248 apply / 134 blocked_primitive / 458 not_applicable`
 
 This directory contains bounded internal implementation, audit, corrective, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -11,6 +11,7 @@ Authoritative references:
 - `plans/002-long-term-roadmap.md`
 - `plans/003-planning-process.md`
 - ADR-0001/0002/0003/0004
+- ADR-0005 — internal Yosemite fork dependency boundary
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 - `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md`
 - `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`
@@ -22,6 +23,7 @@ Authoritative references:
 - `105-residual-option-audit.toml`
 - `110-completion-ledger.toml`
 - `plans/closure/i2pcontrol-proposal-170/116-closure.md`
+- `plans/closure/i2pcontrol-proposal-170/117-closure.md`
 - `plans/registry.md`
 
 Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
@@ -38,7 +40,7 @@ Preferred production ownership remains `emissary-cli/src/i2pcontrol/**`.
 
 M061/M062/M063 remain containment authority. M109/M115 are the bounded historical exception for existing CLI startup tunnel ownership. M116 adds **no** non-I2PControl production authority.
 
-No standalone crate split, router-core API, dependency fork, Yosemite patch/vendor, parallel SAM stack, frontend coupling, or hosted CI expansion is authorized by M116.
+No standalone crate split, router-core API, Yosemite patch/vendor, parallel SAM stack, frontend coupling, or hosted CI expansion is authorized by M116. M117 separately closes the ADR-0005-authorized optional, exact-revision I2PControl-only Yosemite alias and adapter integration.
 
 ## Current production state
 
@@ -86,7 +88,8 @@ Official status remains **partial Proposal 170 support**.
 | M115 | closed | M109 runtime-disable/lifecycle corrective |
 | M110 | closed historically; M116 corrective required | shared client session + destination/key/PrivKeyFile ownership |
 | **M116** | **closed** | M110 concurrency/cancellation/identity/Streamr/NewDest/secret corrective; closure recorded |
-| M111 | proposed / dependency-blocked | Yosemite SAM session-wire options; up to 44 cells |
+| **M117** | **closed** | ADR-0005-authorized exact Yosemite fork pin and I2PControl adapter integration; no matrix promotion |
+| M111 | proposed / blocked on M118 | Yosemite SAM session-wire options; up to 44 cells |
 | M112 | proposed / blocked | client proxy/session lifecycle; 69 current cells including seven `NewDest` cells from M116 |
 | M113 | proposed / blocked | server presentation/routing/LeaseSet; up to 21 cells |
 | M114 | proposed / blocked | zero-residual live/reference final reclosure |
@@ -104,7 +107,7 @@ Plans in this completion line:
 - `115-m109-runtime-disable-and-lifecycle-truthfulness-corrective-pass.md`
 - `116-m110-shared-session-and-newdest-corrective-pass.md`
 
-Per `plans/003-planning-process.md`, M116 is closed and no future handoff is currently executable. M111-M114 remain roadmap-only until their independent gates are satisfied.
+Per `plans/003-planning-process.md`, M117 is closed and M118 is the next dependency-ready Emissary handoff. M111 remains roadmap-only and blocked on M118's neutral variance/backup semantics; M112-M114 retain their independent blockers.
 
 ## M116 — closed corrective
 
@@ -136,7 +139,7 @@ A cell becomes/remains `apply` only with request→real-runtime evidence. Diffic
 
 ## M111 — SAM session-wire options
 
-M111 remains dependency-blocked. Required semantics must reach actual Yosemite session creation through an accepted public dependency API. No vendored/path/git Yosemite, raw/parallel SAM stack, or Proposal-shaped core API is authorized.
+M111 remains blocked on M118's neutral router/tunnel-pool semantics and its own semantic re-freeze. M117 supplies the accepted internal generic Yosemite API through ADR-0005; no raw/parallel SAM stack or Proposal-shaped core API is authorized.
 
 ## M112 — client proxy/lifecycle residuals
 

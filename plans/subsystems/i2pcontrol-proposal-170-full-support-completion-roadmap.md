@@ -1,11 +1,12 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096, M098-M110, M115, and M116 closed; M097/M104 closed as blocked; M111-M114 remain roadmap-defined and blocked
+Status: active; M095-M096, M098-M110, M115-M117 closed; M097/M104 closed as blocked; M111-M114 remain roadmap-defined and blocked
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
 Current corrective baseline: `09247ccf8367a7b3a7050e0584614c4e59cafe8e` — post-M110 closure/containment head.
 M116 implementation head: `626d76311a6dc142ecc07827845081b9a9f4c860`.
+M117 implementation head: `22c893a`.
 
 Pinned external authority:
 
@@ -19,7 +20,7 @@ Canonical/internal authority:
 - `plans/001-terminology-and-domain-model.md`;
 - `plans/002-long-term-roadmap.md`;
 - `plans/003-planning-process.md`;
-- ADR-0001/0002/0003/0004;
+- ADR-0001/0002/0003/0004/0005;
 - M061/M062/M063 containment authority;
 - M093 tunnel security reclosure;
 - M095 machine-readable full-support matrix;
@@ -27,6 +28,7 @@ Canonical/internal authority:
 - M110 completion ledger;
 - M109/M115/M110 historical closure evidence;
 - M116 post-M110 corrective plan.
+- M117 internal Yosemite fork pin and I2PControl adapter integration plan/closure.
 
 All external specifications, source trees, documentation, issues, pull requests and reference routers are read-only evidence. All repository writes remain internal to `eggstack/emissary`. No upstream contribution/review/merge/contact activity is authorized.
 
@@ -127,7 +129,7 @@ M116 satisfies none of the reasons to invoke this exception, so no external path
 
 No milestone automatically authorizes Yosemite vendoring/forking/patching, path/git overrides, parallel raw SAM, Proposal-shaped `emissary-core` APIs, or dependencies added merely to increase matrix counts.
 
-M111 remains dependency-blocked until an accepted public Yosemite API exposes its exact session-wire semantics or a separately accepted architecture decision changes dependency policy.
+M117 closed the ADR-0005-authorized internal Yosemite API/dependency boundary. M111 remains blocked on M118's neutral variance/backup runtime semantics and its own semantic re-freeze; no raw/parallel SAM stack or Proposal-shaped core API is authorized.
 
 ## 4. Cross-cutting invariants
 
@@ -197,7 +199,10 @@ M110 shared session + destination/key ownership     [CLOSED — HISTORICAL]
 M116 M110 shared/session/NewDest corrective         [CLOSED]
   |
   v
-M111 SAM session-wire options                       [PROPOSED / DEPENDENCY-BLOCKED]
+M117 internal Yosemite fork + adapter                [CLOSED]
+  |
+  v
+M111 SAM session-wire options                       [PROPOSED / BLOCKED ON M118]
   |
   v
 M112 client proxy/session-lifecycle residuals       [PROPOSED / BLOCKED]
@@ -250,15 +255,30 @@ M116 requires:
 
 Authorized production paths are exclusively under `emissary-cli/src/i2pcontrol/**` and are enumerated in the M116 plan. No core/util/startup/Cargo/Yosemite/frontend/workflow path is authorized.
 
+## 10a. M117 — internal Yosemite fork and adapter integration
+
+Plan: `plans/implementation/i2pcontrol-proposal-170/117-internal-yosemite-fork-pin-and-i2pcontrol-adapter-integration.md`.
+
+Status: **closed**; implementation commit `22c893a`; closure:
+`plans/closure/i2pcontrol-proposal-170/117-closure.md`.
+
+M117 pins Yosemite Y001/Y002's reviewed implementation revision
+`8026f5b424fc178d683e63555335f8b33e0aba04` behind the optional `i2pcontrol`-owned
+`yosemite-i2pcontrol` alias. It routes I2PControl Yosemite use sites through the alias,
+connects the generic session-wire and signature-aware destination APIs, and amends M062
+containment evidence. It does not promote Proposal cells or implement M118 router behavior.
+
 ## 11. M111 — SAM session-wire option completion
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/111-sam-session-wire-option-completion.md`
 
-Status: **proposed / dependency-blocked**.
+Status: **proposed / blocked on M118**.
 
 Target: up to 44 cells. Completion requires real serialization through an accepted public Yosemite API. No raw SAM construction, vendored/path Yosemite, or Proposal-shaped core seam is authorized.
 
-M116 does not satisfy or alter this dependency gate.
+M117 satisfies the accepted generic API/dependency part of this gate. M111 still depends
+on M118's neutral variance/backup runtime semantics and must re-freeze Proposal semantics,
+especially `UseSSL`, before promotion.
 
 ## 12. M112 — client proxy/session-lifecycle residuals
 

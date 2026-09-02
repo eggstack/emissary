@@ -41,7 +41,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M117 active** | M117 is executing against closed Yosemite Y001/Y002; M118 remains independently ready |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M118 ready** | M117 is closed; M118 neutral router capability may execute now; M111 remains blocked on M118 |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M062 regression authority | ADR-0005 permits only optional I2PControl-owned exact-revision fork alias; no global patch/vendor/path dependency |
 | I2PControl tunnel security | closed at M093 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | regression authority | M118 must preserve tunnel anonymity/resource boundaries |
 
@@ -61,7 +61,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 ADR-0005 records the maintainer-authorized internal Yosemite fork strategy.
 
-The ordinary workspace Yosemite dependency remains unchanged for non-I2PControl code. Future M117 may add a second optional package alias pinned by exact `git + rev` to `eggstack/yosemite`, activated only by `i2pcontrol` and imported only below `emissary-cli/src/i2pcontrol/**`.
+The ordinary workspace Yosemite dependency remains unchanged for non-I2PControl code. M117 added a second optional package alias pinned by exact `git + rev` to `eggstack/yosemite`, activated only by `i2pcontrol` and imported only below `emissary-cli/src/i2pcontrol/**`.
 
 No `[patch.crates-io]`, workspace replacement, path dependency, vendoring, floating branch dependency, or upstream activity is authorized.
 
@@ -86,7 +86,7 @@ variance + backups              SESSION CREATE surface
   |                             |
   |                             v
   |                         M117 exact fork alias/adoption
-  |                         [ACTIVE; PIN 8026f5b]
+  |                         [CLOSED; PIN 8026f5b]
   |                             |
   +--------------+--------------+
                  |
@@ -106,19 +106,21 @@ M114 live/reference final reclosure                  [ROADMAP / BLOCKED]
 
 M110-M114 identifiers remain stable; later corrective/dependency milestones are inserted without renumbering historical plans.
 
-## Current Emissary handoff — M117
+## Closed Emissary handoff — M117
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/117-internal-yosemite-fork-pin-and-i2pcontrol-adapter-integration.md`
 
-Status: **active**.
+Status: **closed**; implementation commit `22c893a`; closure:
+`plans/closure/i2pcontrol-proposal-170/117-closure.md`.
 
 Yosemite Y001 and Y002 are closed in `eggstack/yosemite`. M117 pins the exact Y002
 implementation revision `8026f5b424fc178d683e63555335f8b33e0aba04`, which contains Y001,
-and is limited to the I2PControl feature-owned adapter boundary.
+and is limited to the I2PControl feature-owned adapter boundary. It does not promote
+Proposal cells or implement M118 router behavior.
 
-## Independently ready Emissary handoff — M118
+## Current Emissary handoff — M118
 
 Plan:
 
@@ -148,7 +150,9 @@ Plan:
 
 Status: **satisfied** by Yosemite Y001/Y002 closure and the exact reviewed fork commit above.
 
-M117 will not replace the workspace Yosemite dependency. It may add only an optional `yosemite-i2pcontrol` package alias in `emissary-cli`, exact-revision pinned and feature-owned, then migrate I2PControl-only imports/use sites.
+M117 did not replace the workspace Yosemite dependency. It added only the optional
+`yosemite-i2pcontrol` package alias in `emissary-cli`, exact-revision pinned and
+feature-owned, and migrated I2PControl-only imports/use sites.
 
 M117 implements no router behavior and no Proposal cell promotion.
 
@@ -158,7 +162,7 @@ M117 implements no router behavior and no Proposal cell promotion.
 
 `plans/implementation/i2pcontrol-proposal-170/111-sam-session-wire-option-completion.md`
 
-Blocked until M117 provides the accepted fork API and M118 provides any required real router effect for variance/backups. M111 must re-freeze `UseSSL` semantics and MUST NOT map Proposal `UseSSL` to Yosemite's SAM-router transport `ssl` merely because the field exists.
+Blocked on M118's required real router effect for variance/backups and its own semantic re-freeze. M117 provides the accepted internal fork API. M111 must re-freeze `UseSSL` semantics and MUST NOT map Proposal `UseSSL` to Yosemite's SAM-router transport `ssl` merely because the field exists.
 
 ### M112
 
@@ -200,13 +204,14 @@ A cell becomes `apply` only with real request→runtime evidence. `not_applicabl
 | M115 | closed | `plans/closure/i2pcontrol-proposal-170/115-closure.md` |
 | M110 | closed historically; corrected by M116 | `plans/closure/i2pcontrol-proposal-170/110-closure.md` |
 | M116 | closed | `plans/closure/i2pcontrol-proposal-170/116-closure.md` |
+| M117 | closed | `plans/closure/i2pcontrol-proposal-170/117-closure.md` |
 
 M093 remains tunnel production/security regression authority. M092 remains historical authority against unauthorized Yosemite/core/vendor changes; ADR-0005 supersedes only its blanket internal-fork prohibition with the exact alias/revision strategy above.
 
 ## Registry maintenance rules
 
-1. M117 is the current active Emissary implementation handoff; M118 remains independently ready.
-2. M117's Yosemite dependency gate is closed at the exact pinned revision above.
+1. M118 is the current dependency-ready Emissary implementation handoff.
+2. M117 is closed at the exact pinned Yosemite revision above.
 3. Yosemite Y001 is separately ready only in `eggstack/yosemite`; Emissary agents must not implement it in this repository.
 4. M111-M114 must not execute until their named gates close and the specific plan is promoted.
 5. Treat `248 / 134 / 458` as the current closed matrix; prerequisite infrastructure does not alter it.

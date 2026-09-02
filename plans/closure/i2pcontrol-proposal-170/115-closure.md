@@ -10,11 +10,12 @@ Source subsystem roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`
 
-Repository baseline reviewed: `ee3b444` (implementation head)
+Repository baseline reviewed: `ecb2245` (implementation head)
 
 Implementation commits:
 
 - `ee3b444` — correct runtime-gated startup lifecycle composition, truthful lifecycle snapshots, retryable shared startup-client sessions, and focused regressions.
+- `ecb2245` — commit lifecycle state before final shared-session release and release on abnormal stop paths.
 
 ## 1. Executive finding
 

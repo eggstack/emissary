@@ -92,7 +92,7 @@ Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/115-closure.
 
 Baseline:
 
-- `ee3b444` — M115 implementation head.
+- `ecb2245` — M115 implementation head.
 
 Bounded objective:
 

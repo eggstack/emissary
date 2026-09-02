@@ -4,7 +4,7 @@ Status: active; M095-M096 and M098-M109 and M115 closed, M097/M104 closed as blo
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
-Current corrective baseline: `ee3b444` — M115 implementation head; closure and planning reconciliation follow.
+Current corrective baseline: `ecb2245` — M115 implementation head; closure and planning reconciliation follow.
 
 Pinned external authority:
 

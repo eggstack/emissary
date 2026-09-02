@@ -206,6 +206,7 @@ A cell becomes `apply` only with real request→runtime evidence. `not_applicabl
 | M109 | closed | `plans/closure/i2pcontrol-proposal-170/109-closure.md` |
 | M115 | closed | `plans/closure/i2pcontrol-proposal-170/115-closure.md` |
 | M110 | closed historically; corrected by M116 | `plans/closure/i2pcontrol-proposal-170/110-closure.md` |
+| M111 | closed | `plans/closure/i2pcontrol-proposal-170/111-closure.md` |
 | M116 | closed | `plans/closure/i2pcontrol-proposal-170/116-closure.md` |
 | M117 | closed | `plans/closure/i2pcontrol-proposal-170/117-closure.md` |
 | M118 | closed | `plans/closure/i2pcontrol-proposal-170/118-closure.md` |

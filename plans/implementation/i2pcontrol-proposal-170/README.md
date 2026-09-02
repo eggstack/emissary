@@ -25,6 +25,7 @@ Authoritative references:
 - `plans/closure/i2pcontrol-proposal-170/116-closure.md`
 - `plans/closure/i2pcontrol-proposal-170/117-closure.md`
 - `plans/closure/i2pcontrol-proposal-170/118-closure.md`
+- `plans/closure/i2pcontrol-proposal-170/111-closure.md`
 - `plans/registry.md`
 
 Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).

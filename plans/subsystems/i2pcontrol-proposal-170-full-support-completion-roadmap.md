@@ -303,6 +303,7 @@ Target: up to 44 cells. M111 applied the 40 applicable SessionWire cells and kep
 M117 satisfied the accepted generic API/dependency part of this gate and M118 satisfied
 the neutral runtime part. `UseSSL` remains blocked because its Proposal local
 application/session TLS semantics are distinct from Yosemite SAM-control TLS.
+Closure: `plans/closure/i2pcontrol-proposal-170/111-closure.md`.
 
 ## 12. M112 — client proxy/session-lifecycle residuals
 

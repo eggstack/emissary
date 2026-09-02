@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; M109 and **M115 are closed**; **M110 is the ready/registered successor**; M111-M114 remain roadmap-defined and blocked; current TunnelManager matrix remains `224 apply / 158 blocked_primitive / 458 not_applicable`
+Status: partial Proposal 170 production support; M109, **M115, and M110 are closed**; M111-M114 remain roadmap-defined and blocked; current TunnelManager matrix is `255 apply / 127 blocked_primitive / 458 not_applicable`
 
 This directory contains bounded internal implementation, audit, corrective, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -53,8 +53,8 @@ M109/M115 are the bounded exception for existing CLI startup tunnel ownership: o
 
 Current M095 matrix:
 
-- 224 `apply`;
-- 158 `blocked_primitive`;
+- 255 `apply`;
+- 127 `blocked_primitive`;
 - 458 `not_applicable`;
 - 0 planned/unknown/unsupported/accept-inert cells.
 
@@ -80,7 +80,7 @@ Official status remains **partial Proposal 170 support** until the residual-opti
 | M108 | closed | managed TLS upgrade-permission corrective |
 | M109 | closed | startup-managed named lifecycle + `All=true` action semantics; edit/delete contract disposition |
 | **M115** | **closed** | M109 runtime-disable isolation, lifecycle state truthfulness, shared startup-client session recovery/lifetime |
-| **M110** | **ready / registered** | shared client sessions + destination/key/PrivKeyFile ownership; up to 31 cells |
+| **M110** | **closed** | shared client sessions + destination/key/PrivKeyFile ownership; 31 cells |
 | M111 | proposed / dependency-blocked | real Yosemite SAM session-wire option transport; up to 44 cells |
 | M112 | proposed / blocked | client proxy and session-lifecycle residuals; up to 62 cells |
 | M113 | proposed / blocked | server presentation/address routing/LeaseSet residuals; up to 21 cells |
@@ -98,7 +98,7 @@ Plans in this current completion line:
 - `114-full-proposal-170-live-interoperability-and-final-reclosure.md`
 - `115-m109-runtime-disable-and-lifecycle-truthfulness-corrective-pass.md`
 
-Per `plans/003-planning-process.md`, only M110 is currently registered as an executable handoff. The existence of M111-M114 files does not make them ready.
+Per `plans/003-planning-process.md`, M110 is closed and no successor is currently registered: M111-M114 remain roadmap-only until their named capability gates are satisfied.
 
 ## M109 — historical closed handoff
 
@@ -122,15 +122,14 @@ Required outcome:
 - stopping the final active controlled client releases that session;
 - restart/session ownership remains generation-safe;
 - no core/util/Yosemite/Cargo/frontend/workflow change;
-- M095 remains `224 / 158 / 458`.
+- M095 is now `255 / 127 / 458`; M115's historical closure remains `224 / 158 / 458`.
 
 Plan: `115-m109-runtime-disable-and-lifecycle-truthfulness-corrective-pass.md`.
 
 ## Residual option ownership
 
-M105's current 158 cells remain partitioned without overlap:
+M105's historical 164-cell audit is reconciled by the M110 completion ledger. The current 127 cells remain partitioned without overlap:
 
-- M110: 31 — `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile`;
 - M111: 44 — `UseSSL`, `TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions`;
 - M112: 62 — proxy/plugin/jump plus post-M106 client lifecycle rows;
 - M113: 21 — server presentation/address-routing plus LeaseSet rows.
@@ -141,7 +140,7 @@ A cell becomes `apply` only with request→real-runtime evidence. A cell becomes
 
 ## M110 — shared sessions and destination/key ownership
 
-M110 is ready for independent handoff: M109 and M115 are closed, the bounded I2PControl-local shared-session/client-secret owner is explicitly accepted for this next milestone, and accepted Yosemite 0.7.0 exposes public `DestinationKind::Persistent` and `SessionOptions` primitives sufficient for the required destination-material handoff without dependency changes.
+M110 is closed by `plans/closure/i2pcontrol-proposal-170/110-closure.md`. It provides the bounded I2PControl-local shared-session/client-secret owner, confined imported-key ownership, and accepted Yosemite 0.7.0 `DestinationKind::Persistent`/`SessionOptions` handoff for all 31 targeted cells.
 
 M115's neutral startup-client session owner must not be generalized into M110's Proposal `Shared` implementation by implication. M110 now owns its separate capability and secret-ownership implementation.
 

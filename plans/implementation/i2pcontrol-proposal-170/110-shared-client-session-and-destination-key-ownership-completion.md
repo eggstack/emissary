@@ -1,6 +1,6 @@
 # M110 — Shared Client Session and Destination-Key Ownership Completion
 
-Status: **ready** — registered successor to closed M115 corrective
+Status: **closed** — closure: `plans/closure/i2pcontrol-proposal-170/110-closure.md`
 
 Class: capability / lifecycle / secret ownership
 

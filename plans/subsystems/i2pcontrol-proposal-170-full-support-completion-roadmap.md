@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096 and M098-M109 and M115 closed, M097/M104 closed as blocked; **M110 ready**; M111-M114 remain roadmap-defined and blocked on primitive evidence
+Status: active; M095-M096 and M098-M110 and M115 closed, M097/M104 closed as blocked; M111-M114 remain roadmap-defined and blocked on primitive evidence
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -57,8 +57,8 @@ After M109 the fork has:
 Current M095 matrix:
 
 - 70 option rows × 12 canonical tunnel types = 840 cells;
-- 224 `apply`;
-- 158 applicable `blocked_primitive`;
+- 255 `apply`;
+- 127 applicable `blocked_primitive`;
 - 458 `not_applicable`;
 - 0 `planned_apply`, unknown, unsupported, or accept-inert cells.
 
@@ -72,7 +72,7 @@ M115 closed all three findings with runtime-gated composition, atomic last-commi
 
 Remaining completion gates are therefore:
 
-1. **Residual option semantics:** 158 applicable option/type cells remain owned by M110-M113;
+1. **Residual option semantics:** 127 applicable option/type cells remain owned by M111-M113;
 2. **Final evidence:** public/reseeded/reference-router certification remains M114-only after the residual option gates close.
 
 ## 3. Ownership boundary
@@ -146,16 +146,16 @@ This workstream MUST NOT implement unrelated base I2PControl methods, API 2, non
 
 ## 6. Residual option partition
 
-The authoritative cell-level evidence remains M095/M105. The post-M106 residual is 158 cells.
+The authoritative cell-level evidence remains M095/M105 plus the M110 completion ledger. After M110, 127 cells remain.
 
 | Roadmap owner | Residual families | Current maximum cells | Primary blocker |
 |---|---|---:|---|
-| M110 | `Shared`; `NewDest`; `PersistentClientKey`; `PrivKeyFile` | 31 | bounded shared-session/client-secret/key ownership |
+| M110 | `Shared`; `NewDest`; `PersistentClientKey`; `PrivKeyFile` | 31 | closed; bounded shared-session/client-secret/key ownership |
 | M111 | `UseSSL`; `TunnelVariance`; `TunnelBackupQuantity`; `SigType`; `CustomOptions` | 44 | accepted Yosemite public session-wire capability |
 | M112 | `UseOutproxyPlugin`; `SSLProxies`; `JumpList`; `ConnectDelay`; `Profile`; remaining `DelayOpen`; `Reduce*`; `Close*` | 62 | client runtime/proxy semantics and applicability |
 | M113 | `AllowInternalSSL`; `UniqueLocalAddressPerClient`; `MultiHoming`; `EncryptLeaseSet`; `OptionalLookup`; `LeaseSetClientAuths` | 21 | server presentation/routing and LeaseSet security owners |
 
-31 + 44 + 62 + 21 = 158 current blocked cells. M115 owns none of them.
+44 + 62 + 21 = 127 current blocked cells. M110 and M115 own no current blocked cells.
 
 A cell may become `not_applicable` only with affirmative pinned/reference evidence. A cell may remain blocked if a required safe primitive does not exist; in that case M114 cannot become ready and full support cannot be claimed.
 
@@ -171,7 +171,7 @@ M109 startup-managed action semantics               [CLOSED]
 M115 M109 runtime/lifecycle corrective              [CLOSED]
   |
   v
-M110 shared session + destination/key ownership     [READY]
+  M110 shared session + destination/key ownership     [CLOSED]
   |
   v
 M111 SAM session-wire options                       [PROPOSED / BLOCKED ON DEPENDENCY]
@@ -189,7 +189,7 @@ M114 live/reference interoperability + reclosure    [PROPOSED / BLOCKED]
 
 M110-M114 were numbered before the M109 post-closure defects were discovered. Their identifiers remain stable; M115 is inserted into execution order without renumbering those plans.
 
-Only M110 is registered in `plans/registry.md` as dependency-ready.
+M110 is closed; no successor is currently registered in `plans/registry.md`.
 
 ## 8. M109 — startup-managed tunnel action semantics
 
@@ -224,11 +224,11 @@ M115 does not implement Proposal option `Shared` and does not create a general I
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/110-shared-client-session-and-destination-key-ownership-completion.md`
 
-Status: **ready / registered**.
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/110-closure.md`.
 
 Target: up to 31 residual cells.
 
-M109 and M115 are closed. The M115 closure accepts the bounded I2PControl-local ownership model for independent M110 execution, the exact M095/M105 cell set remains frozen, and accepted Yosemite 0.7.0 exposes public `DestinationKind::Persistent` and `SessionOptions` primitives sufficient for the required destination-material handoff without dependency changes.
+M109 and M115 are closed. M110 provides the bounded I2PControl-local ownership model, the exact M095/M105 cell set, and accepted Yosemite 0.7.0 `DestinationKind::Persistent` and `SessionOptions` handoff for all 31 targeted cells.
 
 The neutral M115 startup-session owner is not evidence that Proposal `Shared` is implemented.
 
@@ -351,7 +351,7 @@ Per `plans/003-planning-process.md`:
 
 - M109 remains historically closed;
 - M115 is historically closed;
-- M110 is the sole ready/registered successor handoff;
+- M110 is closed; no successor is currently registered;
 - M111-M114 remain roadmap/indexed but unregistered as active handoffs;
 - M115 closure records the completed M110 readiness review;
 - each later closure decides the next transition;

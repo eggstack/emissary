@@ -33,7 +33,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M110 ready** | implement bounded shared client-session and destination/key ownership; M111 remains dependency-blocked |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | none | M110 closed; M111 remains dependency-blocked |
 | I2PControl Proposal 170 source/truthfulness | RouterInfo source line closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | none | 42 available / 1 neutral / 0 unavailable |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M115 exact M109 CLI-tunnel seam only | M061/M062/M063 remain controlling |
 | I2PControl tunnel runtime | all 12 data planes real | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M115 corrective only | do not redesign data planes or option semantics |
@@ -46,7 +46,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 - All 12 TunnelManager data planes and seven canonical action handlers exist.
 - All six ClientServicesInfo selectors are operational.
 - API 1-only negotiation and M107/M108 managed TLS hardening are operational.
-- Current TunnelManager option matrix: `224 apply / 158 blocked_primitive / 458 not_applicable`.
+- Current TunnelManager option matrix: `255 apply / 127 blocked_primitive / 458 not_applicable`.
 - M109 added named startup lifecycle and mixed `All=true`; M115 corrected runtime-disable isolation, shared-client session recovery/lifetime, and lock-contention state truthfulness.
 - Full Proposal 170 status remains **partial**.
 
@@ -62,7 +62,7 @@ M109 startup-managed action semantics               [CLOSED]
 M115 M109 runtime/lifecycle corrective              [CLOSED]
   |
   v
-M110 shared session + destination/key ownership     [READY — REGISTERED HANDOFF]
+  M110 shared session + destination/key ownership     [CLOSED]
   |
   v
 M111 SAM session-wire options                       [ROADMAP ONLY / DEPENDENCY-BLOCKED]
@@ -80,7 +80,7 @@ M114 live/reference final reclosure                 [ROADMAP ONLY / BLOCKED]
 
 M110-M114 were numbered before this post-M109 corrective was discovered. Their numeric identifiers remain stable; execution order is M109 → M115 → M110 → M111 → M112 → M113 → M114.
 
-Per `plans/003-planning-process.md`, M110 is the sole dependency-ready implementation handoff. M111-M114 MUST NOT be executed until their predecessor/capability gates are satisfied and this registry marks the specific plan ready.
+Per `plans/003-planning-process.md`, M110 is closed and no successor is currently registered. M111-M114 MUST NOT be executed until their predecessor/capability gates are satisfied and this registry marks the specific plan ready.
 
 ## Closed corrective — M115
 
@@ -123,13 +123,13 @@ M115 MUST NOT:
 
 M115 closure leaves M095 exactly `224 / 158 / 458` and records that M110's independent readiness gates are satisfied.
 
-## Ready handoff — M110
+## Closed handoff — M110
 
 ### M110
 
 `plans/implementation/i2pcontrol-proposal-170/110-shared-client-session-and-destination-key-ownership-completion.md`
 
-Ready/registered. Owns up to 31 current cells: `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile`. M115 closure accepts the bounded I2PControl-local ownership model and records sufficient accepted Yosemite 0.7.0 public primitives for the required destination-material handoff.
+Closed; closure: `plans/closure/i2pcontrol-proposal-170/110-closure.md`. Owns 31 cells: `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile`. The closure records the bounded I2PControl-local ownership model, accepted Yosemite 0.7.0 public primitives, and the post-M110 matrix `255 / 127 / 458`.
 
 ## Roadmap-defined future plans — NOT registered for execution
 
@@ -159,9 +159,8 @@ Proposed/blocked. Final reclosure only after M115 is closed, zero applicable M09
 
 ## Residual option ownership
 
-Current 158 cells remain partitioned without overlap:
+Current 127 cells remain partitioned without overlap:
 
-- M110: 31;
 - M111: 44;
 - M112: 62;
 - M113: 21.
@@ -188,10 +187,10 @@ M093 remains the current tunnel production/security authority. M092 remains auth
 
 ## Registry maintenance rules
 
-1. M110 is the sole dependency-ready implementation handoff.
+1. M110 is closed; no successor is currently registered.
 2. M111-M114 are roadmap/indexed only and MUST NOT be executed until this registry marks the specific plan ready.
-3. M115 does not change the `224 / 158 / 458` option matrix.
-4. Do not reattempt final reclosure while M115 is open or any applicable option cell is blocked/planned/unsupported/unknown/inert.
+3. M110 changes the matrix to `255 / 127 / 458`; M115 remains historical at `224 / 158 / 458`.
+4. Do not reattempt final reclosure while any applicable option cell is blocked/planned/unsupported/unknown/inert.
 5. Proposal 170 policy remains under `emissary-cli/src/i2pcontrol/**` wherever possible.
 6. Non-I2PControl production paths require a neutral canonical owner and exact pre-authorization.
 7. No Yosemite vendoring/forking/path override/parallel SAM or Proposal-shaped core API is authorized by these plans.

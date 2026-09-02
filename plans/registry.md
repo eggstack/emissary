@@ -41,7 +41,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M112 closed as blocked** | M113 remains blocked; no dependency-ready Emissary handoff |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M113 closed as blocked** | M114 remains blocked; 70 blocked cells remain (4 UseSSL + 45 M112 + 21 M113) |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M062 regression authority | ADR-0005 permits only optional I2PControl-owned exact-revision fork alias; no global patch/vendor/path dependency |
 | I2PControl tunnel security | closed at M093 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | regression authority | M118 closure preserves tunnel anonymity/resource boundaries |
 
@@ -54,7 +54,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 - API 1-only negotiation and M107/M108 managed TLS hardening are operational.
 - M109/M115 startup lifecycle and M110/M116 shared-session/destination ownership corrective line are closed.
 - M095 records `312 apply / 70 blocked_primitive / 458 not_applicable` after M112.
-- M112 applied 24 TCP client lifecycle cells; 45 M112-owned applicable cells remain explicitly blocked.
+- M112 applied 24 TCP client lifecycle cells; 45 M112-owned applicable cells remain explicitly blocked. M113 retained all 21 server presentation/LeaseSet cells as blocked with exact primitive evidence; no new router subsystem was created.
 - Full Proposal 170 status remains **partial**.
 
 ## Dependency architecture change
@@ -95,9 +95,9 @@ M111 SAM session-wire Proposal mapping               [CLOSED — 40 APPLY / 4 Us
   |
   v
 M112 client proxy/session lifecycle                  [CLOSED AS BLOCKED — 24 APPLY / 45 REMAIN; 5b2f3ca]
-  |
-  v
-M113 server presentation + LeaseSet                  [ROADMAP / BLOCKED]
+   |
+   v
+ M113 server presentation + LeaseSet                  [CLOSED AS BLOCKED — 0 APPLY / 21 REMAIN; 82368ea]
   |   \
   |    `-- interface freeze may unlock Yosemite Y003
   v
@@ -180,7 +180,11 @@ Closure: `plans/closure/i2pcontrol-proposal-170/112-closure.md`.
 
 `plans/implementation/i2pcontrol-proposal-170/113-server-presentation-address-routing-and-leaseset-residual-completion.md`
 
-Blocked. Owns up to 21 server presentation/routing/LeaseSet cells. Its semantic freeze is an interface dependency for Yosemite Y003. Any real encrypted/authenticated LeaseSet primitive missing from Emissary core still requires a separately registered neutral-owner plan before core changes.
+Closed as blocked. Retained all 21 server presentation/routing/LeaseSet cells as
+`blocked_primitive` with exact Yosemite/M093 evidence (AllowInternalSSL,
+UniqueLocalAddressPerClient, MultiHoming, EncryptLeaseSet, OptionalLookup,
+LeaseSetClientAuths). No TLS termination, multihoming, or LeaseSet key stack was
+created. Closure: `plans/closure/i2pcontrol-proposal-170/113-closure.md`.
 
 ### M114
 
@@ -213,16 +217,18 @@ A cell becomes `apply` only with real request→runtime evidence. `not_applicabl
 | M116 | closed | `plans/closure/i2pcontrol-proposal-170/116-closure.md` |
 | M117 | closed | `plans/closure/i2pcontrol-proposal-170/117-closure.md` |
 | M118 | closed | `plans/closure/i2pcontrol-proposal-170/118-closure.md` |
+| M112 | closed as blocked | `plans/closure/i2pcontrol-proposal-170/112-closure.md` |
+| M113 | closed as blocked | `plans/closure/i2pcontrol-proposal-170/113-closure.md` |
 
 M093 remains tunnel production/security regression authority. M092 remains historical authority against unauthorized Yosemite/core/vendor changes; ADR-0005 supersedes only its blanket internal-fork prohibition with the exact alias/revision strategy above.
 
 ## Registry maintenance rules
 
-1. M112 is closed as blocked; M113 is the next roadmap handoff but remains dependency-blocked.
+1. M113 is closed as blocked; M114 is the next roadmap handoff but remains dependency-blocked.
 2. M117 is closed at the exact pinned Yosemite revision above.
 3. M118 is closed at implementation commit `e7f3e04`; its neutral capability does not change matrix counts.
 4. Yosemite Y001 is separately ready only in `eggstack/yosemite`; Emissary agents must not implement it in this repository.
-5. M111 is closed with 40 SessionWire cells applied and four UseSSL cells blocked; M112 is closed as blocked, while M113-M114 remain blocked.
+5. M111 is closed with 40 SessionWire cells applied and four UseSSL cells blocked; M112 and M113 are closed as blocked, while M114 remains blocked.
 6. Treat `312 / 70 / 458` as the current closed matrix; prerequisite infrastructure does not alter it.
 7. Keep Proposal 170 policy under `emissary-cli/src/i2pcontrol/**` wherever possible; M118 is a specifically authorized neutral lower-layer exception.
 8. No global Yosemite patch/replacement/vendor/path dependency is permitted.

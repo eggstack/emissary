@@ -61,6 +61,14 @@ post_m112_applied_families = ["ConnectDelay", "Close", "CloseTime", "NewDest"]
 post_m112_applied_tunnel_types = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient"]
 post_m112_remaining_m112_cells = 45
 post_m112_closure = "plans/closure/i2pcontrol-proposal-170/112-closure.md"
+post_m113_matrix_apply_cells = 312
+post_m113_matrix_blocked_primitive_cells = 70
+post_m113_matrix_not_applicable_cells = 458
+post_m113_matrix_sha256 = "9fea6844e0b7e28959e1169491d100ce2f81124fff790f6c10882b765b41eea9"
+post_m113_completed_cell_count = 0
+post_m113_applied_families = []
+post_m113_remaining_m113_cells = 21
+post_m113_closure = "plans/closure/i2pcontrol-proposal-170/113-closure.md"
 
 [[cells]]
 canonical_option = "Shared"

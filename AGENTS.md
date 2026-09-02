@@ -39,10 +39,12 @@ responses. Keep changes within `emissary-cli/src/i2pcontrol/` and its compositio
 turn the administrative API into a router lifecycle or protocol implementation.
 
 The current Proposal 170 baseline remains partial: RouterInfo is 43 additions with
-42 available, 1 protocol-permitted neutral, and 0 unavailable; non-empty AddressBook
-SetConfig is still rejected truthfully; and unapplied runtime options fail before
-allocation. The authoritative completion inventory is
-`plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`.
+42 available, 1 protocol-permitted neutral, and 0 unavailable; AddressBook all 13
+SetConfig keys are operational; and unapplied runtime options (including 4 UseSSL,
+45 client proxy/reduction, and 21 server LeaseSet/presentation cells documented in
+M111-M113 closures) fail before allocation. The authoritative completion inventory is
+`plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (312
+apply / 70 blocked_primitive / 458 not_applicable after M113).
 
 Streamr is intentionally separate from TCP tunnel helpers. Preserve its documented
 16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh,

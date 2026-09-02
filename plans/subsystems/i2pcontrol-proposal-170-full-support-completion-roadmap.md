@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M112, M115-M118 closed; M097/M104/M112 closed as blocked; M113-M114 remain roadmap-defined and blocked
+Status: active; M095-M113, M115-M118 closed; M097/M104/M112/M113 closed as blocked; M114 remains roadmap-defined and blocked
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -9,6 +9,7 @@ M116 implementation head: `626d76311a6dc142ecc07827845081b9a9f4c860`.
 M117 implementation head: `22c893a`.
 M118 implementation head: `e7f3e04`.
 M112 implementation head: `5b2f3caa6af8767ef393254f20ca010211a8de3a`.
+M113 implementation head: `82368ea` (closure-only; no production delta).
 
 Pinned external authority:
 
@@ -180,7 +181,7 @@ M095/M105 plus M110's completion ledger are current cell evidence, subject to M1
 | M110 | `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile` | 31 promoted cells | historically closed; M116 corrective authority |
 | M111 | `UseSSL`, `TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions` | 4 blocked after 40 applied | closed; UseSSL remains blocked with exact semantic reason |
 | M112 | proxy/plugin/jump + client `ConnectDelay`/`Profile`/remaining `DelayOpen`/`Reduce*`/`Close*`/`NewDest` | 45 blocked | closed as blocked; 24 TCP lifecycle cells applied, Streamr and unsupported owner cells retained |
-| M113 | server presentation/address-routing/LeaseSet | 21 blocked | blocked |
+| M113 | server presentation/address-routing/LeaseSet | 21 blocked | closed as blocked; no safe TLS/multihoming/LeaseSet primitive at 8026f5b |
 
 Current blocked count is 70 = 4 + 45 + 21.
 
@@ -221,7 +222,7 @@ M111 SAM session-wire options                       [CLOSED — 40 APPLY / 4 Use
 M112 client proxy/session-lifecycle residuals       [CLOSED AS BLOCKED — 24 APPLY / 45 REMAIN]
   |
   v
-M113 server presentation + LeaseSet residuals       [PROPOSED / BLOCKED]
+M113 server presentation + LeaseSet residuals       [CLOSED AS BLOCKED — 0 APPLY / 21 REMAIN; 82368ea]
   |
   | zero applicable residual cells + no open corrective
   v
@@ -325,9 +326,9 @@ M111 closed the final client session configuration dependency. M112 closure:
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/113-server-presentation-address-routing-and-leaseset-residual-completion.md`
 
-Status: **proposed / blocked**.
+Status: **closed as blocked**.
 
-Target: up to 21 cells. LeaseSet encryption/client-auth requires a real accepted primitive with no downgrade. Presentation/address-routing may not weaken M093 loopback/SSRF boundaries.
+Current result: 0 cells applied; 21 cells remain blocked with exact presentation/routing and LeaseSet primitive reasons. `AllowInternalSSL`, `UniqueLocalAddressPerClient`, and `MultiHoming` remain blocked because no bounded TLS termination or safe per-client/multihomed routing owner exists without weakening M093 loopback confinement; `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` remain blocked because Yosemite 8026f5b declares but does not serialize encrypted-LeaseSet/client-auth fields on `SESSION CREATE`. Closure: `plans/closure/i2pcontrol-proposal-170/113-closure.md`.
 
 ## 14. M114 — final live/reference reclosure
 
@@ -424,8 +425,8 @@ Per `plans/003-planning-process.md`:
 
 - M110 remains historically closed;
 - M116 and M117 were closed historical handoffs;
-- M118, M111, and M112 are closed; M113 is the next roadmap handoff but remains blocked;
-- M113-M114 remain roadmap/indexed but blocked;
+- M118, M111, M112, and M113 are closed; M114 is the next roadmap handoff but remains blocked;
+- M114 remains roadmap/indexed but blocked;
 - M116 closure decides exact current matrix/residual ownership;
 - blocked plans may not execute because their files exist;
 - material deviations require plan/ADR correction before code changes;

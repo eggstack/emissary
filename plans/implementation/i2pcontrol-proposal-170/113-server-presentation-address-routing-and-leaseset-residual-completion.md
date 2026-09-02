@@ -1,6 +1,10 @@
 # M113 — Server Presentation, Address-Routing, and LeaseSet Residual Completion
 
-Status: **proposed / blocked** — roadmap-defined; not registry-ready until M110/M111 establish final key/session ownership and exact LeaseSet/presentation primitives are demonstrated
+Status: **closed as blocked** — 21 server presentation/routing/LeaseSet cells remain blocked with exact primitive evidence; no apply or not_applicable reclassification
+
+Closure record: `plans/closure/i2pcontrol-proposal-170/113-closure.md`
+
+Historical status: proposed / blocked — roadmap-defined; not registry-ready until M110/M111 establish final key/session ownership and exact LeaseSet/presentation primitives are demonstrated
 
 Class: capability / server security / LeaseSet ownership
 

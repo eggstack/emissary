@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104 closed as blocked; residual option cells remain
+Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; residual option cells remain (70 blocked: 4 UseSSL + 45 client + 21 server LeaseSet/presentation)
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -350,10 +350,11 @@ The matrix records `AllowInternalSSL`, `UniqueLocalAddressPerClient`,
 `LeaseSetClientAuths` as explicit residual blockers. No server-side TLS trust
 owner, per-client address allocator, multihoming router, or supported
 Yosemite/SAM LeaseSet key/serializer path exists in this checkout, so these
-options fail before allocation and never silently downgrade. M104 is closed as
-blocked at the final verification stop condition; a future reattempt requires
-resolution of the applicable residual cells before live interoperability can be
-reclosed. See `plans/closure/i2pcontrol-proposal-170/104-closure.md`.
+options fail before allocation and never silently downgrade. M104/M113 are
+closed as blocked at the final verification stop condition; a future reattempt
+requires resolution of the applicable residual cells before live interoperability
+can be reclosed. See `plans/closure/i2pcontrol-proposal-170/104-closure.md` and
+`plans/closure/i2pcontrol-proposal-170/113-closure.md`.
 
 ## AddressBook
 
@@ -504,6 +505,9 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M084 | closed | merged-head integration/planning corrective (test fixture, M062 bookkeeping, status reconciliation); see `plans/closure/i2pcontrol-proposal-170/084-closure.md` |
 | M085 | closed | independently audited actual post-M084 merged head; tunnel runtime/security line complete against the pinned Proposal 170 revision and current internal fork head; see `plans/closure/i2pcontrol-proposal-170/085-closure.md` |
 | M086 | closed | documentation/evidence reconciliation only; trusted-peer documentation and closure errata corrected without reopening runtime/security; see `plans/closure/i2pcontrol-proposal-170/086-closure.md` |
+| M111 | closed | SAM session-wire completion; 40 apply / 4 UseSSL blocked; see `plans/closure/i2pcontrol-proposal-170/111-closure.md` |
+| M112 | closed as blocked | client proxy and session-lifecycle residuals; 24 apply / 45 blocked; see `plans/closure/i2pcontrol-proposal-170/112-closure.md` |
+| M113 | closed as blocked | server presentation/routing/LeaseSet residuals; 0 apply / 21 blocked; see `plans/closure/i2pcontrol-proposal-170/113-closure.md` |
 
 ## Final-status rule
 

@@ -400,6 +400,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m109 = is_authorized_m109_path(path);
         let authorized_m115 = is_authorized_m115_path(path);
         let authorized_m110 = is_authorized_m110_path(path);
+        let authorized_m116 = is_authorized_m116_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -415,6 +416,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m109
                 || authorized_m115
                 || authorized_m110
+                || authorized_m116
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -434,12 +436,35 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m109
                     || authorized_m115
                     || authorized_m110
+                    || authorized_m116
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
             );
         }
     }
+}
+
+fn is_authorized_m116_path(path: &str) -> bool {
+    matches!(
+        path,
+        "emissary-cli/src/i2pcontrol/backends/options.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/session.rs"
+            | "emissary-cli/src/i2pcontrol/backends/streamr.rs"
+            | "emissary-cli/src/i2pcontrol/client_secret_store.rs"
+            | "emissary-cli/src/i2pcontrol/production.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "emissary-cli/tests/m095_full_support_matrix.rs"
+            | "plans/closure/i2pcontrol-proposal-170/116-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/105-residual-option-audit.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/110-completion-ledger.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/112-client-proxy-and-session-lifecycle-residual-completion.md"
+            | "plans/implementation/i2pcontrol-proposal-170/116-m110-shared-session-and-newdest-corrective-pass.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+    )
 }
 
 fn is_authorized_m110_path(path: &str) -> bool {

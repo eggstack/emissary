@@ -6,7 +6,6 @@
 
 use std::{
     collections::BTreeMap,
-    hash::{Hash, Hasher},
     sync::Arc,
 };
 
@@ -129,15 +128,82 @@ struct SharedSessionEntry {
 
 #[derive(Default)]
 struct SharedSessionState {
-    entries: BTreeMap<String, SharedSessionEntry>,
+    entries: BTreeMap<CompatibilityKey, SharedSessionEntry>,
+}
+
+/// Exact shared-session identity. The persistent key is retained only in this
+/// private equality/order authority; its formatting is always redacted.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct CompatibilityKey {
+    style: String,
+    identity: CompatibilityIdentity,
+    session_options: String,
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum CompatibilityIdentity {
+    Transient,
+    Persistent(String),
+}
+
+impl std::fmt::Debug for CompatibilityKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CompatibilityKey")
+            .field("style", &self.style)
+            .field(
+                "identity",
+                &match &self.identity {
+                    CompatibilityIdentity::Transient => "transient",
+                    CompatibilityIdentity::Persistent(_) => "persistent",
+                },
+            )
+            .field("session_options", &self.session_options)
+            .finish()
+    }
+}
+
+impl std::fmt::Display for CompatibilityKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}|{}", self.style, self.session_options)
+    }
+}
+
+/// A per-key creator reservation that reopens the key if the creator future
+/// is cancelled, panics, times out, or otherwise drops before publication.
+struct CreationReservation {
+    registry: SharedClientSessionRegistry,
+    key: CompatibilityKey,
+    active: bool,
+}
+
+impl CreationReservation {
+    fn new(registry: SharedClientSessionRegistry, key: CompatibilityKey) -> Self {
+        Self {
+            registry,
+            key,
+            active: true,
+        }
+    }
+
+    fn disarm(&mut self) {
+        self.active = false;
+    }
+}
+
+impl Drop for CreationReservation {
+    fn drop(&mut self) {
+        if self.active {
+            self.registry.cancel_creation(&self.key);
+        }
+    }
 }
 
 /// Bounded owner for I2PControl-shared client sessions.
 ///
 /// The compatibility key contains every translated Yosemite session setting
-/// and a non-reversible fingerprint of persistent identity material. Session
-/// construction happens outside the bookkeeping lock; the per-key creator
-/// reservation prevents concurrent equivalent starts from duplicating owners.
+/// and the exact persistent identity material. Session construction happens
+/// outside the bookkeeping lock; the per-key creator reservation prevents
+/// concurrent equivalent starts from duplicating owners.
 #[derive(Clone)]
 pub struct SharedClientSessionRegistry {
     state: Arc<Mutex<SharedSessionState>>,
@@ -177,7 +243,7 @@ impl SharedClientSessionRegistry {
     ) -> Result<SharedStreamSessionLease, String> {
         let key = compatibility_key(&options, "stream");
         loop {
-            let (notify, create) = {
+            let waiter = {
                 let mut state = self.state.lock();
                 if let Some(entry) = state.entries.get_mut(&key) {
                     if let Some(SessionHandle::Stream(session)) = &entry.session {
@@ -191,7 +257,14 @@ impl SharedClientSessionRegistry {
                             key: key.clone(),
                         });
                     }
-                    (Arc::clone(&entry.notify), !entry.creating)
+                    if entry.creating {
+                        let mut waiter = Box::pin(Arc::clone(&entry.notify).notified_owned());
+                        waiter.as_mut().enable();
+                        Some(waiter)
+                    } else {
+                        entry.creating = true;
+                        None
+                    }
                 } else {
                     if state.entries.len() >= self.max_sessions {
                         return Err("shared client session capacity exhausted".to_string());
@@ -206,25 +279,29 @@ impl SharedClientSessionRegistry {
                             notify: Arc::clone(&notify),
                         },
                     );
-                    (notify, true)
+                    None
                 }
             };
-            if !create {
-                notify.notified().await;
+            if let Some(waiter) = waiter {
+                waiter.await;
                 continue;
             }
+            let mut reservation = CreationReservation::new(self.clone(), key.clone());
             let result = Session::<style::Stream>::new(options.clone())
                 .await
                 .map(|session| Arc::new(Mutex::new(session)))
                 .map_err(|_| "client shared session setup failed".to_string());
             let mut state = self.state.lock();
-            let entry = state.entries.get_mut(&key).expect("creator reservation exists");
+            let Some(entry) = state.entries.get_mut(&key) else {
+                return Err("client shared session reservation was lost".to_string());
+            };
             entry.creating = false;
             match result {
                 Ok(session) => {
                     entry.members = 1;
                     entry.session = Some(SessionHandle::Stream(Arc::clone(&session)));
                     entry.notify.notify_waiters();
+                    reservation.disarm();
                     return Ok(SharedStreamSessionLease {
                         session,
                         registry: self.clone(),
@@ -235,6 +312,7 @@ impl SharedClientSessionRegistry {
                     let notify = Arc::clone(&entry.notify);
                     state.entries.remove(&key);
                     notify.notify_waiters();
+                    reservation.disarm();
                     return Err(error);
                 }
             }
@@ -247,7 +325,7 @@ impl SharedClientSessionRegistry {
     ) -> Result<SharedDatagramSessionLease, String> {
         let key = compatibility_key(&options, "datagram");
         loop {
-            let (notify, create) = {
+            let waiter = {
                 let mut state = self.state.lock();
                 if let Some(entry) = state.entries.get_mut(&key) {
                     if let Some(SessionHandle::Datagram(session)) = &entry.session {
@@ -261,7 +339,14 @@ impl SharedClientSessionRegistry {
                             key: key.clone(),
                         });
                     }
-                    (Arc::clone(&entry.notify), !entry.creating)
+                    if entry.creating {
+                        let mut waiter = Box::pin(Arc::clone(&entry.notify).notified_owned());
+                        waiter.as_mut().enable();
+                        Some(waiter)
+                    } else {
+                        entry.creating = true;
+                        None
+                    }
                 } else {
                     if state.entries.len() >= self.max_sessions {
                         return Err("shared client session capacity exhausted".to_string());
@@ -276,25 +361,29 @@ impl SharedClientSessionRegistry {
                             notify: Arc::clone(&notify),
                         },
                     );
-                    (notify, true)
+                    None
                 }
             };
-            if !create {
-                notify.notified().await;
+            if let Some(waiter) = waiter {
+                waiter.await;
                 continue;
             }
+            let mut reservation = CreationReservation::new(self.clone(), key.clone());
             let result = Session::<style::Repliable>::new(options.clone())
                 .await
                 .map(SharedDatagramSession::spawn)
                 .map_err(|_| "client shared datagram session setup failed".to_string());
             let mut state = self.state.lock();
-            let entry = state.entries.get_mut(&key).expect("creator reservation exists");
+            let Some(entry) = state.entries.get_mut(&key) else {
+                return Err("client shared datagram session reservation was lost".to_string());
+            };
             entry.creating = false;
             match result {
                 Ok(session) => {
                     entry.members = 1;
                     entry.session = Some(SessionHandle::Datagram(Arc::clone(&session)));
                     entry.notify.notify_waiters();
+                    reservation.disarm();
                     return Ok(SharedDatagramSessionLease {
                         session,
                         registry: self.clone(),
@@ -305,13 +394,28 @@ impl SharedClientSessionRegistry {
                     let notify = Arc::clone(&entry.notify);
                     state.entries.remove(&key);
                     notify.notify_waiters();
+                    reservation.disarm();
                     return Err(error);
                 }
             }
         }
     }
 
-    fn release(&self, key: &str) {
+    fn cancel_creation(&self, key: &CompatibilityKey) {
+        let notify = {
+            let mut state = self.state.lock();
+            let Some(entry) = state.entries.get(key) else { return };
+            if !entry.creating || entry.session.is_some() {
+                return;
+            }
+            state.entries.remove(key).map(|entry| entry.notify)
+        };
+        if let Some(notify) = notify {
+            notify.notify_waiters();
+        }
+    }
+
+    fn release(&self, key: &CompatibilityKey) {
         let session = {
             let mut state = self.state.lock();
             let Some(entry) = state.entries.get_mut(key) else { return };
@@ -334,7 +438,7 @@ impl SharedClientSessionRegistry {
 pub struct SharedStreamSessionLease {
     pub(crate) session: StreamSession,
     registry: SharedClientSessionRegistry,
-    key: String,
+    key: CompatibilityKey,
 }
 
 impl Drop for SharedStreamSessionLease {
@@ -346,7 +450,7 @@ impl Drop for SharedStreamSessionLease {
 pub struct SharedDatagramSessionLease {
     pub(crate) session: Arc<SharedDatagramSession>,
     registry: SharedClientSessionRegistry,
-    key: String,
+    key: CompatibilityKey,
 }
 
 impl Drop for SharedDatagramSessionLease {
@@ -355,19 +459,21 @@ impl Drop for SharedDatagramSessionLease {
     }
 }
 
-fn compatibility_key(options: &SessionOptions, style: &str) -> String {
+fn compatibility_key(options: &SessionOptions, style: &str) -> CompatibilityKey {
     let mut safe_options = options.clone();
     let identity = match &safe_options.destination {
-        DestinationKind::Transient => "transient".to_string(),
+        DestinationKind::Transient => CompatibilityIdentity::Transient,
         DestinationKind::Persistent { private_key } => {
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            private_key.hash(&mut hasher);
-            format!("persistent:{:016x}", hasher.finish())
+            CompatibilityIdentity::Persistent(private_key.clone())
         }
     };
     safe_options.nickname.clear();
     safe_options.destination = DestinationKind::Transient;
-    format!("{style}|{identity}|{safe_options:?}")
+    CompatibilityKey {
+        style: style.to_owned(),
+        identity,
+        session_options: format!("{safe_options:?}"),
+    }
 }
 
 /// Translate a client definition and its owned identity into Yosemite options.
@@ -580,6 +686,38 @@ mod tests {
         assert_eq!(first_key, compatibility_key(&same, "stream"));
         assert_ne!(first_key, compatibility_key(&different, "stream"));
         assert_ne!(first_key, compatibility_key(&different_identity, "stream"));
-        assert!(!first_key.contains("c2VjcmV0"));
+        let debug = format!("{first_key:?}");
+        let display = format!("{first_key}");
+        assert!(!debug.contains("c2VjcmV0"));
+        assert!(!display.contains("c2VjcmV0"));
+        assert!(debug.contains("persistent"));
+    }
+
+    #[tokio::test]
+    async fn waiter_registration_precedes_notification() {
+        let notify = Arc::new(Notify::new());
+        let mut waiter = Box::pin(Arc::clone(&notify).notified_owned());
+        waiter.as_mut().enable();
+        notify.notify_waiters();
+        tokio::time::timeout(std::time::Duration::from_secs(1), waiter)
+            .await
+            .expect("enabled waiter must observe notify_waiters");
+    }
+
+    #[test]
+    fn dropped_creator_reservation_reopens_its_key() {
+        let registry = SharedClientSessionRegistry::new();
+        let key = compatibility_key(&SessionOptions::default(), "stream");
+        registry.state.lock().entries.insert(
+            key.clone(),
+            SharedSessionEntry {
+                session: None,
+                members: 0,
+                creating: true,
+                notify: Arc::new(Notify::new()),
+            },
+        );
+        drop(CreationReservation::new(registry.clone(), key));
+        assert_eq!(registry.session_count(), 0);
     }
 }

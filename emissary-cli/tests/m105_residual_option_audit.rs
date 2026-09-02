@@ -164,10 +164,26 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         ("PrivKeyFile", "ircserver"),
     ]);
     assert_eq!(m110_completed.len(), 31);
-    let expected = actual
+    let m116_reclassified = BTreeSet::from([
+        ("NewDest".to_owned(), "client".to_owned()),
+        ("NewDest".to_owned(), "httpclient".to_owned()),
+        ("NewDest".to_owned(), "ircclient".to_owned()),
+        ("NewDest".to_owned(), "socks".to_owned()),
+        ("NewDest".to_owned(), "socksirc".to_owned()),
+        ("NewDest".to_owned(), "connectclient".to_owned()),
+        ("NewDest".to_owned(), "streamrclient".to_owned()),
+    ]);
+    assert_eq!(m116_reclassified.len(), 7);
+    let expected: BTreeSet<(String, String)> = actual
         .difference(&candidates)
         .filter(|cell| !m110_completed.contains(&(cell.0.as_str(), cell.1.as_str())))
         .cloned()
         .collect();
-    assert_eq!(current_blocked, expected);
+    let expected_with_m116 = expected
+        .union(&m116_reclassified)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_with_m116);
+    assert_eq!(audit["summary"]["post_m116_reclassified_cells"].as_integer(), Some(7));
+    assert_eq!(audit["summary"]["post_m116_blocking_milestone"].as_str(), Some("M112"));
 }

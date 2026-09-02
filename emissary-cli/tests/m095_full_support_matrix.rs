@@ -223,6 +223,23 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
             .find(|row| string_field(row, "canonical_key") == key)
             .unwrap_or_else(|| panic!("M098 option {key} must be present"))
     };
+    let new_dest = option("NewDest");
+    assert_eq!(string_field(new_dest, "completion_owner"), "M112");
+    assert_eq!(
+        string_field(new_dest, "current_or_planned_disposition"),
+        "blocked_primitive_or_not_applicable"
+    );
+    let new_dest_cells = new_dest["cells"].as_array().unwrap();
+    assert!(new_dest_cells[..7]
+        .iter()
+        .all(|cell| cell.as_str() == Some("blocked_primitive")));
+    assert!(new_dest_cells[7..]
+        .iter()
+        .all(|cell| cell.as_str() == Some("not_applicable")));
+    assert_eq!(string_field(new_dest, "blocking_milestone"), "M112");
+    for tunnel_type in &tunnel_types[..7] {
+        assert!(new_dest["cell_notes"].as_table().unwrap().contains_key(*tunnel_type));
+    }
     for key in [
         "ProxyList",
         "ProxyAuth",
@@ -437,4 +454,31 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         }
     }
     assert_no_forbidden(&root);
+}
+
+#[test]
+fn current_matrix_counts_are_explicit_and_exact() {
+    let root = matrix();
+    let options = rows(&root, "tunnel_manager", "options");
+    let counts = options
+        .iter()
+        .flat_map(|row| row["cells"].as_array().unwrap())
+        .fold((0, 0, 0), |mut counts, cell| {
+            match cell.as_str().expect("cell disposition") {
+                "apply" => counts.0 += 1,
+                "blocked_primitive" => counts.1 += 1,
+                "not_applicable" => counts.2 += 1,
+                "planned_apply" => panic!("planned_apply must not remain in the closed matrix"),
+                other => panic!("unexpected cell disposition {other}"),
+            }
+            counts
+        });
+    assert_eq!(counts, (248, 134, 458));
+    let declared = root
+        .get("current_matrix_counts")
+        .and_then(Value::as_table)
+        .expect("current matrix counts are declared");
+    assert_eq!(declared["apply"].as_integer(), Some(248));
+    assert_eq!(declared["blocked_primitive"].as_integer(), Some(134));
+    assert_eq!(declared["not_applicable"].as_integer(), Some(458));
 }

@@ -38,8 +38,9 @@ use crate::i2pcontrol::{
         RuntimeAddressBookEntry, RuntimeAddressBookHandle, RuntimeAddressBookSnapshot,
         RuntimeAddressBookType,
     },
-    client_secret_store::ClientDestinationStore,
     backends::{registry::TunnelBackendRegistry, BackendError, TunnelBackend},
+    backends::options::validate_common_options,
+    client_secret_store::ClientDestinationStore,
     control_plane::{AddressBookControl, ControlPlane, TunnelManagerControl},
     domain::{
         address_book::{
@@ -1029,6 +1030,9 @@ impl ProductionTunnelManagerControl {
                 .clone()
         };
         let definition = self.prepare_server_definition(definition).await?;
+        if let Err(error) = validate_common_options(definition.tunnel_type, &definition.options) {
+            return Ok(format!("error - {error}"));
+        }
         if definition.tunnel_type.is_client() {
             self.client_destinations
                 .stage(&definition, self.sam_tcp_port.ok_or_else(|| {

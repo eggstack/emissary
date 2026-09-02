@@ -21,6 +21,11 @@ use tokio::{
 };
 use yosemite::{style, DatagramOptions, DestinationKind, Session, SessionOptions};
 
+use emissary_core::{
+    crypto::{base32_encode, base64_decode},
+    primitives::Destination,
+};
+
 use super::{
     options::{
         validate_common_options, validate_options, OptionValidationError, STREAMR_CLIENT_OPTIONS,
@@ -64,6 +69,7 @@ const DEFAULT_BIND_ADDRESS: IpAddr = IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
 struct StreamrClientConfig {
     name: String,
     producer: String,
+    producer_identity: String,
     local_target: SocketAddr,
     source_port: u16,
     session_options: SessionOptions,
@@ -421,8 +427,10 @@ async fn run_streamr_client(
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => return false,
                 };
-                if payload_is_forwardable(event.payload.len()) {
-                    let _peer = event.peer;
+                if payload_is_forwardable(event.payload.len())
+                    && canonical_destination_identity(&event.peer)
+                        .is_some_and(|peer| peer == config.producer_identity)
+                {
                     let _ = output.send_to(&event.payload, config.local_target).await;
                 }
             }
@@ -568,6 +576,11 @@ impl StreamrClientTunnelBackend {
             .ok_or_else(|| BackendError::Internal {
                 message: "streamrclient producer destination is invalid".to_owned(),
             })?;
+        let producer_identity = canonical_destination_identity(producer).ok_or_else(|| {
+            BackendError::Internal {
+                message: "streamrclient producer destination is not canonical".to_owned(),
+            }
+        })?;
         let target_host = local_loopback_address(definition, TunnelType::StreamrClient)?;
         let target_port =
             definition.options.target_port.ok_or_else(|| BackendError::MissingOption {
@@ -577,6 +590,7 @@ impl StreamrClientTunnelBackend {
         Ok(StreamrClientConfig {
             name: definition.name.as_str().to_owned(),
             producer: producer.to_owned(),
+            producer_identity,
             local_target: SocketAddr::new(target_host, target_port),
             source_port: definition.options.listen_port.unwrap_or(0),
             session_options: SessionOptions::default(),
@@ -908,6 +922,25 @@ fn valid_destination(value: &str) -> bool {
         && !value.contains('\\')
 }
 
+/// Return the canonical destination identity used by Yosemite's repliable
+/// receive path. Full destinations are parsed and reduced to their I2P hash;
+/// already-canonical base32 identities are accepted in either bare or
+/// `.b32.i2p` form. Names and aliases are rejected because they do not prove
+/// the authenticated peer identity.
+fn canonical_destination_identity(value: &str) -> Option<String> {
+    let value = value.strip_suffix(".b32.i2p").unwrap_or(value);
+    if value.len() == 52
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || matches!(byte, b'2'..=b'7'))
+    {
+        return Some(value.to_owned());
+    }
+    let decoded = base64_decode(value)?;
+    let destination = Destination::parse(&decoded).ok()?;
+    Some(base32_encode(destination.id().to_vec()))
+}
+
 fn option_error(error: OptionValidationError) -> BackendError {
     match error {
         OptionValidationError::Missing {
@@ -930,6 +963,10 @@ fn option_error(error: OptionValidationError) -> BackendError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn producer_destination() -> String {
+        "a".repeat(52)
+    }
     use crate::i2pcontrol::domain::tunnel::{StartIntent, TunnelName, TunnelOptions};
 
     fn definition(tunnel_type: TunnelType) -> TunnelDefinition {
@@ -988,6 +1025,21 @@ mod tests {
     }
 
     #[test]
+    fn streamr_peer_matching_requires_canonical_destination_identity() {
+        let producer = producer_destination();
+        assert_eq!(canonical_destination_identity(&producer), Some(producer.clone()));
+        assert_eq!(
+            canonical_destination_identity(&format!("{producer}.b32.i2p")),
+            Some(producer.clone())
+        );
+        assert!(canonical_destination_identity("producer-alias.i2p").is_none());
+        assert_ne!(
+            canonical_destination_identity(&producer),
+            canonical_destination_identity(&"b".repeat(52))
+        );
+    }
+
+    #[test]
     fn local_udp_source_policy_is_loopback_only() {
         assert!(local_udp_source_allowed("127.0.0.1:9000".parse().unwrap()));
         assert!(local_udp_source_allowed("[::1]:9000".parse().unwrap()));
@@ -1020,7 +1072,7 @@ mod tests {
             backend.config(&def),
             Err(BackendError::MissingOption { option, .. }) if option == "TargetDestination"
         ));
-        def.options.target_destination = Some("producer-destination".to_owned());
+        def.options.target_destination = Some(producer_destination());
         assert!(backend.config(&def).is_ok());
     }
 
@@ -1029,7 +1081,7 @@ mod tests {
         let client = StreamrClientTunnelBackend::new(7656);
         let mut client_def = definition(TunnelType::StreamrClient);
         client_def.options.target_port = Some(9000);
-        client_def.options.target_destination = Some("producer-destination".to_owned());
+        client_def.options.target_destination = Some(producer_destination());
         assert_eq!(
             client.config(&client_def).unwrap().local_target,
             "127.0.0.1:9000".parse().unwrap()
@@ -1082,7 +1134,7 @@ mod tests {
         let backend = StreamrClientTunnelBackend::new(7656);
         let mut client_definition = definition(TunnelType::StreamrClient);
         client_definition.options.target_port = Some(9000);
-        client_definition.options.target_destination = Some("producer-destination".to_owned());
+        client_definition.options.target_destination = Some(producer_destination());
         client_definition
             .raw_config
             .insert("TargetHost".to_owned(), serde_json::json!("0.0.0.0"));
@@ -1146,7 +1198,7 @@ mod tests {
         let backend = StreamrClientTunnelBackend::new(7656);
         let mut definition = definition(TunnelType::StreamrClient);
         definition.options.target_port = Some(9000);
-        definition.options.target_destination = Some("producer-destination".to_owned());
+        definition.options.target_destination = Some(producer_destination());
         definition
             .raw_config
             .insert("TargetHost".to_owned(), serde_json::json!("127.0.0.1"));

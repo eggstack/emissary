@@ -199,13 +199,16 @@ pub fn validate_common_options(
             return Err(common_unsupported(tunnel_type, field));
         }
     }
-    // NewDest, PersistentClientKey, and Shared are meaningful only for the
-    // control-plane client families and are applied by the bounded owner.
+    // NewDest is coupled to M112's close-on-idle/resume lifecycle owner. Keep
+    // it fail-closed until that owner exists; in particular, do not rotate a
+    // destination merely because a manual start was staged.
+    if options.new_dest.is_some() {
+        return Err(common_unsupported(tunnel_type, "NewDest"));
+    }
+    // PersistentClientKey and Shared are meaningful only for the control-plane
+    // client families and are applied by the bounded owner.
     if options.shared.is_some() && !tunnel_type.is_client() {
         return Err(common_unsupported(tunnel_type, "Shared"));
-    }
-    if options.new_dest.is_some() && !tunnel_type.is_client() {
-        return Err(common_unsupported(tunnel_type, "NewDest"));
     }
     if options.persistent_client_key.is_some() && !tunnel_type.is_client() {
         return Err(common_unsupported(tunnel_type, "PersistentClientKey"));
@@ -493,6 +496,31 @@ mod tests {
         let error = validate_options(TunnelType::Client, &options, CLIENT_OPTIONS).unwrap_err();
         assert_eq!(error.to_string(), "client does not support option SSLKey");
         assert!(!error.to_string().contains("secret-key"));
+    }
+
+    #[test]
+    fn new_dest_is_rejected_for_every_tunnel_family() {
+        for tunnel_type in [
+            TunnelType::Client,
+            TunnelType::HttpClient,
+            TunnelType::IrcClient,
+            TunnelType::Socks,
+            TunnelType::SocksIrc,
+            TunnelType::ConnectClient,
+            TunnelType::StreamrClient,
+            TunnelType::Server,
+            TunnelType::HttpServer,
+            TunnelType::HttpBidirServer,
+            TunnelType::IrcServer,
+            TunnelType::StreamrServer,
+        ] {
+            let options = TunnelOptions {
+                new_dest: Some(true),
+                ..Default::default()
+            };
+            let error = validate_common_options(tunnel_type, &options).unwrap_err();
+            assert_eq!(error.to_string(), format!("{tunnel_type} does not support option NewDest"));
+        }
     }
 
     #[test]

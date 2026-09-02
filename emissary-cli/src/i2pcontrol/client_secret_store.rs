@@ -31,26 +31,26 @@ const MAX_SECRET_SIZE: usize = 64 * 1024;
 const MAX_REFERENCE_LENGTH: usize = 256;
 const MAX_ENTRIES: usize = 1000;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct StoredEntry {
     private_key: String,
     import_reference: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct Envelope {
     version: u32,
     entries: BTreeMap<String, StoredEntry>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct PendingEntry {
     private_key: Option<String>,
     import_reference: Option<String>,
     persist: bool,
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct State {
     entries: BTreeMap<String, StoredEntry>,
     pending: BTreeMap<String, PendingEntry>,

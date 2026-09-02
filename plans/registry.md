@@ -94,7 +94,7 @@ variance + backups              SESSION CREATE surface
 M111 SAM session-wire Proposal mapping               [CLOSED — 40 APPLY / 4 UseSSL BLOCKED]
   |
   v
-M112 client proxy/session lifecycle                  [CLOSED AS BLOCKED — 24 APPLY / 45 REMAIN]
+M112 client proxy/session lifecycle                  [CLOSED AS BLOCKED — 24 APPLY / 45 REMAIN; 5b2f3ca]
   |
   v
 M113 server presentation + LeaseSet                  [ROADMAP / BLOCKED]

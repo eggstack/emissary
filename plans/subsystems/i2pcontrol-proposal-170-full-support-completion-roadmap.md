@@ -8,6 +8,7 @@ Current corrective baseline: `09247ccf8367a7b3a7050e0584614c4e59cafe8e` — post
 M116 implementation head: `626d76311a6dc142ecc07827845081b9a9f4c860`.
 M117 implementation head: `22c893a`.
 M118 implementation head: `e7f3e04`.
+M112 implementation head: `5b2f3caa6af8767ef393254f20ca010211a8de3a`.
 
 Pinned external authority:
 

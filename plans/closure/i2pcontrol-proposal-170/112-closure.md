@@ -4,7 +4,7 @@ Status: **closed as blocked**
 
 Date: 2026-09-02
 
-Implementation commits: pending the implementation commit recorded below
+Implementation commit: `5b2f3caa6af8767ef393254f20ca010211a8de3a`
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/112-client-proxy-and-session-lifecycle-residual-completion.md`
 
@@ -14,6 +14,8 @@ M112 completed the safe, portable client lifecycle slice in the existing
 I2PControl-owned streaming listener. The exact M095 matrix changed from
 `288 apply / 94 blocked_primitive / 458 not_applicable` to
 `312 apply / 70 blocked_primitive / 458 not_applicable`.
+
+Final M095 matrix SHA-256: `9fea6844e0b7e28959e1169491d100ce2f81124fff790f6c10882b765b41eea9`.
 
 The 24 applied cells are:
 

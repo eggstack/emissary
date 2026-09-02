@@ -34,7 +34,9 @@ core_inspection = [
   "emissary-core/src/tunnel/mod.rs",
 ]
 core_owner_hooks = [
+  "emissary-core/src/config.rs",
   "emissary-core/src/sam/mod.rs",
+  "emissary-core/src/sam/parser.rs",
   "emissary-core/src/transport/ntcp2/mod.rs",
   "emissary-core/src/transport/ntcp2/session/active.rs",
   "emissary-core/src/transport/ntcp2/session/mod.rs",
@@ -69,6 +71,26 @@ forbidden_terms_in_core_declarations = [
   "Sender<",
   "Receiver<",
 ]
+
+[[evidence]]
+path = "emissary-core/src/config.rs"
+owner = "exploratory tunnel configuration conversion"
+purpose = "Supplies defaults for newly extended neutral tunnel-pool configuration fields."
+consumer = "Existing tunnel manager construction."
+why_upstream_insufficient = "The local TunnelPoolConfig constructor must initialize the local neutral fields."
+sensitivity = "configuration construction seam"
+seam = "default-preserving constructor"
+reference = "M118 implementation amendment; mechanical struct-update only"
+
+[[evidence]]
+path = "emissary-core/src/sam/parser.rs"
+owner = "SAM command parser"
+purpose = "Validates bounded generic tunnel-pool options before session allocation."
+consumer = "Existing SAM session construction."
+why_upstream_insufficient = "The local SAM parser owns the accepted option-validation boundary."
+sensitivity = "protocol option validation"
+seam = "pre-allocation parser validation"
+reference = "M118 exact neutral SAM owner"
 
 [[evidence]]
 path = "emissary-cli/src/config.rs"

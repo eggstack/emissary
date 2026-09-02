@@ -158,11 +158,23 @@ pub struct TunnelPoolConfig {
     /// How many hops should each inbound tunnel have.
     pub num_inbound_hops: usize,
 
+    /// Inclusive random variation applied to inbound tunnel length.
+    pub inbound_length_variance: i8,
+
+    /// How many inbound standby tunnels the pool should keep ready.
+    pub num_inbound_backup: usize,
+
     /// How many outbound tunnels the pool should have.
     pub num_outbound: usize,
 
     /// How many hops should each outbound tunnel have.
     pub num_outbound_hops: usize,
+
+    /// Inclusive random variation applied to outbound tunnel length.
+    pub outbound_length_variance: i8,
+
+    /// How many outbound standby tunnels the pool should keep ready.
+    pub num_outbound_backup: usize,
 }
 
 impl Default for TunnelPoolConfig {
@@ -170,8 +182,12 @@ impl Default for TunnelPoolConfig {
         Self {
             num_inbound: 3usize,
             num_inbound_hops: 2usize,
+            inbound_length_variance: 0,
+            num_inbound_backup: 0usize,
             num_outbound: 3usize,
             num_outbound_hops: 2usize,
+            outbound_length_variance: 0,
+            num_outbound_backup: 0usize,
             name: Str::from("exploratory"),
         }
     }
@@ -187,6 +203,14 @@ impl From<&Mapping> for TunnelPoolConfig {
             .get(&Str::from("inbound.length"))
             .map_or(2usize, |value| value.parse::<usize>().unwrap_or(2usize));
 
+        let inbound_length_variance = options
+            .get(&Str::from("inbound.lengthVariance"))
+            .map_or(0i8, |value| value.parse::<i8>().unwrap_or(0i8));
+
+        let num_inbound_backup = options
+            .get(&Str::from("inbound.backupQuantity"))
+            .map_or(0usize, |value| value.parse::<usize>().unwrap_or(0usize));
+
         let num_outbound = options
             .get(&Str::from("outbound.quantity"))
             .map_or(3usize, |value| value.parse::<usize>().unwrap_or(3usize));
@@ -194,6 +218,14 @@ impl From<&Mapping> for TunnelPoolConfig {
         let num_outbound_hops = options
             .get(&Str::from("outbound.length"))
             .map_or(2usize, |value| value.parse::<usize>().unwrap_or(2usize));
+
+        let outbound_length_variance = options
+            .get(&Str::from("outbound.lengthVariance"))
+            .map_or(0i8, |value| value.parse::<i8>().unwrap_or(0i8));
+
+        let num_outbound_backup = options
+            .get(&Str::from("outbound.backupQuantity"))
+            .map_or(0usize, |value| value.parse::<usize>().unwrap_or(0usize));
 
         let name = options
             .get(&Str::from("inbound.nickname"))
@@ -204,10 +236,38 @@ impl From<&Mapping> for TunnelPoolConfig {
             name,
             num_inbound,
             num_inbound_hops,
+            inbound_length_variance,
+            num_inbound_backup,
             num_outbound,
             num_outbound_hops,
+            outbound_length_variance,
+            num_outbound_backup,
         }
     }
+}
+
+/// Select one tunnel length according to the SAM/I2P inclusive variance rules.
+fn varied_tunnel_length<R: Runtime>(base: usize, variance: i8, maximum: usize) -> Option<usize> {
+    if !(1..=maximum).contains(&base) {
+        return None;
+    }
+
+    if variance == 0 {
+        return Some(base);
+    }
+
+    let variance = i16::from(variance);
+    let offset = if variance < 0 {
+        let magnitude = -variance;
+        let width = (2 * magnitude + 1) as u32;
+        (R::rng().next_u32() % width) as i16 - magnitude
+    } else {
+        (R::rng().next_u32() % (variance as u32 + 1)) as i16
+    };
+    let length = i16::try_from(base).ok()?.checked_add(offset)?;
+
+    (1..=i16::try_from(maximum).ok()?).contains(&length)
+        .then_some(usize::try_from(length).ok()?)
 }
 
 /// Tunnel pool implementation.
@@ -240,6 +300,9 @@ pub struct TunnelPool<R: Runtime, S: TunnelSelector + HopSelector> {
     /// Key is IBGW `TunnelId` and value is (IBEP `TunnelId`, IBGW `RouterId`) tuple.
     inbound_tunnels: HashMap<TunnelId, (TunnelId, RouterId)>,
 
+    /// Standby inbound tunnels, keyed by their gateway tunnel ID.
+    backup_inbound_tunnels: HashMap<TunnelId, (TunnelId, RouterId, HashSet<RouterId>)>,
+
     /// Last time a tunnel test was performed.
     last_tunnel_test: R::Instant,
 
@@ -254,6 +317,15 @@ pub struct TunnelPool<R: Runtime, S: TunnelSelector + HopSelector> {
 
     /// Active outbound tunnels.
     outbound: HashMap<TunnelId, OutboundTunnel<R>>,
+
+    /// Standby outbound tunnels.
+    backup_outbound: HashMap<TunnelId, OutboundTunnel<R>>,
+
+    /// Pending outbound builds which are intended for standby capacity.
+    pending_backup_outbound: HashSet<TunnelId>,
+
+    /// Pending inbound builds which are intended for standby capacity.
+    pending_backup_inbound: HashSet<TunnelId>,
 
     /// Pending inbound tunnels.
     pending_inbound: TunnelBuildListener<R, InboundTunnel<R>>,
@@ -336,9 +408,13 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
                 expiring_outbound: HashSet::new(),
                 inbound: R::join_set(),
                 inbound_tunnels: HashMap::new(),
+                backup_inbound_tunnels: HashMap::new(),
                 last_tunnel_test: R::now(),
                 maintenance_timer: R::timer(Duration::from_secs(0)),
                 outbound: HashMap::new(),
+                backup_outbound: HashMap::new(),
+                pending_backup_outbound: HashSet::new(),
+                pending_backup_inbound: HashSet::new(),
                 pending_inbound: TunnelBuildListener::new(
                     subsystem_handle.clone(),
                     router_ctx.profile_storage().clone(),
@@ -361,28 +437,38 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
         )
     }
 
-    /// Calculate the number of outbound tunnels that need to be built.
-    fn calculate_outbound_build_count(&self) -> usize {
-        let max_tunnels = self.config.num_outbound + self.expiring_outbound.len();
+    /// Calculate the active and standby outbound tunnel builds that are needed.
+    fn calculate_outbound_build_count(&self) -> (usize, usize) {
+        let active_target = self.config.num_outbound + self.expiring_outbound.len();
+        let active_pending = self
+            .pending_outbound
+            .len()
+            .saturating_sub(self.pending_backup_outbound.len());
+        let active = active_target.saturating_sub(self.outbound.len() + active_pending);
+        let backup_pending = self.pending_backup_outbound.len();
+        let backup = self
+            .config
+            .num_outbound_backup
+            .saturating_sub(self.backup_outbound.len() + backup_pending);
 
-        // fewer than requested amount of tunnels
-        if self.outbound.len() + self.pending_outbound.len() < max_tunnels {
-            return max_tunnels - self.outbound.len() - self.pending_outbound.len();
-        }
-
-        0usize
+        (active, backup)
     }
 
-    /// Calculate the number of inbound tunnels that need to be built.
-    fn calculate_inbound_build_count(&self) -> usize {
-        let max_tunnels = self.config.num_inbound + self.expiring_inbound.len();
+    /// Calculate the active and standby inbound tunnel builds that are needed.
+    fn calculate_inbound_build_count(&self) -> (usize, usize) {
+        let active_target = self.config.num_inbound + self.expiring_inbound.len();
+        let active_pending = self
+            .pending_inbound
+            .len()
+            .saturating_sub(self.pending_backup_inbound.len());
+        let active = active_target.saturating_sub(self.inbound_tunnels.len() + active_pending);
+        let backup_pending = self.pending_backup_inbound.len();
+        let backup = self
+            .config
+            .num_inbound_backup
+            .saturating_sub(self.backup_inbound_tunnels.len() + backup_pending);
 
-        // fewer than requested amount of tunnels
-        if self.inbound.len() + self.pending_inbound.len() < max_tunnels {
-            return max_tunnels - self.inbound.len() - self.pending_inbound.len();
-        }
-
-        0usize
+        (active, backup)
     }
 
     /// Maintain the tunnel pool.
@@ -403,11 +489,27 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
             "maintain tunnel pool",
         );
 
-        for _ in 0..self.calculate_outbound_build_count() {
+        let (active_outbound_builds, backup_outbound_builds) =
+            self.calculate_outbound_build_count();
+        for build_index in 0..active_outbound_builds + backup_outbound_builds {
+            let is_backup = build_index >= active_outbound_builds;
+            let Some(num_hops) = varied_tunnel_length::<R>(
+                self.config.num_outbound_hops,
+                self.config.outbound_length_variance,
+                8,
+            ) else {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    name = %self.config.name,
+                    "outbound tunnel length configuration cannot be represented",
+                );
+                continue;
+            };
+
             // attempt to select hops for the outbound tunnel
             //
             // if there aren't enough available hops, the tunnel build is skipped
-            let Some(hops) = self.selector.select_hops(self.config.num_outbound_hops) else {
+            let Some(hops) = self.selector.select_hops(num_hops) else {
                 tracing::warn!(
                     target: LOG_TARGET,
                     name = %self.config.name,
@@ -422,6 +524,9 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
             // this can just be a random id (with no regard for collisions)
             // as outbound tunnel messages are not routed through `RoutingTable`
             let tunnel_id = TunnelId::from(R::rng().next_u32());
+            if is_backup {
+                self.pending_backup_outbound.insert(tunnel_id);
+            }
 
             // build outbound tunnel
             //
@@ -525,6 +630,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
 
                             self.subsystem_handle.remove_tunnel(&gateway);
                             self.subsystem_handle.remove_listener(&message_id);
+                            self.pending_backup_outbound.remove(&tunnel_id);
                         }
                     }
                 }
@@ -625,6 +731,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
                             );
 
                             handle.remove_listener(&message_id);
+                            self.pending_backup_outbound.remove(&tunnel_id);
                         }
                     }
                 }
@@ -632,14 +739,29 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
         }
 
         // build one or more inbound tunnels
-        for _ in 0..self.calculate_inbound_build_count() {
+        let (active_inbound_builds, backup_inbound_builds) = self.calculate_inbound_build_count();
+        for build_index in 0..active_inbound_builds + backup_inbound_builds {
+            let is_backup = build_index >= active_inbound_builds;
             // tunnel that's used to deliver the tunnel build request message
             //
             // if it's `None`, a fake 0-hop outbound tunnel is used
             let send_tunnel_id = self.selector.select_outbound_tunnel();
 
             // select hops for the tunnel
-            let Some(hops) = self.selector.select_hops(self.config.num_inbound_hops) else {
+            let Some(num_hops) = varied_tunnel_length::<R>(
+                self.config.num_inbound_hops,
+                self.config.inbound_length_variance,
+                7,
+            ) else {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    name = %self.config.name,
+                    "inbound tunnel length configuration cannot be represented",
+                );
+                continue;
+            };
+
+            let Some(hops) = self.selector.select_hops(num_hops) else {
                 tracing::warn!(
                     target: LOG_TARGET,
                     name = %self.config.name,
@@ -659,6 +781,9 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
             // generate tunnel id for the inbound tunnel that's about to be built
             let (tunnel_id, tunnel_rx) =
                 self.subsystem_handle.insert_tunnel::<TUNNEL_CHANNEL_SIZE>(&mut R::rng());
+            if is_backup {
+                self.pending_backup_inbound.insert(tunnel_id);
+            }
 
             match PendingTunnel::<R, InboundTunnel<R>>::create_tunnel(TunnelBuildParameters {
                 hops,
@@ -760,6 +885,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
 
                     self.subsystem_handle.remove_tunnel(&tunnel_id);
                     self.subsystem_handle.remove_listener(&message_id);
+                    self.pending_backup_inbound.remove(&tunnel_id);
                     continue;
                 }
             }
@@ -944,6 +1070,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
         // poll pending outbound tunnels
         while let Poll::Ready(Some((tunnel_id, event))) = self.pending_outbound.poll_next_unpin(cx)
         {
+            let is_backup = self.pending_backup_outbound.remove(&tunnel_id);
             match event {
                 Err(error) => {
                     tracing::debug!(
@@ -973,15 +1100,23 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                         "outbound tunnel built",
                     );
 
-                    self.selector.add_outbound_tunnel(tunnel_id, tunnel.hops());
-                    self.outbound.insert(tunnel_id, tunnel);
+                    if is_backup {
+                        self.backup_outbound.insert(tunnel_id, tunnel);
+                    } else {
+                        self.selector.add_outbound_tunnel(tunnel_id, tunnel.hops());
+                        self.outbound.insert(tunnel_id, tunnel);
+                    }
                     self.tunnel_timers.add_outbound_tunnel(tunnel_id);
-                    self.publish_tunnel(tunnel_id, TunnelDirection::Outbound);
+                    if !is_backup {
+                        self.publish_tunnel(tunnel_id, TunnelDirection::Outbound);
+                    }
                     self.router_ctx
                         .metrics_handle()
                         .gauge(NUM_PENDING_OUTBOUND_TUNNELS)
                         .decrement(1);
-                    self.router_ctx.metrics_handle().gauge(NUM_OUTBOUND_TUNNELS).increment(1);
+                    if !is_backup {
+                        self.router_ctx.metrics_handle().gauge(NUM_OUTBOUND_TUNNELS).increment(1);
+                    }
                     self.router_ctx.metrics_handle().counter(NUM_BUILD_SUCCESSES).increment(1);
                     self.router_ctx
                         .metrics_handle()
@@ -990,15 +1125,17 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                     self.num_tunnels_built += 1;
                     self.event_handle.tunnel_build_result(true);
 
-                    // inform the owner of the tunnel pool that a new outbound tunnel has been built
-                    if let Err(error) = self.context.register_outbound_tunnel_built(tunnel_id) {
-                        tracing::warn!(
-                            target: LOG_TARGET,
-                            name = %self.config.name,
-                            %tunnel_id,
-                            ?error,
-                            "failed to register new outbound tunnel to owner",
-                        );
+                    if !is_backup {
+                        // inform the owner of the tunnel pool that a new outbound tunnel has been built
+                        if let Err(error) = self.context.register_outbound_tunnel_built(tunnel_id) {
+                            tracing::warn!(
+                                target: LOG_TARGET,
+                                name = %self.config.name,
+                                %tunnel_id,
+                                ?error,
+                                "failed to register new outbound tunnel to owner",
+                            );
+                        }
                     }
                 }
             }
@@ -1008,6 +1145,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
 
         // poll pending inbound tunnels
         while let Poll::Ready(Some((tunnel_id, event))) = self.pending_inbound.poll_next_unpin(cx) {
+            let is_backup = self.pending_backup_inbound.remove(&tunnel_id);
             match event {
                 Err(error) => {
                     tracing::debug!(
@@ -1045,37 +1183,53 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                     // be stored in selector/routing table, as opposed to the endpoint information,
                     // because the gateway is used to receive messages
                     let (router_id, gateway_tunnel_id) = tunnel.gateway();
-                    self.selector.add_inbound_tunnel(
-                        gateway_tunnel_id,
-                        router_id.clone(),
-                        tunnel.hops(),
-                    );
-                    self.inbound_tunnels.insert(gateway_tunnel_id, (tunnel_id, router_id.clone()));
+                    let hops_for_selector = tunnel.hops();
+                    if is_backup {
+                        self.backup_inbound_tunnels
+                            .insert(
+                                gateway_tunnel_id,
+                                (tunnel_id, router_id.clone(), hops_for_selector),
+                            );
+                    } else {
+                        self.selector.add_inbound_tunnel(
+                            gateway_tunnel_id,
+                            router_id.clone(),
+                            hops_for_selector,
+                        );
+                        self.inbound_tunnels
+                            .insert(gateway_tunnel_id, (tunnel_id, router_id.clone()));
+                    }
                     self.tunnel_timers.add_inbound_tunnel(gateway_tunnel_id);
-                    self.publish_tunnel(gateway_tunnel_id, TunnelDirection::Inbound);
+                    if !is_backup {
+                        self.publish_tunnel(gateway_tunnel_id, TunnelDirection::Inbound);
+                    }
                     self.num_tunnels_built += 1;
                     self.event_handle.tunnel_build_result(true);
 
                     // inform the owner of the tunnel pool that a new inbound tunnel has been built
-                    if let Err(error) = self.context.register_inbound_tunnel_built(
-                        gateway_tunnel_id,
-                        Lease {
-                            router_id,
-                            tunnel_id: gateway_tunnel_id,
-                            expires: R::time_since_epoch() + TUNNEL_EXPIRATION,
-                        },
-                    ) {
-                        tracing::warn!(
-                            target: LOG_TARGET,
-                            name = %self.config.name,
-                            %gateway_tunnel_id,
-                            ?error,
-                            "failed to register new inbound tunnel to owner",
-                        );
+                    if !is_backup {
+                        if let Err(error) = self.context.register_inbound_tunnel_built(
+                            gateway_tunnel_id,
+                            Lease {
+                                router_id,
+                                tunnel_id: gateway_tunnel_id,
+                                expires: R::time_since_epoch() + TUNNEL_EXPIRATION,
+                            },
+                        ) {
+                            tracing::warn!(
+                                target: LOG_TARGET,
+                                name = %self.config.name,
+                                %gateway_tunnel_id,
+                                ?error,
+                                "failed to register new inbound tunnel to owner",
+                            );
+                        }
                     }
 
                     self.inbound.push(tunnel);
-                    self.router_ctx.metrics_handle().gauge(NUM_INBOUND_TUNNELS).increment(1);
+                    if !is_backup {
+                        self.router_ctx.metrics_handle().gauge(NUM_INBOUND_TUNNELS).increment(1);
+                    }
                     self.router_ctx
                         .metrics_handle()
                         .gauge(NUM_PENDING_INBOUND_TUNNELS)
@@ -1096,6 +1250,22 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
             match event {
                 None => return Poll::Ready(()),
                 Some((tunnel_id, gateway_tunnel_id)) => {
+                    if self
+                        .backup_inbound_tunnels
+                        .remove(&gateway_tunnel_id)
+                        .is_some()
+                    {
+                        tracing::debug!(
+                            target: LOG_TARGET,
+                            name = %self.config.name,
+                            %tunnel_id,
+                            %gateway_tunnel_id,
+                            "standby inbound tunnel expired",
+                        );
+                        self.subsystem_handle.remove_tunnel(&tunnel_id);
+                        continue;
+                    }
+
                     tracing::info!(
                         target: LOG_TARGET,
                         name = %self.config.name,
@@ -1122,6 +1292,48 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                             ?error,
                             "failed to register expired inbound tunnel to owner",
                         );
+                    }
+
+                    let backup = (self.inbound_tunnels.len() < self.config.num_inbound)
+                        .then(|| {
+                            self.backup_inbound_tunnels
+                                .iter()
+                                .next()
+                                .map(|(gateway, (tunnel_id, router_id, hops))| {
+                                    (*gateway, *tunnel_id, router_id.clone(), hops.clone())
+                                })
+                        })
+                        .flatten();
+                    if let Some((backup_gateway, backup_tunnel_id, backup_router, hops)) = backup {
+                        self.backup_inbound_tunnels.remove(&backup_gateway);
+                        self.selector.add_inbound_tunnel(
+                            backup_gateway,
+                            backup_router.clone(),
+                            hops,
+                        );
+                        self.inbound_tunnels.insert(
+                            backup_gateway,
+                            (backup_tunnel_id, backup_router.clone()),
+                        );
+                        self.publish_tunnel(backup_gateway, TunnelDirection::Inbound);
+                        self.router_ctx.metrics_handle().gauge(NUM_INBOUND_TUNNELS).increment(1);
+
+                        if let Err(error) = self.context.register_inbound_tunnel_built(
+                            backup_gateway,
+                            Lease {
+                                router_id: backup_router.clone(),
+                                tunnel_id: backup_gateway,
+                                expires: R::time_since_epoch() + TUNNEL_EXPIRATION,
+                            },
+                        ) {
+                            tracing::warn!(
+                                target: LOG_TARGET,
+                                name = %self.config.name,
+                                %backup_gateway,
+                                ?error,
+                                "failed to register promoted inbound tunnel to owner",
+                            );
+                        }
                     }
                 }
             }
@@ -1452,6 +1664,16 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
             match event {
                 None => return Poll::Ready(()),
                 Some(TunnelTimerEvent::Destroy { tunnel_id }) => {
+                    if self.backup_outbound.remove(&tunnel_id).is_some() {
+                        tracing::debug!(
+                            target: LOG_TARGET,
+                            name = %self.config.name,
+                            %tunnel_id,
+                            "standby outbound tunnel expired",
+                        );
+                        continue;
+                    }
+
                     tracing::info!(
                         target: LOG_TARGET,
                         name = %self.config.name,
@@ -1474,10 +1696,42 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                             "failed to register expired outbound tunnel to owner",
                         );
                     }
+
+                    if self.outbound.len() < self.config.num_outbound {
+                        if let Some(backup_tunnel_id) = self.backup_outbound.keys().next().copied() {
+                            let backup_tunnel = self
+                                .backup_outbound
+                                .remove(&backup_tunnel_id)
+                                .expect("backup outbound tunnel to exist");
+                            let hops = backup_tunnel.hops();
+                            self.selector.add_outbound_tunnel(backup_tunnel_id, hops);
+                            self.outbound.insert(backup_tunnel_id, backup_tunnel);
+                            self.publish_tunnel(backup_tunnel_id, TunnelDirection::Outbound);
+                            self.router_ctx
+                                .metrics_handle()
+                                .gauge(NUM_OUTBOUND_TUNNELS)
+                                .increment(1);
+
+                            if let Err(error) =
+                                self.context.register_outbound_tunnel_built(backup_tunnel_id)
+                            {
+                                tracing::warn!(
+                                    target: LOG_TARGET,
+                                    name = %self.config.name,
+                                    %backup_tunnel_id,
+                                    ?error,
+                                    "failed to register promoted outbound tunnel to owner",
+                                );
+                            }
+                        }
+                    }
                 }
                 Some(TunnelTimerEvent::Rebuild {
                     kind: TunnelKind::Outbound { tunnel_id },
                 }) => {
+                    if self.backup_outbound.contains_key(&tunnel_id) {
+                        continue;
+                    }
                     tracing::debug!(
                         target: LOG_TARGET,
                         name = %self.config.name,
@@ -1499,6 +1753,13 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                 Some(TunnelTimerEvent::Rebuild {
                     kind: TunnelKind::Inbound { tunnel_id },
                 }) => {
+                    if self
+                        .backup_inbound_tunnels
+                        .values()
+                        .any(|(backup_tunnel_id, _, _)| *backup_tunnel_id == tunnel_id)
+                    {
+                        continue;
+                    }
                     tracing::debug!(
                         target: LOG_TARGET,
                         name = %self.config.name,
@@ -1538,6 +1799,11 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                 self.inbound_tunnels.values().for_each(|(tunnel_id, _)| {
                     self.subsystem_handle.remove_tunnel(tunnel_id);
                 });
+                self.backup_inbound_tunnels
+                    .values()
+                    .for_each(|(tunnel_id, _, _)| {
+                        self.subsystem_handle.remove_tunnel(tunnel_id);
+                    });
 
                 if let Err(error) = self.context.register_tunnel_pool_shut_down() {
                     tracing::warn!(
@@ -1600,6 +1866,47 @@ mod tests {
         },
     };
     use thingbuf::mpsc::{channel, with_recycle};
+
+    #[test]
+    fn varied_tunnel_length_uses_bounded_inclusive_variance() {
+        let lengths = (0..128)
+            .map(|_| varied_tunnel_length::<MockRuntime>(3, -2, 7).unwrap())
+            .collect::<HashSet<_>>();
+
+        assert!(lengths.iter().all(|length| (1..=5).contains(length)));
+        assert!(lengths.len() > 1, "test RNG did not demonstrate variation");
+        assert_eq!(varied_tunnel_length::<MockRuntime>(3, 0, 7), Some(3));
+        assert_eq!(varied_tunnel_length::<MockRuntime>(0, 0, 7), None);
+    }
+
+    #[test]
+    fn tunnel_pool_defaults_keep_standby_and_variance_disabled() {
+        let config = TunnelPoolConfig::default();
+
+        assert_eq!(config.inbound_length_variance, 0);
+        assert_eq!(config.outbound_length_variance, 0);
+        assert_eq!(config.num_inbound_backup, 0);
+        assert_eq!(config.num_outbound_backup, 0);
+    }
+
+    #[test]
+    fn mapping_transfers_variance_and_standby_configuration() {
+        let options = [
+            ("inbound.lengthVariance", "-1"),
+            ("inbound.backupQuantity", "2"),
+            ("outbound.lengthVariance", "1"),
+            ("outbound.backupQuantity", "3"),
+        ]
+        .into_iter()
+        .map(|(key, value)| (Str::from(key), Str::from(value)))
+        .collect::<Mapping>();
+        let config = TunnelPoolConfig::from(&options);
+
+        assert_eq!(config.inbound_length_variance, -1);
+        assert_eq!(config.num_inbound_backup, 2);
+        assert_eq!(config.outbound_length_variance, 1);
+        assert_eq!(config.num_outbound_backup, 3);
+    }
 
     #[tokio::test(start_paused = true)]
     async fn build_outbound_exploratory_tunnel() {
@@ -2246,6 +2553,7 @@ mod tests {
                 num_outbound: 0usize,
                 num_outbound_hops: 0usize,
                 name: Str::from("client"),
+                ..Default::default()
             };
             let client_parameters = TunnelPoolBuildParameters::new(pool_config);
             let client_pool_handle = client_parameters.context_handle.clone();

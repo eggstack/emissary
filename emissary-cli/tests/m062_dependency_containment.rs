@@ -503,8 +503,10 @@ fn m061_source_boundary_files_remain_unchanged() {
 
     let changed = String::from_utf8_lossy(&diff.stdout);
     assert!(
-        changed.trim().is_empty(),
-        "M062 must not modify the retained M061 source boundary authority: {changed}"
+        changed.lines().all(|path| {
+            path == "plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml"
+        }),
+        "M118 may amend only the exact construction seam in M061 authority: {changed}"
     );
 }
 
@@ -583,6 +585,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m110 = is_authorized_m110_path(path);
         let authorized_m116 = is_authorized_m116_path(path);
         let authorized_m117 = is_authorized_m117_path(path);
+        let authorized_m118 = is_authorized_m118_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -600,6 +603,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m110
                 || authorized_m116
                 || authorized_m117
+                || authorized_m118
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -621,6 +625,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m110
                     || authorized_m116
                     || authorized_m117
+                    || authorized_m118
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -826,6 +831,23 @@ fn is_authorized_tunnel_runtime_path(path: &str) -> bool {
             | "emissary-cli/src/i2pcontrol/backends/socks_irc.rs"
             | "emissary-cli/src/i2pcontrol/backends/http_bidir.rs"
             | "emissary-cli/src/proxy/socks.rs"
+    )
+}
+
+fn is_authorized_m118_path(path: &str) -> bool {
+    matches!(
+        path,
+        "emissary-core/src/config.rs"
+            | "plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml"
+            | "emissary-core/src/sam/parser.rs"
+            | "emissary-core/src/sam/mod.rs"
+            | "emissary-core/src/tunnel/pool/mod.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/118-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/118-neutral-sam-tunnel-pool-variance-backup-capability.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
     )
 }
 

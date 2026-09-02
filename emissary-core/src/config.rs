@@ -52,6 +52,7 @@ impl From<Option<ExploratoryConfig>> for TunnelPoolConfig {
                 num_inbound_hops: config.inbound_len.unwrap_or(default_config.num_inbound_hops),
                 num_outbound: config.outbound_count.unwrap_or(default_config.num_outbound),
                 num_outbound_hops: config.outbound_len.unwrap_or(default_config.num_outbound_hops),
+                ..default_config
             },
         }
     }

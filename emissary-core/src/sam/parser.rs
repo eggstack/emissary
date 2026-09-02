@@ -344,11 +344,43 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
             }),
             ("SESSION", Some("CREATE")) => {
                 // checking that the options have valid values
-                let data_for_options_check:[(&'static str, u8, u8, &'static str); 4] = [
-                    ("inbound.quantity", 1, 16, "invalid inbound tunnel quantity, 16 is the maximum quantity"),
-                    ("outbound.quantity", 1, 16, "invalid outbound tunnel quantity, 16 is the maximum quantity"), 
-                    ("inbound.length", 1, 7, "invalid inbound tunnel length, 0-hop is not supported and 7 is the maximum length"), 
-                    ("outbound.length", 1, 8, "invalid outbound tunnel length, 0-hop is not supported and 8 is the maximum length")
+                let data_for_options_check: [(&'static str, i16, i16, &'static str); 6] = [
+                    (
+                        "inbound.quantity",
+                        1,
+                        16,
+                        "invalid inbound tunnel quantity, 16 is the maximum quantity",
+                    ),
+                    (
+                        "outbound.quantity",
+                        1,
+                        16,
+                        "invalid outbound tunnel quantity, 16 is the maximum quantity",
+                    ),
+                    (
+                        "inbound.length",
+                        1,
+                        7,
+                        "invalid inbound tunnel length, 0-hop is not supported and 7 is the maximum length",
+                    ),
+                    (
+                        "outbound.length",
+                        1,
+                        8,
+                        "invalid outbound tunnel length, 0-hop is not supported and 8 is the maximum length",
+                    ),
+                    (
+                        "inbound.backupQuantity",
+                        0,
+                        16,
+                        "invalid inbound backup quantity, 16 is the maximum quantity",
+                    ),
+                    (
+                        "outbound.backupQuantity",
+                        0,
+                        16,
+                        "invalid outbound backup quantity, 16 is the maximum quantity",
+                    ),
                 ];
 
                 for (option, min, max, error_msg) in data_for_options_check {
@@ -356,7 +388,7 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                         continue;
                     };
 
-                    let Ok(value) = value.parse::<u8>() else {
+                    let Ok(value) = value.parse::<i16>() else {
                         tracing::warn!(
                             target: LOG_TARGET,
                             ?value,
@@ -373,6 +405,54 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                             ?max,
                             ?value,
                             error_msg
+                        );
+                        return Err(());
+                    }
+                }
+
+                for (option, length_option, max_length) in [
+                    ("inbound.lengthVariance", "inbound.length", 7i16),
+                    ("outbound.lengthVariance", "outbound.length", 8i16),
+                ] {
+                    let Some(value) = parsed_cmd.key_value_pairs.get(option) else {
+                        continue;
+                    };
+                    let Ok(variance) = value.parse::<i16>() else {
+                        tracing::warn!(
+                            target: LOG_TARGET,
+                            ?value,
+                            %option,
+                            "invalid tunnel length variance",
+                        );
+                        return Err(());
+                    };
+                    if !(-7..=7).contains(&variance) {
+                        tracing::warn!(
+                            target: LOG_TARGET,
+                            ?variance,
+                            %option,
+                            "tunnel length variance must be between -7 and 7",
+                        );
+                        return Err(());
+                    }
+
+                    let length = parsed_cmd
+                        .key_value_pairs
+                        .get(length_option)
+                        .and_then(|value| value.parse::<i16>().ok())
+                        .unwrap_or(2);
+                    let (minimum, maximum) = if variance < 0 {
+                        (length + variance, length - variance)
+                    } else {
+                        (length, length + variance)
+                    };
+                    if minimum < 1 || maximum > max_length {
+                        tracing::warn!(
+                            target: LOG_TARGET,
+                            ?length,
+                            ?variance,
+                            %option,
+                            "tunnel length variance reaches an unsupported hop count",
                         );
                         return Err(());
                     }
@@ -1150,6 +1230,47 @@ mod tests {
                 ),
                 Err(_) => {}
             }
+        }
+    }
+
+    #[test]
+    fn parse_tunnel_variance_and_backup_options() {
+        match SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             inbound.length=2 inbound.lengthVariance=-1 inbound.backupQuantity=3 \
+             outbound.length=3 outbound.lengthVariance=2 outbound.backupQuantity=4",
+        ) {
+            Some(SamCommand::CreateSession { options, .. }) => {
+                assert_eq!(options.get("inbound.lengthVariance"), Some(&"-1".to_string()));
+                assert_eq!(options.get("inbound.backupQuantity"), Some(&"3".to_string()));
+                assert_eq!(options.get("outbound.lengthVariance"), Some(&"2".to_string()));
+                assert_eq!(options.get("outbound.backupQuantity"), Some(&"4".to_string()));
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+    }
+
+    #[test]
+    fn reject_invalid_tunnel_variance_and_backup_options() {
+        let invalid_options = [
+            "inbound.lengthVariance=8",
+            "outbound.lengthVariance=-8",
+            "inbound.lengthVariance=abc",
+            "outbound.lengthVariance=1.1",
+            "inbound.backupQuantity=-1",
+            "outbound.backupQuantity=17",
+            "inbound.length=1 inbound.lengthVariance=-1",
+            "outbound.length=8 outbound.lengthVariance=1",
+        ];
+
+        for options in invalid_options {
+            let command = format!(
+                "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT {options}"
+            );
+            assert!(
+                SamCommand::parse::<MockRuntime>(&command).is_none(),
+                "invalid tunnel options were accepted: {options}"
+            );
         }
     }
 

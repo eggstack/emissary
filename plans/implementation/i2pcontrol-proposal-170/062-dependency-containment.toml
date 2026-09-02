@@ -41,6 +41,7 @@ baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",
+  "emissary-core/src/config.rs",
   "plans/implementation/i2pcontrol-proposal-170/109-startup-managed-tunnel-action-semantics-corrective.md",
   "plans/implementation/i2pcontrol-proposal-170/110-shared-client-session-and-destination-key-ownership-completion.md",
   "plans/implementation/i2pcontrol-proposal-170/111-sam-session-wire-option-completion.md",

@@ -1,6 +1,6 @@
 # M118 — Neutral SAM Tunnel-Pool Variance and Backup Capability
 
-Status: **ready**
+Status: **active**
 
 Class: capability / neutral lower-layer exception / tunnel-pool semantics
 
@@ -53,6 +53,11 @@ M118 is an explicit lower-layer exception. Production changes are limited to:
 Tests may be added in the existing module/test locations for those owners.
 
 No other `emissary-core/**` path is pre-authorized. If correct standby/variance semantics require another exact existing tunnel-pool owner, stop and amend/register the plan before changing it.
+
+Implementation amendment: adding fields to `TunnelPoolConfig` requires the existing
+`emissary-core/src/config.rs` exploratory-config constructor to use struct-update defaults.
+This is a mechanical construction seam only; it adds no runtime owner or behavior outside the
+SAM/tunnel-pool paths above. M062 exact-path authority records this one additional path.
 
 No `emissary-cli/src/**`, `emissary-util/**`, Cargo/dependency, startup, frontend, transport, NetDb, I2CP, workflow, release, or Yosemite production change is authorized by M118.
 

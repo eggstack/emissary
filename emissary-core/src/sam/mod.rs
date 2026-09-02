@@ -651,6 +651,20 @@ impl<R: Runtime> Future for SamServer<R> {
                                     .get("inbound.length")
                                     .and_then(|v| v.parse().ok())
                                     .unwrap_or(config.num_inbound_hops),
+                                inbound_length_variance: options
+                                    .get("inbound.lengthVariance")
+                                    .map(|v| {
+                                        v.parse()
+                                            .expect("SAM parser validates inbound length variance")
+                                    })
+                                    .unwrap_or(config.inbound_length_variance),
+                                num_inbound_backup: options
+                                    .get("inbound.backupQuantity")
+                                    .map(|v| {
+                                        v.parse()
+                                            .expect("SAM parser validates inbound backup quantity")
+                                    })
+                                    .unwrap_or(config.num_inbound_backup),
                                 num_outbound: options
                                     .get("outbound.quantity")
                                     .and_then(|v| v.parse().ok())
@@ -659,6 +673,20 @@ impl<R: Runtime> Future for SamServer<R> {
                                     .get("outbound.length")
                                     .and_then(|v| v.parse().ok())
                                     .unwrap_or(config.num_outbound_hops),
+                                outbound_length_variance: options
+                                    .get("outbound.lengthVariance")
+                                    .map(|v| {
+                                        v.parse()
+                                            .expect("SAM parser validates outbound length variance")
+                                    })
+                                    .unwrap_or(config.outbound_length_variance),
+                                num_outbound_backup: options
+                                    .get("outbound.backupQuantity")
+                                    .map(|v| {
+                                        v.parse()
+                                            .expect("SAM parser validates outbound backup quantity")
+                                    })
+                                    .unwrap_or(config.num_outbound_backup),
                             }) {
                                 Ok(tunnel_pool_future) => tunnel_pool_future,
                                 Err(error) => {

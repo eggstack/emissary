@@ -41,9 +41,9 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M118 ready** | M117 is closed; M118 neutral router capability may execute now; M111 remains blocked on M118 |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M111 ready** | M117 and M118 are closed; M111 semantic re-freeze is the next transition |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M062 regression authority | ADR-0005 permits only optional I2PControl-owned exact-revision fork alias; no global patch/vendor/path dependency |
-| I2PControl tunnel security | closed at M093 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | regression authority | M118 must preserve tunnel anonymity/resource boundaries |
+| I2PControl tunnel security | closed at M093 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | regression authority | M118 closure preserves tunnel anonymity/resource boundaries |
 
 ## Current production state
 
@@ -77,7 +77,7 @@ M116 post-M110 corrective                            [CLOSED]
   v                             v
 M118 neutral SAM/tunnel-pool    Yosemite Y001
 variance + backups              SESSION CREATE surface
-[READY]                         [READY IN YOSEMITE]
+[CLOSED]                        [READY IN YOSEMITE]
   |                             |
   |                             v
   |                         Yosemite Y002
@@ -91,7 +91,7 @@ variance + backups              SESSION CREATE surface
   +--------------+--------------+
                  |
                  v
-M111 SAM session-wire Proposal mapping               [ROADMAP / BLOCKED]
+M111 SAM session-wire Proposal mapping               [READY / SEMANTIC RE-FREEZE]
   |
   v
 M112 client proxy/session lifecycle                  [ROADMAP / BLOCKED]
@@ -120,13 +120,14 @@ implementation revision `8026f5b424fc178d683e63555335f8b33e0aba04`, which contai
 and is limited to the I2PControl feature-owned adapter boundary. It does not promote
 Proposal cells or implement M118 router behavior.
 
-## Current Emissary handoff — M118
+## Closed Emissary handoff — M118
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/118-neutral-sam-tunnel-pool-variance-backup-capability.md`
 
-Status: **ready**.
+Status: **closed**; implementation commit `e7f3e04beccbf9f894ca23ec6d7e3ee21a180001`; closure:
+`plans/closure/i2pcontrol-proposal-170/118-closure.md`.
 
 Baseline:
 
@@ -134,13 +135,15 @@ Baseline:
 
 Objective: add only the neutral Emissary SAM/tunnel-pool primitives necessary to honor canonical length-variance and backup-quantity session settings.
 
-Authorized production paths are limited to:
+Authorized production paths were limited to:
 
 - `emissary-core/src/sam/parser.rs`;
 - `emissary-core/src/sam/mod.rs`;
 - `emissary-core/src/tunnel/pool/mod.rs`.
 
-M118 changes no I2PControl production code and must not alter M095 counts. Exact reference semantics, standby/failover behavior, zero-hop limits, cancellation, and build bounds are closure requirements. If correct backup behavior requires broader core redesign, that slice remains blocked rather than approximated.
+M118 changed no I2PControl production code and did not alter M095 counts. Exact reference semantics,
+standby/failover behavior, zero-hop limits, cancellation, and build bounds are recorded in the
+closure evidence.
 
 ## M117 dependency gate — satisfied
 
@@ -162,7 +165,7 @@ M117 implements no router behavior and no Proposal cell promotion.
 
 `plans/implementation/i2pcontrol-proposal-170/111-sam-session-wire-option-completion.md`
 
-Blocked on M118's required real router effect for variance/backups and its own semantic re-freeze. M117 provides the accepted internal fork API. M111 must re-freeze `UseSSL` semantics and MUST NOT map Proposal `UseSSL` to Yosemite's SAM-router transport `ssl` merely because the field exists.
+Ready after M117 and M118 closure. M117 provides the accepted internal fork API and M118 provides the real neutral variance/backup effect. M111 must re-freeze `UseSSL` semantics and MUST NOT map Proposal `UseSSL` to Yosemite's SAM-router transport `ssl` merely because the field exists.
 
 ### M112
 
@@ -205,17 +208,19 @@ A cell becomes `apply` only with real request→runtime evidence. `not_applicabl
 | M110 | closed historically; corrected by M116 | `plans/closure/i2pcontrol-proposal-170/110-closure.md` |
 | M116 | closed | `plans/closure/i2pcontrol-proposal-170/116-closure.md` |
 | M117 | closed | `plans/closure/i2pcontrol-proposal-170/117-closure.md` |
+| M118 | closed | `plans/closure/i2pcontrol-proposal-170/118-closure.md` |
 
 M093 remains tunnel production/security regression authority. M092 remains historical authority against unauthorized Yosemite/core/vendor changes; ADR-0005 supersedes only its blanket internal-fork prohibition with the exact alias/revision strategy above.
 
 ## Registry maintenance rules
 
-1. M118 is the current dependency-ready Emissary implementation handoff.
+1. M111 is the current dependency-ready Emissary implementation handoff.
 2. M117 is closed at the exact pinned Yosemite revision above.
-3. Yosemite Y001 is separately ready only in `eggstack/yosemite`; Emissary agents must not implement it in this repository.
-4. M111-M114 must not execute until their named gates close and the specific plan is promoted.
-5. Treat `248 / 134 / 458` as the current closed matrix; prerequisite infrastructure does not alter it.
-6. Keep Proposal 170 policy under `emissary-cli/src/i2pcontrol/**` wherever possible; M118 is a specifically authorized neutral lower-layer exception.
-7. No global Yosemite patch/replacement/vendor/path dependency is permitted.
-8. Proposal 170 remains pinned to `2026-05-20`; later proposal revisions require a delta audit.
-9. Writes are internal to `eggstack/emissary` and plan-authorized `eggstack/yosemite` only. No upstream issue/PR/review/submission/merge/adoption/contact/release activity is authorized.
+3. M118 is closed at implementation commit `e7f3e04`; its neutral capability does not change matrix counts.
+4. Yosemite Y001 is separately ready only in `eggstack/yosemite`; Emissary agents must not implement it in this repository.
+5. M111 is ready but must re-freeze its exact semantic/cell scope before implementation; M112-M114 remain blocked.
+6. Treat `248 / 134 / 458` as the current closed matrix; prerequisite infrastructure does not alter it.
+7. Keep Proposal 170 policy under `emissary-cli/src/i2pcontrol/**` wherever possible; M118 is a specifically authorized neutral lower-layer exception.
+8. No global Yosemite patch/replacement/vendor/path dependency is permitted.
+9. Proposal 170 remains pinned to `2026-05-20`; later proposal revisions require a delta audit.
+10. Writes are internal to `eggstack/emissary` and plan-authorized `eggstack/yosemite` only. No upstream issue/PR/review/submission/merge/adoption/contact/release activity is authorized.

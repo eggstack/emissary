@@ -1,12 +1,13 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096, M098-M110, M115-M117 closed; M097/M104 closed as blocked; M111-M114 remain roadmap-defined and blocked
+Status: active; M095-M096, M098-M110, M115-M118 closed; M097/M104 closed as blocked; M111 ready; M112-M114 remain roadmap-defined and blocked
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
 Current corrective baseline: `09247ccf8367a7b3a7050e0584614c4e59cafe8e` — post-M110 closure/containment head.
 M116 implementation head: `626d76311a6dc142ecc07827845081b9a9f4c860`.
 M117 implementation head: `22c893a`.
+M118 implementation head: `e7f3e04`.
 
 Pinned external authority:
 
@@ -29,6 +30,7 @@ Canonical/internal authority:
 - M109/M115/M110 historical closure evidence;
 - M116 post-M110 corrective plan.
 - M117 internal Yosemite fork pin and I2PControl adapter integration plan/closure.
+- M118 neutral SAM tunnel-pool variance/backup capability plan/closure.
 
 All external specifications, source trees, documentation, issues, pull requests and reference routers are read-only evidence. All repository writes remain internal to `eggstack/emissary`. No upstream contribution/review/merge/contact activity is authorized.
 
@@ -76,7 +78,7 @@ M116 was the corrective gate. Matrix correctness took precedence over preserving
 
 Remaining completion gates after M116 are:
 
-1. M111 accepted Yosemite session-wire capability;
+1. M111 accepted Yosemite session-wire capability and M118 neutral tunnel-pool semantics;
 2. M112 client proxy/lifecycle semantics (and possibly `NewDest` if M116 returns it to blocked);
 3. M113 server presentation/routing/LeaseSet security semantics;
 4. M114 final live/reference/public/security/containment reclosure.
@@ -125,11 +127,18 @@ Any future production change outside I2PControl requires all of:
 
 M116 satisfies none of the reasons to invoke this exception, so no external path is authorized.
 
+M118 is the separately registered neutral exception for generic SAM tunnel-pool variance
+and standby/failover behavior. Its exact production paths and mechanical config-construction
+seam are recorded in the M118 plan and M061/M062 authority; it does not authorize Proposal
+170 policy or matrix changes.
+
 ### Dependency rule
 
 No milestone automatically authorizes Yosemite vendoring/forking/patching, path/git overrides, parallel raw SAM, Proposal-shaped `emissary-core` APIs, or dependencies added merely to increase matrix counts.
 
-M117 closed the ADR-0005-authorized internal Yosemite API/dependency boundary. M111 remains blocked on M118's neutral variance/backup runtime semantics and its own semantic re-freeze; no raw/parallel SAM stack or Proposal-shaped core API is authorized.
+M117 closed the ADR-0005-authorized internal Yosemite API/dependency boundary, and M118
+closed the neutral variance/backup runtime prerequisite. M111 is ready for its own
+semantic re-freeze; no raw/parallel SAM stack or Proposal-shaped core API is authorized.
 
 ## 4. Cross-cutting invariants
 
@@ -168,7 +177,7 @@ M095/M105 plus M110's completion ledger are current cell evidence, subject to M1
 | Owner | Families | Pre-M116 count | Current status |
 |---|---|---:|---|
 | M110 | `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile` | 31 promoted cells | historically closed; M116 corrective authority |
-| M111 | `UseSSL`, `TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions` | 44 blocked | dependency-blocked |
+| M111 | `UseSSL`, `TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions` | 44 blocked | ready; semantic re-freeze required |
 | M112 | proxy/plugin/jump + client `ConnectDelay`/`Profile`/remaining `DelayOpen`/`Reduce*`/`Close*`/`NewDest` | 69 blocked | blocked; includes seven `NewDest` cells transferred by M116 |
 | M113 | server presentation/address-routing/LeaseSet | 21 blocked | blocked |
 
@@ -202,7 +211,10 @@ M116 M110 shared/session/NewDest corrective         [CLOSED]
 M117 internal Yosemite fork + adapter                [CLOSED]
   |
   v
-M111 SAM session-wire options                       [PROPOSED / BLOCKED ON M118]
+M118 neutral SAM tunnel-pool variance/backups       [CLOSED]
+  |
+  v
+M111 SAM session-wire options                       [READY / SEMANTIC RE-FREEZE]
   |
   v
 M112 client proxy/session-lifecycle residuals       [PROPOSED / BLOCKED]
@@ -268,17 +280,29 @@ M117 pins Yosemite Y001/Y002's reviewed implementation revision
 connects the generic session-wire and signature-aware destination APIs, and amends M062
 containment evidence. It does not promote Proposal cells or implement M118 router behavior.
 
+## 10b. M118 — neutral SAM tunnel-pool capability
+
+Plan: `plans/implementation/i2pcontrol-proposal-170/118-neutral-sam-tunnel-pool-variance-backup-capability.md`.
+
+Status: **closed**; implementation commit `e7f3e04`; closure:
+`plans/closure/i2pcontrol-proposal-170/118-closure.md`.
+
+M118 adds only the neutral generic SAM/tunnel-pool behavior required for signed
+length variance and separately maintained standby tunnel capacity. It preserves the
+existing 1..7 inbound and 1..8 outbound hop boundaries, does not change M095 counts,
+and does not authorize Proposal policy in core.
+
 ## 11. M111 — SAM session-wire option completion
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/111-sam-session-wire-option-completion.md`
 
-Status: **proposed / blocked on M118**.
+Status: **ready**; M117 and M118 prerequisites are closed, with semantic re-freeze required.
 
 Target: up to 44 cells. Completion requires real serialization through an accepted public Yosemite API. No raw SAM construction, vendored/path Yosemite, or Proposal-shaped core seam is authorized.
 
-M117 satisfies the accepted generic API/dependency part of this gate. M111 still depends
-on M118's neutral variance/backup runtime semantics and must re-freeze Proposal semantics,
-especially `UseSSL`, before promotion.
+M117 satisfies the accepted generic API/dependency part of this gate and M118 satisfies
+the neutral runtime part. M111 must still re-freeze Proposal semantics, especially
+`UseSSL`, before changing any matrix disposition.
 
 ## 12. M112 — client proxy/session-lifecycle residuals
 
@@ -392,8 +416,9 @@ Known stable/nightly rustfmt mismatch is a tooling limitation; record it and avo
 Per `plans/003-planning-process.md`:
 
 - M110 remains historically closed;
-- M116 was the sole registered ready handoff and is now closed;
-- M111-M114 remain roadmap/indexed but unregistered;
+- M116 and M117 were closed historical handoffs;
+- M118 is closed and M111 is the current registered ready handoff;
+- M112-M114 remain roadmap/indexed but blocked;
 - M116 closure decides exact current matrix/residual ownership;
 - blocked plans may not execute because their files exist;
 - material deviations require plan/ADR correction before code changes;
@@ -411,7 +436,8 @@ If safe comparison requires a canonicalization capability not present in existin
 
 ### Yosemite capability
 
-M111 may remain blocked indefinitely if the accepted dependency cannot express its session-wire fields. This is preferable to an unauthorized fork/vendor/parallel stack.
+M111 may retain individual cells as blocked if the accepted dependency cannot express
+their exact session-wire fields. This is preferable to an unauthorized fork/vendor/parallel stack.
 
 ### Java-specific mechanisms
 

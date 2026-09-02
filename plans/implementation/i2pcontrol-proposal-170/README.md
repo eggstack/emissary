@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; M109, M115, M110, M116, and M117 are closed; M111-M114 remain roadmap-defined and blocked; M095 currently records `248 apply / 134 blocked_primitive / 458 not_applicable`
+Status: partial Proposal 170 production support; M109, M115, M110, M116, M117, and M118 are closed; M111 is ready; M112-M114 remain roadmap-defined and blocked; M095 currently records `248 apply / 134 blocked_primitive / 458 not_applicable`
 
 This directory contains bounded internal implementation, audit, corrective, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -24,6 +24,7 @@ Authoritative references:
 - `110-completion-ledger.toml`
 - `plans/closure/i2pcontrol-proposal-170/116-closure.md`
 - `plans/closure/i2pcontrol-proposal-170/117-closure.md`
+- `plans/closure/i2pcontrol-proposal-170/118-closure.md`
 - `plans/registry.md`
 
 Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
@@ -40,7 +41,7 @@ Preferred production ownership remains `emissary-cli/src/i2pcontrol/**`.
 
 M061/M062/M063 remain containment authority. M109/M115 are the bounded historical exception for existing CLI startup tunnel ownership. M116 adds **no** non-I2PControl production authority.
 
-No standalone crate split, router-core API, Yosemite patch/vendor, parallel SAM stack, frontend coupling, or hosted CI expansion is authorized by M116. M117 separately closes the ADR-0005-authorized optional, exact-revision I2PControl-only Yosemite alias and adapter integration.
+No standalone crate split, router-core API, Yosemite patch/vendor, parallel SAM stack, frontend coupling, or hosted CI expansion is authorized by M116. M117 separately closes the ADR-0005-authorized optional, exact-revision I2PControl-only Yosemite alias and adapter integration. M118 is the separately registered neutral SAM/tunnel-pool exception for generic variance and standby semantics; it does not change I2PControl production ownership or matrix counts.
 
 ## Current production state
 
@@ -89,7 +90,8 @@ Official status remains **partial Proposal 170 support**.
 | M110 | closed historically; M116 corrective required | shared client session + destination/key/PrivKeyFile ownership |
 | **M116** | **closed** | M110 concurrency/cancellation/identity/Streamr/NewDest/secret corrective; closure recorded |
 | **M117** | **closed** | ADR-0005-authorized exact Yosemite fork pin and I2PControl adapter integration; no matrix promotion |
-| M111 | proposed / blocked on M118 | Yosemite SAM session-wire options; up to 44 cells |
+| **M118** | **closed** | neutral SAM tunnel variance and standby/failover capability; no matrix promotion |
+| M111 | ready | Yosemite SAM session-wire options; up to 44 cells; semantic re-freeze required |
 | M112 | proposed / blocked | client proxy/session lifecycle; 69 current cells including seven `NewDest` cells from M116 |
 | M113 | proposed / blocked | server presentation/routing/LeaseSet; up to 21 cells |
 | M114 | proposed / blocked | zero-residual live/reference final reclosure |
@@ -106,8 +108,13 @@ Plans in this completion line:
 - `114-full-proposal-170-live-interoperability-and-final-reclosure.md`
 - `115-m109-runtime-disable-and-lifecycle-truthfulness-corrective-pass.md`
 - `116-m110-shared-session-and-newdest-corrective-pass.md`
+- `118-neutral-sam-tunnel-pool-variance-backup-capability.md`
 
-Per `plans/003-planning-process.md`, M117 is closed and M118 is the next dependency-ready Emissary handoff. M111 remains roadmap-only and blocked on M118's neutral variance/backup semantics; M112-M114 retain their independent blockers.
+Per `plans/003-planning-process.md`, M117 and M118 are closed. M111 is now the next dependency-ready Emissary handoff; M112-M114 retain their independent blockers.
+
+M118 closure: `plans/closure/i2pcontrol-proposal-170/118-closure.md`. It records the
+read-only reference freeze, exact neutral owner paths, standby promotion/replenishment
+semantics, verification outcomes, and the decision to promote M111 to ready.
 
 ## M116 — closed corrective
 
@@ -139,7 +146,7 @@ A cell becomes/remains `apply` only with request→real-runtime evidence. Diffic
 
 ## M111 — SAM session-wire options
 
-M111 remains blocked on M118's neutral router/tunnel-pool semantics and its own semantic re-freeze. M117 supplies the accepted internal generic Yosemite API through ADR-0005; no raw/parallel SAM stack or Proposal-shaped core API is authorized.
+M111 is ready after M117 and M118 closure, but still requires its own semantic re-freeze. M117 supplies the accepted internal generic Yosemite API through ADR-0005 and M118 supplies the neutral variance/backup runtime effect; no raw/parallel SAM stack or Proposal-shaped core API is authorized.
 
 ## M112 — client proxy/lifecycle residuals
 

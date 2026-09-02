@@ -1,6 +1,6 @@
 # M118 — Neutral SAM Tunnel-Pool Variance and Backup Capability
 
-Status: **active**
+Status: **closed**
 
 Class: capability / neutral lower-layer exception / tunnel-pool semantics
 
@@ -16,7 +16,7 @@ Architecture authority:
 - M061/M062 containment authority;
 - M093 tunnel security authority.
 
-Consumer dependency: M111 remains blocked until both this neutral router-side capability and M117's Yosemite client-side adoption are closed.
+Consumer dependency: M111 is ready now that this neutral router-side capability and M117's Yosemite client-side adoption are closed; M111 still requires its own semantic re-freeze before implementation.
 
 ## 1. Objective
 
@@ -227,4 +227,21 @@ Partial truthfulness is acceptable: a slice may remain `blocked_primitive` rathe
 
 ## 15. Closure evidence
 
-Require semantic-reference freeze, exact changed paths, focused variance/standby/failover tests, cancellation/resource review, broad verification outcomes, containment/security review, unresolved findings, M111 readiness decision, and internal-only attestation.
+Require semantic-reference freeze, exact changed paths, focused variance/standby/failover tests, cancellation/resource review, broad verification outcomes, containment/security review, unresolved findings, M111 readiness decision, and internal-only attestation. These requirements are satisfied by `plans/closure/i2pcontrol-proposal-170/118-closure.md`.
+
+## 16. Closure disposition
+
+M118 is closed by implementation commit `e7f3e04beccbf9f894ca23ec6d7e3ee21a180001` and
+closure record `plans/closure/i2pcontrol-proposal-170/118-closure.md`.
+
+The reference freeze recorded the I2CP signed variance and backup semantics from the
+[I2CP specification](https://i2p.net/en/docs/specs/i2cp/), the
+[I2CP overview](https://i2p.net/en/docs/specs/i2cp-overview/), and the read-only
+[I2P router tunnel-pool implementation](https://raw.githubusercontent.com/i2p/i2p.i2p/master/router/java/src/net/i2p/router/tunnel/pool/TunnelPool.java).
+Positive variance samples an inclusive additive range; negative variance samples an
+inclusive symmetric range. Backup quantity is separately maintained standby capacity
+for fail-over and is promoted only when active capacity is lost.
+
+The implementation keeps Emissary's existing inbound 1..7 and outbound 1..8 hop
+boundaries, rejects configurations whose full variance range crosses those boundaries,
+and leaves M095 at `248 apply / 134 blocked_primitive / 458 not_applicable`.

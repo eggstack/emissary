@@ -212,7 +212,31 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         .difference(&m111_completed)
         .cloned()
         .collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m111);
+    let m112_applied: BTreeSet<(String, String)> = [
+        "ConnectDelay",
+        "Close",
+        "CloseTime",
+        "NewDest",
+    ]
+    .into_iter()
+    .flat_map(|option| {
+        ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient"]
+            .into_iter()
+            .map(move |tunnel_type| (option.to_owned(), tunnel_type.to_owned()))
+    })
+    .collect();
+    assert_eq!(m112_applied.len(), 24);
+    let expected_post_m112 = expected_post_m111
+        .difference(&m112_applied)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m112);
     assert_eq!(audit["summary"]["post_m116_reclassified_cells"].as_integer(), Some(7));
     assert_eq!(audit["summary"]["post_m116_blocking_milestone"].as_str(), Some("M112"));
+    assert_eq!(audit["summary"]["post_m112_matrix_apply_cells"].as_integer(), Some(312));
+    assert_eq!(
+        audit["summary"]["post_m112_matrix_blocked_primitive_cells"].as_integer(),
+        Some(70)
+    );
+    assert_eq!(audit["summary"]["post_m112_completed_cell_count"].as_integer(), Some(24));
 }

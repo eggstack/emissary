@@ -1,7 +1,10 @@
 use std::{
     fmt,
     net::{IpAddr, SocketAddr},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 
@@ -9,7 +12,7 @@ use futures::{future::BoxFuture, FutureExt};
 use parking_lot::Mutex;
 use tokio::{
     net::{TcpListener, TcpStream},
-    sync::{mpsc, oneshot, watch, OnceCell},
+    sync::{mpsc, oneshot, watch, Notify},
 };
 use yosemite_i2pcontrol::{style, Session, SessionOptions, StreamOptions};
 
@@ -35,14 +38,23 @@ enum EagerSession {
     Shared(SharedStreamSessionLease),
 }
 
-/// Owns exactly one session for one listener generation.
+struct SessionState {
+    session: Option<SessionResource>,
+    creating: bool,
+    started: bool,
+}
+
+/// Owns the session for one listener generation.
 ///
-/// Delayed generations leave the cell empty until a handler asks for the
-/// session. `OnceCell` serializes concurrent first users, while the
-/// generation cancellation receiver makes a cancelled setup deterministic.
+/// A session may be dropped and recreated after an idle close. Creation is
+/// serialized by the small state machine, while network I/O remains outside
+/// the bookkeeping lock. The owner is generation-local, so a cancelled old
+/// generation cannot mutate a restarted tunnel.
 struct ClientSessionOwner {
-    session: OnceCell<Result<SessionResource, ClientListenerRuntimeError>>,
+    state: tokio::sync::Mutex<SessionState>,
+    changed: Arc<Notify>,
     session_options: SessionOptions,
+    resume_session_options: SessionOptions,
     cancellation: watch::Receiver<bool>,
     setup_failed: mpsc::UnboundedSender<()>,
     shared_registry: Option<Arc<SharedClientSessionRegistry>>,
@@ -52,14 +64,21 @@ struct ClientSessionOwner {
 impl ClientSessionOwner {
     fn delayed(
         session_options: SessionOptions,
+        resume_session_options: SessionOptions,
         cancellation: watch::Receiver<bool>,
         setup_failed: mpsc::UnboundedSender<()>,
         shared_registry: Option<Arc<SharedClientSessionRegistry>>,
         shared: bool,
     ) -> Self {
         Self {
-            session: OnceCell::const_new(),
+            state: tokio::sync::Mutex::new(SessionState {
+                session: None,
+                creating: false,
+                started: false,
+            }),
+            changed: Arc::new(Notify::new()),
             session_options,
+            resume_session_options,
             cancellation,
             setup_failed,
             shared_registry,
@@ -69,21 +88,26 @@ impl ClientSessionOwner {
 
     fn eager(
         session: Session<style::Stream>,
+        resume_session_options: SessionOptions,
         cancellation: watch::Receiver<bool>,
         setup_failed: mpsc::UnboundedSender<()>,
         shared_lease: Option<SharedStreamSessionLease>,
     ) -> Self {
-        let cell = OnceCell::const_new();
         let session = shared_lease
             .as_ref()
             .map_or_else(|| Arc::new(Mutex::new(session)), |lease| Arc::clone(&lease.session));
-        let _ = cell.set(Ok(SessionResource {
-            session,
-            _shared_lease: shared_lease,
-        }));
         Self {
-            session: cell,
+            state: tokio::sync::Mutex::new(SessionState {
+                session: Some(SessionResource {
+                    session,
+                    _shared_lease: shared_lease,
+                }),
+                creating: false,
+                started: true,
+            }),
+            changed: Arc::new(Notify::new()),
             session_options: SessionOptions::default(),
+            resume_session_options,
             cancellation,
             setup_failed,
             shared_registry: None,
@@ -93,17 +117,22 @@ impl ClientSessionOwner {
 
     fn eager_shared(
         lease: SharedStreamSessionLease,
+        resume_session_options: SessionOptions,
         cancellation: watch::Receiver<bool>,
         setup_failed: mpsc::UnboundedSender<()>,
     ) -> Self {
-        let cell = OnceCell::const_new();
-        let _ = cell.set(Ok(SessionResource {
-            session: Arc::clone(&lease.session),
-            _shared_lease: Some(lease),
-        }));
         Self {
-            session: cell,
+            state: tokio::sync::Mutex::new(SessionState {
+                session: Some(SessionResource {
+                    session: Arc::clone(&lease.session),
+                    _shared_lease: Some(lease),
+                }),
+                creating: false,
+                started: true,
+            }),
+            changed: Arc::new(Notify::new()),
             session_options: SessionOptions::default(),
+            resume_session_options,
             cancellation,
             setup_failed,
             shared_registry: None,
@@ -112,46 +141,93 @@ impl ClientSessionOwner {
     }
 
     async fn get(&self) -> Result<SharedSession, ClientListenerRuntimeError> {
-        let cancellation = self.cancellation.clone();
-        let session_options = self.session_options.clone();
-        let shared_registry = self.shared_registry.clone();
-        let shared = self.shared;
-        let result = self
-            .session
-            .get_or_init(|| async move {
-                let resource = tokio::select! {
-                    biased;
-                    _ = cancellation_won(cancellation) => Err(ClientListenerRuntimeError::SessionSetup),
-                    result = async {
-                        if shared {
-                            let Some(registry) = shared_registry else {
-                                return Err("shared client session owner unavailable".to_string());
-                            };
-                            registry.acquire_stream(session_options).await
-                                .map(|lease| SessionResource {
-                                    session: Arc::clone(&lease.session),
-                                    _shared_lease: Some(lease),
-                                })
-                        } else {
-                            Session::<style::Stream>::new(session_options).await
-                                .map(|session| SessionResource {
-                                    session: Arc::new(Mutex::new(session)),
-                                    _shared_lease: None,
-                                })
-                                .map_err(|_| "client session setup failed".to_string())
-                        }
-                    } => result.map_err(|_| ClientListenerRuntimeError::SessionSetup),
-                };
-                resource
-            })
-            .await;
-        match result {
-            Ok(resource) => Ok(Arc::clone(&resource.session)),
-            Err(error) => {
-                let _ = self.setup_failed.send(());
-                Err(error.clone())
+        loop {
+            let waiter = {
+                let mut state = self.state.lock().await;
+                if let Some(resource) = &state.session {
+                    return Ok(Arc::clone(&resource.session));
+                }
+                if state.creating {
+                    let mut waiter = Box::pin(Arc::clone(&self.changed).notified_owned());
+                    waiter.as_mut().enable();
+                    Some(waiter)
+                } else {
+                    state.creating = true;
+                    None
+                }
+            };
+            if let Some(waiter) = waiter {
+                waiter.await;
+                continue;
+            }
+
+            let session_options = {
+                let state = self.state.lock().await;
+                if state.session.is_some() {
+                    continue;
+                }
+                if state.started {
+                    self.resume_session_options.clone()
+                } else {
+                    self.session_options.clone()
+                }
+            };
+            let cancellation = self.cancellation.clone();
+            let shared_registry = self.shared_registry.clone();
+            let result = tokio::select! {
+                biased;
+                _ = cancellation_won(cancellation) => Err(ClientListenerRuntimeError::SessionSetup),
+                result = async {
+                    if self.shared {
+                        let Some(registry) = shared_registry else {
+                            return Err(ClientListenerRuntimeError::SessionSetup);
+                        };
+                        registry.acquire_stream(session_options).await
+                            .map(|lease| SessionResource {
+                                session: Arc::clone(&lease.session),
+                                _shared_lease: Some(lease),
+                            })
+                            .map_err(|_| ClientListenerRuntimeError::SessionSetup)
+                    } else {
+                        Session::<style::Stream>::new(session_options).await
+                            .map(|session| SessionResource {
+                                session: Arc::new(Mutex::new(session)),
+                                _shared_lease: None,
+                            })
+                            .map_err(|_| ClientListenerRuntimeError::SessionSetup)
+                    }
+                } => result,
+            };
+            let mut state = self.state.lock().await;
+            state.creating = false;
+            state.started = true;
+            match result {
+                Ok(resource) => {
+                    let session = Arc::clone(&resource.session);
+                    state.session = Some(resource);
+                    self.changed.notify_waiters();
+                    return Ok(session);
+                }
+                Err(error) => {
+                    self.changed.notify_waiters();
+                    let _ = self.setup_failed.send(());
+                    return Err(error);
+                }
             }
         }
+    }
+
+    async fn close_if_idle(&self) {
+        let mut state = self.state.lock().await;
+        let session = if !state.creating {
+            // Dropping SessionResource closes the generation-owned SAM stream.
+            // Shared lifecycle options are rejected before reaching here.
+            state.session.take()
+        } else {
+            None
+        };
+        drop(state);
+        drop(session);
     }
 }
 
@@ -161,12 +237,73 @@ async fn cancellation_won(mut cancellation: watch::Receiver<bool>) {
     }
 }
 
+struct ConnectionActivity {
+    active: AtomicUsize,
+    changed: Notify,
+}
+
+impl ConnectionActivity {
+    fn new() -> Self {
+        Self {
+            active: AtomicUsize::new(0),
+            changed: Notify::new(),
+        }
+    }
+
+    fn acquire(self: &Arc<Self>) -> ConnectionActivityGuard {
+        self.active.fetch_add(1, Ordering::AcqRel);
+        ConnectionActivityGuard {
+            activity: Arc::clone(self),
+        }
+    }
+}
+
+struct ConnectionActivityGuard {
+    activity: Arc<ConnectionActivity>,
+}
+
+impl Drop for ConnectionActivityGuard {
+    fn drop(&mut self) {
+        self.activity.active.fetch_sub(1, Ordering::AcqRel);
+        self.activity.changed.notify_one();
+    }
+}
+
+async fn run_idle_closer(
+    session: Arc<ClientSessionOwner>,
+    activity: Arc<ConnectionActivity>,
+    cancellation: watch::Receiver<bool>,
+    idle_time: Duration,
+) {
+    loop {
+        let mut activity_changed = Box::pin(activity.changed.notified());
+        activity_changed.as_mut().enable();
+        if activity.active.load(Ordering::Acquire) != 0 {
+            tokio::select! {
+                _ = cancellation_won(cancellation.clone()) => return,
+                _ = &mut activity_changed => continue,
+            }
+        }
+        tokio::select! {
+            _ = cancellation_won(cancellation.clone()) => return,
+            _ = &mut activity_changed => continue,
+            _ = tokio::time::sleep(idle_time) => {
+                if activity.active.load(Ordering::Acquire) == 0 {
+                    session.close_if_idle().await;
+                }
+            }
+        }
+    }
+}
+
 /// The narrow session capability exposed to a client protocol handler.
 #[derive(Clone)]
 pub struct ClientStreamConnector {
     session: Arc<ClientSessionOwner>,
     destination: Arc<str>,
     destination_port: u16,
+    connect_delay: Option<Duration>,
+    cancellation: watch::Receiver<bool>,
 }
 
 impl fmt::Debug for ClientStreamConnector {
@@ -191,6 +328,14 @@ impl ClientStreamConnector {
         destination: &str,
         destination_port: u16,
     ) -> Result<yosemite_i2pcontrol::Stream, ClientListenerRuntimeError> {
+        if let Some(delay) = self.connect_delay {
+            tokio::select! {
+                _ = tokio::time::sleep(delay) => {},
+                _ = cancellation_won(self.cancellation.clone()) => {
+                    return Err(ClientListenerRuntimeError::SessionSetup);
+                }
+            }
+        }
         let session = self.session.get().await?;
         let future = {
             let mut session = session.lock();
@@ -217,6 +362,10 @@ pub struct ClientListenerRuntimeConfig {
     pub sam_tcp_port: u16,
     pub max_connections: usize,
     pub delay_open: bool,
+    pub connect_delay: Option<Duration>,
+    pub close_on_idle: bool,
+    pub close_idle_time: Duration,
+    pub new_dest_on_resume: bool,
     pub session_options: SessionOptions,
     pub handler: ClientConnectionHandler,
 }
@@ -232,6 +381,10 @@ impl fmt::Debug for ClientListenerRuntimeConfig {
             .field("sam_tcp_port", &self.sam_tcp_port)
             .field("max_connections", &self.max_connections)
             .field("delay_open", &self.delay_open)
+            .field("connect_delay", &self.connect_delay)
+            .field("close_on_idle", &self.close_on_idle)
+            .field("close_idle_time", &self.close_idle_time)
+            .field("new_dest_on_resume", &self.new_dest_on_resume)
             .finish_non_exhaustive()
     }
 }
@@ -309,16 +462,33 @@ pub async fn run_client_listener_with_shared_session(
         }
     };
     let local_address = listener.local_addr().map_err(|_| ClientListenerRuntimeError::Bind)?;
+    let initial_session_options = config.session_options.clone();
+    let mut resume_session_options = initial_session_options.clone();
+    if config.new_dest_on_resume {
+        resume_session_options.destination = yosemite_i2pcontrol::DestinationKind::Transient;
+    }
     let session = Arc::new(match eager_session {
         Some(EagerSession::Shared(lease)) => {
-            ClientSessionOwner::eager_shared(lease, cancellation.clone(), setup_failed)
+            ClientSessionOwner::eager_shared(
+                lease,
+                resume_session_options.clone(),
+                cancellation.clone(),
+                setup_failed,
+            )
         }
         Some(EagerSession::Local(session)) => {
-            ClientSessionOwner::eager(*session, cancellation.clone(), setup_failed, None)
+            ClientSessionOwner::eager(
+                *session,
+                resume_session_options.clone(),
+                cancellation.clone(),
+                setup_failed,
+                None,
+            )
         },
         None => {
             ClientSessionOwner::delayed(
-                config.session_options,
+                initial_session_options,
+                resume_session_options,
                 cancellation.clone(),
                 setup_failed,
                 shared_registry,
@@ -330,11 +500,22 @@ pub async fn run_client_listener_with_shared_session(
         session,
         destination: Arc::from(config.destination),
         destination_port: config.destination_port,
+        connect_delay: config.connect_delay,
+        cancellation: cancellation.clone(),
     };
     let max_connections = config.max_connections.clamp(1, DEFAULT_MAX_CONNECTIONS);
     let handler = config.handler;
     let _ = ready.send(Ok(local_address));
     let mut tasks = BoundedTaskGroup::new(max_connections);
+    let activity = Arc::new(ConnectionActivity::new());
+    let mut idle_closer = config.close_on_idle.then(|| {
+        tokio::spawn(run_idle_closer(
+            Arc::clone(&connector.session),
+            Arc::clone(&activity),
+            cancellation.clone(),
+            config.close_idle_time,
+        ))
+    });
 
     loop {
         if *cancellation.borrow() {
@@ -345,13 +526,19 @@ pub async fn run_client_listener_with_shared_session(
             _ = cancellation.changed() => break,
             Some(()) = setup_failed_rx.recv() => {
                 tasks.drain(STOP_TIMEOUT).await;
+                if let Some(idle_closer) = idle_closer.take() {
+                    idle_closer.abort();
+                    let _ = idle_closer.await;
+                }
                 return Err(ClientListenerRuntimeError::SessionSetup);
             }
             result = listener.accept() => {
                 let Ok((stream, _)) = result else { break };
                 let handler = Arc::clone(&handler);
                 let connector = connector.clone();
+                let activity_guard = activity.acquire();
                 let _ = tasks.try_spawn(async move {
+                    let _activity_guard = activity_guard;
                     let _ = std::panic::AssertUnwindSafe((handler)(stream, connector))
                         .catch_unwind()
                         .await;
@@ -364,6 +551,10 @@ pub async fn run_client_listener_with_shared_session(
     }
 
     tasks.drain(STOP_TIMEOUT).await;
+    if let Some(idle_closer) = idle_closer.take() {
+        idle_closer.abort();
+        let _ = idle_closer.await;
+    }
     Ok(())
 }
 
@@ -549,6 +740,10 @@ mod tests {
             sam_tcp_port,
             max_connections,
             delay_open: false,
+            connect_delay: None,
+            close_on_idle: false,
+            close_idle_time: Duration::from_secs(30 * 60),
+            new_dest_on_resume: false,
             session_options: SessionOptions {
                 samv3_tcp_port: sam_tcp_port,
                 nickname: "client-listener".to_owned(),
@@ -681,6 +876,71 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(session_creates.load(Ordering::Acquire), 1);
+        cancel_tx.send(true).unwrap();
+        assert!(runtime.await.unwrap().is_ok());
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn connect_delay_is_applied_before_remote_session_use() {
+        let (sam_port, sam_task) = fake_sam().await;
+        let started = tokio::time::Instant::now();
+        let (elapsed_tx, elapsed_rx) = oneshot::channel();
+        let elapsed_tx = Arc::new(Mutex::new(Some(elapsed_tx)));
+        let handler: ClientConnectionHandler = Arc::new(move |stream, connector| {
+            let elapsed_tx = Arc::clone(&elapsed_tx);
+            Box::pin(async move {
+                let _ = connector.connect().await;
+                let elapsed = started.elapsed();
+                let _ = elapsed_tx.lock().take().map(|sender| sender.send(elapsed));
+                drop(stream);
+            })
+        });
+        let mut runtime_config = config(sam_port, handler, 1);
+        runtime_config.connect_delay = Some(Duration::from_millis(60));
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (ready_tx, ready_rx) = oneshot::channel();
+        let runtime = tokio::spawn(run_client_listener(runtime_config, cancel_rx, ready_tx));
+        let address = ready_rx.await.unwrap().unwrap();
+        drop(TcpStream::connect(address).await.unwrap());
+        let elapsed = tokio::time::timeout(Duration::from_secs(1), elapsed_rx)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(elapsed >= Duration::from_millis(45), "elapsed={elapsed:?}");
+        cancel_tx.send(true).unwrap();
+        assert!(runtime.await.unwrap().is_ok());
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn close_on_idle_recreates_the_session_for_a_new_generation() {
+        let (sam_port, sam_task, _hellos, session_creates) = counting_fake_sam().await;
+        let handler: ClientConnectionHandler = Arc::new(|stream, connector| {
+            Box::pin(async move {
+                let _ = connector.connect().await;
+                drop(stream);
+            })
+        });
+        let mut runtime_config = config(sam_port, handler, 1);
+        runtime_config.close_on_idle = true;
+        runtime_config.close_idle_time = Duration::from_millis(30);
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (ready_tx, ready_rx) = oneshot::channel();
+        let runtime = tokio::spawn(run_client_listener(runtime_config, cancel_rx, ready_tx));
+        let address = ready_rx.await.unwrap().unwrap();
+        assert_eq!(session_creates.load(Ordering::Acquire), 1);
+        drop(TcpStream::connect(address).await.unwrap());
+        tokio::time::sleep(Duration::from_millis(90)).await;
+        assert_eq!(session_creates.load(Ordering::Acquire), 1);
+        drop(TcpStream::connect(address).await.unwrap());
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while session_creates.load(Ordering::Acquire) < 2 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
         cancel_tx.send(true).unwrap();
         assert!(runtime.await.unwrap().is_ok());
         sam_task.abort();

@@ -21,6 +21,33 @@ matrix = "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.t
 historical_audit = "plans/implementation/i2pcontrol-proposal-170/105-residual-option-audit.toml"
 closure = "plans/closure/i2pcontrol-proposal-170/110-closure.md"
 
+[post_m112]
+status = "closed as blocked"
+matrix_before_apply = 288
+matrix_before_blocked_primitive = 94
+matrix_before_not_applicable = 458
+matrix_after_apply = 312
+matrix_after_blocked_primitive = 70
+matrix_after_not_applicable = 458
+completed_cell_count = 24
+matrix_sha256_after = "ef4c6c1beccca74ab0c78a648bf1db97254b58a9d1074bc8eb1b08fd214b2773"
+remaining_m112_applicable_residual_count = 45
+applied_options = ["ConnectDelay", "Close", "CloseTime", "NewDest"]
+applied_tunnel_types = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient"]
+reclassified_cells = [
+    "ConnectDelay:client", "ConnectDelay:httpclient", "ConnectDelay:ircclient",
+    "ConnectDelay:socks", "ConnectDelay:socksirc", "ConnectDelay:connectclient",
+    "Close:client", "Close:httpclient", "Close:ircclient", "Close:socks",
+    "Close:socksirc", "Close:connectclient", "CloseTime:client",
+    "CloseTime:httpclient", "CloseTime:ircclient", "CloseTime:socks",
+    "CloseTime:socksirc", "CloseTime:connectclient", "NewDest:client",
+    "NewDest:httpclient", "NewDest:ircclient", "NewDest:socks",
+    "NewDest:socksirc", "NewDest:connectclient",
+]
+matrix = "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+historical_audit = "plans/implementation/i2pcontrol-proposal-170/105-residual-option-audit.toml"
+closure = "plans/closure/i2pcontrol-proposal-170/112-closure.md"
+
 [post_m116]
 status = "closed"
 matrix_before_apply = 255

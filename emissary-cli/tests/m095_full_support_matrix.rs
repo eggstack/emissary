@@ -227,12 +227,13 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
     assert_eq!(string_field(new_dest, "completion_owner"), "M112");
     assert_eq!(
         string_field(new_dest, "current_or_planned_disposition"),
-        "blocked_primitive_or_not_applicable"
+        "apply_or_blocked_primitive_or_not_applicable"
     );
     let new_dest_cells = new_dest["cells"].as_array().unwrap();
-    assert!(new_dest_cells[..7]
+    assert!(new_dest_cells[..6]
         .iter()
-        .all(|cell| cell.as_str() == Some("blocked_primitive")));
+        .all(|cell| cell.as_str() == Some("apply")));
+    assert_eq!(new_dest_cells[6].as_str(), Some("blocked_primitive"));
     assert!(new_dest_cells[7..]
         .iter()
         .all(|cell| cell.as_str() == Some("not_applicable")));
@@ -269,7 +270,7 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         }
         assert_eq!(
             string_field(row, "completion_owner"),
-            "residual-option-line"
+            "M112"
         );
         assert!(!string_field(row, "blocked_primitive").is_empty());
         assert!(!string_field(row, "blocking_milestone").is_empty());
@@ -294,16 +295,23 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
             assert_eq!(cells[6].as_str(), Some("blocked_primitive"));
             continue;
         }
-        for (index, cell) in cells.iter().enumerate().take(7) {
-            assert_eq!(
-                cell.as_str(),
-                Some("blocked_primitive"),
-                "{key} cell {index}"
-            );
+        if matches!(key, "ConnectDelay" | "Close" | "CloseTime") {
+            for (index, cell) in cells.iter().enumerate().take(6) {
+                assert_eq!(cell.as_str(), Some("apply"), "{key} cell {index}");
+            }
+            assert_eq!(cells[6].as_str(), Some("blocked_primitive"));
+        } else {
+            for (index, cell) in cells.iter().enumerate().take(7) {
+                assert_eq!(
+                    cell.as_str(),
+                    Some("blocked_primitive"),
+                    "{key} cell {index}"
+                );
+            }
         }
         assert_eq!(
             string_field(row, "completion_owner"),
-            "residual-option-line"
+            "M112"
         );
         assert!(!string_field(row, "blocked_primitive").is_empty());
         assert!(!string_field(row, "blocking_milestone").is_empty());
@@ -473,12 +481,12 @@ fn current_matrix_counts_are_explicit_and_exact() {
             }
             counts
         });
-    assert_eq!(counts, (288, 94, 458));
+    assert_eq!(counts, (312, 70, 458));
     let declared = root
         .get("current_matrix_counts")
         .and_then(Value::as_table)
         .expect("current matrix counts are declared");
-    assert_eq!(declared["apply"].as_integer(), Some(288));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(94));
+    assert_eq!(declared["apply"].as_integer(), Some(312));
+    assert_eq!(declared["blocked_primitive"].as_integer(), Some(70));
     assert_eq!(declared["not_applicable"].as_integer(), Some(458));
 }

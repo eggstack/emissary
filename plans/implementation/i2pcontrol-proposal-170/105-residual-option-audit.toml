@@ -52,6 +52,15 @@ post_m111_completed_cell_count = 40
 post_m111_reclassified_family = "TunnelVariance/TunnelBackupQuantity/SigType/CustomOptions"
 post_m111_blocking_milestone = "M111 for UseSSL; M112/M113 for remaining residuals"
 post_m111_closure = "plans/closure/i2pcontrol-proposal-170/111-closure.md"
+post_m112_matrix_apply_cells = 312
+post_m112_matrix_blocked_primitive_cells = 70
+post_m112_matrix_not_applicable_cells = 458
+post_m112_matrix_sha256 = "ef4c6c1beccca74ab0c78a648bf1db97254b58a9d1074bc8eb1b08fd214b2773"
+post_m112_completed_cell_count = 24
+post_m112_applied_families = ["ConnectDelay", "Close", "CloseTime", "NewDest"]
+post_m112_applied_tunnel_types = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient"]
+post_m112_remaining_m112_cells = 45
+post_m112_closure = "plans/closure/i2pcontrol-proposal-170/112-closure.md"
 
 [[cells]]
 canonical_option = "Shared"

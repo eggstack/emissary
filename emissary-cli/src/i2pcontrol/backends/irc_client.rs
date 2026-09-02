@@ -14,7 +14,8 @@ use super::{
 use crate::i2pcontrol::{
     client_secret_store::ClientDestinationStore,
     backends::runtime::{
-        ClientConnectionHandler, ClientListenerRuntimeConfig,
+        client_lifecycle_config, ClientConnectionHandler, ClientLifecycleConfig,
+        ClientListenerRuntimeConfig,
         ClientListenerRuntimeError,
     },
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
@@ -35,6 +36,7 @@ struct IrcClientConfig {
     destination_port: u16,
     sam_tcp_port: u16,
     delay_open: bool,
+    lifecycle: ClientLifecycleConfig,
     session_options: SessionOptions,
 }
 
@@ -223,6 +225,10 @@ impl IrcClientRuntimeSupervisor {
                     destination_port: config.destination_port,
                     sam_tcp_port: config.sam_tcp_port,
                     delay_open: config.delay_open,
+                    connect_delay: config.lifecycle.connect_delay,
+                    close_on_idle: config.lifecycle.close_on_idle,
+                    close_idle_time: config.lifecycle.close_idle_time,
+                    new_dest_on_resume: config.lifecycle.new_dest_on_resume,
                     session_options: config.session_options,
                     max_connections: MAX_CONNECTIONS,
                     handler,
@@ -348,6 +354,7 @@ impl IrcClientTunnelBackend {
             destination_port: definition.options.target_port.unwrap_or(0),
             sam_tcp_port: self.sam_tcp_port,
             delay_open: definition.options.delay_open.unwrap_or(false),
+            lifecycle: client_lifecycle_config(definition)?,
             session_options: SessionOptions::default(),
         })
     }

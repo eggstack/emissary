@@ -25,7 +25,8 @@ use crate::i2pcontrol::{
     address_book_runtime::RuntimeAddressBookHandle,
     client_secret_store::ClientDestinationStore,
     backends::runtime::{
-        ClientConnectionHandler, ClientListenerRuntimeConfig,
+        client_lifecycle_config, ClientConnectionHandler, ClientLifecycleConfig,
+        ClientListenerRuntimeConfig,
         ClientListenerRuntimeError, ClientStreamConnector,
     },
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
@@ -451,6 +452,7 @@ pub(crate) struct SocksConfig {
     pub(crate) outproxy_credentials: Option<(String, String)>,
     pub(crate) address_book: Option<Arc<RuntimeAddressBookHandle>>,
     pub(crate) require_auth: bool,
+    pub(crate) lifecycle: ClientLifecycleConfig,
     pub(crate) delay_open: bool,
     pub(crate) session_options: SessionOptions,
 }
@@ -824,6 +826,10 @@ impl SocksRuntimeSupervisor {
                     sam_tcp_port: config.sam_tcp_port,
                     session_options: config.session_options,
                     delay_open: config.delay_open,
+                    connect_delay: config.lifecycle.connect_delay,
+                    close_on_idle: config.lifecycle.close_on_idle,
+                    close_idle_time: config.lifecycle.close_idle_time,
+                    new_dest_on_resume: config.lifecycle.new_dest_on_resume,
                     max_connections: MAX_CONNECTIONS,
                     handler,
                 },
@@ -1008,6 +1014,7 @@ pub(crate) fn config_for(
         outproxy_credentials,
         address_book,
         require_auth,
+        lifecycle: client_lifecycle_config(definition)?,
         delay_open: definition.options.delay_open.unwrap_or(false),
         session_options: SessionOptions::default(),
     })
@@ -1271,6 +1278,7 @@ mod tests {
             outproxy_credentials: None,
             address_book: None,
             require_auth,
+            lifecycle: ClientLifecycleConfig::DISABLED,
             delay_open: false,
             session_options: SessionOptions::default(),
         }

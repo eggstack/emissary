@@ -23,7 +23,8 @@ use crate::i2pcontrol::{
     address_book_runtime::RuntimeAddressBookHandle,
     client_secret_store::ClientDestinationStore,
     backends::runtime::{
-        ClientConnectionHandler, ClientListenerRuntimeConfig,
+        client_lifecycle_config, ClientConnectionHandler, ClientLifecycleConfig,
+        ClientListenerRuntimeConfig,
         ClientListenerRuntimeError,
     },
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
@@ -114,6 +115,7 @@ struct ConnectConfig {
     outproxy_authorization: Option<String>,
     address_book: Option<Arc<RuntimeAddressBookHandle>>,
     delay_open: bool,
+    lifecycle: ClientLifecycleConfig,
     session_options: SessionOptions,
 }
 
@@ -277,6 +279,10 @@ impl RuntimeSupervisor {
                     sam_tcp_port: config.sam_tcp_port,
                     session_options: config.session_options,
                     delay_open: config.delay_open,
+                    connect_delay: config.lifecycle.connect_delay,
+                    close_on_idle: config.lifecycle.close_on_idle,
+                    close_idle_time: config.lifecycle.close_idle_time,
+                    new_dest_on_resume: config.lifecycle.new_dest_on_resume,
                     max_connections: MAX_CONNECTIONS,
                     handler,
                 },
@@ -620,6 +626,7 @@ impl ConnectClientTunnelBackend {
             outproxy_authorization,
             address_book: self.address_book.clone(),
             delay_open: definition.options.delay_open.unwrap_or(false),
+            lifecycle: client_lifecycle_config(definition)?,
             session_options: SessionOptions::default(),
         })
     }
@@ -715,6 +722,9 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "Description",
         "StartOnLoad",
         "DelayOpen",
+        "ConnectDelay",
+        "Close",
+        "CloseTime",
         "Shared",
         "NewDest",
         "PersistentClientKey",

@@ -228,10 +228,10 @@ pub fn validate_common_options(
             return Err(common_unsupported(tunnel_type, field));
         }
     }
-    // NewDest is coupled to M112's close-on-idle/resume lifecycle owner. Keep
-    // it fail-closed until that owner exists; in particular, do not rotate a
-    // destination merely because a manual start was staged.
-    if options.new_dest.is_some() {
+    // NewDest is coupled to M112's close-on-idle/resume lifecycle owner. It is
+    // only meaningful for streaming client generations; in particular, do not
+    // rotate a destination merely because a manual start was staged.
+    if options.new_dest.is_some() && (!tunnel_type.is_client() || is_streamr) {
         return Err(common_unsupported(tunnel_type, "NewDest"));
     }
     // PersistentClientKey and Shared are meaningful only for the control-plane
@@ -543,14 +543,8 @@ mod tests {
     }
 
     #[test]
-    fn new_dest_is_rejected_for_every_tunnel_family() {
+    fn new_dest_is_rejected_for_non_streaming_client_families() {
         for tunnel_type in [
-            TunnelType::Client,
-            TunnelType::HttpClient,
-            TunnelType::IrcClient,
-            TunnelType::Socks,
-            TunnelType::SocksIrc,
-            TunnelType::ConnectClient,
             TunnelType::StreamrClient,
             TunnelType::Server,
             TunnelType::HttpServer,
@@ -564,6 +558,21 @@ mod tests {
             };
             let error = validate_common_options(tunnel_type, &options).unwrap_err();
             assert_eq!(error.to_string(), format!("{tunnel_type} does not support option NewDest"));
+        }
+
+        for tunnel_type in [
+            TunnelType::Client,
+            TunnelType::HttpClient,
+            TunnelType::IrcClient,
+            TunnelType::Socks,
+            TunnelType::SocksIrc,
+            TunnelType::ConnectClient,
+        ] {
+            let options = TunnelOptions {
+                new_dest: Some(true),
+                ..Default::default()
+            };
+            assert!(validate_common_options(tunnel_type, &options).is_ok());
         }
     }
 

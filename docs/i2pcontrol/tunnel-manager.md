@@ -352,17 +352,21 @@ compatibility.
 
 `UseSSL` remains fail-closed: Proposal 170's local application/session TLS meaning
 is distinct from Yosemite's SAM control-connection TLS field and has no accepted
-Emissary owner. `Shared`, `NewDest`, `PersistentClientKey`, and `PrivKeyFile` retain
-their existing M110/M116 ownership and disposition.
+Emissary owner. M112 adds bounded `ConnectDelay`, `Close`, and `CloseTime` behavior
+to the six streaming client listeners. `NewDest=true` is accepted only with
+`Close=true` and `PersistentClientKey=false`; after an owned idle close, the next
+session uses a fresh transient destination. `Shared=true` cannot be combined with
+`Close=true`, because one member must not close a session owned by another member.
 
 | Disposition | Proposal 170 fields |
 |---|---|
 | Parsed and round-tripped | `Description`, `StartOnLoad`, `TargetDestination`, `Destination`, `TargetPort`, `ReachableBy`, `Port`, `TargetHost`, `Host` |
 | Applied by accepted client proxy/filter runtimes | `ProxyList`, `ProxyAuth`, `ProxyUsername`, `ProxyPassword`, `OutproxyAuth`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `AllowUserAgent`, `AllowReferer`, `AllowAccept` |
-| Rejected before allocation as residual blockers | `UseOutproxyPlugin`, `SSLProxies`, `JumpList`, `ConnectDelay`, `Profile`, `DelayOpen`, `Reduce`, `ReduceCount`, `ReduceTime`, `Close`, `CloseTime` |
+| Applied by six streaming client lifecycle owners | `ConnectDelay` (0–60,000 ms), `Close`, `CloseTime` (1 ms–7 days), `NewDest` under its lifecycle constraints |
+| Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, `SSLProxies`, `JumpList`, `Profile`, `Reduce`, `ReduceCount`, `ReduceTime`, Streamr `DelayOpen`, `Close`, `CloseTime`, and `NewDest` cells without a meaningful Streamr equivalent |
 | Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime` |
 | Rejected before allocation as residual server blockers | `AllowInternalSSL`, `UniqueLocalAddressPerClient`, `MultiHoming`, `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
-| Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `SigType`, `EncType`, `CustomOptions`, `NewDest`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
+| Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
 
 `PrivKeyFile` is part of the pinned input inventory and is retained as a redacted
 canonical path value, but start is rejected until confined import and atomic
@@ -370,9 +374,11 @@ handoff into an I2PControl-owned key store exist. New `OutproxyPassword` values
 are held in the same typed redacted boundary as `ProxyPassword`; legacy raw
 compatibility values remain response-redacted. Proxy credentials are bounded, separated between the local
 listener and the configured I2P outproxy, and never serialized in canonical
-`get` output. `UseOutproxyPlugin`, `SSLProxies`, `JumpList`, and the client
-management family fail before listener/session allocation because no exact
-Emissary-owned primitive currently exists for them. `AllowInternalSSL` is not
+`get` output. `UseOutproxyPlugin`, `SSLProxies`, `JumpList`, `Profile`, and the
+Reduce family fail before listener/session allocation because no exact
+Emissary-owned primitive currently exists for them. Streamr lifecycle cells
+remain explicit blocked responses because its datagram owner has no corresponding
+TCP session event. `AllowInternalSSL` is not
 applicable to the accepted HTTP-only outbound client; server-role cells belong
 to M099.
 

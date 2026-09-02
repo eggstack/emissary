@@ -224,11 +224,12 @@ impl ClientRuntimeSupervisor {
     }
 
     /// Start one validated client definition and wait for runtime readiness.
-    pub async fn start(
+    pub(crate) async fn start(
         &self,
         config: ClientTunnelRuntimeConfig,
         session_options: SessionOptions,
         delay_open: bool,
+        lifecycle: super::runtime::ClientLifecycleConfig,
         shared_registry: Option<Arc<super::runtime::session::SharedClientSessionRegistry>>,
         shared: bool,
     ) -> BackendResult<()> {
@@ -255,6 +256,10 @@ impl ClientRuntimeSupervisor {
                     sam_tcp_port: ready_config.sam_tcp_port,
                     max_connections: 1,
                     delay_open,
+                    connect_delay: lifecycle.connect_delay,
+                    close_on_idle: lifecycle.close_on_idle,
+                    close_idle_time: lifecycle.close_idle_time,
+                    new_dest_on_resume: lifecycle.new_dest_on_resume,
                     session_options,
                     handler: std::sync::Arc::new(|_, _| Box::pin(async {})),
                 },
@@ -417,6 +422,9 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "i2p.tunnel.listenInterface",
         "i2p.tunnel.listenPort",
         "DelayOpen",
+        "ConnectDelay",
+        "Close",
+        "CloseTime",
         "Shared",
         "NewDest",
         "PersistentClientKey",
@@ -473,6 +481,7 @@ impl TunnelBackend for ClientTunnelBackend {
 
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
         let config = self.config(definition)?;
+        let lifecycle = super::runtime::session::client_lifecycle_config(definition)?;
         let session_options = super::runtime::session::build_client_session_options(
             definition,
             self.supervisor.sam_tcp_port,
@@ -484,6 +493,7 @@ impl TunnelBackend for ClientTunnelBackend {
                 config,
                 session_options,
                 definition.options.delay_open.unwrap_or(false),
+                lifecycle,
                 self.supervisor.shared_registry.clone(),
                 definition.options.shared.unwrap_or(false),
             )

@@ -1,6 +1,6 @@
 # M112 — Client Proxy and Session-Lifecycle Residual Completion
 
-Status: **ready** — M110/M111 have frozen the remaining client session owner and the exact M105 residual set; M116 transferred seven `NewDest` cells here; execution still requires this plan's own semantic re-freeze
+Status: **closed as blocked** — six TCP client families now apply `ConnectDelay`, `Close`, `CloseTime`, and `NewDest`; 45 M112-owned residual cells remain explicitly blocked
 
 Class: capability / client runtime lifecycle / proxy policy
 
@@ -17,6 +17,8 @@ Source evidence:
 
 Pinned authority: I2P Proposal 170 revision `2026-05-20`, status Open.
 
+Closure record: `plans/closure/i2pcontrol-proposal-170/112-closure.md`
+
 External references are read-only. Repository writes are internal-only.
 
 ## 1. Objective
@@ -32,7 +34,7 @@ M112 must distinguish Proposal 170 contract effects from Java I2PTunnel implemen
 
 ## 2. Hard blockers and readiness
 
-M112 remains unregistered until:
+Before execution, M112 required registration until:
 
 1. M110/M111 establish the final client session ownership/configuration object that lifecycle options would act upon;
 2. the current M095/M105 residual inventory is re-frozen;
@@ -217,3 +219,13 @@ Require exact cell ledger, runtime/timer/proxy tests, cancellation/contention re
 ## 14. Internal-only boundary
 
 No upstream issue/PR/review/submission/merge/adoption request, plugin/dependency contribution preparation, branch/tag push, release, or maintainer contact is authorized. External references are read-only.
+
+## 15. Closure disposition
+
+M112 completed its authorized portable client-lifecycle slice and closed the
+remaining rows with exact dispositions. `ConnectDelay`, `Close`, `CloseTime`, and
+`NewDest` apply for `client`, `httpclient`, `ircclient`, `socks`, `socksirc`, and
+`connectclient`. Proxy/plugin/TLS-jump behavior, `Profile`, `Reduce*`, and the
+Streamr lifecycle cells remain blocked because no safe accepted owner exists.
+The matrix delta is `288 / 94 / 458` to `312 / 70 / 458`; M113 and M114 remain
+blocked and no future plan becomes dependency-ready from this closure.

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096, M098-M111, M115-M118 closed; M097/M104 closed as blocked; M112 ready; M113-M114 remain roadmap-defined and blocked
+Status: active; M095-M112, M115-M118 closed; M097/M104/M112 closed as blocked; M113-M114 remain roadmap-defined and blocked
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -60,12 +60,12 @@ The fork currently has:
 M095 currently records:
 
 - 70 option rows × 12 canonical tunnel types = 840 cells;
-- 288 `apply`;
-- 94 `blocked_primitive`;
+- 312 `apply`;
+- 70 `blocked_primitive`;
 - 458 `not_applicable`;
 - 0 planned/unknown/unsupported/accept-inert cells.
 
-M116 closed with exact counts of 248 `apply`, 134 `blocked_primitive`, and 458 `not_applicable`. M111 then applied 40 SAM session-wire cells, leaving 288 `apply`, 94 `blocked_primitive`, and 458 `not_applicable`. Post-M110 review found and M116 corrected defects in:
+M116 closed with exact counts of 248 `apply`, 134 `blocked_primitive`, and 458 `not_applicable`. M111 then applied 40 SAM session-wire cells, and M112 applied 24 portable TCP client lifecycle cells, leaving 312 `apply`, 70 `blocked_primitive`, and 458 `not_applicable`. Post-M110 review found and M116 corrected defects in:
 
 - shared-session waiter lost wakeup;
 - creator-cancellation reservation poisoning;
@@ -178,10 +178,10 @@ M095/M105 plus M110's completion ledger are current cell evidence, subject to M1
 |---|---|---:|---|
 | M110 | `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile` | 31 promoted cells | historically closed; M116 corrective authority |
 | M111 | `UseSSL`, `TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions` | 4 blocked after 40 applied | closed; UseSSL remains blocked with exact semantic reason |
-| M112 | proxy/plugin/jump + client `ConnectDelay`/`Profile`/remaining `DelayOpen`/`Reduce*`/`Close*`/`NewDest` | 69 blocked | ready; includes seven `NewDest` cells transferred by M116 |
+| M112 | proxy/plugin/jump + client `ConnectDelay`/`Profile`/remaining `DelayOpen`/`Reduce*`/`Close*`/`NewDest` | 45 blocked | closed as blocked; 24 TCP lifecycle cells applied, Streamr and unsupported owner cells retained |
 | M113 | server presentation/address-routing/LeaseSet | 21 blocked | blocked |
 
-Current blocked count is 94 = 4 + 69 + 21.
+Current blocked count is 70 = 4 + 45 + 21.
 
 M116 returned M110 cells to `blocked_primitive` where exact semantics were absent. In particular:
 
@@ -217,7 +217,7 @@ M118 neutral SAM tunnel-pool variance/backups       [CLOSED]
 M111 SAM session-wire options                       [CLOSED — 40 APPLY / 4 UseSSL BLOCKED]
   |
   v
-M112 client proxy/session-lifecycle residuals       [READY]
+M112 client proxy/session-lifecycle residuals       [CLOSED AS BLOCKED — 24 APPLY / 45 REMAIN]
   |
   v
 M113 server presentation + LeaseSet residuals       [PROPOSED / BLOCKED]
@@ -309,12 +309,16 @@ Closure: `plans/closure/i2pcontrol-proposal-170/111-closure.md`.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/112-client-proxy-and-session-lifecycle-residual-completion.md`
 
-Status: **ready**.
+Status: **closed as blocked**.
 
-Current target: 69 cells. M112 owns the `Close*`/idle lifecycle family and the seven `NewDest` cells transferred by M116 because the correct trigger depends on that lifecycle owner.
+Current result: 24 cells applied across six TCP client families; 45 cells remain
+blocked with exact proxy/plugin/TLS-jump, profile, reduction, and Streamr
+lifecycle reasons. M112 owned the `Close*`/idle lifecycle family and the seven
+`NewDest` cells transferred by M116 because the correct trigger depends on that
+lifecycle owner.
 
-M111 has closed the final client session configuration dependency; M112 may now execute
-its own residual semantic re-freeze and lifecycle/proxy implementation.
+M111 closed the final client session configuration dependency. M112 closure:
+`plans/closure/i2pcontrol-proposal-170/112-closure.md`.
 
 ## 13. M113 — server presentation/address-routing/LeaseSet residuals
 
@@ -419,7 +423,7 @@ Per `plans/003-planning-process.md`:
 
 - M110 remains historically closed;
 - M116 and M117 were closed historical handoffs;
-- M118 and M111 are closed; M112 is the current registered ready handoff;
+- M118, M111, and M112 are closed; M113 is the next roadmap handoff but remains blocked;
 - M113-M114 remain roadmap/indexed but blocked;
 - M116 closure decides exact current matrix/residual ownership;
 - blocked plans may not execute because their files exist;

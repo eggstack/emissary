@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; M109, M115, M110, M116, M117, M118, and M111 are closed; M112 is ready; M113-M114 remain roadmap-defined and blocked; M095 currently records `288 apply / 94 blocked_primitive / 458 not_applicable`
+Status: partial Proposal 170 production support; M109, M115, M110, M116, M117, M118, M111, and M112 are closed; M112 closed as blocked with 45 named residual cells; M113-M114 remain roadmap-defined and blocked; M095 currently records `312 apply / 70 blocked_primitive / 458 not_applicable`
 
 This directory contains bounded internal implementation, audit, corrective, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -59,8 +59,8 @@ No standalone crate split, router-core API, Yosemite patch/vendor, parallel SAM 
 
 Current M095 matrix is:
 
-- 288 `apply`;
-- 94 `blocked_primitive`;
+- 312 `apply`;
+- 70 `blocked_primitive`;
 - 458 `not_applicable`;
 - 0 planned/unknown/unsupported/accept-inert cells.
 
@@ -93,7 +93,7 @@ Official status remains **partial Proposal 170 support**.
 | **M117** | **closed** | ADR-0005-authorized exact Yosemite fork pin and I2PControl adapter integration; no matrix promotion |
 | **M118** | **closed** | neutral SAM tunnel variance and standby/failover capability; no matrix promotion |
 | **M111** | **closed** | Yosemite SAM session-wire completion; 40 SessionWire cells applied, four UseSSL cells remain explicitly blocked |
-| M112 | ready | client proxy/session lifecycle; 69 current cells including seven `NewDest` cells from M116 |
+| M112 | closed as blocked | six TCP client families apply `ConnectDelay`, `Close`, `CloseTime`, and `NewDest`; 45 M112 residual cells remain blocked |
 | M113 | proposed / blocked | server presentation/routing/LeaseSet; up to 21 cells |
 | M114 | proposed / blocked | zero-residual live/reference final reclosure |
 
@@ -111,7 +111,9 @@ Plans in this completion line:
 - `116-m110-shared-session-and-newdest-corrective-pass.md`
 - `118-neutral-sam-tunnel-pool-variance-backup-capability.md`
 
-Per `plans/003-planning-process.md`, M111 is closed and M112 is now the next dependency-ready Emissary handoff. M113-M114 retain their independent blockers.
+Per `plans/003-planning-process.md`, M112 is closed as blocked. M113-M114 retain
+their independent blockers; no future Emissary handoff is dependency-ready from
+this closure.
 
 M118 closure: `plans/closure/i2pcontrol-proposal-170/118-closure.md`. It records the
 read-only reference freeze, exact neutral owner paths, standby promotion/replenishment
@@ -151,7 +153,10 @@ M111 is closed. M117 supplies the accepted internal generic Yosemite API through
 
 ## M112 — client proxy/lifecycle residuals
 
-M112 is ready. It owns portable client lifecycle/proxy semantics, including `Close*` and the seven `NewDest` cells transferred by M116; its own execution-time residual re-freeze remains required.
+M112 is closed as blocked. It applied portable `ConnectDelay`, `Close`, `CloseTime`,
+and `NewDest` behavior for six TCP client families. Proxy/plugin/TLS-jump,
+`Profile`, `Reduce*`, and Streamr lifecycle cells remain explicitly blocked; see
+`plans/closure/i2pcontrol-proposal-170/112-closure.md`.
 
 ## M113 — server presentation/LeaseSet residuals
 

@@ -41,7 +41,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M112 ready** | M111 is closed; M112 client proxy/session-lifecycle re-freeze is the next transition |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M112 closed as blocked** | M113 remains blocked; no dependency-ready Emissary handoff |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M062 regression authority | ADR-0005 permits only optional I2PControl-owned exact-revision fork alias; no global patch/vendor/path dependency |
 | I2PControl tunnel security | closed at M093 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | regression authority | M118 closure preserves tunnel anonymity/resource boundaries |
 
@@ -53,8 +53,8 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 - All six ClientServicesInfo selectors are operational.
 - API 1-only negotiation and M107/M108 managed TLS hardening are operational.
 - M109/M115 startup lifecycle and M110/M116 shared-session/destination ownership corrective line are closed.
-- M095 records `288 apply / 94 blocked_primitive / 458 not_applicable` after M111.
-- Seven client `NewDest` cells remain transferred to M112.
+- M095 records `312 apply / 70 blocked_primitive / 458 not_applicable` after M112.
+- M112 applied 24 TCP client lifecycle cells; 45 M112-owned applicable cells remain explicitly blocked.
 - Full Proposal 170 status remains **partial**.
 
 ## Dependency architecture change
@@ -94,7 +94,7 @@ variance + backups              SESSION CREATE surface
 M111 SAM session-wire Proposal mapping               [CLOSED — 40 APPLY / 4 UseSSL BLOCKED]
   |
   v
-M112 client proxy/session lifecycle                  [READY]
+M112 client proxy/session lifecycle                  [CLOSED AS BLOCKED — 24 APPLY / 45 REMAIN]
   |
   v
 M113 server presentation + LeaseSet                  [ROADMAP / BLOCKED]
@@ -171,7 +171,10 @@ Closed. M117 provided the accepted internal fork API and M118 provided the real 
 
 `plans/implementation/i2pcontrol-proposal-170/112-client-proxy-and-session-lifecycle-residual-completion.md`
 
-Ready. Owns 69 client proxy/lifecycle cells, including seven `NewDest` cells transferred by M116. It may consume closed Yosemite generic capabilities if exact semantics require them, but remains I2PControl-owned wherever possible.
+Closed as blocked. Applied 24 cells (`ConnectDelay`, `Close`, `CloseTime`, and
+`NewDest` across six TCP client families). The remaining 45 M112 cells retain
+exact proxy/plugin/TLS-jump, profile, reduction, and Streamr lifecycle blockers.
+Closure: `plans/closure/i2pcontrol-proposal-170/112-closure.md`.
 
 ### M113
 
@@ -187,10 +190,10 @@ Blocked. Implements no missing feature. Readiness requires zero applicable resid
 
 ## Residual ownership
 
-Current blocked count is 94 after M111:
+Current blocked count is 70 after M112:
 
 - M111: 4 `UseSSL` cells remain blocked;
-- M112: 69;
+- M112: 45;
 - M113: 21.
 
 M117/M118/Y001/Y002 are infrastructure/capability prerequisites and do not change matrix counts by themselves.
@@ -215,12 +218,12 @@ M093 remains tunnel production/security regression authority. M092 remains histo
 
 ## Registry maintenance rules
 
-1. M112 is the current dependency-ready Emissary implementation handoff; M111 is closed.
+1. M112 is closed as blocked; M113 is the next roadmap handoff but remains dependency-blocked.
 2. M117 is closed at the exact pinned Yosemite revision above.
 3. M118 is closed at implementation commit `e7f3e04`; its neutral capability does not change matrix counts.
 4. Yosemite Y001 is separately ready only in `eggstack/yosemite`; Emissary agents must not implement it in this repository.
-5. M111 is closed with 40 SessionWire cells applied and four UseSSL cells blocked; M112 is ready, while M113-M114 remain blocked.
-6. Treat `288 / 94 / 458` as the current closed matrix; prerequisite infrastructure does not alter it.
+5. M111 is closed with 40 SessionWire cells applied and four UseSSL cells blocked; M112 is closed as blocked, while M113-M114 remain blocked.
+6. Treat `312 / 70 / 458` as the current closed matrix; prerequisite infrastructure does not alter it.
 7. Keep Proposal 170 policy under `emissary-cli/src/i2pcontrol/**` wherever possible; M118 is a specifically authorized neutral lower-layer exception.
 8. No global Yosemite patch/replacement/vendor/path dependency is permitted.
 9. Proposal 170 remains pinned to `2026-05-20`; later proposal revisions require a delta audit.

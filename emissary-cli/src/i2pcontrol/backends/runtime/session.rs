@@ -7,6 +7,7 @@
 use std::{
     collections::BTreeMap,
     sync::Arc,
+    time::Duration,
 };
 
 use parking_lot::Mutex;
@@ -20,6 +21,32 @@ use crate::i2pcontrol::domain::tunnel::{TunnelDefinition, TunnelOptions, TunnelT
 type StreamSession = Arc<Mutex<Session<style::Stream>>>;
 
 const DATAGRAM_BUFFER_SIZE: usize = 4095;
+const MAX_CONNECT_DELAY: u64 = 60_000;
+const MAX_CLOSE_IDLE_TIME: u64 = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_CLOSE_IDLE_TIME: Duration = Duration::from_secs(30 * 60);
+
+/// Generation-local lifecycle controls for streaming client listeners.
+///
+/// The close policy is implemented by the I2PControl session owner itself.
+/// Reduction remains rejected because Yosemite 0.7.0 does not consume its
+/// similarly named declaration. Streamr has a separate datagram owner and
+/// does not use this type.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ClientLifecycleConfig {
+    pub(crate) connect_delay: Option<Duration>,
+    pub(crate) close_on_idle: bool,
+    pub(crate) close_idle_time: Duration,
+    pub(crate) new_dest_on_resume: bool,
+}
+
+impl ClientLifecycleConfig {
+    pub(crate) const DISABLED: Self = Self {
+        connect_delay: None,
+        close_on_idle: false,
+        close_idle_time: DEFAULT_CLOSE_IDLE_TIME,
+        new_dest_on_resume: false,
+    };
+}
 
 /// An inbound datagram delivered by the single owner of a shared repliable
 /// session.  Subscribers receive independent owned payloads, so no caller
@@ -659,6 +686,106 @@ fn option_error(error: super::super::options::OptionValidationError) -> BackendE
     }
 }
 
+/// Parse the residual client lifecycle fields before any runtime allocation.
+/// Values are stored in the canonical raw configuration because they are
+/// still Proposal fields rather than part of the public Emissary domain
+/// model. The returned policy is nevertheless typed before it reaches a
+/// listener generation.
+pub(crate) fn client_lifecycle_config(
+    definition: &TunnelDefinition,
+) -> BackendResult<ClientLifecycleConfig> {
+    let tunnel_type = definition.tunnel_type;
+    if !tunnel_type.is_client() {
+        for key in ["ConnectDelay", "Close", "CloseTime"] {
+            if definition.raw_config.contains_key(key) {
+                return Err(BackendError::UnsupportedOption {
+                    tunnel_type,
+                    option: key.to_owned(),
+                });
+            }
+        }
+        return Ok(ClientLifecycleConfig::DISABLED);
+    }
+
+    let connect_delay = raw_duration(
+        definition,
+        "ConnectDelay",
+        0,
+        MAX_CONNECT_DELAY,
+    )?;
+    let close_on_idle = match definition.raw_config.get("Close") {
+        None => false,
+        Some(value) => value.as_bool().ok_or_else(|| BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "Close".to_owned(),
+        })?,
+    };
+    let close_idle_time = raw_duration(
+        definition,
+        "CloseTime",
+        1,
+        MAX_CLOSE_IDLE_TIME,
+    )?
+    .unwrap_or(DEFAULT_CLOSE_IDLE_TIME);
+    if definition.raw_config.contains_key("CloseTime") && !close_on_idle {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "CloseTime".to_owned(),
+        });
+    }
+
+    let new_dest_on_resume = definition.options.new_dest.unwrap_or(false);
+    if new_dest_on_resume && !close_on_idle {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "NewDest".to_owned(),
+        });
+    }
+    if new_dest_on_resume && definition.options.persistent_client_key.unwrap_or(false) {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "NewDest".to_owned(),
+        });
+    }
+    if close_on_idle && definition.options.shared.unwrap_or(false) {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "Close".to_owned(),
+        });
+    }
+
+    Ok(ClientLifecycleConfig {
+        connect_delay,
+        close_on_idle,
+        close_idle_time,
+        new_dest_on_resume,
+    })
+}
+
+fn raw_duration(
+    definition: &TunnelDefinition,
+    key: &str,
+    minimum: u64,
+    maximum: u64,
+) -> BackendResult<Option<Duration>> {
+    let Some(value) = definition.raw_config.get(key) else {
+        return Ok(None);
+    };
+    let Some(value) = value.as_u64() else {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type: definition.tunnel_type,
+            option: key.to_owned(),
+        });
+    };
+    if !(minimum..=maximum).contains(&value) {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type: definition.tunnel_type,
+            option: key.to_owned(),
+        });
+    }
+    Ok(Some(Duration::from_millis(value)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -726,6 +853,80 @@ mod tests {
             build_session_options(&definition, 7656, false, DestinationKind::Transient)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn client_lifecycle_controls_are_bounded_and_fail_before_allocation() {
+        let mut valid = definition();
+        valid
+            .raw_config
+            .insert("ConnectDelay".to_owned(), serde_json::json!(60_000));
+        valid
+            .raw_config
+            .insert("Close".to_owned(), serde_json::json!(true));
+        valid
+            .raw_config
+            .insert("CloseTime".to_owned(), serde_json::json!(1_000));
+        valid.options.new_dest = Some(true);
+        let lifecycle = client_lifecycle_config(&valid).unwrap();
+        assert_eq!(lifecycle.connect_delay, Some(Duration::from_secs(60)));
+        assert!(lifecycle.close_on_idle);
+        assert_eq!(lifecycle.close_idle_time, Duration::from_secs(1));
+        assert!(lifecycle.new_dest_on_resume);
+
+        for (key, value) in [
+            ("ConnectDelay", serde_json::json!(60_001)),
+            ("ConnectDelay", serde_json::json!(-1)),
+            ("Close", serde_json::json!("true")),
+            ("CloseTime", serde_json::json!(0)),
+        ] {
+            let mut invalid = definition();
+            invalid.raw_config.insert(key.to_owned(), value);
+            if key == "CloseTime" {
+                invalid.raw_config.insert("Close".to_owned(), serde_json::json!(true));
+            }
+            assert!(matches!(
+                client_lifecycle_config(&invalid),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == key
+            ));
+        }
+
+        let mut close_time_without_close = definition();
+        close_time_without_close
+            .raw_config
+            .insert("CloseTime".to_owned(), serde_json::json!(1));
+        assert!(matches!(
+            client_lifecycle_config(&close_time_without_close),
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "CloseTime"
+        ));
+
+        let mut new_dest_without_close = definition();
+        new_dest_without_close.options.new_dest = Some(true);
+        assert!(matches!(
+            client_lifecycle_config(&new_dest_without_close),
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
+        ));
+
+        let mut shared_close = definition();
+        shared_close
+            .raw_config
+            .insert("Close".to_owned(), serde_json::json!(true));
+        shared_close.options.shared = Some(true);
+        assert!(matches!(
+            client_lifecycle_config(&shared_close),
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "Close"
+        ));
+
+        let mut persistent_new_dest = definition();
+        persistent_new_dest
+            .raw_config
+            .insert("Close".to_owned(), serde_json::json!(true));
+        persistent_new_dest.options.new_dest = Some(true);
+        persistent_new_dest.options.persistent_client_key = Some(true);
+        assert!(matches!(
+            client_lifecycle_config(&persistent_new_dest),
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
+        ));
     }
 
     #[test]

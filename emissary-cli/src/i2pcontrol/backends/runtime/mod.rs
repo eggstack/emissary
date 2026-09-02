@@ -30,4 +30,5 @@ pub use client_listener::{
     run_client_listener_with_shared_session, ClientConnectionHandler,
     ClientListenerRuntimeConfig, ClientListenerRuntimeError, ClientStreamConnector,
 };
+pub(crate) use session::{client_lifecycle_config, ClientLifecycleConfig};
 pub use peer_identity_impl::{TrustedPeerIdentity, MAX_TRUSTED_DESTINATION_B64_TEXT};

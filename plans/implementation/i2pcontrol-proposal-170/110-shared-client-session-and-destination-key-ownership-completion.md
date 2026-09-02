@@ -1,6 +1,6 @@
 # M110 — Shared Client Session and Destination-Key Ownership Completion
 
-Status: **proposed / blocked** — roadmap-defined; not registry-ready until M109 closes and the closure/maintainer explicitly accepts the bounded I2PControl-local ownership model below
+Status: **ready** — registered successor to closed M115 corrective
 
 Class: capability / lifecycle / secret ownership
 
@@ -31,13 +31,13 @@ The target is an I2PControl-owned, bounded, generation-safe session/key owner th
 
 M110 is intentionally separate from SAM session-wire options (`UseSSL`, tunnel variance/backups, `SigType`, `CustomOptions`) because those require a different dependency capability and are owned by M111.
 
-## 2. Blocker and readiness rule
+## 2. Readiness gates
 
-M105 classifies these cells as architecture/ownership blocked rather than simple parser gaps. M110 MUST remain unregistered until all of the following are true:
+M105 classifies these cells as architecture/ownership blocked rather than simple parser gaps. The following readiness gates are now satisfied by the M115 closure and registry reconciliation:
 
-1. M109 is closed and startup lifecycle ownership is stable;
-2. a maintainer/closure explicitly accepts a bounded I2PControl-local shared-session and client-secret owner rather than a router-global owner;
-3. current Yosemite public APIs are rechecked and shown sufficient to create a client streaming session from generated/imported persistent destination material without a dependency fork/vendor or parallel SAM stack;
+1. M109 and M115 are closed and startup lifecycle ownership is stable;
+2. the M115 closure explicitly accepts a bounded I2PControl-local shared-session and client-secret owner rather than a router-global owner;
+3. accepted Yosemite 0.7.0 public APIs expose `DestinationKind::Persistent` and `SessionOptions`, sufficient to create a client streaming session from generated/imported persistent destination material without a dependency fork/vendor or parallel SAM stack;
 4. exact applicable cells are frozen from the current M095/M105 artifacts.
 
 If item 3 is false, split the dependency-blocked portion rather than changing Yosemite under this plan.

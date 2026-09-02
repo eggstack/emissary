@@ -1,10 +1,10 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096 and M098-M109 closed, M097/M104 closed as blocked; **M115 ready corrective**; M110-M114 roadmap-defined and blocked on predecessor/primitive evidence
+Status: active; M095-M096 and M098-M109 and M115 closed, M097/M104 closed as blocked; **M110 ready**; M111-M114 remain roadmap-defined and blocked on primitive evidence
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
-Current corrective baseline: `fa25f194a919d52c76f298c640688697a15f66b3` — M109 closure head.
+Current corrective baseline: `ee3b444` — M115 implementation head; closure and planning reconciliation follow.
 
 Pinned external authority:
 
@@ -62,17 +62,18 @@ Current M095 matrix:
 - 458 `not_applicable`;
 - 0 `planned_apply`, unknown, unsupported, or accept-inert cells.
 
-Post-M109 review found a separate corrective gate now owned by M115:
+Post-M109 review found a separate corrective gate, now closed by M115:
 
-- the M109 lifecycle-controlled startup path is selected whenever the feature is compiled rather than only when runtime I2PControl is enabled;
-- lifecycle state may report synthetic `Starting` on internal mutex contention;
-- the controlled startup-client shared Yosemite session cannot recover cleanly from initial creation failure and lacks explicit final-member teardown ownership.
+- the M109 lifecycle-controlled startup path was selected whenever the feature was compiled rather than only when runtime I2PControl was enabled;
+- lifecycle state could report synthetic `Starting` on internal mutex contention;
+- the controlled startup-client shared Yosemite session could not recover cleanly from initial creation failure and lacked explicit final-member teardown ownership.
+
+M115 closed all three findings with runtime-gated composition, atomic last-committed lifecycle snapshots, and a bounded retryable shared-session owner.
 
 Remaining completion gates are therefore:
 
-1. **M115 lifecycle/composition corrective:** restore runtime-disabled isolation and truthful/recoverable startup lifecycle ownership;
-2. **Residual option semantics:** 158 applicable option/type cells remain owned by M110-M113;
-3. **Final evidence:** public/reseeded/reference-router certification remains M114-only after corrective/option gates close.
+1. **Residual option semantics:** 158 applicable option/type cells remain owned by M110-M113;
+2. **Final evidence:** public/reseeded/reference-router certification remains M114-only after the residual option gates close.
 
 ## 3. Ownership boundary
 
@@ -167,10 +168,10 @@ M108 managed TLS corrective                         [CLOSED]
 M109 startup-managed action semantics               [CLOSED]
   |
   v
-M115 M109 runtime/lifecycle corrective              [READY]
+M115 M109 runtime/lifecycle corrective              [CLOSED]
   |
   v
-M110 shared session + destination/key ownership     [PROPOSED / BLOCKED]
+M110 shared session + destination/key ownership     [READY]
   |
   v
 M111 SAM session-wire options                       [PROPOSED / BLOCKED ON DEPENDENCY]
@@ -188,7 +189,7 @@ M114 live/reference interoperability + reclosure    [PROPOSED / BLOCKED]
 
 M110-M114 were numbered before the M109 post-closure defects were discovered. Their identifiers remain stable; M115 is inserted into execution order without renumbering those plans.
 
-Only M115 is registered in `plans/registry.md` as dependency-ready.
+Only M110 is registered in `plans/registry.md` as dependency-ready.
 
 ## 8. M109 — startup-managed tunnel action semantics
 
@@ -204,7 +205,7 @@ Post-closure findings are not retroactively folded into M109; planning governanc
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/115-m109-runtime-disable-and-lifecycle-truthfulness-corrective-pass.md`
 
-Status: **ready / registered**.
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/115-closure.md`.
 
 Objective:
 
@@ -223,11 +224,11 @@ M115 does not implement Proposal option `Shared` and does not create a general I
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/110-shared-client-session-and-destination-key-ownership-completion.md`
 
-Status: **proposed / blocked**.
+Status: **ready / registered**.
 
 Target: up to 31 residual cells.
 
-Readiness requires M109 and M115 closure plus explicit acceptance of the bounded I2PControl-local ownership model and proof current accepted Yosemite APIs can consume the required destination material.
+M109 and M115 are closed. The M115 closure accepts the bounded I2PControl-local ownership model for independent M110 execution, the exact M095/M105 cell set remains frozen, and accepted Yosemite 0.7.0 exposes public `DestinationKind::Persistent` and `SessionOptions` primitives sufficient for the required destination-material handoff without dependency changes.
 
 The neutral M115 startup-session owner is not evidence that Proposal `Shared` is implemented.
 
@@ -349,9 +350,10 @@ The known stable/nightly rustfmt mismatch remains a tooling issue. Run and recor
 Per `plans/003-planning-process.md`:
 
 - M109 remains historically closed;
-- M115 is the sole ready/registered corrective handoff;
-- M110-M114 remain roadmap/indexed but unregistered as active handoffs;
-- M115 closure decides whether M110 is eligible for a readiness review;
+- M115 is historically closed;
+- M110 is the sole ready/registered successor handoff;
+- M111-M114 remain roadmap/indexed but unregistered as active handoffs;
+- M115 closure records the completed M110 readiness review;
 - each later closure decides the next transition;
 - blocked plans may not be executed simply because their files exist;
 - material deviations require plan/ADR correction before code changes;

@@ -33,7 +33,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M115 ready** | correct M109 runtime-disable/session/state defects; then reassess M110 readiness |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M110 ready** | implement bounded shared client-session and destination/key ownership; M111 remains dependency-blocked |
 | I2PControl Proposal 170 source/truthfulness | RouterInfo source line closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | none | 42 available / 1 neutral / 0 unavailable |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M115 exact M109 CLI-tunnel seam only | M061/M062/M063 remain controlling |
 | I2PControl tunnel runtime | all 12 data planes real | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M115 corrective only | do not redesign data planes or option semantics |
@@ -47,7 +47,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 - All six ClientServicesInfo selectors are operational.
 - API 1-only negotiation and M107/M108 managed TLS hardening are operational.
 - Current TunnelManager option matrix: `224 apply / 158 blocked_primitive / 458 not_applicable`.
-- M109 added named startup lifecycle and mixed `All=true`, but post-closure review found that the controlled path is selected whenever the feature is compiled rather than only when runtime I2PControl is enabled; shared-client session recovery/lifetime and lock-contention state truthfulness also require correction.
+- M109 added named startup lifecycle and mixed `All=true`; M115 corrected runtime-disable isolation, shared-client session recovery/lifetime, and lock-contention state truthfulness.
 - Full Proposal 170 status remains **partial**.
 
 ## Current dependency graph
@@ -59,10 +59,10 @@ M108 managed TLS upgrade corrective                 [CLOSED]
 M109 startup-managed action semantics               [CLOSED]
   |
   v
-M115 M109 runtime/lifecycle corrective              [READY — SOLE REGISTERED HANDOFF]
+M115 M109 runtime/lifecycle corrective              [CLOSED]
   |
   v
-M110 shared session + destination/key ownership     [ROADMAP ONLY / BLOCKED]
+M110 shared session + destination/key ownership     [READY — REGISTERED HANDOFF]
   |
   v
 M111 SAM session-wire options                       [ROADMAP ONLY / DEPENDENCY-BLOCKED]
@@ -80,19 +80,19 @@ M114 live/reference final reclosure                 [ROADMAP ONLY / BLOCKED]
 
 M110-M114 were numbered before this post-M109 corrective was discovered. Their numeric identifiers remain stable; execution order is M109 → M115 → M110 → M111 → M112 → M113 → M114.
 
-Per `plans/003-planning-process.md`, M115 is the sole dependency-ready implementation handoff. M110-M114 MUST NOT be executed until their predecessor/capability gates are satisfied and this registry marks the specific plan ready.
+Per `plans/003-planning-process.md`, M110 is the sole dependency-ready implementation handoff. M111-M114 MUST NOT be executed until their predecessor/capability gates are satisfied and this registry marks the specific plan ready.
 
-## Ready handoff — M115
+## Closed corrective — M115
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/115-m109-runtime-disable-and-lifecycle-truthfulness-corrective-pass.md`
 
-Status: **ready**.
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/115-closure.md`.
 
 Baseline:
 
-- `fa25f194a919d52c76f298c640688697a15f66b3` — M109 closure head.
+- `ee3b444` — M115 implementation head.
 
 Bounded objective:
 
@@ -121,15 +121,17 @@ M115 MUST NOT:
 - weaken M093 security/anonymity bounds;
 - interact with upstream repositories/maintainers.
 
-M115 closure must leave M095 exactly `224 / 158 / 458` and decide whether M110's independent readiness gates are satisfied.
+M115 closure leaves M095 exactly `224 / 158 / 458` and records that M110's independent readiness gates are satisfied.
 
-## Roadmap-defined future plans — NOT registered for execution
+## Ready handoff — M110
 
 ### M110
 
 `plans/implementation/i2pcontrol-proposal-170/110-shared-client-session-and-destination-key-ownership-completion.md`
 
-Proposed/blocked. Owns up to 31 current cells: `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile`. Requires M109 and M115 closure, explicit bounded I2PControl-local ownership acceptance, and proof accepted Yosemite APIs can consume required destination material.
+Ready/registered. Owns up to 31 current cells: `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile`. M115 closure accepts the bounded I2PControl-local ownership model and records sufficient accepted Yosemite 0.7.0 public primitives for the required destination-material handoff.
+
+## Roadmap-defined future plans — NOT registered for execution
 
 ### M111
 
@@ -178,6 +180,7 @@ A cell may move to `apply` only with real request→runtime evidence. A cell may
 | M107 | closed | `plans/closure/i2pcontrol-proposal-170/107-closure.md` |
 | M108 | closed | `plans/closure/i2pcontrol-proposal-170/108-closure.md` |
 | M109 | closed | `plans/closure/i2pcontrol-proposal-170/109-closure.md` |
+| M115 | closed | `plans/closure/i2pcontrol-proposal-170/115-closure.md` |
 
 M109 remains historical closure evidence; M115 is the new corrective pass required by post-closure findings, following the planning-governance rule that corrective passes are new implementation plans rather than rewrites of prior closure history.
 
@@ -185,8 +188,8 @@ M093 remains the current tunnel production/security authority. M092 remains auth
 
 ## Registry maintenance rules
 
-1. M115 is the sole dependency-ready implementation handoff.
-2. M110-M114 are roadmap/indexed only and MUST NOT be executed until this registry marks the specific plan ready.
+1. M110 is the sole dependency-ready implementation handoff.
+2. M111-M114 are roadmap/indexed only and MUST NOT be executed until this registry marks the specific plan ready.
 3. M115 does not change the `224 / 158 / 458` option matrix.
 4. Do not reattempt final reclosure while M115 is open or any applicable option cell is blocked/planned/unsupported/unknown/inert.
 5. Proposal 170 policy remains under `emissary-cli/src/i2pcontrol/**` wherever possible.

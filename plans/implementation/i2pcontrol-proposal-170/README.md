@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; M109 is historically closed; **M115 is the sole ready/registered corrective**; M110-M114 remain roadmap-defined and blocked; current TunnelManager matrix remains `224 apply / 158 blocked_primitive / 458 not_applicable`
+Status: partial Proposal 170 production support; M109 and **M115 are closed**; **M110 is the ready/registered successor**; M111-M114 remain roadmap-defined and blocked; current TunnelManager matrix remains `224 apply / 158 blocked_primitive / 458 not_applicable`
 
 This directory contains bounded internal implementation, audit, corrective, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -48,7 +48,7 @@ M109/M115 are the bounded exception for existing CLI startup tunnel ownership: o
 - API 1-only authentication and M107/M108 managed TLS hardening are operational.
 - M097/M098/M099/M106 applied bounded option subsets with real runtime effects.
 - Unsupported residual options fail before allocation.
-- M109 added startup named lifecycle and `All=true`; M115 is required because feature compilation currently selects that controlled startup path even when runtime I2PControl is disabled, state observation can fabricate `Starting` on contention, and controlled shared-client session recovery/lifetime is incomplete.
+- M109 added startup named lifecycle and `All=true`; M115 corrected runtime-disable isolation, contention-truthful state observation, and controlled shared-client session recovery/lifetime.
 - Full public/reseeded/reference-router certification remains open.
 
 Current M095 matrix:
@@ -58,7 +58,7 @@ Current M095 matrix:
 - 458 `not_applicable`;
 - 0 planned/unknown/unsupported/accept-inert cells.
 
-Official status remains **partial Proposal 170 support** until M115 and the residual-option line close and M114 succeeds.
+Official status remains **partial Proposal 170 support** until the residual-option line closes and M114 succeeds.
 
 ## Current/future handoff sequence
 
@@ -79,8 +79,8 @@ Official status remains **partial Proposal 170 support** until M115 and the resi
 | M107 | closed | API1/AddressBook/fresh managed-TLS corrective |
 | M108 | closed | managed TLS upgrade-permission corrective |
 | M109 | closed | startup-managed named lifecycle + `All=true` action semantics; edit/delete contract disposition |
-| **M115** | **ready / registered** | M109 runtime-disable isolation, lifecycle state truthfulness, shared startup-client session recovery/lifetime |
-| M110 | proposed / blocked | shared client sessions + destination/key/PrivKeyFile ownership; up to 31 cells |
+| **M115** | **closed** | M109 runtime-disable isolation, lifecycle state truthfulness, shared startup-client session recovery/lifetime |
+| **M110** | **ready / registered** | shared client sessions + destination/key/PrivKeyFile ownership; up to 31 cells |
 | M111 | proposed / dependency-blocked | real Yosemite SAM session-wire option transport; up to 44 cells |
 | M112 | proposed / blocked | client proxy and session-lifecycle residuals; up to 62 cells |
 | M113 | proposed / blocked | server presentation/address routing/LeaseSet residuals; up to 21 cells |
@@ -98,7 +98,7 @@ Plans in this current completion line:
 - `114-full-proposal-170-live-interoperability-and-final-reclosure.md`
 - `115-m109-runtime-disable-and-lifecycle-truthfulness-corrective-pass.md`
 
-Per `plans/003-planning-process.md`, only M115 is currently registered as an executable handoff. The existence of M110-M114 files does not make them ready.
+Per `plans/003-planning-process.md`, only M110 is currently registered as an executable handoff. The existence of M111-M114 files does not make them ready.
 
 ## M109 — historical closed handoff
 
@@ -108,9 +108,9 @@ Closure: `plans/closure/i2pcontrol-proposal-170/109-closure.md`.
 
 Post-closure review does not rewrite M109 history; M115 is the required new corrective pass under planning governance.
 
-## M115 — current corrective handoff
+## M115 — closed corrective handoff
 
-M115 is intentionally narrower than M109. It does not add actions or option support.
+M115 is intentionally narrower than M109. It does not add actions or option support. Closure: `plans/closure/i2pcontrol-proposal-170/115-closure.md`.
 
 Required outcome:
 
@@ -141,9 +141,9 @@ A cell becomes `apply` only with request→real-runtime evidence. A cell becomes
 
 ## M110 — shared sessions and destination/key ownership
 
-M110 is not ready. It now requires M109 and M115 closure plus explicit acceptance of a bounded I2PControl-local shared-session/client-secret owner and proof accepted Yosemite APIs can consume required destination material.
+M110 is ready for independent handoff: M109 and M115 are closed, the bounded I2PControl-local shared-session/client-secret owner is explicitly accepted for this next milestone, and accepted Yosemite 0.7.0 exposes public `DestinationKind::Persistent` and `SessionOptions` primitives sufficient for the required destination-material handoff without dependency changes.
 
-M115's neutral startup-client session owner must not be generalized into M110's Proposal `Shared` implementation by implication.
+M115's neutral startup-client session owner must not be generalized into M110's Proposal `Shared` implementation by implication. M110 now owns its separate capability and secret-ownership implementation.
 
 ## M111 — SAM session-wire options
 

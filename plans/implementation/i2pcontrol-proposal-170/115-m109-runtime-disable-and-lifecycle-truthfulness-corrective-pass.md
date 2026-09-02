@@ -1,6 +1,6 @@
 # M115 — M109 Runtime-Disable and Lifecycle-Truthfulness Corrective Pass
 
-Status: **ready**
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/115-closure.md`
 
 Class: corrective capability / lifecycle / containment / reliability
 

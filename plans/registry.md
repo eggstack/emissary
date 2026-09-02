@@ -41,7 +41,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M113 closed as blocked** | M114 remains blocked; 70 blocked cells remain (4 UseSSL + 45 M112 + 21 M113) |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M114 closed as blocked** | 70 blocked cells remain (4 UseSSL + 45 M112 + 21 M113); a new numbered corrective with accepted primitives is required before another final reclosure |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M062 regression authority | ADR-0005 permits only optional I2PControl-owned exact-revision fork alias; no global patch/vendor/path dependency |
 | I2PControl tunnel security | closed at M093 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | regression authority | M118 closure preserves tunnel anonymity/resource boundaries |
 
@@ -190,7 +190,7 @@ created. Closure: `plans/closure/i2pcontrol-proposal-170/113-closure.md`.
 
 `plans/implementation/i2pcontrol-proposal-170/114-full-proposal-170-live-interoperability-and-final-reclosure.md`
 
-Blocked. Implements no missing feature. Readiness requires zero applicable residual cells and no open high/medium Proposal-scoped correctness/security corrective.
+Closed as blocked. Implements no missing feature. Final evidence confirms the hard gate is false: 70 applicable residual cells remain, and reference/public-network evidence could not be run in this environment.
 
 ## Residual ownership
 
@@ -224,11 +224,11 @@ M093 remains tunnel production/security regression authority. M092 remains histo
 
 ## Registry maintenance rules
 
-1. M113 is closed as blocked; M114 is the next roadmap handoff but remains dependency-blocked.
+1. M114 is closed as blocked; no subsequent Emissary handoff is dependency-ready.
 2. M117 is closed at the exact pinned Yosemite revision above.
 3. M118 is closed at implementation commit `e7f3e04`; its neutral capability does not change matrix counts.
 4. Yosemite Y001 is separately ready only in `eggstack/yosemite`; Emissary agents must not implement it in this repository.
-5. M111 is closed with 40 SessionWire cells applied and four UseSSL cells blocked; M112 and M113 are closed as blocked, while M114 remains blocked.
+5. M111 is closed with 40 SessionWire cells applied and four UseSSL cells blocked; M112, M113, and M114 are closed as blocked.
 6. Treat `312 / 70 / 458` as the current closed matrix; prerequisite infrastructure does not alter it.
 7. Keep Proposal 170 policy under `emissary-cli/src/i2pcontrol/**` wherever possible; M118 is a specifically authorized neutral lower-layer exception.
 8. No global Yosemite patch/replacement/vendor/path dependency is permitted.

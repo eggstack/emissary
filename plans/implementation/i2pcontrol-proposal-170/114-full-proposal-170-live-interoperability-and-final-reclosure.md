@@ -1,6 +1,6 @@
 # M114 — Full Proposal 170 Live Interoperability and Final Reclosure
 
-Status: **proposed / blocked** — final handoff; not registry-ready until M109–M113 are closed and M095 contains zero applicable blocked/planned/unsupported/unknown cells
+Status: **closed as blocked** — final reclosure evidence gathered at the current head; the hard gate remains false because 70 applicable residual cells are still blocked
 
 Class: capability closure / interoperability / security reclosure
 

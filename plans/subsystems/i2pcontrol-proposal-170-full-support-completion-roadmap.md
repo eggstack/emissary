@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M113, M115-M118 closed; M097/M104/M112/M113 closed as blocked; M114 remains roadmap-defined and blocked
+Status: active; M095-M114, M115-M118 closed; M097/M104/M112/M113/M114 closed as blocked; no subsequent Emissary handoff is dependency-ready
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -226,7 +226,7 @@ M113 server presentation + LeaseSet residuals       [CLOSED AS BLOCKED — 0 APP
   |
   | zero applicable residual cells + no open corrective
   v
-M114 live/reference interoperability + reclosure    [PROPOSED / BLOCKED]
+M114 live/reference interoperability + reclosure    [CLOSED AS BLOCKED — 70 residual cells; reference/public evidence unavailable]
 ```
 
 M110-M114 were numbered before later correctives M115/M116. Identifiers remain stable; execution order changes without renumbering.
@@ -425,8 +425,8 @@ Per `plans/003-planning-process.md`:
 
 - M110 remains historically closed;
 - M116 and M117 were closed historical handoffs;
-- M118, M111, M112, and M113 are closed; M114 is the next roadmap handoff but remains blocked;
-- M114 remains roadmap/indexed but blocked;
+- M118, M111, M112, and M113 are closed; M114 has completed its final reclosure and is closed as blocked;
+- M114 is closed as blocked by its final reclosure record; no subsequent Emissary plan is dependency-ready;
 - M116 closure decides exact current matrix/residual ownership;
 - blocked plans may not execute because their files exist;
 - material deviations require plan/ADR correction before code changes;

@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; M109, M115, M110, M116, M117, M118, M111, and M112 are closed; M112 closed as blocked with 45 named residual cells; M113-M114 remain roadmap-defined and blocked; M095 currently records `312 apply / 70 blocked_primitive / 458 not_applicable`
+Status: partial Proposal 170 production support; M109, M115, M110, M116, M117, M118, and M111 are closed; M112, M113, and M114 are closed as blocked with 45, 21, and 70 named residual/evidence blockers; M095 currently records `312 apply / 70 blocked_primitive / 458 not_applicable`
 
 This directory contains bounded internal implementation, audit, corrective, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -94,8 +94,8 @@ Official status remains **partial Proposal 170 support**.
 | **M118** | **closed** | neutral SAM tunnel variance and standby/failover capability; no matrix promotion |
 | **M111** | **closed** | Yosemite SAM session-wire completion; 40 SessionWire cells applied, four UseSSL cells remain explicitly blocked |
 | M112 | closed as blocked | six TCP client families apply `ConnectDelay`, `Close`, `CloseTime`, and `NewDest`; 45 M112 residual cells remain blocked |
-| M113 | proposed / blocked | server presentation/routing/LeaseSet; up to 21 cells |
-| M114 | proposed / blocked | zero-residual live/reference final reclosure |
+| M113 | closed as blocked | server presentation/routing/LeaseSet; 21 cells remain blocked |
+| M114 | closed as blocked | final reclosure; 70 applicable cells and external interoperability evidence remain unresolved |
 
 M110-M114 were reserved before the later M115/M116 correctives. Execution order is M109 → M115 → M110 → M116 → M111 → M112 → M113 → M114.
 
@@ -160,11 +160,11 @@ and `NewDest` behavior for six TCP client families. Proxy/plugin/TLS-jump,
 
 ## M113 — server presentation/LeaseSet residuals
 
-M113 remains blocked and security-sensitive. LeaseSet encryption/client authorization requires real accepted primitives with no downgrade. Presentation/address-routing may not relax literal-loopback/no-SSRF boundaries.
+M113 is closed as blocked and remains security-sensitive. LeaseSet encryption/client authorization requires real accepted primitives with no downgrade. Presentation/address-routing may not relax literal-loopback/no-SSRF boundaries.
 
 ## M114 — final reclosure
 
-M114 remains blocked until M116 and M111-M113 are closed as applicable, the authoritative matrix has zero unresolved applicable cells, and no high/medium Proposal-scoped corrective remains.
+M114 is closed as blocked: its final reclosure found the authoritative matrix still has 70 unresolved applicable cells and the required reference/public-network evidence is unavailable in this environment. No full-support claim is made.
 
 M114 implements no missing feature. Only successful M114 closure may state `full Proposal 170 support against pinned revision 2026-05-20`.
 

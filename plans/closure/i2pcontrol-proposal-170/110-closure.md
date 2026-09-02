@@ -119,6 +119,12 @@ cargo test -p emissary-cli --no-default-features --features i2pcontrol --lib --n
   664 passed
 cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m095_full_support_matrix --test m105_residual_option_audit --no-fail-fast
   2 passed
+cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m061_containment --test m062_dependency_containment --test i2pcontrol_live_runtime --test m095_full_support_matrix --test m105_residual_option_audit --no-fail-fast
+  28 passed across 5 suites
+cargo test -p emissary-cli --no-default-features --features i2pcontrol --no-fail-fast
+  pass
+cargo check -p emissary-cli --no-default-features
+cargo check
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 git diff --check
 ```

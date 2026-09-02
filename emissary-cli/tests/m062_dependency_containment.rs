@@ -399,6 +399,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m107 = is_authorized_m107_path(path);
         let authorized_m109 = is_authorized_m109_path(path);
         let authorized_m115 = is_authorized_m115_path(path);
+        let authorized_m110 = is_authorized_m110_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -413,6 +414,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m107
                 || authorized_m109
                 || authorized_m115
+                || authorized_m110
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -431,12 +433,50 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m107
                     || authorized_m109
                     || authorized_m115
+                    || authorized_m110
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
             );
         }
     }
+}
+
+fn is_authorized_m110_path(path: &str) -> bool {
+    matches!(
+        path,
+        "emissary-cli/src/i2pcontrol/backends/client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/connect_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_bidir.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/irc_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/irc_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/options.rs"
+            | "emissary-cli/src/i2pcontrol/backends/registry.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/mod.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/session.rs"
+            | "emissary-cli/src/i2pcontrol/backends/server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/socks.rs"
+            | "emissary-cli/src/i2pcontrol/backends/socks_irc.rs"
+            | "emissary-cli/src/i2pcontrol/backends/streamr.rs"
+            | "emissary-cli/src/i2pcontrol/client_secret_store.rs"
+            | "emissary-cli/src/i2pcontrol/mod.rs"
+            | "emissary-cli/src/i2pcontrol/production.rs"
+            | "emissary-cli/src/i2pcontrol/server_secret_store.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "emissary-cli/tests/m095_full_support_matrix.rs"
+            | "emissary-cli/tests/m105_residual_option_audit.rs"
+            | "plans/closure/i2pcontrol-proposal-170/110-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/105-residual-option-audit.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/110-completion-ledger.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/110-shared-client-session-and-destination-key-ownership-completion.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+    )
 }
 
 fn is_authorized_m099_path(path: &str) -> bool {

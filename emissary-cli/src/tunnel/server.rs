@@ -220,7 +220,8 @@ impl ServerTunnelLifecycleController {
     }
 
     async fn mark_failed(&self, message: &str) -> Result<(), String> {
-        self.state.lock().await.state = StartupTunnelState::Failed;
+        let mut state = self.state.lock().await;
+        state.state = StartupTunnelState::Failed;
         self.state_snapshot.store(StartupTunnelState::Failed);
         Err(message.to_string())
     }

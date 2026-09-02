@@ -281,7 +281,8 @@ impl ClientTunnelLifecycleController {
     }
 
     async fn mark_failed(&self, message: &str) -> Result<(), String> {
-        self.state.lock().await.state = StartupTunnelState::Failed;
+        let mut state = self.state.lock().await;
+        state.state = StartupTunnelState::Failed;
         self.state_snapshot.store(StartupTunnelState::Failed);
         Err(message.to_string())
     }
@@ -376,9 +377,6 @@ impl ClientTunnelLifecycleController {
                 shared_session,
             )
             .await;
-            if let Some(owner) = session_owner {
-                owner.release(&session_member).await;
-            }
             let mut state = state_ref.lock().await;
             if state.generation == generation && state.state != StartupTunnelState::Failed {
                 let next_state = if result.is_ok() {
@@ -389,6 +387,10 @@ impl ClientTunnelLifecycleController {
                 state.state = next_state;
                 state_snapshot.store(next_state);
                 state.cancellation = None;
+            }
+            drop(state);
+            if let Some(owner) = session_owner {
+                owner.release(&session_member).await;
             }
         });
         {

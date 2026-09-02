@@ -833,7 +833,6 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "EncType",
         "EncryptLeaseSet",
         "LeaseSetClientAuths",
-        "CustomOptions",
         "i2cp",
     ];
     for (key, value) in &definition.raw_config {

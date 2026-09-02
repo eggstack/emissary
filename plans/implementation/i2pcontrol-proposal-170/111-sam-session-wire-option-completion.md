@@ -1,6 +1,6 @@
 # M111 — SAM Session-Wire Option Completion
 
-Status: **ready** — M117's accepted Yosemite dependency gate and M118's neutral SAM/tunnel-pool capability are closed; execution still requires the semantic re-freeze and evidence defined below
+Status: **closed** — 40 SessionWire cells are applied through the accepted Yosemite session serializer; 4 UseSSL cells remain explicitly blocked because Proposal local TLS semantics are not Yosemite SAM-control TLS
 
 Class: capability / dependency integration / protocol-adjacent containment
 
@@ -37,18 +37,17 @@ The sole valid completion mechanism is to pass validated Proposal 170 values thr
 At the M105/M108 baseline, the accepted Yosemite 0.7.0 API did not expose all required
 session-wire semantics; that historical evidence explains why M111 was blocked.
 
-That dependency blocker is now resolved by M117's accepted exact-revision adapter, and
-M118 now supplies the real neutral variance/backup tunnel-pool effect. M111 is promoted
-to ready, but it must re-freeze the exact Proposal 170 option/cell set at execution time
-and may keep any unsupported semantic slice blocked.
+That dependency blocker was resolved by M117's accepted exact-revision adapter, and M118
+supplies the real neutral variance/backup tunnel-pool effect. This plan has now completed
+its execution-time semantic re-freeze and may keep any unsupported semantic slice blocked.
 
-M111 is ready because the first condition is explicitly satisfied, subject to its own
-execution-time semantic freeze:
+M111 became executable because one of the following conditions was explicitly satisfied:
 
 1. a released crates.io Yosemite version exposes the needed public typed/raw session-option fields and can be adopted without Proposal-170-shaped changes outside the dependency boundary; or
 2. a separately accepted architecture decision authorizes a narrowly scoped dependency strategy that preserves M062/M093 containment and does not recreate the invalid M091 vendor/path-dependency pattern.
 
-A maintainer must explicitly register M111 after that evidence exists. The existence of this plan is not authorization to fork, vendor, patch, or contact Yosemite upstream.
+The completed execution records that M117/M118 satisfy this gate. The existence of this
+plan is not authorization to fork, vendor, patch, or contact Yosemite upstream.
 
 ## 3. Invariants
 

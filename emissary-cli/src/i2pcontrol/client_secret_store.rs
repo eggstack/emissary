@@ -396,9 +396,11 @@ async fn generate_private_key(
 }
 
 fn parse_signature_type(value: &str) -> Result<u16, String> {
-    value
-        .parse::<u16>()
-        .map_err(|_| "SigType must be an unsigned 16-bit integer".to_owned())
+    match value.parse::<u16>() {
+        Ok(7) if value == "7" => Ok(7),
+        Ok(_) => Err("SigType is unsupported by the Emissary SAM router".to_owned()),
+        Err(_) => Err("SigType must be the supported unsigned value 7".to_owned()),
+    }
 }
 
 fn validate_private_key(value: &str) -> Result<(), String> {
@@ -570,10 +572,10 @@ mod tests {
         let store = ClientDestinationStore::new(directory.path());
         let mut definition = definition("selected-signature");
         definition.options.persistent_client_key = Some(true);
-        definition.options.sig_type = Some("11".to_owned());
+        definition.options.sig_type = Some("7".to_owned());
         store.stage(&definition, port).await.unwrap();
 
-        assert_eq!(command_rx.await.unwrap(), "DEST GENERATE SIGNATURE_TYPE=11\n");
+        assert_eq!(command_rx.await.unwrap(), "DEST GENERATE SIGNATURE_TYPE=7\n");
         assert_eq!(
             store.active("selected-signature").await.unwrap().unwrap().as_str(),
             "cHJpdmF0ZQ=="

@@ -473,12 +473,12 @@ fn current_matrix_counts_are_explicit_and_exact() {
             }
             counts
         });
-    assert_eq!(counts, (248, 134, 458));
+    assert_eq!(counts, (288, 94, 458));
     let declared = root
         .get("current_matrix_counts")
         .and_then(Value::as_table)
         .expect("current matrix counts are declared");
-    assert_eq!(declared["apply"].as_integer(), Some(248));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(134));
+    assert_eq!(declared["apply"].as_integer(), Some(288));
+    assert_eq!(declared["blocked_primitive"].as_integer(), Some(94));
     assert_eq!(declared["not_applicable"].as_integer(), Some(458));
 }

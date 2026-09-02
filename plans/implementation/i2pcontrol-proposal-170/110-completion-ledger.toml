@@ -34,6 +34,65 @@ reclassification_reason = "NewDest requires M112-owned close-on-idle/resume life
 shared_streamr_disposition = "apply; canonical authenticated producer identity matching retained"
 closure = "plans/closure/i2pcontrol-proposal-170/116-closure.md"
 
+[post_m111]
+status = "closed"
+matrix_before_apply = 248
+matrix_before_blocked_primitive = 134
+matrix_before_not_applicable = 458
+matrix_after_apply = 288
+matrix_after_blocked_primitive = 94
+matrix_after_not_applicable = 458
+reclassified_cells = [
+    "TunnelVariance:client",
+    "TunnelVariance:httpclient",
+    "TunnelVariance:ircclient",
+    "TunnelVariance:socks",
+    "TunnelVariance:socksirc",
+    "TunnelVariance:connectclient",
+    "TunnelVariance:server",
+    "TunnelVariance:httpserver",
+    "TunnelVariance:httpbidirserver",
+    "TunnelVariance:ircserver",
+    "TunnelBackupQuantity:client",
+    "TunnelBackupQuantity:httpclient",
+    "TunnelBackupQuantity:ircclient",
+    "TunnelBackupQuantity:socks",
+    "TunnelBackupQuantity:socksirc",
+    "TunnelBackupQuantity:connectclient",
+    "TunnelBackupQuantity:server",
+    "TunnelBackupQuantity:httpserver",
+    "TunnelBackupQuantity:httpbidirserver",
+    "TunnelBackupQuantity:ircserver",
+    "SigType:client",
+    "SigType:httpclient",
+    "SigType:ircclient",
+    "SigType:socks",
+    "SigType:socksirc",
+    "SigType:connectclient",
+    "SigType:server",
+    "SigType:httpserver",
+    "SigType:httpbidirserver",
+    "SigType:ircserver",
+    "CustomOptions:client",
+    "CustomOptions:httpclient",
+    "CustomOptions:ircclient",
+    "CustomOptions:socks",
+    "CustomOptions:socksirc",
+    "CustomOptions:connectclient",
+    "CustomOptions:server",
+    "CustomOptions:httpserver",
+    "CustomOptions:httpbidirserver",
+    "CustomOptions:ircserver",
+]
+unchanged_blocked_cells = [
+    "UseSSL:httpclient",
+    "UseSSL:connectclient",
+    "UseSSL:httpserver",
+    "UseSSL:httpbidirserver",
+]
+reclassification_reason = "M117 Yosemite 8026f5b serializes the generic session-wire fields and M118 supplies neutral variance/backup runtime effect; Emissary core supports only signature type 7; Proposal UseSSL remains blocked because its local application/session TLS semantics are not Yosemite SAM-control TLS."
+closure = "plans/closure/i2pcontrol-proposal-170/111-closure.md"
+
 [ownership]
 session_registry = "emissary-cli/src/i2pcontrol/backends/runtime/session.rs::SharedClientSessionRegistry"
 stream_listener_owner = "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"

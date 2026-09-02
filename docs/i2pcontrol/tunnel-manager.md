@@ -340,14 +340,20 @@ typed `EncType` values are validated before allocation and map to both inbound a
 outbound session settings. `EncType` accepts current core-supported values 3–7,
 with at most two distinct values and at most one ML-KEM variant.
 
-The remaining common fields are retained canonically for truthful `get`/`edit`
-round-tripping but fail before session/listener allocation: `Shared`, `UseSSL`,
-`TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions`, `NewDest`,
-`PersistentClientKey`, and `PrivKeyFile`. Yosemite 0.7.0 does not serialize the
-corresponding session controls on its SAM wire (and hardcodes signing type 7),
-while Emissary does not yet have the bounded shared/client-key authorities those
-identity semantics require. `CustomOptions` is bounded to 32 string entries with
-128-byte keys and values; it is not an arbitrary SAM escape hatch.
+M111 adds the generic session-wire controls supplied by the accepted Yosemite fork:
+`TunnelVariance` (−2–2) and `TunnelBackupQuantity` (0–3) reach inbound/outbound
+`SESSION CREATE` options and are consumed by the neutral tunnel-pool owner;
+`SigType` is supported for the Emissary router's canonical type 7 and is emitted
+for both destination and session generation. `CustomOptions` accepts at most 32
+validated `i2cp.*` token pairs (64-byte keys, 256-byte values), rejects duplicate
+or typed/reserved keys, and reaches the same Yosemite session serializer. All are
+validated before session/listener allocation and participate in shared-session
+compatibility.
+
+`UseSSL` remains fail-closed: Proposal 170's local application/session TLS meaning
+is distinct from Yosemite's SAM control-connection TLS field and has no accepted
+Emissary owner. `Shared`, `NewDest`, `PersistentClientKey`, and `PrivKeyFile` retain
+their existing M110/M116 ownership and disposition.
 
 | Disposition | Proposal 170 fields |
 |---|---|

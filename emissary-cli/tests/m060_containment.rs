@@ -18,6 +18,7 @@ fn source(path: &str) -> String {
 #[test]
 fn core_changes_stay_inside_the_accepted_m060_budget() {
     let allowed = BTreeSet::from([
+        "emissary-core/src/config.rs",
         "emissary-core/src/error/mod.rs",
         "emissary-core/src/events.rs",
         "emissary-core/src/i2cp/socket.rs",

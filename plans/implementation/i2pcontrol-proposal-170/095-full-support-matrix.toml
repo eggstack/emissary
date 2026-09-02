@@ -9,12 +9,12 @@ proposal_revision = "2026-05-20"
 source_url = "https://i2p.net/proposals/170-i2pcontrol-expansion.txt"
 source_sha256 = "f13ae00b886c5e72131bc5d5b138a371148d1faa6899a119a1dacb65a555e7dc"
 planning_baseline = "630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207"
-current_production_head = "626d76311a6dc142ecc07827845081b9a9f4c860"
+current_production_head = "M111 implementation head (recorded after implementation commit)"
 
 [current_matrix_counts]
 total = 840
-apply = 248
-blocked_primitive = 134
+apply = 288
+blocked_primitive = 94
 not_applicable = 458
 
 [contract_counts]
@@ -832,12 +832,12 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M097"
+completion_owner = "M111"
 current_or_planned_disposition = "blocked_primitive"
 cells = ["not_applicable", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "blocked_primitive", "not_applicable", "not_applicable", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable"]
-blocked_primitive = "Yosemite 0.7.0 SessionOptions.ssl is not emitted on the SAM SESSION CREATE wire"
-blocking_milestone = "M097"
-cell_notes = { "client" = "The pinned option is not applicable to this tunnel family.", "httpclient" = "blocked on Yosemite SAM wire support.", "ircclient" = "The pinned option is not applicable to this tunnel family.", "socks" = "The pinned option is not applicable to this tunnel family.", "socksirc" = "The pinned option is not applicable to this tunnel family.", "connectclient" = "blocked on Yosemite SAM wire support.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "blocked on Yosemite SAM wire support.", "httpbidirserver" = "blocked on Yosemite SAM wire support.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+blocked_primitive = "Proposal UseSSL means local application/session TLS; mapping it to Yosemite SessionOptions.ssl would select SAM-control-connection TLS, and no accepted Emissary owner currently provides the Proposal presentation-TLS effect"
+blocking_milestone = "M111"
+cell_notes = { "client" = "The pinned option is not applicable to this tunnel family.", "httpclient" = "blocked: Proposal UseSSL is local application/session TLS, not Yosemite SAM-control TLS; no accepted Emissary owner exists.", "ircclient" = "The pinned option is not applicable to this tunnel family.", "socks" = "The pinned option is not applicable to this tunnel family.", "socksirc" = "The pinned option is not applicable to this tunnel family.", "connectclient" = "blocked: Proposal UseSSL is local application/session TLS, not Yosemite SAM-control TLS; no accepted Emissary owner exists.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "blocked: Proposal UseSSL is local application/session TLS, not Yosemite SAM-control TLS; no accepted Emissary owner exists.", "httpbidirserver" = "blocked: Proposal UseSSL is local application/session TLS, not Yosemite SAM-control TLS; no accepted Emissary owner exists.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
 canonical_key = "TunnelLength"
@@ -862,12 +862,11 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M097"
-current_or_planned_disposition = "blocked_primitive"
-cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable"]
-cell_notes = { "client" = "blocked on Yosemite SAM wire support.", "httpclient" = "blocked on Yosemite SAM wire support.", "ircclient" = "blocked on Yosemite SAM wire support.", "socks" = "blocked on Yosemite SAM wire support.", "socksirc" = "blocked on Yosemite SAM wire support.", "connectclient" = "blocked on Yosemite SAM wire support.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "blocked on Yosemite SAM wire support.", "httpserver" = "blocked on Yosemite SAM wire support.", "httpbidirserver" = "blocked on Yosemite SAM wire support.", "ircserver" = "blocked on Yosemite SAM wire support.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
-blocked_primitive = "Yosemite 0.7.0 exposes variance in Rust but does not emit it on the SAM SESSION CREATE wire"
-blocking_milestone = "M097"
+completion_owner = "M111"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
+cell_notes = { "client" = "M111 validates and forwards both inbound/outbound variance through Yosemite; M118 applies it per tunnel build.", "httpclient" = "M111 validates and forwards both inbound/outbound variance through Yosemite; M118 applies it per tunnel build.", "ircclient" = "M111 validates and forwards both inbound/outbound variance through Yosemite; M118 applies it per tunnel build.", "socks" = "M111 validates and forwards both inbound/outbound variance through Yosemite; M118 applies it per tunnel build.", "socksirc" = "M111 validates and forwards both inbound/outbound variance through Yosemite; M118 applies it per tunnel build.", "connectclient" = "M111 validates and forwards both inbound/outbound variance through Yosemite; M118 applies it per tunnel build.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "M111 validates and forwards both inbound/outbound variance through Yosemite; M118 applies it per tunnel build.", "httpserver" = "M111 validates and forwards both inbound/outbound variance through Yosemite; M118 applies it per tunnel build.", "httpbidirserver" = "M111 validates and forwards both inbound/outbound variance through Yosemite; M118 applies it per tunnel build.", "ircserver" = "M111 validates and forwards both inbound/outbound variance through Yosemite; M118 applies it per tunnel build.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+implementation_evidence = "M111 reaches Yosemite 8026f5b SESSION CREATE serialization; M118 consumes the four generic values in Emissary's neutral tunnel pool."
 
 [[tunnel_manager.options]]
 canonical_key = "TunnelQuantity"
@@ -892,12 +891,11 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M097"
-current_or_planned_disposition = "blocked_primitive"
-cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable"]
-cell_notes = { "client" = "blocked on Yosemite SAM wire support.", "httpclient" = "blocked on Yosemite SAM wire support.", "ircclient" = "blocked on Yosemite SAM wire support.", "socks" = "blocked on Yosemite SAM wire support.", "socksirc" = "blocked on Yosemite SAM wire support.", "connectclient" = "blocked on Yosemite SAM wire support.", "streamrclient" = "The pinned option is not applicable to this tunnel family.", "server" = "blocked on Yosemite SAM wire support.", "httpserver" = "blocked on Yosemite SAM wire support.", "httpbidirserver" = "blocked on Yosemite SAM wire support.", "ircserver" = "blocked on Yosemite SAM wire support.", "streamrserver" = "The pinned option is not applicable to this tunnel family." }
-blocked_primitive = "Yosemite 0.7.0 exposes backup quantity in Rust but does not emit it on the SAM SESSION CREATE wire"
-blocking_milestone = "M097"
+completion_owner = "M111"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
+cell_notes = { "client" = "M111 validates and forwards both inbound/outbound backup quantities through Yosemite; M118 maintains them as standby capacity.", "httpclient" = "M111 validates and forwards both inbound/outbound backup quantities through Yosemite; M118 maintains them as standby capacity.", "ircclient" = "M111 validates and forwards both inbound/outbound backup quantities through Yosemite; M118 maintains them as standby capacity.", "socks" = "M111 validates and forwards both inbound/outbound backup quantities through Yosemite; M118 maintains them as standby capacity.", "socksirc" = "M111 validates and forwards both inbound/outbound backup quantities through Yosemite; M118 maintains them as standby capacity.", "connectclient" = "M111 validates and forwards both inbound/outbound backup quantities through Yosemite; M118 maintains them as standby capacity.", "streamrclient" = "The pinned option is not applicable to this tunnel family.", "server" = "M111 validates and forwards both inbound/outbound backup quantities through Yosemite; M118 maintains them as standby capacity.", "httpserver" = "M111 validates and forwards both inbound/outbound backup quantities through Yosemite; M118 maintains them as standby capacity.", "httpbidirserver" = "M111 validates and forwards both inbound/outbound backup quantities through Yosemite; M118 maintains them as standby capacity.", "ircserver" = "M111 validates and forwards both inbound/outbound backup quantities through Yosemite; M118 maintains them as standby capacity.", "streamrserver" = "The pinned option is not applicable to this tunnel family." }
+implementation_evidence = "M111 reaches Yosemite 8026f5b SESSION CREATE serialization; M118 consumes the four generic values in Emissary's neutral tunnel pool."
 
 [[tunnel_manager.options]]
 canonical_key = "SigType"
@@ -908,12 +906,11 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = true
 compatibility_aliases = []
-completion_owner = "M097"
-current_or_planned_disposition = "blocked_primitive"
-cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable"]
-cell_notes = { "client" = "blocked on Yosemite SAM wire support.", "httpclient" = "blocked on Yosemite SAM wire support.", "ircclient" = "blocked on Yosemite SAM wire support.", "socks" = "blocked on Yosemite SAM wire support.", "socksirc" = "blocked on Yosemite SAM wire support.", "connectclient" = "blocked on Yosemite SAM wire support.", "streamrclient" = "The pinned option is not applicable to this tunnel family.", "server" = "blocked on Yosemite SAM wire support.", "httpserver" = "blocked on Yosemite SAM wire support.", "httpbidirserver" = "blocked on Yosemite SAM wire support.", "ircserver" = "blocked on Yosemite SAM wire support.", "streamrserver" = "The pinned option is not applicable to this tunnel family." }
-blocked_primitive = "Yosemite 0.7.0 hardcodes signing type 7 on the SAM SESSION CREATE path and does not map SigType"
-blocking_milestone = "M097"
+completion_owner = "M111"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
+cell_notes = { "client" = "M111 forwards supported signature type 7 through Yosemite session/destination generation; other router types fail closed.", "httpclient" = "M111 forwards supported signature type 7 through Yosemite session/destination generation; other router types fail closed.", "ircclient" = "M111 forwards supported signature type 7 through Yosemite session/destination generation; other router types fail closed.", "socks" = "M111 forwards supported signature type 7 through Yosemite session/destination generation; other router types fail closed.", "socksirc" = "M111 forwards supported signature type 7 through Yosemite session/destination generation; other router types fail closed.", "connectclient" = "M111 forwards supported signature type 7 through Yosemite session/destination generation; other router types fail closed.", "streamrclient" = "The pinned option is not applicable to this tunnel family.", "server" = "M111 forwards supported signature type 7 through Yosemite session/destination generation; other router types fail closed.", "httpserver" = "M111 forwards supported signature type 7 through Yosemite session/destination generation; other router types fail closed.", "httpbidirserver" = "M111 forwards supported signature type 7 through Yosemite session/destination generation; other router types fail closed.", "ircserver" = "M111 forwards supported signature type 7 through Yosemite session/destination generation; other router types fail closed.", "streamrserver" = "The pinned option is not applicable to this tunnel family." }
+implementation_evidence = "M111 forwards the explicitly supported Emissary signature type 7 through Yosemite SESSION CREATE and DEST GENERATE; unsupported router types fail before allocation."
 
 [[tunnel_manager.options]]
 canonical_key = "EncType"
@@ -938,12 +935,11 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M097"
-current_or_planned_disposition = "blocked_primitive"
-cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable"]
-cell_notes = { "client" = "blocked on Yosemite SAM wire support.", "httpclient" = "blocked on Yosemite SAM wire support.", "ircclient" = "blocked on Yosemite SAM wire support.", "socks" = "blocked on Yosemite SAM wire support.", "socksirc" = "blocked on Yosemite SAM wire support.", "connectclient" = "blocked on Yosemite SAM wire support.", "streamrclient" = "The pinned option is not applicable to this tunnel family.", "server" = "blocked on Yosemite SAM wire support.", "httpserver" = "blocked on Yosemite SAM wire support.", "httpbidirserver" = "blocked on Yosemite SAM wire support.", "ircserver" = "blocked on Yosemite SAM wire support.", "streamrserver" = "The pinned option is not applicable to this tunnel family." }
-blocked_primitive = "Yosemite 0.7.0 has no bounded allowlisted custom-option pass-through to SAM SESSION CREATE"
-blocking_milestone = "M097"
+completion_owner = "M111"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "apply", "apply", "apply", "apply", "not_applicable"]
+cell_notes = { "client" = "M111 validates bounded i2cp.* tokens and forwards them through Yosemite SESSION CREATE; typed keys are reserved.", "httpclient" = "M111 validates bounded i2cp.* tokens and forwards them through Yosemite SESSION CREATE; typed keys are reserved.", "ircclient" = "M111 validates bounded i2cp.* tokens and forwards them through Yosemite SESSION CREATE; typed keys are reserved.", "socks" = "M111 validates bounded i2cp.* tokens and forwards them through Yosemite SESSION CREATE; typed keys are reserved.", "socksirc" = "M111 validates bounded i2cp.* tokens and forwards them through Yosemite SESSION CREATE; typed keys are reserved.", "connectclient" = "M111 validates bounded i2cp.* tokens and forwards them through Yosemite SESSION CREATE; typed keys are reserved.", "streamrclient" = "The pinned option is not applicable to this tunnel family.", "server" = "M111 validates bounded i2cp.* tokens and forwards them through Yosemite SESSION CREATE; typed keys are reserved.", "httpserver" = "M111 validates bounded i2cp.* tokens and forwards them through Yosemite SESSION CREATE; typed keys are reserved.", "httpbidirserver" = "M111 validates bounded i2cp.* tokens and forwards them through Yosemite SESSION CREATE; typed keys are reserved.", "ircserver" = "M111 validates bounded i2cp.* tokens and forwards them through Yosemite SESSION CREATE; typed keys are reserved.", "streamrserver" = "The pinned option is not applicable to this tunnel family." }
+implementation_evidence = "M111 validates bounded i2cp.* tokens and reaches Yosemite 8026f5b SESSION CREATE additional-option serialization without typed-option overrides."
 
 [[tunnel_manager.options]]
 canonical_key = "ProxyList"

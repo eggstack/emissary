@@ -586,6 +586,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m116 = is_authorized_m116_path(path);
         let authorized_m117 = is_authorized_m117_path(path);
         let authorized_m118 = is_authorized_m118_path(path);
+        let authorized_m111 = is_authorized_m111_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -604,6 +605,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m116
                 || authorized_m117
                 || authorized_m118
+                || authorized_m111
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -849,6 +851,10 @@ fn is_authorized_m118_path(path: &str) -> bool {
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
     )
+}
+
+fn is_authorized_m111_path(path: &str) -> bool {
+    matches!(path, "emissary-cli/tests/m060_containment.rs")
 }
 
 fn is_authorized_m065_path(path: &str) -> bool {

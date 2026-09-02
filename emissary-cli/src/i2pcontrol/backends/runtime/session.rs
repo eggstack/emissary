@@ -138,6 +138,7 @@ struct CompatibilityKey {
     style: String,
     identity: CompatibilityIdentity,
     session_options: String,
+    session_options_identity: String,
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -473,7 +474,28 @@ fn compatibility_key(options: &SessionOptions, style: &str) -> CompatibilityKey 
         style: style.to_owned(),
         identity,
         session_options: format!("{safe_options:?}"),
+        session_options_identity: additional_options_identity(&safe_options),
     }
+}
+
+/// Preserve exact custom-option equality for sharing without putting values in
+/// the key's Debug/Display output. Yosemite's SessionOption Debug intentionally
+/// redacts values, which is suitable for diagnostics but insufficient for
+/// compatibility identity.
+fn additional_options_identity(options: &SessionOptions) -> String {
+    options
+        .additional_options
+        .iter()
+        .map(|option| {
+            format!(
+                "{}:{}:{}:{};",
+                option.key().len(),
+                option.value().len(),
+                option.key(),
+                option.value()
+            )
+        })
+        .collect()
 }
 
 /// Translate a client definition and its owned identity into Yosemite options.
@@ -563,11 +585,8 @@ pub fn build_session_options(
     Ok(options)
 }
 
-/// Apply the generic Yosemite session-wire settings that are already modeled
-/// by the I2PControl domain. The common validator currently keeps these
-/// Proposal cells fail-closed until M111/M118 provide their complete semantic
-/// evidence; keeping this adapter ready here prevents a second SAM command
-/// path when that gate closes.
+/// Apply validated generic Yosemite session-wire settings through the one
+/// session builder used by every affected backend.
 pub(crate) fn apply_session_wire_options(
     options: &mut SessionOptions,
     tunnel_options: &TunnelOptions,
@@ -691,19 +710,22 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_session_controls_fail_before_translation() {
-        for set in [
-            |options: &mut TunnelOptions| options.tunnel_variance = Some(1),
-            |options: &mut TunnelOptions| options.tunnel_backup_quantity = Some(1),
-            |options: &mut TunnelOptions| options.use_ssl = Some(true),
-        ] {
-            let mut definition = definition();
-            set(&mut definition.options);
-            assert!(
-                build_session_options(&definition, 7656, false, DestinationKind::Transient)
-                    .is_err()
-            );
-        }
+    fn supported_session_controls_translate_and_use_ssl_stays_blocked() {
+        let mut definition = definition();
+        definition.options.tunnel_variance = Some(1);
+        definition.options.tunnel_backup_quantity = Some(1);
+        let options =
+            build_session_options(&definition, 7656, false, DestinationKind::Transient).unwrap();
+        assert_eq!(options.inbound_len_variance, 1);
+        assert_eq!(options.outbound_len_variance, 1);
+        assert_eq!(options.inbound_backup_quantity, 1);
+        assert_eq!(options.outbound_backup_quantity, 1);
+
+        definition.options.use_ssl = Some(true);
+        assert!(
+            build_session_options(&definition, 7656, false, DestinationKind::Transient)
+                .is_err()
+        );
     }
 
     #[test]
@@ -808,12 +830,15 @@ mod tests {
         let mut different = first.clone();
         different.outbound_len = 4;
         let mut different_wire = first.clone();
-        different_wire.signature_type = 11;
+        different_wire.signature_type = 7;
         different_wire.inbound_len_variance = -2;
         different_wire.outbound_backup_quantity = 3;
         different_wire
             .add_session_option("i2cp.custom".to_owned(), "safe-value".to_owned())
             .unwrap();
+        let mut different_custom_value = different_wire.clone();
+        different_custom_value.additional_options[0] =
+            yosemite_i2pcontrol::SessionOption::new("i2cp.custom", "different-value").unwrap();
         let mut different_identity = first.clone();
         different_identity.destination = DestinationKind::Persistent {
             private_key: "b3RoZXIta2V5".to_owned(),
@@ -822,6 +847,10 @@ mod tests {
         assert_eq!(first_key, compatibility_key(&same, "stream"));
         assert_ne!(first_key, compatibility_key(&different, "stream"));
         assert_ne!(first_key, compatibility_key(&different_wire, "stream"));
+        assert_ne!(
+            compatibility_key(&different_wire, "stream"),
+            compatibility_key(&different_custom_value, "stream")
+        );
         assert_ne!(first_key, compatibility_key(&different_identity, "stream"));
         let debug = format!("{first_key:?}");
         let display = format!("{first_key}");

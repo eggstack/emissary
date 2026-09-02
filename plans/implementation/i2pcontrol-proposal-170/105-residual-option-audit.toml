@@ -45,6 +45,13 @@ post_m116_reclassified_cells = 7
 post_m116_reclassified_family = "NewDest"
 post_m116_blocking_milestone = "M112"
 post_m116_closure = "plans/closure/i2pcontrol-proposal-170/116-closure.md"
+post_m111_matrix_apply_cells = 288
+post_m111_matrix_blocked_primitive_cells = 94
+post_m111_matrix_not_applicable_cells = 458
+post_m111_completed_cell_count = 40
+post_m111_reclassified_family = "TunnelVariance/TunnelBackupQuantity/SigType/CustomOptions"
+post_m111_blocking_milestone = "M111 for UseSSL; M112/M113 for remaining residuals"
+post_m111_closure = "plans/closure/i2pcontrol-proposal-170/111-closure.md"
 
 [[cells]]
 canonical_option = "Shared"

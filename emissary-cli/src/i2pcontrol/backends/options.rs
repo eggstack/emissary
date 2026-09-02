@@ -8,6 +8,12 @@
 use std::fmt;
 
 use crate::i2pcontrol::domain::tunnel::{TunnelOptions, TunnelType};
+use yosemite_i2pcontrol::SessionOption;
+
+const SUPPORTED_SIGNATURE_TYPE: u16 = 7;
+const MAX_CUSTOM_OPTIONS: usize = 32;
+const MAX_CUSTOM_OPTION_KEY_LENGTH: usize = 64;
+const MAX_CUSTOM_OPTION_VALUE_LENGTH: usize = 256;
 
 /// Policy for the protocol-defined custom option namespace.
 #[allow(dead_code)]
@@ -152,21 +158,13 @@ pub fn validate_common_options(
         TunnelType::StreamrClient | TunnelType::StreamrServer
     );
 
-    // These fields are represented canonically, but the current Yosemite
-    // dependency does not carry them to the SAM SESSION CREATE wire. Keep
-    // them fail-closed until a supported primitive exists; accepting them
-    // here would make a persisted option look applied when it is not.
+    // Proposal UseSSL controls the local application/session presentation side.
+    // Yosemite's similarly named field controls TLS on the SAM control
+    // connection, so it is deliberately not mapped here.
     if options.use_ssl.is_some() {
         return Err(common_unsupported(tunnel_type, "UseSSL"));
     }
     for (present, field) in [
-        (options.tunnel_variance.is_some(), "TunnelVariance"),
-        (
-            options.tunnel_backup_quantity.is_some(),
-            "TunnelBackupQuantity",
-        ),
-        (options.sig_type.is_some(), "SigType"),
-        (!options.custom_options.is_empty(), "CustomOptions"),
         (
             options.priv_key_file.is_some()
                 && !matches!(
@@ -188,6 +186,37 @@ pub fn validate_common_options(
         if present {
             return Err(common_unsupported(tunnel_type, field));
         }
+    }
+
+    if let Some(value) = options.tunnel_variance {
+        if is_streamr {
+            return Err(common_unsupported(tunnel_type, "TunnelVariance"));
+        }
+        if !(-2..=2).contains(&value) {
+            return Err(common_unsupported(tunnel_type, "TunnelVariance"));
+        }
+    }
+    if let Some(value) = options.tunnel_backup_quantity {
+        if is_streamr {
+            return Err(common_unsupported(tunnel_type, "TunnelBackupQuantity"));
+        }
+        if value > 3 {
+            return Err(common_unsupported(tunnel_type, "TunnelBackupQuantity"));
+        }
+    }
+    if let Some(value) = options.sig_type.as_deref() {
+        if is_streamr {
+            return Err(common_unsupported(tunnel_type, "SigType"));
+        }
+        if value.parse::<u16>().ok() != Some(SUPPORTED_SIGNATURE_TYPE) || value != "7" {
+            return Err(common_unsupported(tunnel_type, "SigType"));
+        }
+    }
+    if !options.custom_options.is_empty() && !valid_custom_options(&options.custom_options) {
+        return Err(common_unsupported(tunnel_type, "CustomOptions"));
+    }
+    if is_streamr && !options.custom_options.is_empty() {
+        return Err(common_unsupported(tunnel_type, "CustomOptions"));
     }
 
     for (present, field) in [
@@ -248,7 +277,7 @@ pub const CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &[],
     &["TargetPort", "ListenInterface", "DelayOpen"],
     CustomOptionPolicy::Reject,
-    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Accept,
 );
 
 /// Runtime fields supported by the existing generic server backend.
@@ -262,7 +291,7 @@ pub const SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &["TargetPort", "ListenPort"],
     &["TargetHost", "Host"],
     CustomOptionPolicy::Accept,
-    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Accept,
 );
 
 /// Proposal 170 fields consumed by the filtered IRC client runtime.
@@ -275,7 +304,7 @@ pub const IRC_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &[],
     &["TargetPort", "ListenInterface", "DelayOpen"],
     CustomOptionPolicy::Reject,
-    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Accept,
 );
 
 /// Proposal 170 fields consumed by the filtered IRC server runtime.
@@ -284,7 +313,7 @@ pub const IRC_SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     &["TargetPort", "ListenPort"],
     &["HostingDestination"],
     CustomOptionPolicy::Reject,
-    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Accept,
 );
 
 /// Proposal 170 HTTP proxy options consumed by the control-plane client.
@@ -298,7 +327,7 @@ pub const HTTP_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
         "DelayOpen",
     ],
     CustomOptionPolicy::Reject,
-    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Accept,
 );
 
 /// The composed HTTP bidirectional server accepts the union of the already
@@ -317,7 +346,7 @@ pub const HTTP_BIDIR_SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::ne
         "ProxyPassword",
     ],
     CustomOptionPolicy::Reject,
-    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Accept,
 );
 
 /// Proposal 170 CONNECT proxy options consumed by the control-plane client.
@@ -331,7 +360,7 @@ pub const CONNECT_CLIENT_OPTIONS: OptionCapabilities = OptionCapabilities::new(
         "DelayOpen",
     ],
     CustomOptionPolicy::Reject,
-    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Accept,
 );
 
 /// Proposal 170 SOCKS frontend options. The target is selected by each
@@ -347,7 +376,7 @@ pub const SOCKS_OPTIONS: OptionCapabilities = OptionCapabilities::new(
         "DelayOpen",
     ],
     CustomOptionPolicy::Reject,
-    CustomOptionPolicy::Reject,
+    CustomOptionPolicy::Accept,
 );
 
 /// SOCKS-IRC has the same listener and proxy-authentication surface as SOCKS;
@@ -428,6 +457,21 @@ fn present_runtime_fields(options: &TunnelOptions) -> Vec<&'static str> {
 
 fn field_present(options: &TunnelOptions, field: &str) -> bool {
     present_runtime_fields(options).contains(&field)
+}
+
+fn valid_custom_options(options: &std::collections::BTreeMap<String, String>) -> bool {
+    if options.len() > MAX_CUSTOM_OPTIONS {
+        return false;
+    }
+
+    let mut folded_keys = std::collections::BTreeSet::new();
+    options.iter().all(|(key, value)| {
+        key.starts_with("i2cp.")
+            && key.len() <= MAX_CUSTOM_OPTION_KEY_LENGTH
+            && value.len() <= MAX_CUSTOM_OPTION_VALUE_LENGTH
+            && folded_keys.insert(key.to_ascii_lowercase())
+            && SessionOption::new(key.clone(), value.clone()).is_ok()
+    })
 }
 
 #[cfg(test)]
@@ -540,5 +584,64 @@ mod tests {
             "httpserver does not support option CustomOptions"
         );
         assert!(!error.to_string().contains("secret"));
+    }
+
+    #[test]
+    fn session_wire_values_are_strictly_bounded_and_router_supported() {
+        let mut options = TunnelOptions {
+            tunnel_variance: Some(3),
+            ..Default::default()
+        };
+        assert_eq!(
+            validate_common_options(TunnelType::Client, &options)
+                .unwrap_err()
+                .to_string(),
+            "client does not support option TunnelVariance"
+        );
+
+        options.tunnel_variance = None;
+        options.tunnel_backup_quantity = Some(4);
+        assert_eq!(
+            validate_common_options(TunnelType::Client, &options)
+                .unwrap_err()
+                .to_string(),
+            "client does not support option TunnelBackupQuantity"
+        );
+
+        options.tunnel_backup_quantity = None;
+        options.sig_type = Some("11".to_owned());
+        assert_eq!(
+            validate_common_options(TunnelType::Client, &options)
+                .unwrap_err()
+                .to_string(),
+            "client does not support option SigType"
+        );
+
+        options.sig_type = Some("7".to_owned());
+        assert!(validate_common_options(TunnelType::Client, &options).is_ok());
+    }
+
+    #[test]
+    fn custom_options_are_bounded_namespaced_and_cannot_override_typed_fields() {
+        let mut options = TunnelOptions::default();
+        options
+            .custom_options
+            .insert("i2cp.custom".to_owned(), "safe-value".to_owned());
+        assert!(validate_common_options(TunnelType::Client, &options).is_ok());
+
+        options.custom_options.insert("custom".to_owned(), "value".to_owned());
+        assert!(validate_common_options(TunnelType::Client, &options).is_err());
+
+        options.custom_options.remove("custom");
+        options
+            .custom_options
+            .insert("i2cp.leaseSetEncType".to_owned(), "6,4".to_owned());
+        assert!(validate_common_options(TunnelType::Client, &options).is_err());
+
+        options.custom_options.clear();
+        options
+            .custom_options
+            .insert("i2cp.custom".to_owned(), "bad value".to_owned());
+        assert!(validate_common_options(TunnelType::Client, &options).is_err());
     }
 }

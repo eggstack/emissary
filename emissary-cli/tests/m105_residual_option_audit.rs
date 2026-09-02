@@ -183,7 +183,36 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         .union(&m116_reclassified)
         .cloned()
         .collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_with_m116);
+    let m111_completed: BTreeSet<(String, String)> = [
+        "TunnelVariance",
+        "TunnelBackupQuantity",
+        "SigType",
+        "CustomOptions",
+    ]
+    .into_iter()
+    .flat_map(|option| {
+        [
+            "client",
+            "httpclient",
+            "ircclient",
+            "socks",
+            "socksirc",
+            "connectclient",
+            "server",
+            "httpserver",
+            "httpbidirserver",
+            "ircserver",
+        ]
+        .into_iter()
+        .map(move |tunnel_type| (option.to_owned(), tunnel_type.to_owned()))
+    })
+    .collect();
+    assert_eq!(m111_completed.len(), 40);
+    let expected_post_m111 = expected_with_m116
+        .difference(&m111_completed)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m111);
     assert_eq!(audit["summary"]["post_m116_reclassified_cells"].as_integer(), Some(7));
     assert_eq!(audit["summary"]["post_m116_blocking_milestone"].as_str(), Some("M112"));
 }

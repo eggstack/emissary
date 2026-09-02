@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096, M098-M110, M115-M118 closed; M097/M104 closed as blocked; M111 ready; M112-M114 remain roadmap-defined and blocked
+Status: active; M095-M096, M098-M111, M115-M118 closed; M097/M104 closed as blocked; M112 ready; M113-M114 remain roadmap-defined and blocked
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -60,12 +60,12 @@ The fork currently has:
 M095 currently records:
 
 - 70 option rows × 12 canonical tunnel types = 840 cells;
-- 248 `apply`;
-- 134 `blocked_primitive`;
+- 288 `apply`;
+- 94 `blocked_primitive`;
 - 458 `not_applicable`;
 - 0 planned/unknown/unsupported/accept-inert cells.
 
-M116 closed with exact counts of 248 `apply`, 134 `blocked_primitive`, and 458 `not_applicable`. Post-M110 review found and M116 corrected defects in:
+M116 closed with exact counts of 248 `apply`, 134 `blocked_primitive`, and 458 `not_applicable`. M111 then applied 40 SAM session-wire cells, leaving 288 `apply`, 94 `blocked_primitive`, and 458 `not_applicable`. Post-M110 review found and M116 corrected defects in:
 
 - shared-session waiter lost wakeup;
 - creator-cancellation reservation poisoning;
@@ -79,7 +79,7 @@ M116 was the corrective gate. Matrix correctness took precedence over preserving
 Remaining completion gates after M116 are:
 
 1. M111 accepted Yosemite session-wire capability and M118 neutral tunnel-pool semantics;
-2. M112 client proxy/lifecycle semantics (and possibly `NewDest` if M116 returns it to blocked);
+2. M112 client proxy/lifecycle semantics (including the seven `NewDest` cells transferred by M116);
 3. M113 server presentation/routing/LeaseSet security semantics;
 4. M114 final live/reference/public/security/containment reclosure.
 
@@ -137,8 +137,8 @@ seam are recorded in the M118 plan and M061/M062 authority; it does not authoriz
 No milestone automatically authorizes Yosemite vendoring/forking/patching, path/git overrides, parallel raw SAM, Proposal-shaped `emissary-core` APIs, or dependencies added merely to increase matrix counts.
 
 M117 closed the ADR-0005-authorized internal Yosemite API/dependency boundary, and M118
-closed the neutral variance/backup runtime prerequisite. M111 is ready for its own
-semantic re-freeze; no raw/parallel SAM stack or Proposal-shaped core API is authorized.
+closed the neutral variance/backup runtime prerequisite. M111 consumed both prerequisites
+and is now closed; no raw/parallel SAM stack or Proposal-shaped core API is authorized.
 
 ## 4. Cross-cutting invariants
 
@@ -177,11 +177,11 @@ M095/M105 plus M110's completion ledger are current cell evidence, subject to M1
 | Owner | Families | Pre-M116 count | Current status |
 |---|---|---:|---|
 | M110 | `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile` | 31 promoted cells | historically closed; M116 corrective authority |
-| M111 | `UseSSL`, `TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions` | 44 blocked | ready; semantic re-freeze required |
-| M112 | proxy/plugin/jump + client `ConnectDelay`/`Profile`/remaining `DelayOpen`/`Reduce*`/`Close*`/`NewDest` | 69 blocked | blocked; includes seven `NewDest` cells transferred by M116 |
+| M111 | `UseSSL`, `TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions` | 4 blocked after 40 applied | closed; UseSSL remains blocked with exact semantic reason |
+| M112 | proxy/plugin/jump + client `ConnectDelay`/`Profile`/remaining `DelayOpen`/`Reduce*`/`Close*`/`NewDest` | 69 blocked | ready; includes seven `NewDest` cells transferred by M116 |
 | M113 | server presentation/address-routing/LeaseSet | 21 blocked | blocked |
 
-Current blocked count is 134 = 44 + 69 + 21.
+Current blocked count is 94 = 4 + 69 + 21.
 
 M116 returned M110 cells to `blocked_primitive` where exact semantics were absent. In particular:
 
@@ -214,10 +214,10 @@ M117 internal Yosemite fork + adapter                [CLOSED]
 M118 neutral SAM tunnel-pool variance/backups       [CLOSED]
   |
   v
-M111 SAM session-wire options                       [READY / SEMANTIC RE-FREEZE]
+M111 SAM session-wire options                       [CLOSED — 40 APPLY / 4 UseSSL BLOCKED]
   |
   v
-M112 client proxy/session-lifecycle residuals       [PROPOSED / BLOCKED]
+M112 client proxy/session-lifecycle residuals       [READY]
   |
   v
 M113 server presentation + LeaseSet residuals       [PROPOSED / BLOCKED]
@@ -296,23 +296,24 @@ and does not authorize Proposal policy in core.
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/111-sam-session-wire-option-completion.md`
 
-Status: **ready**; M117 and M118 prerequisites are closed, with semantic re-freeze required.
+Status: **closed**; 40 SessionWire cells are applied through the accepted Yosemite serializer; four UseSSL cells remain blocked with an exact semantic reason.
 
-Target: up to 44 cells. Completion requires real serialization through an accepted public Yosemite API. No raw SAM construction, vendored/path Yosemite, or Proposal-shaped core seam is authorized.
+Target: up to 44 cells. M111 applied the 40 applicable SessionWire cells and kept the four UseSSL cells blocked. No raw SAM construction, vendored/path Yosemite, or Proposal-shaped core seam was authorized.
 
-M117 satisfies the accepted generic API/dependency part of this gate and M118 satisfies
-the neutral runtime part. M111 must still re-freeze Proposal semantics, especially
-`UseSSL`, before changing any matrix disposition.
+M117 satisfied the accepted generic API/dependency part of this gate and M118 satisfied
+the neutral runtime part. `UseSSL` remains blocked because its Proposal local
+application/session TLS semantics are distinct from Yosemite SAM-control TLS.
 
 ## 12. M112 — client proxy/session-lifecycle residuals
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/112-client-proxy-and-session-lifecycle-residual-completion.md`
 
-Status: **proposed / blocked**.
+Status: **ready**.
 
 Current target: 69 cells. M112 owns the `Close*`/idle lifecycle family and the seven `NewDest` cells transferred by M116 because the correct trigger depends on that lifecycle owner.
 
-M116 must not implement M112's timers/idle-close machinery solely to preserve an `apply` classification.
+M111 has closed the final client session configuration dependency; M112 may now execute
+its own residual semantic re-freeze and lifecycle/proxy implementation.
 
 ## 13. M113 — server presentation/address-routing/LeaseSet residuals
 
@@ -417,8 +418,8 @@ Per `plans/003-planning-process.md`:
 
 - M110 remains historically closed;
 - M116 and M117 were closed historical handoffs;
-- M118 is closed and M111 is the current registered ready handoff;
-- M112-M114 remain roadmap/indexed but blocked;
+- M118 and M111 are closed; M112 is the current registered ready handoff;
+- M113-M114 remain roadmap/indexed but blocked;
 - M116 closure decides exact current matrix/residual ownership;
 - blocked plans may not execute because their files exist;
 - material deviations require plan/ADR correction before code changes;

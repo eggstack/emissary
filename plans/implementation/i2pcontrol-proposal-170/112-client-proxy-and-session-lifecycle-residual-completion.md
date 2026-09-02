@@ -1,6 +1,6 @@
 # M112 — Client Proxy and Session-Lifecycle Residual Completion
 
-Status: **proposed / blocked** — roadmap-defined; not registry-ready until M110/M111 closures freeze the remaining client session owner and the exact M105 residual set is revalidated; M116 transferred seven `NewDest` cells here
+Status: **ready** — M110/M111 have frozen the remaining client session owner and the exact M105 residual set; M116 transferred seven `NewDest` cells here; execution still requires this plan's own semantic re-freeze
 
 Class: capability / client runtime lifecycle / proxy policy
 

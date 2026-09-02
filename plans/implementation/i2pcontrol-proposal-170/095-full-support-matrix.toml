@@ -9,7 +9,13 @@ proposal_revision = "2026-05-20"
 source_url = "https://i2p.net/proposals/170-i2pcontrol-expansion.txt"
 source_sha256 = "f13ae00b886c5e72131bc5d5b138a371148d1faa6899a119a1dacb65a555e7dc"
 planning_baseline = "630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207"
-current_production_head = "4f5bd42cdd6991dc5c225d42b9ddf0490aa32559"
+current_production_head = "626d76311a6dc142ecc07827845081b9a9f4c860"
+
+[current_matrix_counts]
+total = 840
+apply = 248
+blocked_primitive = 134
+not_applicable = 458
 
 [contract_counts]
 router_info_total = 43
@@ -1236,10 +1242,12 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = true
 compatibility_aliases = []
-completion_owner = "M110"
-current_or_planned_disposition = "apply_or_not_applicable"
-cells = ["apply", "apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+completion_owner = "M112"
+current_or_planned_disposition = "blocked_primitive_or_not_applicable"
+cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "Correct NewDest behavior requires M112's close-on-idle/resume lifecycle trigger; M116 rejects it before destination generation or session allocation.", "httpclient" = "Correct NewDest behavior requires M112's close-on-idle/resume lifecycle trigger; M116 rejects it before destination generation or session allocation.", "ircclient" = "Correct NewDest behavior requires M112's close-on-idle/resume lifecycle trigger; M116 rejects it before destination generation or session allocation.", "socks" = "Correct NewDest behavior requires M112's close-on-idle/resume lifecycle trigger; M116 rejects it before destination generation or session allocation.", "socksirc" = "Correct NewDest behavior requires M112's close-on-idle/resume lifecycle trigger; M116 rejects it before destination generation or session allocation.", "connectclient" = "Correct NewDest behavior requires M112's close-on-idle/resume lifecycle trigger; M116 rejects it before destination generation or session allocation.", "streamrclient" = "Correct NewDest behavior requires M112's close-on-idle/resume lifecycle trigger; M116 rejects it before destination generation or session allocation.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+blocked_primitive = "M112-owned close-on-idle/resume lifecycle trigger with exact generation cancellation"
+blocking_milestone = "M112"
 
 [[tunnel_manager.options]]
 canonical_key = "PersistentClientKey"

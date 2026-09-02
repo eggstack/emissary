@@ -14,11 +14,25 @@ matrix_before_not_applicable = 458
 matrix_after_apply = 255
 matrix_after_blocked_primitive = 127
 matrix_after_not_applicable = 458
+matrix_sha256_after = "76bcd0d0d8ba12d9865eb264f820be5a474134c3d3226c086f7228dc546e3af8"
 completed_cell_count = 31
 remaining_applicable_residual_count = 127
 matrix = "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
 historical_audit = "plans/implementation/i2pcontrol-proposal-170/105-residual-option-audit.toml"
 closure = "plans/closure/i2pcontrol-proposal-170/110-closure.md"
+
+[post_m116]
+status = "closed"
+matrix_before_apply = 255
+matrix_before_blocked_primitive = 127
+matrix_before_not_applicable = 458
+matrix_after_apply = 248
+matrix_after_blocked_primitive = 134
+matrix_after_not_applicable = 458
+reclassified_cells = ["NewDest:client", "NewDest:httpclient", "NewDest:ircclient", "NewDest:socks", "NewDest:socksirc", "NewDest:connectclient", "NewDest:streamrclient"]
+reclassification_reason = "NewDest requires M112-owned close-on-idle/resume lifecycle semantics; unsupported requests fail before destination generation or session allocation."
+shared_streamr_disposition = "apply; canonical authenticated producer identity matching retained"
+closure = "plans/closure/i2pcontrol-proposal-170/116-closure.md"
 
 [ownership]
 session_registry = "emissary-cli/src/i2pcontrol/backends/runtime/session.rs::SharedClientSessionRegistry"

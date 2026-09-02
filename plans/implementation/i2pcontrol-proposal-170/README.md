@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; M109, M115, and M110 are historically closed; **M116 is the sole ready corrective**; M111-M114 remain roadmap-defined and blocked; M095 currently records `255 apply / 127 blocked_primitive / 458 not_applicable`, provisionally pending M116
+Status: partial Proposal 170 production support; M109, M115, M110, and M116 are closed; M111-M114 remain roadmap-defined and blocked; M095 currently records `248 apply / 134 blocked_primitive / 458 not_applicable`
 
 This directory contains bounded internal implementation, audit, corrective, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -21,6 +21,7 @@ Authoritative references:
 - `095-full-support-matrix.toml`
 - `105-residual-option-audit.toml`
 - `110-completion-ledger.toml`
+- `plans/closure/i2pcontrol-proposal-170/116-closure.md`
 - `plans/registry.md`
 
 Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
@@ -49,17 +50,17 @@ No standalone crate split, router-core API, dependency fork, Yosemite patch/vend
 - API 1-only authentication and M107/M108 managed TLS hardening are operational.
 - M109/M115 startup lifecycle/runtime-disable work is closed.
 - M110 added real I2PControl-local shared sessions, destination identity ownership and confined key import.
-- Post-M110 review found M116-scoped defects: shared-session lost wakeup, creator-cancellation poisoning, collision-unsafe identity fingerprinting, Streamr cross-producer delivery, unproven `NewDest` lifecycle semantics, and raw internal secret `Debug` derivation.
+- Post-M110 review found and M116 corrected: shared-session lost wakeup, creator-cancellation poisoning, collision-unsafe identity fingerprinting, Streamr cross-producer delivery, unproven `NewDest` lifecycle semantics, and raw internal secret `Debug` derivation.
 - Full public/reseeded/reference-router certification remains open.
 
-Current M095 matrix is provisionally:
+Current M095 matrix is:
 
-- 255 `apply`;
-- 127 `blocked_primitive`;
+- 248 `apply`;
+- 134 `blocked_primitive`;
 - 458 `not_applicable`;
 - 0 planned/unknown/unsupported/accept-inert cells.
 
-M116 closure must recompute those counts from evidence. It may reduce `apply`; keeping `255` is not an acceptance criterion.
+M116 closure records the exact reclassification: seven client `NewDest` cells moved from `apply` to `blocked_primitive` under M112.
 
 Official status remains **partial Proposal 170 support**.
 
@@ -84,9 +85,9 @@ Official status remains **partial Proposal 170 support**.
 | M109 | closed | startup-managed named lifecycle + `All=true` semantics |
 | M115 | closed | M109 runtime-disable/lifecycle corrective |
 | M110 | closed historically; M116 corrective required | shared client session + destination/key/PrivKeyFile ownership |
-| **M116** | **ready / registered** | M110 concurrency/cancellation/identity/Streamr/NewDest/secret corrective |
+| **M116** | **closed** | M110 concurrency/cancellation/identity/Streamr/NewDest/secret corrective; closure recorded |
 | M111 | proposed / dependency-blocked | Yosemite SAM session-wire options; up to 44 cells |
-| M112 | proposed / blocked | client proxy/session lifecycle; 62 current cells, possibly +7 `NewDest` after M116 |
+| M112 | proposed / blocked | client proxy/session lifecycle; 69 current cells including seven `NewDest` cells from M116 |
 | M113 | proposed / blocked | server presentation/routing/LeaseSet; up to 21 cells |
 | M114 | proposed / blocked | zero-residual live/reference final reclosure |
 
@@ -103,9 +104,9 @@ Plans in this completion line:
 - `115-m109-runtime-disable-and-lifecycle-truthfulness-corrective-pass.md`
 - `116-m110-shared-session-and-newdest-corrective-pass.md`
 
-Per `plans/003-planning-process.md`, only M116 is currently executable. M111-M114 remain roadmap-only.
+Per `plans/003-planning-process.md`, M116 is closed and no future handoff is currently executable. M111-M114 remain roadmap-only until their independent gates are satisfied.
 
-## M116 — ready corrective
+## M116 — closed corrective
 
 M116 does not reopen general Proposal 170 scope. It corrects M110's exact owner boundaries:
 
@@ -117,7 +118,7 @@ M116 does not reopen general Proposal 170 scope. It corrects M110's exact owner 
 - `NewDest` must be re-derived from pinned/reference semantics;
 - if correct `NewDest` requires M112's `Close*` lifecycle primitive, those cells return to `blocked_primitive` and transfer to M112 without implementing M112 here;
 - secret-bearing internal store/session types must not expose raw private material through ordinary `Debug`/`Display`;
-- matrix/ledgers must be reconciled to exact post-corrective evidence.
+- matrix/ledgers are reconciled to exact post-corrective evidence in `plans/closure/i2pcontrol-proposal-170/116-closure.md`.
 
 M116 production authority is I2PControl-only and explicitly enumerated in the plan.
 
@@ -129,7 +130,7 @@ The pre-M116 matrix has 127 blocked cells owned nominally by:
 - M112: 62 — proxy/plugin/jump and client lifecycle `Reduce*`/`Close*` family;
 - M113: 21 — server presentation/address-routing/LeaseSet.
 
-M116 may return M110 cells to blocked where exact semantics are absent. `NewDest` may add up to seven cells to M112. `Shared × streamrclient` may also return to blocked if safe producer identity matching cannot be implemented inside the existing owner without forbidden scope expansion.
+M116 returned all seven client `NewDest` cells to `blocked_primitive` under M112. `Shared × streamrclient` remains `apply` because canonical authenticated producer matching is implemented within the existing owner.
 
 A cell becomes/remains `apply` only with request→real-runtime evidence. Difficulty is not evidence of `not_applicable`, and no accept-inert state is permitted.
 
@@ -139,7 +140,7 @@ M111 remains dependency-blocked. Required semantics must reach actual Yosemite s
 
 ## M112 — client proxy/lifecycle residuals
 
-M112 remains blocked. It owns portable client lifecycle/proxy semantics, including `Close*`; M116 must transfer `NewDest` there rather than implementing a timer/idle-close framework if reference semantics require that owner.
+M112 remains blocked. It owns portable client lifecycle/proxy semantics, including `Close*` and the seven `NewDest` cells transferred by M116; it must not be executed merely to preserve historical M110 matrix counts.
 
 ## M113 — server presentation/LeaseSet residuals
 

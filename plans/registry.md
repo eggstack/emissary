@@ -33,10 +33,10 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
-| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M116 ready** | correct post-M110 concurrency/Streamr/NewDest/secret-truthfulness defects; then reassess successor readiness |
+| I2PControl Proposal 170 full-support completion | active | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | none | M116 closed; M111-M114 remain blocked on independent capability/residual gates |
 | I2PControl Proposal 170 source/truthfulness | RouterInfo source line closed | `plans/subsystems/i2pcontrol-proposal-170-roadmap.md` | none | 42 available / 1 neutral / 0 unavailable |
-| I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M116 I2PControl-only corrective | M061/M062/M063 remain controlling; no new lower-layer seam |
-| I2PControl tunnel runtime | all 12 data planes real | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | M116 corrective only | do not redesign data planes or option program |
+| I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | none | M061/M062/M063 remain controlling; no new lower-layer seam |
+| I2PControl tunnel runtime | all 12 data planes real | `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md` | none | M116 closed; do not redesign data planes or option program |
 | I2PControl tunnel security | closed at M093 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | regression authority | M116 must restore Streamr/shared-session isolation without weakening M093 |
 
 ## Current production state
@@ -48,7 +48,7 @@ Pinned Proposal 170 revision: `2026-05-20` (proposal remains Open).
 - API 1-only negotiation and M107/M108 managed TLS hardening are operational.
 - M109 startup lifecycle and M115 runtime-disable/lifecycle corrections are closed.
 - M110 implemented shared client sessions and destination/key ownership, but post-closure review found M116-scoped concurrency, cancellation, Streamr isolation, compatibility-key, `NewDest`, and internal secret-Debug defects.
-- M095 currently records `255 apply / 127 blocked_primitive / 458 not_applicable`; **those counts are provisional until M116 closure** because M110 `NewDest` and potentially `Shared × streamrclient` require corrective disposition.
+- M095 currently records `248 apply / 134 blocked_primitive / 458 not_applicable`; M116 reclassified seven client `NewDest` cells to M112 and retained `Shared × streamrclient` after canonical producer matching.
 - Full Proposal 170 status remains **partial**.
 
 ## Current dependency graph
@@ -66,7 +66,7 @@ M115 M109 runtime/lifecycle corrective              [CLOSED]
 M110 shared session + destination/key ownership     [CLOSED — HISTORICAL]
   |
   v
-M116 M110 shared/session/NewDest corrective         [READY — SOLE REGISTERED HANDOFF]
+M116 M110 shared/session/NewDest corrective         [CLOSED]
   |
   v
 M111 SAM session-wire options                       [ROADMAP ONLY / DEPENDENCY-BLOCKED]
@@ -84,15 +84,15 @@ M114 live/reference final reclosure                 [ROADMAP ONLY / BLOCKED]
 
 M110-M114 were numbered before later correctives M115/M116 were discovered. Numeric identifiers remain stable. Current execution order is M109 → M115 → M110 → M116 → M111 → M112 → M113 → M114.
 
-Per `plans/003-planning-process.md`, M116 is the sole dependency-ready implementation handoff. M111-M114 MUST NOT be executed until their independent gates are satisfied and this registry explicitly marks the specific plan ready.
+Per `plans/003-planning-process.md`, M116 was the sole dependency-ready implementation handoff and is now closed. M111-M114 MUST NOT be executed until their independent gates are satisfied and this registry explicitly marks the specific plan ready.
 
-## Ready handoff — M116
+## Closed handoff — M116
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/116-m110-shared-session-and-newdest-corrective-pass.md`
 
-Status: **ready**.
+Status: **closed**. Closure: `plans/closure/i2pcontrol-proposal-170/116-closure.md`.
 
 Baseline:
 
@@ -120,7 +120,7 @@ Authorized production paths are I2PControl-only and limited to:
 
 M116 MUST NOT change Yosemite/Cargo/core/util/startup/frontend/workflow/release paths or implement M111-M114 residual features.
 
-The current `255 / 127 / 458` matrix is not an acceptance target. Any cell without exact safe runtime semantics must move back to `blocked_primitive`.
+The pre-corrective `255 / 127 / 458` matrix was not an acceptance target. The closed M116 matrix is `248 / 134 / 458`; any future cell without exact safe runtime semantics must remain `blocked_primitive`.
 
 ## Historical closed handoffs
 
@@ -148,7 +148,7 @@ Proposed/dependency-blocked. Owns up to 44 current cells: `UseSSL`, `TunnelVaria
 
 `plans/implementation/i2pcontrol-proposal-170/112-client-proxy-and-session-lifecycle-residual-completion.md`
 
-Proposed/blocked. Owns the current 62 client proxy/lifecycle cells and may gain up to seven `NewDest` cells if M116 proves close-on-idle/resume semantics are required. It must not be executed merely to preserve M110 matrix counts.
+Proposed/blocked. Owns 69 client proxy/lifecycle cells, including seven `NewDest` cells transferred by M116. It must not be executed merely to preserve M110 matrix counts.
 
 ### M113
 
@@ -164,13 +164,13 @@ Proposed/blocked. Final reclosure requires M116 closed, zero applicable residual
 
 ## Residual option ownership
 
-Nominal pre-M116 residual count is 127:
+The post-M116 residual count is 134:
 
 - M111: 44;
-- M112: 62;
+- M112: 69 (including seven `NewDest` cells transferred by M116);
 - M113: 21.
 
-M116 may return M110 cells to `blocked_primitive` where exact safe semantics are absent. In particular, M112 may gain up to seven `NewDest` cells. The registry must use the exact M116 closure counts rather than preserving `127` by convention.
+M116 returned seven `NewDest` cells to `blocked_primitive` under M112 and retained `Shared × streamrclient` as `apply` after canonical producer matching. The registry uses the exact closed counts rather than preserving `127` by convention.
 
 A cell may remain/become `apply` only with real request→runtime evidence. A cell may become `not_applicable` only with affirmative pinned/reference evidence. No accept-inert state is permitted.
 
@@ -186,18 +186,19 @@ A cell may remain/become `apply` only with real request→runtime evidence. A ce
 | M109 | closed | `plans/closure/i2pcontrol-proposal-170/109-closure.md` |
 | M115 | closed | `plans/closure/i2pcontrol-proposal-170/115-closure.md` |
 | M110 | closed historically; M116 corrective required | `plans/closure/i2pcontrol-proposal-170/110-closure.md` |
+| M116 | closed | `plans/closure/i2pcontrol-proposal-170/116-closure.md` |
 
 M093 remains the current tunnel production/security regression authority. M092 remains authority for removal of the unauthorized M091 Yosemite/core/vendor delta.
 
 ## Registry maintenance rules
 
-1. M116 is the sole ready handoff.
+1. No future handoff is currently ready; M116 is closed.
 2. M111-M114 are roadmap/indexed only and MUST NOT execute until explicitly promoted.
-3. Treat `255 / 127 / 458` as provisional until M116 closure.
+3. Treat `248 / 134 / 458` as the current closed matrix; preserve evidence if future plans alter it.
 4. Do not reattempt final reclosure while any applicable cell is blocked/planned/unsupported/unknown/inert or while M116 remains open.
 5. Proposal 170 policy remains under `emissary-cli/src/i2pcontrol/**` wherever possible.
 6. M116 authorizes no non-I2PControl production path.
 7. No Yosemite vendoring/forking/path override/parallel SAM or Proposal-shaped core API is authorized.
 8. Proposal 170 remains pinned to `2026-05-20`; a later revision requires a delta audit.
-9. External sources are read-only. No upstream issue/PR/review/submission/merge/adoption/contact, branch/tag push, release, or contribution preparation is authorized.
+9. External sources are read-only. No upstream issue/PR/review/submission/merge/adoption/contact, release, or contribution preparation is authorized.
 10. All repository writes remain internal to `eggstack/emissary`.

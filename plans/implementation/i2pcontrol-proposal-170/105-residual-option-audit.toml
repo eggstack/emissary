@@ -37,6 +37,14 @@ post_m110_matrix_blocked_primitive_cells = 127
 post_m110_matrix_not_applicable_cells = 458
 post_m110_completed_cell_count = 31
 post_m110_completion_ledger = "plans/implementation/i2pcontrol-proposal-170/110-completion-ledger.toml"
+post_m116_matrix_apply_cells = 248
+post_m116_matrix_blocked_primitive_cells = 134
+post_m116_matrix_not_applicable_cells = 458
+post_m116_matrix_sha256 = "76bcd0d0d8ba12d9865eb264f820be5a474134c3d3226c086f7228dc546e3af8"
+post_m116_reclassified_cells = 7
+post_m116_reclassified_family = "NewDest"
+post_m116_blocking_milestone = "M112"
+post_m116_closure = "plans/closure/i2pcontrol-proposal-170/116-closure.md"
 
 [[cells]]
 canonical_option = "Shared"

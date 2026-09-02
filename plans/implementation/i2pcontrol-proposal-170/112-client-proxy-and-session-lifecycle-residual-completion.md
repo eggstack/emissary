@@ -1,6 +1,6 @@
 # M112 — Client Proxy and Session-Lifecycle Residual Completion
 
-Status: **proposed / blocked** — roadmap-defined; not registry-ready until M110/M111 closures freeze the remaining client session owner and the exact M105 residual set is revalidated
+Status: **proposed / blocked** — roadmap-defined; not registry-ready until M110/M111 closures freeze the remaining client session owner and the exact M105 residual set is revalidated; M116 transferred seven `NewDest` cells here
 
 Class: capability / client runtime lifecycle / proxy policy
 
@@ -26,7 +26,7 @@ Resolve the remaining client/application residual option families after M106:
 - `UseOutproxyPlugin`, `SSLProxies`, `JumpList` — 12 M105 cells;
 - `ConnectDelay`, `Profile`, remaining `DelayOpen`, `Reduce*`, and `Close*` lifecycle rows — 50 current cells after M106 moved six TCP-client `DelayOpen` cells to `apply`.
 
-The maximum current M112 inventory is therefore 62 blocked cells, subject to an exact baseline freeze from M095/M105 at execution time.
+The current M112 inventory is therefore 69 blocked cells (the original 62 plus seven `NewDest` cells transferred by M116), subject to an exact baseline freeze from M095/M105 at execution time.
 
 M112 must distinguish Proposal 170 contract effects from Java I2PTunnel implementation mechanisms. A Java plugin class, profile object, or timer implementation is not automatically something Emissary must recreate. Cells may move from `blocked_primitive` to `not_applicable` only with affirmative pinned/reference evidence; implementation difficulty is never sufficient.
 
@@ -91,7 +91,7 @@ Any production change outside I2PControl requires a separately registered exact-
 
 ### WP1 — Revalidate applicability by contract effect
 
-For each of the 62 current cells, record:
+For each of the 69 current cells, record:
 
 - pinned Proposal type/value;
 - reference behavior visible to an I2PControl client;

@@ -1,10 +1,11 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M096, M098-M110 and M115 closed historically, M097/M104 closed as blocked; **M116 is the sole ready corrective**; M111-M114 remain roadmap-defined and blocked
+Status: active; M095-M096, M098-M110, M115, and M116 closed; M097/M104 closed as blocked; M111-M114 remain roadmap-defined and blocked
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
 Current corrective baseline: `09247ccf8367a7b3a7050e0584614c4e59cafe8e` — post-M110 closure/containment head.
+M116 implementation head: `626d76311a6dc142ecc07827845081b9a9f4c860`.
 
 Pinned external authority:
 
@@ -55,12 +56,12 @@ The fork currently has:
 M095 currently records:
 
 - 70 option rows × 12 canonical tunnel types = 840 cells;
-- 255 `apply`;
-- 127 `blocked_primitive`;
+- 248 `apply`;
+- 134 `blocked_primitive`;
 - 458 `not_applicable`;
 - 0 planned/unknown/unsupported/accept-inert cells.
 
-Those counts are **provisional during M116**. Post-M110 review found defects capable of invalidating some M110 `apply` cells:
+M116 closed with exact counts of 248 `apply`, 134 `blocked_primitive`, and 458 `not_applicable`. Post-M110 review found and M116 corrected defects in:
 
 - shared-session waiter lost wakeup;
 - creator-cancellation reservation poisoning;
@@ -69,7 +70,7 @@ Those counts are **provisional during M116**. Post-M110 review found defects cap
 - unproven `NewDest` lifecycle semantics;
 - internal raw secret `Debug` derivation.
 
-M116 is the current corrective gate. Matrix correctness takes precedence over preserving the post-M110 count.
+M116 was the corrective gate. Matrix correctness took precedence over preserving the post-M110 count; seven client `NewDest` cells moved to M112.
 
 Remaining completion gates after M116 are:
 
@@ -166,17 +167,17 @@ M095/M105 plus M110's completion ledger are current cell evidence, subject to M1
 |---|---|---:|---|
 | M110 | `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile` | 31 promoted cells | historically closed; M116 corrective authority |
 | M111 | `UseSSL`, `TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions` | 44 blocked | dependency-blocked |
-| M112 | proxy/plugin/jump + client `ConnectDelay`/`Profile`/remaining `DelayOpen`/`Reduce*`/`Close*` | 62 blocked | blocked; may gain up to 7 `NewDest` cells |
+| M112 | proxy/plugin/jump + client `ConnectDelay`/`Profile`/remaining `DelayOpen`/`Reduce*`/`Close*`/`NewDest` | 69 blocked | blocked; includes seven `NewDest` cells transferred by M116 |
 | M113 | server presentation/address-routing/LeaseSet | 21 blocked | blocked |
 
-Nominal current blocked count is 127 = 44 + 62 + 21.
+Current blocked count is 134 = 44 + 69 + 21.
 
-M116 may return M110 cells to `blocked_primitive`. In particular:
+M116 returned M110 cells to `blocked_primitive` where exact semantics were absent. In particular:
 
-- all seven `NewDest` cells move to M112 if correct semantics require M112's close-on-idle/resume primitive;
+- all seven `NewDest` cells moved to M112 because correct semantics require M112's close-on-idle/resume primitive;
 - `Shared × streamrclient` returns to blocked if safe producer-identity isolation cannot be achieved within the existing I2PControl owner.
 
-M116 closure computes the exact count. A cell may become `not_applicable` only with affirmative pinned/reference evidence.
+M116 closure computes and records the exact count in `plans/closure/i2pcontrol-proposal-170/116-closure.md`. A cell may become `not_applicable` only with affirmative pinned/reference evidence.
 
 ## 7. Ordered milestone sequence
 
@@ -193,7 +194,7 @@ M115 M109 runtime/lifecycle corrective              [CLOSED]
 M110 shared session + destination/key ownership     [CLOSED — HISTORICAL]
   |
   v
-M116 M110 shared/session/NewDest corrective         [READY — SOLE REGISTERED HANDOFF]
+M116 M110 shared/session/NewDest corrective         [CLOSED]
   |
   v
 M111 SAM session-wire options                       [PROPOSED / DEPENDENCY-BLOCKED]
@@ -233,7 +234,7 @@ Post-closure review does not rewrite M110 history. M116 is the separately number
 
 Plan: `plans/implementation/i2pcontrol-proposal-170/116-m110-shared-session-and-newdest-corrective-pass.md`
 
-Status: **ready**.
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/116-closure.md`.
 
 M116 requires:
 
@@ -265,7 +266,7 @@ Plan: `plans/implementation/i2pcontrol-proposal-170/112-client-proxy-and-session
 
 Status: **proposed / blocked**.
 
-Pre-M116 target: 62 cells. M112 owns the `Close*`/idle lifecycle family and may gain up to seven `NewDest` cells if M116 proves the correct trigger depends on that lifecycle owner.
+Current target: 69 cells. M112 owns the `Close*`/idle lifecycle family and the seven `NewDest` cells transferred by M116 because the correct trigger depends on that lifecycle owner.
 
 M116 must not implement M112's timers/idle-close machinery solely to preserve an `apply` classification.
 
@@ -371,7 +372,7 @@ Known stable/nightly rustfmt mismatch is a tooling limitation; record it and avo
 Per `plans/003-planning-process.md`:
 
 - M110 remains historically closed;
-- M116 is the sole registered ready handoff;
+- M116 was the sole registered ready handoff and is now closed;
 - M111-M114 remain roadmap/indexed but unregistered;
 - M116 closure decides exact current matrix/residual ownership;
 - blocked plans may not execute because their files exist;

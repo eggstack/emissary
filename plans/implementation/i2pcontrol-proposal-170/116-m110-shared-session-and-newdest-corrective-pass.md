@@ -1,6 +1,6 @@
 # M116 — M110 Shared-Session, Streamr Isolation, and NewDest Corrective Pass
 
-Status: **ready**
+Status: **closed** — implementation and closure recorded in `plans/closure/i2pcontrol-proposal-170/116-closure.md`
 
 Class: corrective concurrency / security / lifecycle semantics / truthfulness / containment
 
@@ -543,10 +543,10 @@ M111-M114 remain blocked throughout M116 implementation.
 
 M116 closure must reassess but must not automatically register M111 simply because M116 closes.
 
-Expected post-M116 state:
+Actual post-M116 state:
 
 - M111 remains dependency-blocked unless an independently accepted Yosemite public session-wire capability appeared;
-- M112 remains blocked and may gain the seven `NewDest` cells if close-on-idle/resume semantics are required;
+- M112 remains blocked and owns the seven `NewDest` cells because close-on-idle/resume semantics are required;
 - M113 remains blocked on presentation/LeaseSet primitives;
 - M114 remains blocked until zero applicable residual cells and no open medium/high corrective remain.
 

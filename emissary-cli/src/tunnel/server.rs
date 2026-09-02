@@ -20,7 +20,10 @@
 
 use crate::{
     config::{I2cpOptions, ServerTunnelConfig},
-    tunnel_client::{StartupTunnelAction, StartupTunnelController, StartupTunnelState},
+    tunnel_client::{
+        StartupTunnelAction, StartupTunnelController, StartupTunnelState,
+        StartupTunnelStateSnapshot,
+    },
 };
 
 use yosemite::{style, DestinationKind, RouterApi, Session, SessionOptions};
@@ -161,6 +164,7 @@ pub struct ServerTunnelLifecycleController {
     config: ServerTunnelRuntimeConfig,
     destination_observer: Option<DestinationObserver>,
     state: Arc<tokio::sync::Mutex<ServerTunnelRuntimeState>>,
+    state_snapshot: Arc<StartupTunnelStateSnapshot>,
     operation: Arc<tokio::sync::Mutex<()>>,
 }
 
@@ -179,6 +183,7 @@ impl ServerTunnelLifecycleController {
                 cancellation: None,
                 task: None,
             })),
+            state_snapshot: Arc::new(StartupTunnelStateSnapshot::new(StartupTunnelState::Stopped)),
             operation: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
@@ -190,6 +195,7 @@ impl ServerTunnelLifecycleController {
                 return Ok(());
             }
             state.state = StartupTunnelState::Stopping;
+            self.state_snapshot.store(StartupTunnelState::Stopping);
             (state.cancellation.take(), state.task.take())
         };
         if let Some(cancellation) = cancellation {
@@ -209,11 +215,13 @@ impl ServerTunnelLifecycleController {
             }
         }
         self.state.lock().await.state = StartupTunnelState::Stopped;
+        self.state_snapshot.store(StartupTunnelState::Stopped);
         Ok(())
     }
 
     async fn mark_failed(&self, message: &str) -> Result<(), String> {
         self.state.lock().await.state = StartupTunnelState::Failed;
+        self.state_snapshot.store(StartupTunnelState::Failed);
         Err(message.to_string())
     }
 }
@@ -230,10 +238,7 @@ impl StartupTunnelController for ServerTunnelLifecycleController {
     }
 
     fn state(&self) -> StartupTunnelState {
-        self.state
-            .try_lock()
-            .map(|state| state.state)
-            .unwrap_or(StartupTunnelState::Starting)
+        self.state_snapshot.load()
     }
 }
 
@@ -265,11 +270,13 @@ impl ServerTunnelLifecycleController {
             }
             state.generation = state.generation.wrapping_add(1);
             state.state = StartupTunnelState::Starting;
+            self.state_snapshot.store(StartupTunnelState::Starting);
             let (cancellation, _) = tokio::sync::watch::channel(false);
             let (ready_sender, ready_receiver) = tokio::sync::oneshot::channel();
             let config = self.config.clone();
             let observer = self.destination_observer.clone();
             let state_ref = Arc::clone(&self.state);
+            let state_snapshot = Arc::clone(&self.state_snapshot);
             let generation = state.generation;
             let task_cancellation = cancellation.clone();
             let task = tokio::spawn(async move {
@@ -282,11 +289,13 @@ impl ServerTunnelLifecycleController {
                 .await;
                 let mut state = state_ref.lock().await;
                 if state.generation == generation && state.state != StartupTunnelState::Failed {
-                    state.state = if result.is_ok() {
+                    let next_state = if result.is_ok() {
                         StartupTunnelState::Stopped
                     } else {
                         StartupTunnelState::Failed
                     };
+                    state.state = next_state;
+                    state_snapshot.store(next_state);
                     state.cancellation = None;
                 }
             });
@@ -300,6 +309,7 @@ impl ServerTunnelLifecycleController {
                 let mut state = self.state.lock().await;
                 if state.generation == generation {
                     state.state = StartupTunnelState::Running;
+                    self.state_snapshot.store(StartupTunnelState::Running);
                 }
                 Ok(())
             }
@@ -745,6 +755,22 @@ mod tests {
             .iter()
             .all(|(_, destination)| destination == "public-destination"));
         sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn lifecycle_state_snapshot_is_truthful_while_state_lock_is_contended() {
+        let controller = ServerTunnelLifecycleController::new(
+            ServerTunnelRuntimeConfig {
+                name: "contended-server".to_string(),
+                port: 0,
+                destination: "private-destination-secret".to_string(),
+                sam_tcp_port: 1,
+                lease_set_enc_type: None,
+            },
+            None,
+        );
+        let _state_guard = controller.state.lock().await;
+        assert_eq!(controller.state(), StartupTunnelState::Stopped);
     }
 
     #[tokio::test]

@@ -207,58 +207,68 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
     let client_tunnels = mem::take(&mut config.client_tunnels);
     let client_tunnel_options = mem::take(&mut config.client_tunnel_options);
     let server_tunnels = mem::take(&mut config.server_tunnels);
-    #[cfg(feature = "i2pcontrol")]
-    let startup_clients = client_tunnels
-        .iter()
-        .map(|config| i2pcontrol::production::StartupClientConfig {
-            name: config.name.clone(),
-            address: config.address.clone(),
-            port: config.port,
-            destination: config.destination.clone(),
-            destination_port: config.destination_port,
-        })
-        .collect::<Vec<_>>();
-    #[cfg(feature = "i2pcontrol")]
-    let startup_servers = server_tunnels
-        .iter()
-        .map(|config| i2pcontrol::production::StartupServerConfig {
-            name: config.name.clone(),
-            port: config.port,
-        })
-        .collect::<Vec<_>>();
-    #[cfg(feature = "i2pcontrol")]
-    let startup_tunnel_inventory = i2pcontrol::production::StartupTunnelInventory::from_configs(
-        &startup_clients,
-        &startup_servers,
-    )
-    .map_err(|error| anyhow!("invalid startup tunnel inventory: {error}"))?;
-    #[cfg(feature = "i2pcontrol")]
-    let startup_tunnel_lifecycle = tunnel_client::StartupTunnelLifecycleHandle::new();
-    #[cfg(feature = "i2pcontrol")]
-    let startup_tunnel_inventory =
-        startup_tunnel_inventory.with_lifecycle(startup_tunnel_lifecycle.clone());
-    #[cfg(feature = "i2pcontrol")]
-    let server_inventory_for_observer = startup_tunnel_inventory.clone();
-    #[cfg(feature = "i2pcontrol")]
-    let server_destination_observer = Some(Arc::new(move |name: &str, destination: &str| {
-        if let Err(error) =
-            server_inventory_for_observer.publish_server_destination(name, destination)
-        {
-            tracing::warn!(
-                target: LOG_TARGET,
-                %error,
-                "failed to publish startup server tunnel destination",
-            );
-        }
-    }) as crate::tunnel::server::DestinationObserver);
-    #[cfg(not(feature = "i2pcontrol"))]
-    let server_destination_observer: Option<crate::tunnel::server::DestinationObserver> = None;
     let router_ui_config = config.router_ui.clone();
     let router_config = config.config.take().expect("to exist");
     let base_path = config.base_path.clone();
 
     #[cfg(feature = "i2pcontrol")]
     let i2pcontrol_enabled = router_config.i2pcontrol.as_ref().is_some_and(|config| config.enabled);
+
+    // Runtime enablement is the composition boundary for the M109 startup
+    // lifecycle seam. A feature-capable binary with I2PControl disabled must
+    // retain the historical startup tunnel owners and validation path.
+    #[cfg(feature = "i2pcontrol")]
+    let (startup_tunnel_inventory, startup_tunnel_lifecycle, server_destination_observer) =
+        if i2pcontrol_enabled {
+            let startup_clients = client_tunnels
+                .iter()
+                .map(|config| i2pcontrol::production::StartupClientConfig {
+                    name: config.name.clone(),
+                    address: config.address.clone(),
+                    port: config.port,
+                    destination: config.destination.clone(),
+                    destination_port: config.destination_port,
+                })
+                .collect::<Vec<_>>();
+            let startup_servers = server_tunnels
+                .iter()
+                .map(|config| i2pcontrol::production::StartupServerConfig {
+                    name: config.name.clone(),
+                    port: config.port,
+                })
+                .collect::<Vec<_>>();
+            let startup_tunnel_inventory =
+                i2pcontrol::production::StartupTunnelInventory::from_configs(
+                    &startup_clients,
+                    &startup_servers,
+                )
+                .map_err(|error| anyhow!("invalid startup tunnel inventory: {error}"))?;
+            let startup_tunnel_lifecycle = tunnel_client::StartupTunnelLifecycleHandle::new();
+            let startup_tunnel_inventory =
+                startup_tunnel_inventory.with_lifecycle(startup_tunnel_lifecycle.clone());
+            let server_inventory_for_observer = startup_tunnel_inventory.clone();
+            let server_destination_observer = Some(Arc::new(move |name: &str, destination: &str| {
+                if let Err(error) =
+                    server_inventory_for_observer.publish_server_destination(name, destination)
+                {
+                    tracing::warn!(
+                        target: LOG_TARGET,
+                        %error,
+                        "failed to publish startup server tunnel destination",
+                    );
+                }
+            })
+                as crate::tunnel::server::DestinationObserver);
+            (
+                Some(startup_tunnel_inventory),
+                Some(startup_tunnel_lifecycle),
+                server_destination_observer,
+            )
+        } else {
+            (None, None, None)
+        };
+    #[cfg(not(feature = "i2pcontrol"))]
+    let server_destination_observer: Option<crate::tunnel::server::DestinationObserver> = None;
 
     #[cfg(feature = "i2pcontrol")]
     let sam_observation = if i2pcontrol_enabled {
@@ -533,28 +543,45 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
         // managers register neutral lifecycle controllers first; without it
         // the historical shared client/session startup path is unchanged.
         #[cfg(feature = "i2pcontrol")]
-        let client_manager = ClientTunnelManager::new_with_lifecycle(
-            client_tunnels,
-            client_tunnel_options,
-            address.port(),
-            startup_tunnel_lifecycle.clone(),
-        )
-        .map_err(|error| anyhow!("invalid startup client lifecycle: {error}"))?;
+        let client_manager = if i2pcontrol_enabled {
+            ClientTunnelManager::new_with_lifecycle(
+                client_tunnels,
+                client_tunnel_options,
+                address.port(),
+                startup_tunnel_lifecycle
+                    .as_ref()
+                    .expect("enabled I2PControl has startup lifecycle")
+                    .clone(),
+            )
+            .map_err(|error| anyhow!("invalid startup client lifecycle: {error}"))?
+        } else {
+            ClientTunnelManager::new(client_tunnels, client_tunnel_options, address.port())
+        };
         #[cfg(not(feature = "i2pcontrol"))]
         let client_manager =
             ClientTunnelManager::new(client_tunnels, client_tunnel_options, address.port());
         tokio::spawn(client_manager.run());
 
         #[cfg(feature = "i2pcontrol")]
-        let server_manager = ServerTunnelManager::new_with_lifecycle(
-            server_tunnels,
-            address.port(),
-            path.clone(),
-            server_destination_observer,
-            startup_tunnel_lifecycle,
-        )
-        .await
-        .map_err(|error| anyhow!("invalid startup server lifecycle: {error}"))?;
+        let server_manager = if i2pcontrol_enabled {
+            ServerTunnelManager::new_with_lifecycle(
+                server_tunnels,
+                address.port(),
+                path.clone(),
+                server_destination_observer,
+                startup_tunnel_lifecycle.expect("enabled I2PControl has startup lifecycle"),
+            )
+            .await
+            .map_err(|error| anyhow!("invalid startup server lifecycle: {error}"))?
+        } else {
+            ServerTunnelManager::new(
+                server_tunnels,
+                address.port(),
+                path.clone(),
+                server_destination_observer,
+            )
+            .await
+        };
         #[cfg(not(feature = "i2pcontrol"))]
         let server_manager = ServerTunnelManager::new(
             server_tunnels,
@@ -661,7 +688,11 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
                     ctx = ctx.with_sam_session_observation(handle.clone());
                 }
 
-                ctx = ctx.with_startup_tunnel_inventory(startup_tunnel_inventory.clone());
+                ctx = ctx.with_startup_tunnel_inventory(
+                    startup_tunnel_inventory
+                        .clone()
+                        .expect("enabled I2PControl has startup inventory"),
+                );
 
                 if let Some(sam_tcp_port) = router.protocol_address_info().sam_tcp.map(|a| a.port())
                 {

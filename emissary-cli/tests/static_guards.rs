@@ -916,3 +916,37 @@ fn handler_uses_live_tunnel_manager_for_i2ptunnel() {
         "Old registry-based resolve_i2ptunnel must be removed"
     );
 }
+
+/// Guard: runtime-disabled feature builds retain the historical startup path.
+///
+/// This is deliberately source-structural because setup_router owns the
+/// application configuration and starts real router/SAM resources. It catches
+/// the M109 regression where `#[cfg(feature = "i2pcontrol")]` selected the
+/// controlled managers before the runtime `enabled` value was known.
+#[test]
+fn runtime_disabled_does_not_select_controlled_startup_path() {
+    let main = read_source("src/main.rs");
+    let enabled = main
+        .find("let i2pcontrol_enabled =")
+        .expect("runtime enablement must be computed");
+    let inventory = main
+        .find("StartupTunnelInventory::from_configs")
+        .expect("startup inventory must remain composed");
+    assert!(
+        enabled < inventory,
+        "runtime enablement must precede M109 inventory construction"
+    );
+
+    let composition = &main[enabled..];
+    assert!(
+        composition.contains("if i2pcontrol_enabled")
+            && composition.contains("ClientTunnelManager::new_with_lifecycle")
+            && composition.contains("ClientTunnelManager::new(client_tunnels"),
+        "controlled and historical startup client constructors must be runtime-selected"
+    );
+    assert!(
+        composition.contains("ServerTunnelManager::new_with_lifecycle")
+            && composition.contains("ServerTunnelManager::new(\n"),
+        "controlled and historical startup server constructors must be runtime-selected"
+    );
+}

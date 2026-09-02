@@ -24,7 +24,10 @@ use yosemite::{style, Session, SessionOptions, StreamOptions};
 use std::{
     collections::BTreeMap,
     future::Future,
-    sync::{Arc, RwLock},
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc, RwLock,
+    },
     time::Duration,
 };
 
@@ -145,6 +148,51 @@ impl StartupTunnelLifecycleHandle {
 
 const MAX_STARTUP_TUNNELS: usize = 1000;
 
+/// Non-blocking last-committed lifecycle state for request-time observation.
+///
+/// The operation mutex protects lifecycle transitions, while this snapshot
+/// keeps synchronous observers truthful when the async runtime state is
+/// temporarily contended.
+pub(crate) struct StartupTunnelStateSnapshot(AtomicU8);
+
+impl StartupTunnelStateSnapshot {
+    pub(crate) fn new(state: StartupTunnelState) -> Self {
+        Self(AtomicU8::new(Self::encode(state)))
+    }
+
+    fn encode(state: StartupTunnelState) -> u8 {
+        match state {
+            StartupTunnelState::Starting => 0,
+            StartupTunnelState::Running => 1,
+            StartupTunnelState::Stopping => 2,
+            StartupTunnelState::Stopped => 3,
+            StartupTunnelState::Failed => 4,
+        }
+    }
+
+    fn decode(value: u8) -> StartupTunnelState {
+        match value {
+            0 => StartupTunnelState::Starting,
+            1 => StartupTunnelState::Running,
+            2 => StartupTunnelState::Stopping,
+            3 => StartupTunnelState::Stopped,
+            4 => StartupTunnelState::Failed,
+            _ => {
+                debug_assert!(false, "invalid startup tunnel state snapshot");
+                StartupTunnelState::Failed
+            }
+        }
+    }
+
+    pub(crate) fn store(&self, state: StartupTunnelState) {
+        self.0.store(Self::encode(state), Ordering::Release);
+    }
+
+    pub(crate) fn load(&self) -> StartupTunnelState {
+        Self::decode(self.0.load(Ordering::Acquire))
+    }
+}
+
 struct ClientTunnelRuntimeState {
     state: StartupTunnelState,
     generation: u64,
@@ -156,8 +204,9 @@ struct ClientTunnelRuntimeState {
 pub struct ClientTunnelLifecycleController {
     config: ClientTunnelRuntimeConfig,
     lease_set_enc_type: Option<String>,
-    shared_session: Option<Arc<tokio::sync::OnceCell<SharedClientSession>>>,
+    shared_session: Option<Arc<SharedClientSessionOwner>>,
     state: Arc<tokio::sync::Mutex<ClientTunnelRuntimeState>>,
+    state_snapshot: Arc<StartupTunnelStateSnapshot>,
     operation: Arc<tokio::sync::Mutex<()>>,
 }
 
@@ -170,7 +219,7 @@ impl ClientTunnelLifecycleController {
     fn new_with_shared_session(
         config: ClientTunnelRuntimeConfig,
         lease_set_enc_type: Option<String>,
-        shared_session: Arc<tokio::sync::OnceCell<SharedClientSession>>,
+        shared_session: Arc<SharedClientSessionOwner>,
     ) -> Self {
         Self::new_inner(config, lease_set_enc_type, Some(shared_session))
     }
@@ -178,7 +227,7 @@ impl ClientTunnelLifecycleController {
     fn new_inner(
         config: ClientTunnelRuntimeConfig,
         lease_set_enc_type: Option<String>,
-        shared_session: Option<Arc<tokio::sync::OnceCell<SharedClientSession>>>,
+        shared_session: Option<Arc<SharedClientSessionOwner>>,
     ) -> Self {
         Self {
             config,
@@ -190,6 +239,7 @@ impl ClientTunnelLifecycleController {
                 cancellation: None,
                 task: None,
             })),
+            state_snapshot: Arc::new(StartupTunnelStateSnapshot::new(StartupTunnelState::Stopped)),
             operation: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
@@ -201,6 +251,7 @@ impl ClientTunnelLifecycleController {
                 return Ok(());
             }
             state.state = StartupTunnelState::Stopping;
+            self.state_snapshot.store(StartupTunnelState::Stopping);
             (state.cancellation.take(), state.task.take())
         };
         if let Some(cancellation) = cancellation {
@@ -210,23 +261,35 @@ impl ClientTunnelLifecycleController {
             tokio::select! {
                 result = &mut task => match result {
                     Ok(()) => {}
-                    Err(_) => return self.mark_failed("client runtime task panicked").await,
+                    Err(_) => {
+                        self.release_shared_session().await;
+                        return self.mark_failed("client runtime task panicked").await;
+                    }
                 },
                 _ = tokio::time::sleep(STARTUP_LIFECYCLE_TIMEOUT) => {
                     task.abort();
                     let _ = task.await;
+                    self.release_shared_session().await;
                     return self.mark_failed("client tunnel stop timed out").await;
                 }
             }
         }
         let mut state = self.state.lock().await;
         state.state = StartupTunnelState::Stopped;
+        self.state_snapshot.store(StartupTunnelState::Stopped);
         Ok(())
     }
 
     async fn mark_failed(&self, message: &str) -> Result<(), String> {
         self.state.lock().await.state = StartupTunnelState::Failed;
+        self.state_snapshot.store(StartupTunnelState::Failed);
         Err(message.to_string())
+    }
+
+    async fn release_shared_session(&self) {
+        if let Some(owner) = &self.shared_session {
+            owner.release(&self.config.name).await;
+        }
     }
 }
 
@@ -242,10 +305,7 @@ impl StartupTunnelController for ClientTunnelLifecycleController {
     }
 
     fn state(&self) -> StartupTunnelState {
-        self.state
-            .try_lock()
-            .map(|state| state.state)
-            .unwrap_or(StartupTunnelState::Starting)
+        self.state_snapshot.load()
     }
 }
 
@@ -261,7 +321,7 @@ impl ClientTunnelLifecycleController {
             return Ok(());
         }
 
-        let (cancellation, ready_receiver, generation) = {
+        let (cancellation, ready_sender, ready_receiver, generation, config, lease_set_enc_type) = {
             let mut state = self.state.lock().await;
             if state.state == StartupTunnelState::Running {
                 return Ok(());
@@ -277,50 +337,72 @@ impl ClientTunnelLifecycleController {
             }
             state.generation = state.generation.wrapping_add(1);
             state.state = StartupTunnelState::Starting;
+            self.state_snapshot.store(StartupTunnelState::Starting);
             let (cancellation, _) = tokio::sync::watch::channel(false);
-            let (ready_sender, ready_receiver) = tokio::sync::oneshot::channel();
+            let (ready_sender, ready_receiver) =
+                tokio::sync::oneshot::channel::<Result<(), String>>();
             let config = self.config.clone();
             let lease_set_enc_type = self.lease_set_enc_type.clone();
-            let shared_session = self
-                .shared_session
-                .as_ref()
-                .and_then(|session| session.get().cloned());
-            if self.shared_session.is_some() && shared_session.is_none() {
-                state.state = StartupTunnelState::Failed;
-                return Err("shared client session is not ready".to_string());
-            }
-            let state_ref = Arc::clone(&self.state);
             let generation = state.generation;
-            let task_cancellation = cancellation.clone();
-            let task = tokio::spawn(async move {
-                let result = run_single_client_inner(
-                    config,
-                    task_cancellation.subscribe(),
-                    ready_sender,
-                    lease_set_enc_type,
-                    shared_session,
-                )
-                .await;
-                let mut state = state_ref.lock().await;
-                if state.generation == generation && state.state != StartupTunnelState::Failed {
-                    state.state = if result.is_ok() {
-                        StartupTunnelState::Stopped
-                    } else {
-                        StartupTunnelState::Failed
-                    };
-                    state.cancellation = None;
-                }
-            });
+            (
+                cancellation,
+                ready_sender,
+                ready_receiver,
+                generation,
+                config,
+                lease_set_enc_type,
+            )
+        };
+
+        let shared_session = if let Some(owner) = &self.shared_session {
+            match owner.acquire(&config.name).await {
+                Ok(session) => Some(session),
+                Err(error) => return self.mark_failed(&error).await,
+            }
+        } else {
+            None
+        };
+        let state_ref = Arc::clone(&self.state);
+        let state_snapshot = Arc::clone(&self.state_snapshot);
+        let task_cancellation = cancellation.clone();
+        let session_owner = self.shared_session.clone();
+        let session_member = config.name.clone();
+        let task = tokio::spawn(async move {
+            let result = run_single_client_inner(
+                config,
+                task_cancellation.subscribe(),
+                ready_sender,
+                lease_set_enc_type,
+                shared_session,
+            )
+            .await;
+            if let Some(owner) = session_owner {
+                owner.release(&session_member).await;
+            }
+            let mut state = state_ref.lock().await;
+            if state.generation == generation && state.state != StartupTunnelState::Failed {
+                let next_state = if result.is_ok() {
+                    StartupTunnelState::Stopped
+                } else {
+                    StartupTunnelState::Failed
+                };
+                state.state = next_state;
+                state_snapshot.store(next_state);
+                state.cancellation = None;
+            }
+        });
+        {
+            let mut state = self.state.lock().await;
             state.cancellation = Some(cancellation.clone());
             state.task = Some(task);
-            (cancellation, ready_receiver, generation)
-        };
+        }
 
         match tokio::time::timeout(STARTUP_LIFECYCLE_TIMEOUT, ready_receiver).await {
             Ok(Ok(Ok(()))) => {
                 let mut state = self.state.lock().await;
                 if state.generation == generation {
                     state.state = StartupTunnelState::Running;
+                    self.state_snapshot.store(StartupTunnelState::Running);
                 }
                 Ok(())
             }
@@ -374,6 +456,118 @@ pub struct ClientTunnelRuntimeConfig {
 }
 
 type SharedClientSession = Arc<tokio::sync::Mutex<Session<style::Stream>>>;
+
+struct SharedClientSessionState {
+    session: Option<SharedClientSession>,
+    members: std::collections::BTreeSet<String>,
+    creating: bool,
+}
+
+/// Own the one startup-manager client session while controlled members exist.
+///
+/// Membership is reserved before session creation so a concurrent stop cannot
+/// publish a newly-created session after the owner has reached zero members.
+/// The bookkeeping lock is never held while Yosemite performs network I/O.
+struct SharedClientSessionOwner {
+    options: SessionOptions,
+    state: tokio::sync::Mutex<SharedClientSessionState>,
+    changed: tokio::sync::Notify,
+}
+
+impl SharedClientSessionOwner {
+    fn new(options: SessionOptions) -> Self {
+        Self {
+            options,
+            state: tokio::sync::Mutex::new(SharedClientSessionState {
+                session: None,
+                members: std::collections::BTreeSet::new(),
+                creating: false,
+            }),
+            changed: tokio::sync::Notify::new(),
+        }
+    }
+
+    async fn acquire(&self, member: &str) -> Result<SharedClientSession, String> {
+        loop {
+            let mut state = self.state.lock().await;
+            if let Some(session) = state.session.clone() {
+                state.members.insert(member.to_string());
+                return Ok(session);
+            }
+
+            state.members.insert(member.to_string());
+            if state.creating {
+                let notified = self.changed.notified();
+                drop(state);
+                notified.await;
+                continue;
+            }
+
+            state.creating = true;
+            drop(state);
+
+            let result = Session::<style::Stream>::new(self.options.clone()).await;
+            let mut state = self.state.lock().await;
+            state.creating = false;
+            match result {
+                Ok(session) if state.members.contains(member) && !state.members.is_empty() => {
+                    let session = Arc::new(tokio::sync::Mutex::new(session));
+                    state.session = Some(Arc::clone(&session));
+                    self.changed.notify_waiters();
+                    return Ok(session);
+                }
+                Ok(_) => {
+                    self.changed.notify_waiters();
+                    return Err("client tunnel session stopped during setup".to_string());
+                }
+                Err(_) => {
+                    state.members.remove(member);
+                    self.changed.notify_waiters();
+                    return Err("client tunnel shared session setup failed".to_string());
+                }
+            }
+        }
+    }
+
+    async fn release(&self, member: &str) {
+        let session = {
+            let mut state = self.state.lock().await;
+            state.members.remove(member);
+            if state.members.is_empty() && !state.creating {
+                state.session.take()
+            } else {
+                None
+            }
+        };
+        drop(session);
+        self.changed.notify_waiters();
+    }
+
+    #[cfg(test)]
+    async fn member_count(&self) -> usize {
+        self.state.lock().await.members.len()
+    }
+
+    #[cfg(test)]
+    async fn has_session(&self) -> bool {
+        self.state.lock().await.session.is_some()
+    }
+}
+
+fn startup_client_session_options(
+    sam_tcp_port: u16,
+    lease_set_enc_type: Option<String>,
+) -> SessionOptions {
+    SessionOptions {
+        publish: false,
+        samv3_tcp_port: sam_tcp_port,
+        nickname: "i2p-tunnel".to_string(),
+        inbound_quantity: 4,
+        outbound_quantity: 4,
+        lease_set_enc_type,
+        ..Default::default()
+    }
+}
 
 /// Run one cancellable generic client tunnel.
 ///
@@ -511,9 +705,6 @@ pub struct ClientTunnelManager {
 
     /// Optional lifecycle owner used by the I2PControl composition seam.
     lifecycle: Option<StartupTunnelLifecycleHandle>,
-
-    /// Shared Yosemite client session for controlled startup tunnels.
-    shared_session: Option<Arc<tokio::sync::OnceCell<SharedClientSession>>>,
 }
 
 impl ClientTunnelManager {
@@ -529,7 +720,6 @@ impl ClientTunnelManager {
             sam_tcp_port,
             tunnels: tunnels.into_iter().map(Arc::from).collect(),
             lifecycle: None,
-            shared_session: None,
         }
     }
 
@@ -544,7 +734,9 @@ impl ClientTunnelManager {
             options.i2cp.as_ref().and_then(|i2cp| i2cp.lease_set_enc_type.clone())
         });
         let manager = Self::new(tunnels, client_tunnel_options, sam_tcp_port);
-        let shared_session = Arc::new(tokio::sync::OnceCell::new());
+        let shared_session = Arc::new(SharedClientSessionOwner::new(
+            startup_client_session_options(sam_tcp_port, lease_set_enc_type.clone()),
+        ));
         for tunnel in &manager.tunnels {
             lifecycle.register(
                 tunnel.name.clone(),
@@ -564,7 +756,6 @@ impl ClientTunnelManager {
         }
         Ok(Self {
             lifecycle: Some(lifecycle),
-            shared_session: Some(shared_session),
             ..manager
         })
     }
@@ -598,32 +789,6 @@ impl ClientTunnelManager {
         }
 
         if let Some(lifecycle) = self.lifecycle.take() {
-            let session = Session::<style::Stream>::new(SessionOptions {
-                publish: false,
-                samv3_tcp_port: self.sam_tcp_port,
-                nickname: "i2p-tunnel".to_string(),
-                inbound_quantity: 4,
-                outbound_quantity: 4,
-                lease_set_enc_type: self.client_tunnel_options.as_ref().and_then(|config| {
-                    config.i2cp.as_ref().and_then(|config| config.lease_set_enc_type.clone())
-                }),
-                ..Default::default()
-            })
-            .await;
-            match session {
-                Ok(session) => {
-                    if let Some(shared_session) = self.shared_session {
-                        let _ = shared_session.set(Arc::new(tokio::sync::Mutex::new(session)));
-                    }
-                }
-                Err(error) => {
-                    tracing::error!(
-                        target: LOG_TARGET,
-                        ?error,
-                        "failed to start controlled client tunnel session",
-                    );
-                }
-            }
             lifecycle.start_all().await;
             return;
         }
@@ -634,17 +799,12 @@ impl ClientTunnelManager {
             "starting client tunnel manager",
         );
 
-        let mut session = match Session::<style::Stream>::new(SessionOptions {
-            publish: false,
-            samv3_tcp_port: self.sam_tcp_port,
-            nickname: "i2p-tunnel".to_string(),
-            inbound_quantity: 4,
-            outbound_quantity: 4,
-            lease_set_enc_type: self.client_tunnel_options.and_then(|config| {
+        let mut session = match Session::<style::Stream>::new(startup_client_session_options(
+            self.sam_tcp_port,
+            self.client_tunnel_options.and_then(|config| {
                 config.i2cp.and_then(|config| config.lease_set_enc_type.clone())
             }),
-            ..Default::default()
-        })
+        ))
         .await
         {
             Ok(session) => session,
@@ -735,16 +895,29 @@ impl ClientTunnelManager {
 #[cfg(test)]
 mod lifecycle_tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
     async fn fake_sam() -> (u16, tokio::task::JoinHandle<()>) {
+        let (port, task, _) = fake_sam_with_failures(0).await;
+        (port, task)
+    }
+
+    async fn fake_sam_with_failures(
+        failures: usize,
+    ) -> (u16, tokio::task::JoinHandle<()>, Arc<AtomicUsize>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
+        let session_creations = Arc::new(AtomicUsize::new(0));
+        let session_creations_for_task = Arc::clone(&session_creations);
         let task = tokio::spawn(async move {
+            let connection_number = AtomicUsize::new(0);
             loop {
                 let Ok((stream, _)) = listener.accept().await else {
                     break;
                 };
+                let connection_number = connection_number.fetch_add(1, Ordering::Relaxed);
+                let session_creations = Arc::clone(&session_creations_for_task);
                 tokio::spawn(async move {
                     let (read_half, mut write_half) = stream.into_split();
                     let mut reader = BufReader::new(read_half);
@@ -753,6 +926,12 @@ mod lifecycle_tests {
                         line.clear();
                         if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
                             break;
+                        }
+                        if line.starts_with("HELLO") {
+                            session_creations.fetch_add(1, Ordering::Relaxed);
+                            if connection_number < failures {
+                                return;
+                            }
                         }
                         let response = if line.starts_with("HELLO") {
                             "HELLO REPLY RESULT=OK VERSION=3.3\n"
@@ -768,7 +947,7 @@ mod lifecycle_tests {
                 });
             }
         });
-        (port, task)
+        (port, task, session_creations)
     }
 
     #[tokio::test]
@@ -796,6 +975,88 @@ mod lifecycle_tests {
         controller.apply(StartupTunnelAction::Stop).await.unwrap();
         assert_eq!(controller.state(), StartupTunnelState::Stopped);
 
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn shared_startup_session_recovers_and_releases_by_membership() {
+        let (sam_port, sam_task, session_creations) = fake_sam_with_failures(1).await;
+        let owner = Arc::new(SharedClientSessionOwner::new(
+            startup_client_session_options(sam_port, None),
+        ));
+        let controller_one = ClientTunnelLifecycleController::new_with_shared_session(
+            ClientTunnelRuntimeConfig {
+                name: "startup-client-one".to_string(),
+                address: Some("127.0.0.1".to_string()),
+                port: 0,
+                destination: "remote-destination-one".to_string(),
+                destination_port: None,
+                sam_tcp_port: sam_port,
+            },
+            None,
+            Arc::clone(&owner),
+        );
+        let controller_two = ClientTunnelLifecycleController::new_with_shared_session(
+            ClientTunnelRuntimeConfig {
+                name: "startup-client-two".to_string(),
+                address: Some("127.0.0.1".to_string()),
+                port: 0,
+                destination: "remote-destination-two".to_string(),
+                destination_port: None,
+                sam_tcp_port: sam_port,
+            },
+            None,
+            Arc::clone(&owner),
+        );
+
+        assert!(controller_one.apply(StartupTunnelAction::Start).await.is_err());
+        assert_eq!(controller_one.state(), StartupTunnelState::Failed);
+        assert_eq!(owner.member_count().await, 0);
+        assert!(!owner.has_session().await);
+
+        let (result_one, result_two) = tokio::join!(
+            controller_one.apply(StartupTunnelAction::Start),
+            controller_two.apply(StartupTunnelAction::Start),
+        );
+        result_one.unwrap();
+        result_two.unwrap();
+        assert_eq!(session_creations.load(Ordering::Relaxed), 2);
+        assert_eq!(owner.member_count().await, 2);
+        assert!(owner.has_session().await);
+
+        controller_one.apply(StartupTunnelAction::Stop).await.unwrap();
+        assert_eq!(owner.member_count().await, 1);
+        assert!(owner.has_session().await);
+
+        controller_two.apply(StartupTunnelAction::Stop).await.unwrap();
+        assert_eq!(owner.member_count().await, 0);
+        assert!(!owner.has_session().await);
+
+        controller_one.apply(StartupTunnelAction::Restart).await.unwrap();
+        assert_eq!(session_creations.load(Ordering::Relaxed), 3);
+        assert_eq!(owner.member_count().await, 1);
+        controller_one.apply(StartupTunnelAction::Stop).await.unwrap();
+        assert!(!owner.has_session().await);
+
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn lifecycle_state_snapshot_is_truthful_while_state_lock_is_contended() {
+        let (sam_port, sam_task) = fake_sam().await;
+        let controller = ClientTunnelLifecycleController::new(
+            ClientTunnelRuntimeConfig {
+                name: "contended-client".to_string(),
+                address: Some("127.0.0.1".to_string()),
+                port: 0,
+                destination: "remote-destination".to_string(),
+                destination_port: None,
+                sam_tcp_port: sam_port,
+            },
+            None,
+        );
+        let _state_guard = controller.state.lock().await;
+        assert_eq!(controller.state(), StartupTunnelState::Stopped);
         sam_task.abort();
     }
 }

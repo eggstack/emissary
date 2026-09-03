@@ -10,7 +10,7 @@ Planning baseline: `045d1e8b4eba1141d2488882f99c5ce994db91a8`
 
 Closure: `plans/closure/i2pcontrol-proposal-170/124-closure.md`
 
-Implementation commit: pending final internal commit
+Implementation commit: `8a302b0`
 
 Source roadmap:
 

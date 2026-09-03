@@ -16,7 +16,7 @@ Implementation commits:
 
 - `8a302b0` — adopt Yosemite Y005 through the optional I2PControl alias and add
   dependency-boundary regressions.
-- Documentation/closure commit — records the M124 closure and planning-state reconciliation.
+- `d4ffab2` — records the M124 closure and planning-state reconciliation.
 
 ## 1. Executive finding
 

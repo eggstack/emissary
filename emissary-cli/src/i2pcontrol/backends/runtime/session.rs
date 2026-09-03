@@ -1068,6 +1068,207 @@ mod tests {
         server.await.unwrap();
     }
 
+    /// M122: the corrected Y004 generic LeaseSet API is reachable from an
+    /// I2PControl-only path without any Proposal mapping.
+    ///
+    /// This constructs validated Y004 session options directly (no
+    /// `EncryptLeaseSet`/`LeaseSetClientAuths` Proposal translation, which
+    /// remains owned by a future M113 successor) and observes the canonical
+    /// wire at a local fake SAM endpoint. Fixture key material mirrors
+    /// Yosemite Y004's own public test vectors; it is not router keying
+    /// material and never leaves the test.
+    #[tokio::test]
+    async fn m122_y004_corrected_leaseset_wire_is_reachable_at_fake_sam() {
+        use yosemite_i2pcontrol::{LeaseSetClientAuth, SessionOptions as YosemiteOptions};
+
+        const LEASE_KEY: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        const PRIVATE_KEY: &str = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
+        const SIGNING_KEY: &str = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=";
+        const SECRET: &str = "c2VjcmV0LXZhbHVlLWZpeHR1cmU=";
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (command_tx, command_rx) = oneshot::channel();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let (read_half, mut write_half) = stream.into_split();
+            let mut reader = BufReader::new(read_half);
+            let mut line = String::new();
+            reader.read_line(&mut line).await.unwrap();
+            assert_eq!(line, "HELLO VERSION\n");
+            write_half.write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n").await.unwrap();
+            line.clear();
+            reader.read_line(&mut line).await.unwrap();
+            command_tx.send(line).unwrap();
+            write_half
+                .write_all(b"SESSION STATUS RESULT=OK DESTINATION=local\n")
+                .await
+                .unwrap();
+        });
+
+        let mut options = YosemiteOptions {
+            samv3_tcp_port: port,
+            nickname: "m122-leaseset-reachability".to_owned(),
+            encrypt_lease_set: true,
+            lease_set_auth_type: 1,
+            lease_set_blinded_type: 10,
+            lease_set_type: 3,
+            lease_set_key: Some(LEASE_KEY.to_owned()),
+            lease_set_private_key: Some(PRIVATE_KEY.to_owned()),
+            lease_set_secret: Some(SECRET.to_owned()),
+            lease_set_signing_private_key: Some(SIGNING_KEY.to_owned()),
+            ..Default::default()
+        };
+        options
+            .add_lease_set_client_auth(LeaseSetClientAuth::dh("alice", LEASE_KEY).unwrap())
+            .unwrap();
+        options
+            .add_lease_set_client_auth(LeaseSetClientAuth::psk("bob", LEASE_KEY).unwrap())
+            .unwrap();
+
+        let _session = Session::<style::Stream>::new(options).await.unwrap();
+        let command = command_rx.await.unwrap();
+
+        // Representative corrected type-domain values.
+        assert!(command.contains("i2cp.encryptLeaseSet=true"));
+        assert!(command.contains("i2cp.leaseSetAuthType=1"));
+        assert!(command.contains("i2cp.leaseSetBlindedType=10"));
+        assert!(command.contains("i2cp.leaseSetType=3"));
+        assert!(command.contains(&format!("i2cp.leaseSetKey={LEASE_KEY}")));
+        assert!(command.contains(&format!("i2cp.leaseSetSecret={SECRET}")));
+        // Canonical private/signing spellings (Y003 emitted truncated aliases).
+        assert!(command.contains(&format!("i2cp.leaseSetPrivateKey={PRIVATE_KEY}")));
+        assert!(command.contains(&format!("i2cp.leaseSetSigningPrivateKey={SIGNING_KEY}")));
+        assert!(!command.contains("i2cp.leaseSetPrivKey="));
+        assert!(!command.contains("i2cp.leaseSetSigningPrivKey="));
+        // Mode-aware client-auth namespaces with deterministic per-mode numbering.
+        assert_eq!(command.matches("i2cp.leaseSetClient.dh.").count(), 1);
+        assert_eq!(command.matches("i2cp.leaseSetClient.psk.").count(), 1);
+        assert!(command.contains(&format!("i2cp.leaseSetClient.dh.0=YWxpY2U=:{LEASE_KEY}")));
+        assert!(command.contains(&format!("i2cp.leaseSetClient.psk.0=Ym9i:{LEASE_KEY}")));
+        assert!(!command.contains("i2cp.leaseSetClientAuth"));
+        server.await.unwrap();
+    }
+
+    /// M122: malformed corrected-API values reject before SAM wire bytes.
+    ///
+    /// Constructor/bounded-collection errors never reach the network, and
+    /// numeric-domain violations fail inside `SessionController::new` before
+    /// the TCP connect (proved by asserting `InvalidOption` against a closed
+    /// port, where a post-connect failure would surface as I/O instead).
+    #[tokio::test]
+    async fn m122_y004_malformed_leaseset_values_reject_before_wire() {
+        use yosemite_i2pcontrol::{
+            Error as YosemiteError, LeaseSetClientAuth, ProtocolError as YosemiteProtocolError,
+        };
+
+        const KEY: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+        // Opaque preformatted fragments, empty names, control bytes, and
+        // non-I2P-base64 material never become entries.
+        assert!(LeaseSetClientAuth::dh("alice", "not-base64!!").is_err());
+        assert!(LeaseSetClientAuth::dh("", KEY).is_err());
+        assert!(LeaseSetClientAuth::dh("bad\nname", KEY).is_err());
+        // Unused-bit violations reject even when the alphabet/padding shape is right.
+        assert!(
+            LeaseSetClientAuth::psk("alice", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB=")
+                .is_err()
+        );
+        assert!(LeaseSetClientAuth::psk("alice", "short").is_err());
+
+        // Duplicates within one mode reject; the same name may appear once
+        // per distinct reference namespace.
+        let mut options = SessionOptions::default();
+        options
+            .add_lease_set_client_auth(LeaseSetClientAuth::dh("alice", KEY).unwrap())
+            .unwrap();
+        assert!(options
+            .add_lease_set_client_auth(LeaseSetClientAuth::dh("alice", KEY).unwrap())
+            .is_err());
+        options
+            .add_lease_set_client_auth(LeaseSetClientAuth::psk("alice", KEY).unwrap())
+            .unwrap();
+
+        // Canonical typed keys and numbered client-auth namespaces are
+        // reserved on the generic path.
+        let mut generic = SessionOptions::default();
+        assert!(generic.add_session_option("i2cp.leaseSetPrivateKey", "x").is_err());
+        assert!(generic.add_session_option("i2cp.leaseSetSigningPrivateKey", "x").is_err());
+        assert!(generic.add_session_option("i2cp.leaseSetClient.dh.0", "x").is_err());
+        assert!(generic.add_session_option("i2cp.leaseSetClient.psk.0", "x").is_err());
+        assert!(generic.add_session_option("i2cp.leaseSetClientAuth.0", "x").is_err());
+
+        // Numeric-domain violations fail before the TCP connect. The closed
+        // port guarantees a post-validation failure would be I/O, not
+        // `InvalidOption`.
+        for mut invalid in [
+            SessionOptions {
+                lease_set_auth_type: 3,
+                ..Default::default()
+            },
+            SessionOptions {
+                lease_set_blinded_type: 65_536,
+                ..Default::default()
+            },
+            SessionOptions {
+                lease_set_type: 0,
+                ..Default::default()
+            },
+            SessionOptions {
+                lease_set_key: Some("not base64!!".to_owned()),
+                ..Default::default()
+            },
+        ] {
+            invalid.samv3_tcp_port = 1;
+            invalid.nickname = "m122-invalid-leaseset".to_owned();
+            assert!(
+                matches!(
+                    Session::<style::Stream>::new(invalid).await,
+                    Err(YosemiteError::Protocol(
+                        YosemiteProtocolError::InvalidOption
+                    ))
+                ),
+                "invalid LeaseSet options must fail before wire"
+            );
+        }
+    }
+
+    /// M122: LeaseSet fixture material never enters debug/diagnostics.
+    #[test]
+    fn m122_y004_leaseset_material_is_redacted_from_debug() {
+        use yosemite_i2pcontrol::LeaseSetClientAuth;
+
+        const KEY: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        const PRIVATE_KEY: &str = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
+        const SIGNING_KEY: &str = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=";
+
+        let mut options = SessionOptions {
+            lease_set_key: Some(KEY.to_owned()),
+            lease_set_private_key: Some(PRIVATE_KEY.to_owned()),
+            lease_set_secret: Some("c2VjcmV0LXZhbHVlLWZpeHR1cmU=".to_owned()),
+            lease_set_signing_private_key: Some(SIGNING_KEY.to_owned()),
+            ..Default::default()
+        };
+        options
+            .add_lease_set_client_auth(LeaseSetClientAuth::dh("alice", KEY).unwrap())
+            .unwrap();
+        let debug = format!("{options:?}");
+        for secret in [
+            KEY,
+            PRIVATE_KEY,
+            SIGNING_KEY,
+            "c2VjcmV0LXZhbHVlLWZpeHR1cmU=",
+        ] {
+            assert!(!debug.contains(secret), "debug leaked LeaseSet material");
+        }
+        let auth_debug = format!("{:?}", LeaseSetClientAuth::dh("alice", KEY).unwrap());
+        assert!(
+            !auth_debug.contains(KEY),
+            "client-auth debug leaked key material"
+        );
+        assert!(auth_debug.contains("<redacted>"));
+    }
+
     #[test]
     fn compatibility_key_includes_session_settings_and_identity_without_exposing_it() {
         let first = SessionOptions {

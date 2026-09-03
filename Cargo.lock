@@ -1985,7 +1985,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "yosemite 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "yosemite 0.7.0 (git+https://github.com/eggstack/yosemite?rev=8026f5b424fc178d683e63555335f8b33e0aba04)",
+ "yosemite 0.7.0 (git+https://github.com/eggstack/yosemite?rev=c2db73dba35dd9392947af5c74df29b0b556775f)",
 ]
 
 [[package]]
@@ -7955,7 +7955,7 @@ dependencies = [
 [[package]]
 name = "yosemite"
 version = "0.7.0"
-source = "git+https://github.com/eggstack/yosemite?rev=8026f5b424fc178d683e63555335f8b33e0aba04#8026f5b424fc178d683e63555335f8b33e0aba04"
+source = "git+https://github.com/eggstack/yosemite?rev=c2db73dba35dd9392947af5c74df29b0b556775f#c2db73dba35dd9392947af5c74df29b0b556775f"
 dependencies = [
  "futures",
  "nom",

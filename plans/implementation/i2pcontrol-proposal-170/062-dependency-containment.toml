@@ -6,13 +6,13 @@ routerinfo_matrix = "43 total / 37 available / 1 neutral / 5 unavailable"
 
 [direct_dependencies]
 "subtle" = { owner = "emissary-cli", owning_feature = "i2pcontrol", version = "2.6.1", default_features = false, optional = true }
-"yosemite-i2pcontrol" = { owner = "emissary-cli", package = "yosemite", owning_feature = "i2pcontrol", source = "https://github.com/eggstack/yosemite", revision = "8026f5b424fc178d683e63555335f8b33e0aba04", features = ["async-extra"], optional = true }
+"yosemite-i2pcontrol" = { owner = "emissary-cli", package = "yosemite", owning_feature = "i2pcontrol", source = "https://github.com/eggstack/yosemite", revision = "c2db73dba35dd9392947af5c74df29b0b556775f", features = ["async-extra"], optional = true }
 
 [fork_dependency]
 alias = "yosemite-i2pcontrol"
 package = "yosemite"
 source = "https://github.com/eggstack/yosemite"
-revision = "8026f5b424fc178d683e63555335f8b33e0aba04"
+revision = "c2db73dba35dd9392947af5c74df29b0b556775f"
 owner = "emissary-cli"
 owning_feature = "i2pcontrol"
 features = ["async-extra"]
@@ -37,8 +37,8 @@ baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 # does not authorize any production path, dependency, or lockfile change.
 # Future execution still requires registry readiness and the exact production
 # authority stated by each plan. ADR-0005 authorizes only the I2PControl-owned
-# exact-revision Yosemite fork alias; current landed revision remains Y002
-# (8026f5b) until a future M122 is explicitly promoted and closed.
+# exact-revision Yosemite fork alias; M122 advances the landed revision to Y004
+# (c2db73d) with corrected LeaseSet wire semantics and adapter reachability only.
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",

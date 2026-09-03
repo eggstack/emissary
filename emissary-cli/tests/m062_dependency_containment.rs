@@ -192,7 +192,7 @@ fn manifest_is_well_formed_and_self_consistent() {
     );
     assert_eq!(
         manifest.fork_dependency.revision,
-        "8026f5b424fc178d683e63555335f8b33e0aba04"
+        "c2db73dba35dd9392947af5c74df29b0b556775f"
     );
     assert_eq!(manifest.fork_dependency.owner, "emissary-cli");
     assert_eq!(manifest.fork_dependency.owning_feature, "i2pcontrol");
@@ -588,6 +588,8 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m118 = is_authorized_m118_path(path);
         let authorized_m119 = is_authorized_m119_path(path);
         let authorized_m120 = is_authorized_m120_path(path);
+        let authorized_m121 = is_authorized_m121_path(path);
+        let authorized_m122 = is_authorized_m122_path(path);
         let authorized_m111 = is_authorized_m111_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
@@ -609,6 +611,8 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m118
                 || authorized_m119
                 || authorized_m120
+                || authorized_m121
+                || authorized_m122
                 || authorized_m111
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
@@ -634,6 +638,8 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m118
                     || authorized_m119
                     || authorized_m120
+                    || authorized_m121
+                    || authorized_m122
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -891,6 +897,34 @@ fn is_authorized_m120_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/121-m111-m112-semantic-truthfulness-corrective.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md"
+    )
+}
+
+fn is_authorized_m121_path(path: &str) -> bool {
+    matches!(
+        path,
+        "plans/closure/i2pcontrol-proposal-170/121-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/121-m111-m112-semantic-truthfulness-corrective.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md"
+    )
+}
+
+fn is_authorized_m122_path(path: &str) -> bool {
+    matches!(
+        path,
+        "Cargo.lock"
+            | "emissary-cli/Cargo.toml"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/session.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/122-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/122-corrected-yosemite-leaseset-pin-adoption.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "docs/i2pcontrol/tunnel-manager.md"
     )
 }
 

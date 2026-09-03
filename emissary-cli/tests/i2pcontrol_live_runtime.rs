@@ -302,6 +302,85 @@ async fn live_runtime_interoperability() {
     .await;
     assert_eq!(wrong["error"]["code"], json!(-32001));
     let token = authenticate(&client, &endpoint, 3, &password).await;
+
+    let protected_methods = [
+        "RouterInfo",
+        "AddressBook",
+        "SetSubscriptions",
+        "SetConfig",
+        "TunnelManager",
+        "ClientServicesInfo",
+    ];
+    for (index, method) in protected_methods.iter().enumerate() {
+        let missing = call(
+            &client,
+            &endpoint,
+            300 + index as u64,
+            method,
+            json!({}),
+        )
+        .await;
+        assert_eq!(missing["error"]["code"], json!(-32002), "{method}");
+
+        let invalid = call(
+            &client,
+            &endpoint,
+            310 + index as u64,
+            method,
+            json!({"Token": "not-a-valid-token"}),
+        )
+        .await;
+        assert_eq!(invalid["error"]["code"], json!(-32003), "{method}");
+    }
+
+    let conflicting_header = client
+        .post(&endpoint)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .header("X-I2PControl-Token", "not-a-valid-token")
+        .body(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 320,
+                "method": "RouterInfo",
+                "params": {"Token": token.clone(), "i2p.router.version": false}
+            })
+            .to_string(),
+        )
+        .send()
+        .await
+        .expect("conflicting token request");
+    let conflicting_header_body: Value = serde_json::from_str(
+        &conflicting_header
+            .text()
+            .await
+            .expect("conflicting token response body"),
+    )
+    .expect("conflicting token response JSON");
+    assert_eq!(conflicting_header_body["error"]["code"], json!(-32003));
+
+    let batch = client
+        .post(&endpoint)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(
+            json!([
+                {
+                    "jsonrpc": "2.0",
+                    "id": 321,
+                    "method": "RouterInfo",
+                    "params": {"Token": token.clone(), "i2p.router.version": false}
+                }
+            ])
+            .to_string(),
+        )
+        .send()
+        .await
+        .expect("batch request");
+    let batch_body: Value = serde_json::from_str(
+        &batch.text().await.expect("batch response body"),
+    )
+    .expect("batch response JSON");
+    assert_eq!(batch_body["error"]["code"], json!(-32600));
+
     let id_response = protected(
         &client,
         &endpoint,

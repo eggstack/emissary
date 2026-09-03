@@ -591,6 +591,8 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m121 = is_authorized_m121_path(path);
         let authorized_m122 = is_authorized_m122_path(path);
         let authorized_m124 = is_authorized_m124_path(path);
+        let authorized_m125 = is_authorized_m125_path(path);
+        let authorized_m126 = is_authorized_m126_path(path);
         let authorized_m111 = is_authorized_m111_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
@@ -615,6 +617,8 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m121
                 || authorized_m122
                 || authorized_m124
+                || authorized_m125
+                || authorized_m126
                 || authorized_m111
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
@@ -643,6 +647,8 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m121
                     || authorized_m122
                     || authorized_m124
+                    || authorized_m125
+                    || authorized_m126
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -948,6 +954,47 @@ fn is_authorized_m124_path(path: &str) -> bool {
             | "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
             | "docs/i2pcontrol/tunnel-manager.md"
+    )
+}
+
+fn is_authorized_m125_path(path: &str) -> bool {
+    matches!(
+        path,
+        "plans/closure/i2pcontrol-proposal-170/125-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/105-residual-option-audit.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/125-m113-capability-crypto-ownership-audit.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "AGENTS.md"
+    )
+}
+
+fn is_authorized_m126_path(path: &str) -> bool {
+    matches!(
+        path,
+        "AGENTS.md"
+            | "emissary-cli/tests/adversarial.rs"
+            | "emissary-cli/tests/i2pcontrol_live_runtime.rs"
+            | "emissary-cli/tests/m061_containment.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "emissary-cli/tests/m095_full_support_matrix.rs"
+            | "emissary-cli/tests/m105_residual_option_audit.rs"
+            | "emissary-cli/tests/m126_requalification.rs"
+            | "emissary-cli/tests/production_adapter.rs"
+            | "emissary-cli/tests/production_composition.rs"
+            | "emissary-cli/tests/router_info_truthfulness.rs"
+            | "plans/closure/i2pcontrol-proposal-170/126-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/105-residual-option-audit.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/110-completion-ledger.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/126-post-m125-operational-security-and-spec-requalification.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
     )
 }
 

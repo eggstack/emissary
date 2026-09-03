@@ -1,6 +1,6 @@
 # M121 — M111/M112 Semantic Truthfulness Corrective
 
-Status: **ready**
+Status: **closed** — both areas demoted (Outcome C + §5.2); matrix is 284 apply / 98 blocked / 458 not_applicable; see `plans/closure/i2pcontrol-proposal-170/121-closure.md`
 
 Class: corrective / Proposal conformance / lifecycle truthfulness
 

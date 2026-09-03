@@ -93,12 +93,12 @@ M119 M118 standby-expiry/variance corrective          [CLOSED]    |
 M120 server preallocation/secret transaction          [CLOSED]    |
   |                                                               |
   v                                                               |
-M121 M111/M112 semantic truthfulness                  [READY]     |
+M121 M111/M112 semantic truthfulness                  [CLOSED 284/98/458]    |
   |                                                               |
   +-------------------------------+-------------------------------+
-                                  |
-                                  v
-M122 corrected Yosemite exact-pin adoption            [BLOCKED ON M121 + Y004]
+                                   |
+                                   v
+M122 corrected Yosemite exact-pin adoption            [BLOCKED ON Y004 ONLY]
   |
   v
 fresh M113/LeaseSet capability audit + plan           [NOT YET AUTHORIZED]
@@ -151,15 +151,15 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/121-m111-m112-semantic-truthfulness-corrective.md`.
 
-Status: ready (unblocked by M120 closure).
+Status: closed (implementation `21f4070`; closure `plans/closure/i2pcontrol-proposal-170/121-closure.md`).
 
-Owner: I2PControl only unless the plan reaches a stop condition and demotes affected cells.
+Owner: I2PControl only; no core/Yosemite/crypto change (stop conditions held, demotion path taken).
 
-Exit:
+Exit (achieved):
 
-- `SigType` classification is justified by actual supported signing semantics, not wire capability alone;
-- `Close`/`CloseTime`/`NewDest` are reference-equivalent or the 18 coupled cells are returned to `blocked_primitive`;
-- M095/M105/ledger/docs are mechanically reconciled to the resulting counts.
+- `SigType` demoted via Outcome C (10 cells); singleton `{7}` is inert, not configurable support;
+- `Close`/`CloseTime`/`NewDest` demoted via §5.2 (18 cells); local TCP-handler-count idle is not reference I2P-session idle and no observation primitive exists;
+- M095/M105/ledger/docs mechanically reconciled to `284 / 98 / 458`.
 
 ## 8. Yosemite Y004 — canonical LeaseSet transport
 
@@ -179,7 +179,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/122-corrected-yosemite-leaseset-pin-adoption.md`.
 
-Status: proposed/blocked on M121 and Y004 closure.
+Status: proposed/blocked on Y004 closure only (M121 gate satisfied).
 
 Exit:
 
@@ -212,11 +212,13 @@ If those cannot be bounded cleanly, M113 LeaseSet cells remain truthfully blocke
 
 ## 11. Residual Proposal work outside corrective findings
 
-At pre-M121 baseline the matrix is `312 apply / 70 blocked_primitive / 458 not_applicable`:
+At pre-M121 baseline the matrix was `312 apply / 70 blocked_primitive / 458 not_applicable`:
 
 - 4 M111 `UseSSL` cells;
 - 45 M112 proxy/plugin/profile/reduction/Streamr lifecycle cells;
 - 21 M113 presentation/routing/LeaseSet cells.
+
+M121 truthfully demotes 28 cells, so the post-M121 baseline is `284 apply / 98 blocked_primitive / 458 not_applicable` (98 = 4 UseSSL + 10 SigType + 63 client + 21 server).
 
 M119, M120, Y004, and M122 are infrastructure/correctness work and do not automatically reduce those counts. M121 may demote already-applied cells if truthfulness requires it.
 

@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support**. Current authoritative M095 matrix: `284 apply / 96 blocked_primitive / 460 not_applicable`.
+Status: **partial Proposal 170 support**. Current authoritative M095 matrix entering M126: `284 apply / 96 blocked_primitive / 460 not_applicable`.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -29,14 +29,15 @@ Containment/support evidence:
 
 ## Current production/support state
 
-- RouterInfo: 43 Proposal additions / 42 available / 1 protocol-permitted neutral / 0 unavailable.
-- AddressBook CRUD, subscriptions, all 13 SetConfig keys and cross-book precedence are operational.
-- All 12 canonical TunnelManager data planes and seven actions exist.
-- All six ClientServicesInfo selectors are operational.
-- API 1-only auth and managed-TLS hardening are operational.
+- RouterInfo: 43 Proposal additions / 42 available / 1 protocol-permitted neutral / 0 unavailable according to current closure evidence.
+- AddressBook CRUD, subscriptions, all 13 SetConfig keys and cross-book precedence are operational according to current closure evidence.
+- All 12 canonical TunnelManager data planes and seven actions exist; current `apply` semantics are subject to M126 independent requalification.
+- All six ClientServicesInfo selectors are operational according to current closure evidence.
+- API 1-only auth and managed-TLS hardening are operational according to current closure evidence.
 - M119 corrected M118 standby-expiry/variance semantics.
 - M121 demoted unsupported `SigType` and `Close`/`CloseTime`/`NewDest` semantics instead of retaining approximate support.
-- M122 exact-pinned Yosemite Y004; M124 now exact-pins Yosemite Y005 `59140a2277bf296928d2e8ce39a148182eeff044` only through the optional I2PControl alias; ordinary Yosemite remains registry 0.7.0.
+- M122 exact-pinned Yosemite Y004; M124 exact-pins Yosemite Y005 `59140a2277bf296928d2e8ce39a148182eeff044` only through the optional I2PControl alias; ordinary Yosemite remains registry 0.7.0.
+- M125 corrected two server-role `AllowInternalSSL` applicability cells and left 96 blocked cells with no dependency-ready owner.
 
 Full Proposal 170 support is not claimed.
 
@@ -46,70 +47,88 @@ Full Proposal 170 support is not claimed.
 |---|---|---|
 | M119 | closed | M118 standby expiry + variance correctness |
 | M120 | historical closed; later corrective required | deterministic server preflight and ordinary server-secret transactionality |
-| M121 | closed | semantic truthfulness; matrix 284/98/458 |
+| M121 | closed | semantic truthfulness; historical matrix 284/98/458 |
 | M122 | closed | exact Y004 dependency adoption; transport only |
-| **M123** | **closed** | M120 commit-phase cancellation/lifecycle atomicity corrective |
-| **M124** | **closed** | exact Y005 dependency adoption; no Proposal mapping |
-| **M125** | **closed** | focused M113 capability/crypto-ownership audit; 2 cells reclassified, no successor implementation |
+| M123 | closed | M120 commit-phase cancellation/lifecycle atomicity corrective |
+| M124 | closed | exact Y005 dependency adoption; no Proposal mapping |
+| M125 | closed | focused M113 capability/crypto-ownership audit; 2 cells reclassified, no successor implementation |
+| **M126** | **ready** | current-head operational/security/spec requalification of the implemented subset |
 
-Yosemite independently registers:
+Yosemite independently closed:
 
-- **Y005 closed** at `59140a2277bf296928d2e8ce39a148182eeff044` — `eggstack/yosemite:plans/implementation/005-y004-leaseset-auth-mode-consistency-corrective.md`.
+- **Y005** at `59140a2277bf296928d2e8ce39a148182eeff044` — `eggstack/yosemite:plans/implementation/005-y004-leaseset-auth-mode-consistency-corrective.md`.
 
-M123, M124 and M125 are closed. M125 completed the focused M113/LeaseSet capability and
-crypto-ownership audit. No successor implementation plan is registered because the audit did not
-freeze a safe owner and exact runtime semantics.
-
-## M123 — server commit cancellation atomicity
+## M126 — current operational/security/spec requalification handoff
 
 Plan:
 
-- `123-m120-commit-phase-cancellation-atomicity-corrective.md`
+- `126-post-m125-operational-security-and-spec-requalification.md`
 
-Later review found that M120 disarms its server-start guard before asynchronous secret/definition durability awaits. Caller cancellation may therefore release lifecycle exclusion and abandon a partially terminalized generation. The secret-store drop helper is also best-effort under `try_lock()` contention.
+Planning baseline:
 
-M123 requires one terminal outcome—fully committed or exact rollback—for fresh, replacement and existing server starts/restarts at every commit boundary. It is I2PControl-only and changes no matrix cell.
+- `685eeeb20f22cdd234e4649c730000d623ad4891`.
 
-## Yosemite Y005 — auth-mode consistency
+M126 independently requalifies the current implemented subset rather than treating historical closures as sufficient current-head proof.
 
-Y004's canonical property spelling and DH/PSK representation remain valid, but its typed API can currently serialize client-auth entries under a mode the Java reference does not consume.
+It must:
 
-Y005 freezes the relationship among LeaseSet type, `leaseSetAuthType`, and numbered DH/PSK entries and rejects typed combinations whose security material would be inert. It implements no router cryptography or Proposal policy.
+- reconstruct the pinned Proposal 170 inventory and mechanically reproduce or truthfully correct `284 / 96 / 460`;
+- trace every claimed `apply` family through authentication/domain validation to a real production owner;
+- black-box test the auth/TLS/JSON-RPC/resource boundary;
+- requalify AddressBook persistence/confinement/atomicity;
+- requalify TunnelManager real-runtime lifecycle, rollback, cancellation, admission and unsupported-option fail-before-effect behavior;
+- verify RouterInfo and ClientServicesInfo source truthfulness and exact wire semantics;
+- re-audit M061/M062 containment;
+- reconcile active documentation/evidence, including stale current-count statements.
 
-Current Emissary has no active Proposal LeaseSet client-auth mapping, so Y005 is a prerequisite for future work rather than a currently active runtime downgrade.
+Concrete production/security defects found during M126 require separately registered M127+ corrective plans. M126 does not opportunistically implement them and does not implement the 96 blocked cells.
 
-## M124 — exact Y005 adoption
+Known entry inconsistency: `AGENTS.md` still states the older post-M113 `312/70/458` matrix. M126 must reconcile active guidance after independently reproducing or correcting the post-M125 counts.
+
+## Recently closed handoffs
+
+### M125 — M113 capability/crypto ownership
+
+Plan:
+
+- `125-m113-capability-crypto-ownership-audit.md`
+
+M125 is closed by `plans/closure/i2pcontrol-proposal-170/125-closure.md`. It confirmed that the remaining encrypted/authenticated LeaseSet, per-client address and multihoming/presentation-routing cells still lack a safe canonical runtime owner. The two server-role `AllowInternalSSL` cells were reclassified to `not_applicable` under Proposal 170's HTTP-client filtering classification.
+
+### M124 — exact Y005 adoption
 
 Plan:
 
 - `124-y005-auth-consistency-pin-adoption.md`
 
-M124 is closed by `plans/closure/i2pcontrol-proposal-170/124-closure.md`. It reviewed and
-exact-pinned Y005 through the existing optional `yosemite-i2pcontrol` alias, updated
-lock/containment evidence, and proved the corrected dependency behavior through I2PControl tests.
+M124 is closed by `plans/closure/i2pcontrol-proposal-170/124-closure.md`. It independently reviewed and exact-pinned Y005 through the existing optional `yosemite-i2pcontrol` alias, updated lock/containment evidence, and proved the corrected dependency behavior through I2PControl tests.
 
-M124 may not implement M113 LeaseSet features or change M095 counts.
+M124 did not map Proposal LeaseSet fields and did not change M095 counts.
+
+### M123 — server commit cancellation atomicity
+
+Plan:
+
+- `123-m120-commit-phase-cancellation-atomicity-corrective.md`
+
+M123 is closed and supersedes only M120's affected cancellation-completeness claim. It requires one terminal outcome—fully committed or exact rollback—for fresh, replacement and existing server starts/restarts at every commit boundary. It is I2PControl-only and changes no matrix cell.
 
 ## Residual Proposal ownership
 
-Current 96 blocked cells are:
+Current 96 blocked cells entering M126 are:
 
 - 4 `UseSSL` cells;
 - 10 `SigType` cells;
 - 63 client proxy/profile/reduction/lifecycle cells, including 18 `Close`/`CloseTime`/`NewDest` cells;
-- 19 server presentation/routing/LeaseSet cells; the two server-role `AllowInternalSSL` cells are
-  not applicable under Proposal 170's HTTP-client filtering classification.
+- 19 server presentation/routing/LeaseSet cells; the two server-role `AllowInternalSSL` cells are not applicable under Proposal 170's HTTP-client filtering classification.
 
-M125 found that serializer reachability is transport capability only: current Emissary still has
-no accepted encrypted/authenticated LeaseSet construction owner. The two server-role
-`AllowInternalSSL` cells were corrected to `not_applicable`; all other M113 residuals remain
-explicitly blocked before allocation.
+M125 found that serializer reachability is transport capability only: current Emissary still has no accepted encrypted/authenticated LeaseSet construction owner. All remaining unsupported cells stay explicitly blocked before allocation unless M126 or a later capability audit establishes a real owner.
 
 ## Containment
 
 Preferred production ownership remains `emissary-cli/src/i2pcontrol/**`.
 
-M061/M062 are authoritative. M123 is explicitly I2PControl-only. M124 may change only the existing optional exact-revision fork alias and I2PControl dependency evidence. No global `[patch]`, path dependency, vendoring, floating Yosemite ref, frontend coupling or broad router refactor is authorized.
+M061/M062 are authoritative. No global `[patch]`, path dependency, vendoring, floating Yosemite ref, frontend coupling or broad router refactor is authorized. Any future residual implementation requires a neutral canonical owner outside I2PControl and a separately registered plan before broader production changes begin.
 
 ## Verification baseline
 
@@ -119,9 +138,11 @@ Implementation plans refine focused tests, but the broad baseline remains:
 cargo check -p emissary-cli --no-default-features --features i2pcontrol
 cargo check -p emissary-cli --no-default-features
 cargo check
+cargo test -p emissary-core
 cargo test -p emissary-cli --no-default-features --features i2pcontrol --lib --no-fail-fast
 cargo test -p emissary-cli --no-default-features --features i2pcontrol --no-fail-fast
 cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m061_containment --test m062_dependency_containment --test m095_full_support_matrix --test m105_residual_option_audit --no-fail-fast
+cargo test -p emissary-cli --no-default-features --features i2pcontrol --test i2pcontrol_live_runtime -- --nocapture
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 cargo fmt --all -- --check
 git diff --check

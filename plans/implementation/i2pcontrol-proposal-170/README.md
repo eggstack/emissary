@@ -48,14 +48,14 @@ Full Proposal 170 support is not claimed.
 | M120 | historical closed; later corrective required | deterministic server preflight and ordinary server-secret transactionality |
 | M121 | closed | semantic truthfulness; matrix 284/98/458 |
 | M122 | closed | exact Y004 dependency adoption; transport only |
-| **M123** | **ready** | M120 commit-phase cancellation/lifecycle atomicity corrective |
-| **M124** | **blocked on M123 + Yosemite Y005** | exact Y005 dependency adoption; no Proposal mapping |
+| **M123** | **closed** | M120 commit-phase cancellation/lifecycle atomicity corrective |
+| **M124** | **blocked on Yosemite Y005** | exact Y005 dependency adoption; no Proposal mapping |
 
 Yosemite independently registers:
 
 - **Y005 ready** — `eggstack/yosemite:plans/implementation/005-y004-leaseset-auth-mode-consistency-corrective.md`.
 
-M123 is the sole ready Emissary implementation handoff.
+M123 is closed. M124 remains the next Emissary handoff, blocked until Yosemite Y005 closes.
 
 ## M123 — server commit cancellation atomicity
 
@@ -81,7 +81,7 @@ Plan:
 
 - `124-y005-auth-consistency-pin-adoption.md`
 
-M124 remains blocked until M123 and Y005 both close. It may only review and exact-pin the Y005 implementation through the existing optional `yosemite-i2pcontrol` alias, update lock/containment evidence, and prove the corrected dependency behavior through I2PControl tests.
+M124 remains blocked until Yosemite Y005 closes. It may only review and exact-pin the Y005 implementation through the existing optional `yosemite-i2pcontrol` alias, update lock/containment evidence, and prove the corrected dependency behavior through I2PControl tests.
 
 M124 may not implement M113 LeaseSet features or change M095 counts.
 

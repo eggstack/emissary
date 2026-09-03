@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 — Post-M114 Corrective Roadmap
 
-Status: active corrective workstream; M119-M122 closed, M123 ready, M124 blocked; Yosemite Y005 ready
+Status: active corrective workstream; M119-M123 closed, M124 blocked on Yosemite Y005; Yosemite Y005 ready
 
 Original corrective baseline: `feafc6a1d9650887015a01f87bf21b57a4e92085`
 
@@ -117,12 +117,12 @@ M121 semantic truthfulness                      [CLOSED 284/98/458]
 M122 Y004 exact-pin adoption                    [CLOSED]       |
   |                                                           |
   v                                                           |
-M123 commit-phase cancellation atomicity        [READY]        |
+M123 commit-phase cancellation atomicity        [CLOSED]       |
   |                                                           |
   +-------------------------------+---------------------------+
                                   |
                                   v
-M124 Y005 exact-pin adoption                    [BLOCKED ON M123 + Y005]
+M124 Y005 exact-pin adoption                    [BLOCKED ON Y005]
   |
   v
 focused M113/LeaseSet capability/crypto audit   [FUTURE / NOT YET REGISTERED]
@@ -131,7 +131,7 @@ focused M113/LeaseSet capability/crypto audit   [FUTURE / NOT YET REGISTERED]
 residual implementations + new final reclosure [FUTURE]
 ```
 
-Only M123 is dependency-ready in Emissary. Y005 is independently ready only in Yosemite.
+M123 is closed. M124 is not dependency-ready because Yosemite Y005 remains open.
 
 ## 6. M123 — commit-phase cancellation atomicity
 
@@ -139,7 +139,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/123-m120-commit-phase-cancellation-atomicity-corrective.md`
 
-Status: **ready**.
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/123-closure.md`.
 
 Owner: I2PControl production state only.
 
@@ -183,7 +183,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/124-y005-auth-consistency-pin-adoption.md`
 
-Status: **proposed / blocked** on M123 and Y005 closure.
+Status: **proposed / blocked** on Yosemite Y005 closure.
 
 M124 may only:
 

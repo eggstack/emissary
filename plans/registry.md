@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | active / partial | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | historical M114 closed as blocked |
-| Post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M123 ready** |
+| Post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M124 blocked on Yosemite Y005** |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
 
 ## Current production state
@@ -52,7 +52,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 M120 remains historically closed for deterministic preflight and ordinary error rollback, but later review invalidated its stronger cancellation-completeness claim. `commit_server_start()` disarms its drop guard before asynchronous secret/definition durability awaits, and caller cancellation can release the per-name lifecycle lock before terminalization is complete. `discard_sync()` also uses best-effort `try_lock()` cleanup.
 
-**M123** is the corrective owner. Historical M120 closure is not rewritten.
+**M123** is the corrective owner. Historical M120 closure is not rewritten; M123's closure supersedes only the affected cancellation-atomicity claim.
 
 ### Yosemite Y004 auth-mode consistency
 
@@ -75,12 +75,12 @@ Y005 auth-mode/type consistency                [READY IN YOSEMITE]
 M122 Y004 exact-pin adoption                    [CLOSED]       |
   |                                                           |
   v                                                           |
-M123 M120 commit-phase cancellation atomicity   [READY]        |
+M123 M120 commit-phase cancellation atomicity   [CLOSED]       |
   |                                                           |
   +-------------------------------+---------------------------+
                                   |
                                   v
-M124 Y005 exact-pin adoption                    [BLOCKED ON M123 + Y005]
+M124 Y005 exact-pin adoption                    [BLOCKED ON Y005]
   |
   v
 focused M113/LeaseSet capability/crypto audit   [FUTURE / BLOCKED ON M124]
@@ -95,7 +95,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/123-m120-commit-phase-cancellation-atomicity-corrective.md`
 
-Status: **ready**.
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/123-closure.md`.
 
 Baseline:
 
@@ -108,7 +108,7 @@ Objective:
 - eliminate best-effort staged-secret cleanup as a correctness mechanism;
 - preserve M120 validation order, secret confinement and current matrix counts.
 
-M123 is the sole dependency-ready Emissary implementation handoff.
+M123 is closed. No Emissary implementation handoff is dependency-ready until Yosemite Y005 closes.
 
 ## Registered future plan — M124
 
@@ -116,7 +116,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/124-y005-auth-consistency-pin-adoption.md`
 
-Status: **proposed / blocked** on M123 closure and Yosemite Y005 closure.
+Status: **proposed / blocked** on Yosemite Y005 closure.
 
 Objective:
 
@@ -157,16 +157,16 @@ The focused M113/LeaseSet capability/crypto-ownership audit remains deferred unt
 | M120 | historical closed; cancellation-atomicity claim requires M123 corrective |
 | M121 | closed at 284/98/458 |
 | M122 | closed at exact Y004 pin; transport only |
-| M123 | ready |
-| M124 | blocked on M123 + Y005 |
+| M123 | closed |
+| M124 | blocked on Yosemite Y005 |
 
 Historical closure records remain unchanged. Corrective closures supersede only affected claims.
 
 ## Registry rules
 
-1. M123 is the sole dependency-ready Emissary handoff.
+1. M123 is closed; M124 is the next Emissary handoff once Yosemite Y005 closes.
 2. Yosemite Y005 is separately the sole ready handoff in `eggstack/yosemite`.
-3. M124 must not execute until both M123 and Y005 close and this registry explicitly promotes it.
+3. M124 must not execute until Yosemite Y005 closes and this registry explicitly promotes it.
 4. Current Emissary pin remains exact Y004 `c2db73d...` until M124; no floating/fork-head dependency is authorized.
 5. Matrix remains `284 / 98 / 458`; correctness infrastructure is not capability evidence.
 6. No M113/LeaseSet router implementation plan is registered until M124 closes and the focused crypto/ownership audit lands.

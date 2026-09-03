@@ -1,6 +1,8 @@
 # M123 — M120 Commit-Phase Cancellation Atomicity Corrective
 
-Status: **ready**
+Status: **closed**
+
+Closure: `plans/closure/i2pcontrol-proposal-170/123-closure.md`
 
 Class: invariant / persistence-lifecycle corrective
 

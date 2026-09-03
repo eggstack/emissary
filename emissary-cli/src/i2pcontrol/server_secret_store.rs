@@ -78,7 +78,10 @@ struct StoreState {
 #[derive(Clone)]
 pub struct ServerDestinationStore {
     root: PathBuf,
-    state: std::sync::Arc<tokio::sync::Mutex<StoreState>>,
+    // State contains only bounded in-memory maps. A synchronous mutex keeps
+    // cancellation cleanup deterministic while all file I/O remains outside
+    // the lock.
+    state: std::sync::Arc<std::sync::Mutex<StoreState>>,
     mutation: std::sync::Arc<tokio::sync::Mutex<()>>,
 }
 
@@ -97,7 +100,7 @@ impl ServerDestinationStore {
     pub fn new(state_root: impl Into<PathBuf>) -> Self {
         Self {
             root: state_root.into().join(STORE_DIRECTORY),
-            state: std::sync::Arc::new(tokio::sync::Mutex::new(StoreState {
+            state: std::sync::Arc::new(std::sync::Mutex::new(StoreState {
                 entries: BTreeMap::new(),
                 pending: BTreeMap::new(),
             })),
@@ -125,7 +128,7 @@ impl ServerDestinationStore {
             (None, Some(Err(error))) => return Err(error),
             (None, None) => BTreeMap::new(),
         };
-        let mut state = self.state.lock().await;
+        let mut state = self.state.lock().map_err(|_| "server destination state lock poisoned")?;
         state.entries = entries;
         state.pending.clear();
         Ok(())
@@ -140,7 +143,7 @@ impl ServerDestinationStore {
     /// lock, and `load` clears any leftover staging.
     pub async fn get(&self, identity: &str) -> Result<Option<StoredDestination>, String> {
         validate_identity(identity)?;
-        let state = self.state.lock().await;
+        let state = self.state.lock().map_err(|_| "server destination state lock poisoned")?;
         if let Some(staged) = state.pending.get(identity) {
             return Ok(Some(StoredDestination(staged.clone())));
         }
@@ -155,7 +158,7 @@ impl ServerDestinationStore {
     pub async fn stage(&self, identity: &str, destination: StoredDestination) -> Result<(), String> {
         validate_identity(identity)?;
         validate_destination(destination.as_str())?;
-        let mut state = self.state.lock().await;
+        let mut state = self.state.lock().map_err(|_| "server destination state lock poisoned")?;
         if !state.entries.contains_key(identity)
             && !state.pending.contains_key(identity)
             && state.entries.len() >= MAX_ENTRIES
@@ -173,11 +176,17 @@ impl ServerDestinationStore {
     pub async fn commit(&self, identity: &str) -> Result<(), String> {
         validate_identity(identity)?;
         let _guard = self.mutation.lock().await;
-        let staged = self.state.lock().await.pending.get(identity).cloned();
+        let staged = self
+            .state
+            .lock()
+            .map_err(|_| "server destination state lock poisoned")?
+            .pending
+            .get(identity)
+            .cloned();
         let Some(staged) = staged else { return Ok(()) };
         validate_destination(&staged)?;
         let entries = {
-            let state = self.state.lock().await;
+            let state = self.state.lock().map_err(|_| "server destination state lock poisoned")?;
             let mut entries = state.entries.clone();
             if !entries.contains_key(identity) && entries.len() >= MAX_ENTRIES {
                 return Err("server destination store capacity exhausted".to_string());
@@ -186,7 +195,7 @@ impl ServerDestinationStore {
             entries
         };
         self.publish(&entries).await?;
-        let mut state = self.state.lock().await;
+        let mut state = self.state.lock().map_err(|_| "server destination state lock poisoned")?;
         state.entries = entries;
         state.pending.remove(identity);
         Ok(())
@@ -197,28 +206,36 @@ impl ServerDestinationStore {
         if validate_identity(identity).is_err() {
             return;
         }
-        self.state.lock().await.pending.remove(identity);
+        self.state
+            .lock()
+            .expect("server destination state lock poisoned")
+            .pending
+            .remove(identity);
     }
 
     /// Drop a staged candidate without awaiting, for cancellation/drop guards.
     ///
-    /// Uses `try_lock`; if the state lock is momentarily contended the staged
-    /// value is left for the next explicit `discard` or `load`. State locks
-    /// are held only for short in-memory updates, never across network or
-    /// file I/O, so contention is not expected on the cancellation path.
+    /// The state lock is synchronous and held only for this bounded
+    /// in-memory update, so cancellation cleanup cannot silently be skipped.
     pub fn discard_sync(&self, identity: &str) {
         if validate_identity(identity).is_err() {
             return;
         }
-        if let Ok(mut state) = self.state.try_lock() {
-            state.pending.remove(identity);
-        }
+        self.state
+            .lock()
+            .expect("server destination state lock poisoned")
+            .pending
+            .remove(identity);
     }
 
     /// Return the number of staged (uncommitted) candidates, for tests.
     #[cfg(test)]
     pub async fn staged_count(&self) -> usize {
-        self.state.lock().await.pending.len()
+        self.state
+            .lock()
+            .expect("server destination state lock poisoned")
+            .pending
+            .len()
     }
 
     /// Publish or replace one validated identity.
@@ -231,7 +248,7 @@ impl ServerDestinationStore {
         validate_destination(destination.as_str())?;
         let _guard = self.mutation.lock().await;
         let entries = {
-            let state = self.state.lock().await;
+            let state = self.state.lock().map_err(|_| "server destination state lock poisoned")?;
             let mut entries = state.entries.clone();
             if !entries.contains_key(identity) && entries.len() >= MAX_ENTRIES {
                 return Err("server destination store capacity exhausted".to_string());
@@ -240,7 +257,7 @@ impl ServerDestinationStore {
             entries
         };
         self.publish(&entries).await?;
-        let mut state = self.state.lock().await;
+        let mut state = self.state.lock().map_err(|_| "server destination state lock poisoned")?;
         state.entries = entries;
         state.pending.remove(identity);
         Ok(())
@@ -294,7 +311,7 @@ impl ServerDestinationStore {
         validate_identity(identity)?;
         let _guard = self.mutation.lock().await;
         let entries = {
-            let state = self.state.lock().await;
+            let state = self.state.lock().map_err(|_| "server destination state lock poisoned")?;
             if !state.entries.contains_key(identity) {
                 return Ok(false);
             }
@@ -303,7 +320,7 @@ impl ServerDestinationStore {
             entries
         };
         self.publish(&entries).await?;
-        let mut state = self.state.lock().await;
+        let mut state = self.state.lock().map_err(|_| "server destination state lock poisoned")?;
         state.entries = entries;
         state.pending.remove(identity);
         Ok(true)
@@ -313,7 +330,7 @@ impl ServerDestinationStore {
     pub async fn prune_unreferenced(&self, referenced: &BTreeSet<String>) -> Result<(), String> {
         let _guard = self.mutation.lock().await;
         let entries = {
-            let state = self.state.lock().await;
+            let state = self.state.lock().map_err(|_| "server destination state lock poisoned")?;
             state
                 .entries
                 .iter()
@@ -321,11 +338,21 @@ impl ServerDestinationStore {
                 .map(|(identity, destination)| (identity.clone(), destination.clone()))
                 .collect::<BTreeMap<_, _>>()
         };
-        if entries.len() == self.state.lock().await.entries.len() {
+        if entries.len()
+            == self
+                .state
+                .lock()
+                .map_err(|_| "server destination state lock poisoned")?
+                .entries
+                .len()
+        {
             return Ok(());
         }
         self.publish(&entries).await?;
-        self.state.lock().await.entries = entries;
+        self.state
+            .lock()
+            .map_err(|_| "server destination state lock poisoned")?
+            .entries = entries;
         Ok(())
     }
 

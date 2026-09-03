@@ -77,6 +77,83 @@ use emissary_core::{
 
 use crate::tunnel_client::{StartupTunnelAction, StartupTunnelLifecycleHandle, StartupTunnelState};
 
+#[cfg(test)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CommitBoundary {
+    BeforeSecretCommit,
+    AfterFreshSecretCommit,
+    AfterReplacementSecretCommit,
+    BeforeExistingDefinitionPersist,
+}
+
+#[cfg(test)]
+struct CommitPhaseTestHook {
+    boundary: std::sync::Mutex<Option<CommitBoundary>>,
+    entered: std::sync::atomic::AtomicBool,
+    entered_notify: tokio::sync::Notify,
+    release: tokio::sync::Notify,
+    terminalized: std::sync::atomic::AtomicBool,
+    terminalized_notify: tokio::sync::Notify,
+}
+
+#[cfg(test)]
+impl CommitPhaseTestHook {
+    fn new() -> Self {
+        Self {
+            boundary: std::sync::Mutex::new(None),
+            entered: std::sync::atomic::AtomicBool::new(false),
+            entered_notify: tokio::sync::Notify::new(),
+            release: tokio::sync::Notify::new(),
+            terminalized: std::sync::atomic::AtomicBool::new(false),
+            terminalized_notify: tokio::sync::Notify::new(),
+        }
+    }
+
+    fn arm(&self, boundary: CommitBoundary) {
+        *self.boundary.lock().expect("commit hook lock poisoned") = Some(boundary);
+        self.entered.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.terminalized.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    async fn pause(&self, boundary: CommitBoundary) {
+        let armed = {
+            let mut configured = self.boundary.lock().expect("commit hook lock poisoned");
+            let armed = configured.as_ref() == Some(&boundary);
+            if armed {
+                configured.take();
+            }
+            armed
+        };
+        if !armed {
+            return;
+        }
+        self.entered.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.entered_notify.notify_waiters();
+        self.release.notified().await;
+    }
+
+    async fn wait_entered(&self) {
+        while !self.entered.load(std::sync::atomic::Ordering::SeqCst) {
+            self.entered_notify.notified().await;
+        }
+    }
+
+    fn release(&self) {
+        self.release.notify_one();
+    }
+
+    fn mark_terminalized(&self) {
+        self.terminalized.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.terminalized_notify.notify_waiters();
+    }
+
+    async fn wait_terminalized(&self) {
+        while !self.terminalized.load(std::sync::atomic::Ordering::SeqCst) {
+            self.terminalized_notify.notified().await;
+        }
+    }
+}
+
 /// Maximum number of startup and control-plane tunnel definitions exposed by
 /// one logical inventory.
 pub const MAX_TUNNEL_INVENTORY: usize = 1000;
@@ -783,6 +860,8 @@ pub struct ProductionTunnelManagerControl {
     client_destinations: ClientDestinationStore,
     sam_tcp_port: Option<u16>,
     lifecycle: Arc<tokio::sync::Mutex<BTreeMap<String, Arc<tokio::sync::Mutex<()>>>>>,
+    #[cfg(test)]
+    commit_hook: Arc<CommitPhaseTestHook>,
 }
 
 /// Bounded server-start transaction state.
@@ -803,15 +882,6 @@ struct PreparedServerStart {
     definition: TunnelDefinition,
     kind: ServerStartKind,
     _guard: ServerStartGuard,
-}
-
-impl PreparedServerStart {
-    /// Disarm the cancellation guard once explicit commit/rollback ownership
-    /// begins. Explicit async paths manage staging themselves; the guard
-    /// remains only for cancellation between staging and this point.
-    fn disarm(&mut self) {
-        self._guard.store.take();
-    }
 }
 
 /// Cancellation guard for staged server secrets.
@@ -897,6 +967,8 @@ impl ProductionTunnelManagerControl {
             client_destinations,
             sam_tcp_port,
             lifecycle: Arc::new(tokio::sync::Mutex::new(BTreeMap::new())),
+            #[cfg(test)]
+            commit_hook: Arc::new(CommitPhaseTestHook::new()),
         })
     }
 
@@ -1065,7 +1137,11 @@ impl ProductionTunnelManagerControl {
         )
     }
 
-    async fn start_locked(&self, name: &str) -> Result<String, String> {
+    async fn start_locked(
+        &self,
+        name: &str,
+        lifecycle: tokio::sync::OwnedMutexGuard<()>,
+    ) -> Result<String, String> {
         if self.startup.get(name)?.is_some() {
             return self.startup_action(name, StartupTunnelAction::Start).await;
         }
@@ -1126,12 +1202,9 @@ impl ProductionTunnelManagerControl {
                         self.rollback_server_start(prepared).await;
                         return Ok("error - server runtime did not publish a destination".into());
                     };
-                    if let Err(error) = self
-                        .commit_server_start(prepared, destination)
-                        .await
-                    {
-                        return Ok(format!("error - {error}"));
-                    }
+                    return self
+                        .terminalize_server_start(prepared, destination, lifecycle)
+                        .await;
                 }
                 Ok("ok".to_string())
             }
@@ -1318,6 +1391,32 @@ impl ProductionTunnelManagerControl {
         drop(prepared);
     }
 
+    /// Transfer the prepared transaction and the per-name lifecycle owner to
+    /// a bounded task before the first commit-phase await. The caller only
+    /// awaits the result channel; cancelling that await cannot cancel the
+    /// transaction or release lifecycle exclusion.
+    async fn terminalize_server_start(
+        &self,
+        prepared: PreparedServerStart,
+        destination: String,
+        lifecycle: tokio::sync::OwnedMutexGuard<()>,
+    ) -> Result<String, String> {
+        let manager = self.clone();
+        let (result_tx, result_rx) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            let result = manager.commit_server_start(prepared, destination).await;
+            #[cfg(test)]
+            manager.commit_hook.mark_terminalized();
+            drop(lifecycle);
+            let _ = result_tx.send(result);
+        });
+        match result_rx.await {
+            Ok(Ok(())) => Ok("ok".to_string()),
+            Ok(Err(error)) => Ok(format!("error - {error}")),
+            Err(_) => Err("server start terminalization task exited".to_string()),
+        }
+    }
+
     /// Commit a staged server start after the runtime published a destination.
     ///
     /// Secret commit precedes durable definition persistence. Any failure
@@ -1327,17 +1426,17 @@ impl ProductionTunnelManagerControl {
     /// after the secret is safely committed.
     async fn commit_server_start(
         &self,
-        mut prepared: PreparedServerStart,
+        prepared: PreparedServerStart,
         destination: String,
     ) -> Result<(), String> {
-        // Explicit ownership starts here; disarm the drop guard so it cannot
-        // clear staging underneath the async commit below.
-        prepared.disarm();
         let backend = self.registry.get(prepared.definition.tunnel_type);
-        match prepared.kind {
+        match &prepared.kind {
             ServerStartKind::NotServer | ServerStartKind::ExistingUnchanged => {
                 let definition = prepared.definition.clone();
-                drop(prepared);
+                #[cfg(test)]
+                self.commit_hook
+                    .pause(CommitBoundary::BeforeExistingDefinitionPersist)
+                    .await;
                 if let Err(error) = self
                     .persist_server_public_destination(definition.clone(), destination)
                     .await
@@ -1347,15 +1446,20 @@ impl ProductionTunnelManagerControl {
                 }
                 Ok(())
             }
-            ServerStartKind::Fresh { ref identity } => {
+            ServerStartKind::Fresh { identity } => {
                 let identity = identity.clone();
                 let definition = prepared.definition.clone();
-                drop(prepared);
+                #[cfg(test)]
+                self.commit_hook.pause(CommitBoundary::BeforeSecretCommit).await;
                 if let Err(error) = self.server_destinations.commit(&identity).await {
                     let _ = backend.stop(&definition).await;
                     self.server_destinations.discard(&identity).await;
                     return Err(error);
                 }
+                #[cfg(test)]
+                self.commit_hook
+                    .pause(CommitBoundary::AfterFreshSecretCommit)
+                    .await;
                 if let Err(error) = self
                     .persist_server_public_destination(definition.clone(), destination)
                     .await
@@ -1367,18 +1471,23 @@ impl ProductionTunnelManagerControl {
                 Ok(())
             }
             ServerStartKind::Replacement {
-                ref identity,
-                ref previous_private,
+                identity,
+                previous_private,
             } => {
                 let identity = identity.clone();
                 let previous_private = previous_private.clone();
                 let definition = prepared.definition.clone();
-                drop(prepared);
+                #[cfg(test)]
+                self.commit_hook.pause(CommitBoundary::BeforeSecretCommit).await;
                 if let Err(error) = self.server_destinations.commit(&identity).await {
                     let _ = backend.stop(&definition).await;
                     self.server_destinations.discard(&identity).await;
                     return Err(error);
                 }
+                #[cfg(test)]
+                self.commit_hook
+                    .pause(CommitBoundary::AfterReplacementSecretCommit)
+                    .await;
                 if let Err(error) = self
                     .persist_server_public_destination(definition.clone(), destination)
                     .await
@@ -1424,6 +1533,8 @@ impl Clone for ProductionTunnelManagerControl {
             client_destinations: self.client_destinations.clone(),
             sam_tcp_port: self.sam_tcp_port,
             lifecycle: Arc::clone(&self.lifecycle),
+            #[cfg(test)]
+            commit_hook: Arc::clone(&self.commit_hook),
         }
     }
 }
@@ -1602,11 +1713,11 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn start(&self, name: &str) -> Result<String, String> {
-        let _lifecycle = self.lifecycle_lock(name).await;
+        let lifecycle = self.lifecycle_lock(name).await;
         if self.startup.get(name)?.is_some() {
             return self.startup_action(name, StartupTunnelAction::Start).await;
         }
-        self.start_locked(name).await
+        self.start_locked(name, lifecycle).await
     }
 
     async fn stop(&self, name: &str) -> Result<String, String> {
@@ -1629,7 +1740,7 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn restart(&self, name: &str) -> Result<String, String> {
-        let _lifecycle = self.lifecycle_lock(name).await;
+        let lifecycle = self.lifecycle_lock(name).await;
         if self.startup.get(name)?.is_some() {
             return self.startup_action(name, StartupTunnelAction::Restart).await;
         }
@@ -1647,7 +1758,7 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         // Reload after the exact stop. This prevents a restart from using a
         // stale pre-edit definition and keeps the old and new generations
         // strictly non-overlapping.
-        self.start_locked(name).await
+        self.start_locked(name, lifecycle).await
     }
 
     fn get_backend(&self, tunnel_type: TunnelType) -> Option<Arc<dyn TunnelBackend>> {
@@ -3098,6 +3209,233 @@ mod tests {
             !tmp.path().join("server-destinations").join("current.json").exists(),
             "cancelled staging must not reach durability"
         );
+    }
+
+    // --- M123 commit-phase cancellation atomicity regressions ---
+
+    #[tokio::test]
+    async fn m123_abort_before_fresh_secret_commit_terminalizes_and_holds_lifecycle() {
+        let secret = m120_secret(0x11);
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, sam_task) = m120_succeeding_sam().await;
+        let manager = m120_manager_with_sam(&tmp, sam_port).await;
+        m120_write_import(tmp.path(), "fresh-before-commit.key", &secret);
+        let mut definition = m120_server_definition("m123-fresh-before", TunnelType::Server);
+        definition.options.priv_key_file = Some("fresh-before-commit.key".to_owned());
+        manager.create(definition).await.unwrap();
+
+        let hook = Arc::clone(&manager.commit_hook);
+        hook.arm(CommitBoundary::BeforeSecretCommit);
+        let worker_manager = manager.clone();
+        let worker = tokio::spawn(async move { worker_manager.start("m123-fresh-before").await });
+        hook.wait_entered().await;
+        assert_eq!(manager.server_destinations.staged_count().await, 1);
+        assert!(!tmp.path().join("server-destinations/current.json").exists());
+
+        let competing_manager = manager.clone();
+        let mut competing = tokio::spawn(async move {
+            competing_manager.stop("m123-fresh-before").await
+        });
+        assert!(tokio::time::timeout(std::time::Duration::from_millis(50), &mut competing)
+            .await
+            .is_err());
+
+        worker.abort();
+        let _ = worker.await;
+        hook.release();
+        hook.wait_terminalized().await;
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+        assert_eq!(competing.await.unwrap().unwrap(), "ok");
+
+        drop(manager);
+        let reloaded = m120_manager_with_sam(&tmp, sam_port).await;
+        let stored = reloaded.get("m123-fresh-before").await.unwrap().unwrap();
+        let identity = m120_identity_of(&stored).expect("fresh identity committed");
+        assert_eq!(stored.options.hosting_destination.as_deref(), Some("server-destination"));
+        assert_eq!(
+            reloaded.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
+            secret
+        );
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m123_abort_after_fresh_secret_commit_finishes_definition_persistence() {
+        let secret = m120_secret(0x22);
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, sam_task) = m120_succeeding_sam().await;
+        let manager = m120_manager_with_sam(&tmp, sam_port).await;
+        m120_write_import(tmp.path(), "fresh-after-commit.key", &secret);
+        let mut definition = m120_server_definition("m123-fresh-after", TunnelType::Server);
+        definition.options.priv_key_file = Some("fresh-after-commit.key".to_owned());
+        manager.create(definition).await.unwrap();
+
+        let hook = Arc::clone(&manager.commit_hook);
+        hook.arm(CommitBoundary::AfterFreshSecretCommit);
+        let worker_manager = manager.clone();
+        let worker = tokio::spawn(async move { worker_manager.start("m123-fresh-after").await });
+        hook.wait_entered().await;
+        let bytes = tokio::fs::read(tmp.path().join("server-destinations/current.json"))
+            .await
+            .unwrap();
+        let envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(envelope["entries"].as_object().unwrap().len(), 1);
+        assert!(
+            m120_identity_of(&manager.get("m123-fresh-after").await.unwrap().unwrap()).is_none()
+        );
+
+        worker.abort();
+        let _ = worker.await;
+        hook.release();
+        hook.wait_terminalized().await;
+        let stored = manager.get("m123-fresh-after").await.unwrap().unwrap();
+        let identity = m120_identity_of(&stored).expect("fresh identity committed");
+        assert_eq!(stored.options.hosting_destination.as_deref(), Some("server-destination"));
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+
+        drop(manager);
+        let reloaded = m120_manager_with_sam(&tmp, sam_port).await;
+        let stored = reloaded.get("m123-fresh-after").await.unwrap().unwrap();
+        assert_eq!(m120_identity_of(&stored).as_deref(), Some(identity.as_str()));
+        assert_eq!(
+            reloaded.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
+            secret
+        );
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m123_abort_after_replacement_secret_commit_finishes_matching_definition() {
+        let old_secret = m120_secret(0x33);
+        let new_secret = m120_secret(0x44);
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, sam_task) = m120_succeeding_sam().await;
+        let manager = m120_manager_with_sam(&tmp, sam_port).await;
+        m120_write_import(tmp.path(), "m123-old.key", &old_secret);
+        m120_write_import(tmp.path(), "m123-new.key", &new_secret);
+        let mut definition = m120_server_definition("m123-replacement", TunnelType::Server);
+        definition.options.priv_key_file = Some("m123-old.key".to_owned());
+        manager.create(definition).await.unwrap();
+        assert_eq!(manager.start("m123-replacement").await.unwrap(), "ok");
+        manager.stop("m123-replacement").await.unwrap();
+
+        let identity = m120_identity_of(&manager.get("m123-replacement").await.unwrap().unwrap())
+            .expect("identity committed");
+        let mut replacement = manager.get("m123-replacement").await.unwrap().unwrap();
+        replacement.options.priv_key_file = Some("m123-new.key".to_owned());
+        manager.update("m123-replacement", replacement, None).await.unwrap();
+
+        let hook = Arc::clone(&manager.commit_hook);
+        hook.arm(CommitBoundary::AfterReplacementSecretCommit);
+        let worker_manager = manager.clone();
+        let worker = tokio::spawn(async move { worker_manager.start("m123-replacement").await });
+        hook.wait_entered().await;
+        assert_eq!(
+            manager.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
+            new_secret
+        );
+        let paused = manager.get("m123-replacement").await.unwrap().unwrap();
+        assert_eq!(
+            paused
+                .raw_config
+                .get(crate::i2pcontrol::backends::server::SERVER_PUBLIC_DESTINATION_KEY)
+                .and_then(|value| value.as_str()),
+            Some("server-destination")
+        );
+
+        worker.abort();
+        let _ = worker.await;
+        hook.release();
+        hook.wait_terminalized().await;
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+        assert_eq!(
+            manager.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
+            new_secret
+        );
+        manager.stop("m123-replacement").await.unwrap();
+
+        drop(manager);
+        let reloaded = m120_manager_with_sam(&tmp, sam_port).await;
+        assert_eq!(
+            reloaded.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
+            new_secret
+        );
+        let stored = reloaded.get("m123-replacement").await.unwrap().unwrap();
+        assert_eq!(m120_identity_of(&stored).as_deref(), Some(identity.as_str()));
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m123_abort_existing_unchanged_start_finishes_public_persistence() {
+        let secret = m120_secret(0x55);
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, sam_task) = m120_succeeding_sam().await;
+        let manager = m120_manager_with_sam(&tmp, sam_port).await;
+        m120_write_import(tmp.path(), "m123-existing.key", &secret);
+        let mut definition = m120_server_definition("m123-existing", TunnelType::Server);
+        definition.options.priv_key_file = Some("m123-existing.key".to_owned());
+        manager.create(definition).await.unwrap();
+        assert_eq!(manager.start("m123-existing").await.unwrap(), "ok");
+        manager.stop("m123-existing").await.unwrap();
+
+        let mut unchanged = manager.get("m123-existing").await.unwrap().unwrap();
+        unchanged.options.priv_key_file = None;
+        manager.update("m123-existing", unchanged, None).await.unwrap();
+        let identity = m120_identity_of(&manager.get("m123-existing").await.unwrap().unwrap())
+            .expect("identity committed");
+        let hook = Arc::clone(&manager.commit_hook);
+        hook.arm(CommitBoundary::BeforeExistingDefinitionPersist);
+        let worker_manager = manager.clone();
+        let worker = tokio::spawn(async move { worker_manager.start("m123-existing").await });
+        hook.wait_entered().await;
+        worker.abort();
+        let _ = worker.await;
+        hook.release();
+        hook.wait_terminalized().await;
+
+        let stored = manager.get("m123-existing").await.unwrap().unwrap();
+        assert_eq!(m120_identity_of(&stored).as_deref(), Some(identity.as_str()));
+        assert_eq!(stored.options.hosting_destination.as_deref(), Some("server-destination"));
+        assert_eq!(
+            manager.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
+            secret
+        );
+        manager.stop("m123-existing").await.unwrap();
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m123_abort_restart_start_phase_terminalizes_before_competing_stop() {
+        let secret = m120_secret(0x66);
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, sam_task) = m120_succeeding_sam().await;
+        let manager = m120_manager_with_sam(&tmp, sam_port).await;
+        m120_write_import(tmp.path(), "m123-restart.key", &secret);
+        let mut definition = m120_server_definition("m123-restart", TunnelType::Server);
+        definition.options.priv_key_file = Some("m123-restart.key".to_owned());
+        manager.create(definition).await.unwrap();
+        assert_eq!(manager.start("m123-restart").await.unwrap(), "ok");
+        manager.stop("m123-restart").await.unwrap();
+
+        let hook = Arc::clone(&manager.commit_hook);
+        hook.arm(CommitBoundary::BeforeSecretCommit);
+        let worker_manager = manager.clone();
+        let worker = tokio::spawn(async move { worker_manager.restart("m123-restart").await });
+        hook.wait_entered().await;
+        let competing_manager = manager.clone();
+        let mut competing = tokio::spawn(async move {
+            competing_manager.stop("m123-restart").await
+        });
+        assert!(tokio::time::timeout(std::time::Duration::from_millis(50), &mut competing)
+            .await
+            .is_err());
+        worker.abort();
+        let _ = worker.await;
+        hook.release();
+        hook.wait_terminalized().await;
+        assert_eq!(competing.await.unwrap().unwrap(), "ok");
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+        sam_task.abort();
     }
 
     #[tokio::test]

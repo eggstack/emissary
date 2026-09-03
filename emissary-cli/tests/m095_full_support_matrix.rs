@@ -362,6 +362,14 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         internal_ssl["cells"].as_array().unwrap()[1].as_str(),
         Some("not_applicable")
     );
+    assert_eq!(
+        internal_ssl["cells"].as_array().unwrap()[8].as_str(),
+        Some("not_applicable")
+    );
+    assert_eq!(
+        internal_ssl["cells"].as_array().unwrap()[9].as_str(),
+        Some("not_applicable")
+    );
 
     for key in [
         "WebsiteHostname",
@@ -418,7 +426,6 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         }
     }
     for key in [
-        "AllowInternalSSL",
         "UniqueLocalAddressPerClient",
         "MultiHoming",
         "EncryptLeaseSet",
@@ -511,12 +518,12 @@ fn current_matrix_counts_are_explicit_and_exact() {
             }
             counts
         });
-    assert_eq!(counts, (284, 98, 458));
+    assert_eq!(counts, (284, 96, 460));
     let declared = root
         .get("current_matrix_counts")
         .and_then(Value::as_table)
         .expect("current matrix counts are declared");
     assert_eq!(declared["apply"].as_integer(), Some(284));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(98));
-    assert_eq!(declared["not_applicable"].as_integer(), Some(458));
+    assert_eq!(declared["blocked_primitive"].as_integer(), Some(96));
+    assert_eq!(declared["not_applicable"].as_integer(), Some(460));
 }

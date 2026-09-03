@@ -365,19 +365,18 @@ tasks and Yosemite exposes no session-activity observation primitive. Any suppli
 (0–60,000 ms) remains applied via the generation-local outbound connector.
 `Shared=true` cannot be combined with `Close=true`, because one member must not close a session owned by another member.
 M113 re-validated the remaining server presentation/routing and LeaseSet cells and
-closed them as blocked: `AllowInternalSSL`, `UniqueLocalAddressPerClient`, and
-`MultiHoming` have no bounded TLS termination or safe per-client/multihomed
-routing owner without weakening M093 loopback confinement, and
-`EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` have no Proposal
-mapping or router encrypted-LeaseSet construction owner. The underlying SAM
-transport is no longer the blocker: Yosemite Y004's canonical generic fields were
-adopted by M122, and Yosemite Y005 (`59140a2`, adopted by M124) adds the
-cross-field auth/type consistency validation. The dependency now serializes
-the corrected generic fields (`i2cp.leaseSetPrivateKey`,
-`i2cp.leaseSetSigningPrivateKey`, mode-aware `i2cp.leaseSetClient.dh/psk`
-entries, reference-backed type domains), proven reachable by I2PControl adapter
-tests — but no Proposal path maps them and no downgrade is permitted, so all 21
-cells fail before allocation.
+closed them as blocked. M125 corrected the two server-role `AllowInternalSSL`
+cells to `not_applicable`, because Proposal 170 places that option under HTTP
+client filtering. `UniqueLocalAddressPerClient` and `MultiHoming` still have no
+bounded per-client/multihomed routing owner without weakening M093 loopback
+confinement, and `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths`
+still have no Proposal mapping or router encrypted-LeaseSet construction owner.
+The underlying SAM transport is no longer the blocker: Yosemite Y004's canonical
+generic fields were adopted by M122, and Yosemite Y005 (`59140a2`, adopted by
+M124) adds cross-field auth/type consistency validation. The dependency now
+serializes corrected generic fields, proven reachable by I2PControl adapter
+tests, but that is transport reachability only; no Proposal path maps them and
+no downgrade is permitted, so the remaining 19 cells fail before allocation.
 
 | Disposition | Proposal 170 fields |
 |---|---|
@@ -386,7 +385,7 @@ cells fail before allocation.
 | Applied by six streaming client lifecycle owners | `ConnectDelay` (0–60,000 ms) |
 | Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, `SSLProxies`, `JumpList`, `Profile`, `Reduce`, `ReduceCount`, `ReduceTime`, `Close`, `CloseTime`, `NewDest`, Streamr `DelayOpen`, Streamr `Close`, `CloseTime`, and `NewDest` cells without a meaningful Streamr equivalent; `SigType` for all applicable families |
 | Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime` |
-| Rejected before allocation as residual server blockers | `AllowInternalSSL`, `UniqueLocalAddressPerClient`, `MultiHoming`, `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
+| Rejected before allocation as residual server blockers | `UniqueLocalAddressPerClient`, `MultiHoming`, `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
 | Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
 
 `PrivKeyFile` is part of the pinned input inventory and is retained as a redacted
@@ -454,9 +453,10 @@ Absent admission values default to 30 global
 connections, 8 concurrent connections per peer, peer rates 30/80/200 per
 minute/hour/day, and aggregate rates 50 per minute and unlimited per hour/day.
 It rejects TLS termination, compression/custom options, proxy/outproxy
-settings, `AllowInternalSSL`, `UniqueLocalAddressPerClient`, `MultiHoming`, and
-LeaseSet security options before session allocation (M113 closed these 21 cells
-as blocked with exact primitive evidence; they are not silently ignored). Request proxy identity and privacy headers are stripped, trusted
+settings, `UniqueLocalAddressPerClient`, `MultiHoming`, and LeaseSet security
+options before session allocation (M125 corrected the two server-role
+`AllowInternalSSL` cells to not applicable; 19 M113 cells remain blocked with
+exact primitive evidence and are not silently ignored). Request proxy identity and privacy headers are stripped, trusted
 peer identity injection is bounded to the 524-byte reference destination
 representation, and response fingerprint/provider/cache/trace headers are
 removed before forwarding. Content-Length and valid chunked framing are

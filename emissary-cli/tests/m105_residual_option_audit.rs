@@ -233,7 +233,8 @@ fn audit_covers_the_exact_m104_residual_inventory() {
     // M121 demotes 10 SigType + 18 Close/CloseTime/NewDest cells back to
     // blocked_primitive. The M105 input inventory is historical (164 rows);
     // the current matrix blocked set must equal the post-M112 blocked set
-    // plus exactly the M121 demoted cells.
+    // plus exactly the M121 demoted cells, less the two M125 classification
+    // corrections.
     let m121_demoted: BTreeSet<(String, String)> = ["SigType"]
         .into_iter()
         .flat_map(|option| {
@@ -265,7 +266,15 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         .union(&m121_demoted)
         .cloned()
         .collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m121);
+    let m125_reclassified = ["httpserver", "httpbidirserver"]
+        .into_iter()
+        .map(|tunnel_type| ("AllowInternalSSL".to_owned(), tunnel_type.to_owned()))
+        .collect::<BTreeSet<_>>();
+    let expected_post_m125 = expected_post_m121
+        .difference(&m125_reclassified)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m125);
     assert_eq!(audit["summary"]["post_m116_reclassified_cells"].as_integer(), Some(7));
     assert_eq!(audit["summary"]["post_m116_blocking_milestone"].as_str(), Some("M112"));
     assert_eq!(audit["summary"]["post_m112_matrix_apply_cells"].as_integer(), Some(312));

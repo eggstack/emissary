@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | active / partial | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | historical M114 closed as blocked |
-| Post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M124 closed; focused M113 audit authorized** |
+| Post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M125 closed; no successor implementation ready** |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
 
 ## Current production state
@@ -43,7 +43,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 - M119 corrected M118 standby expiry/variance semantics.
 - M121 truthfully demoted unsupported `SigType` and `Close`/`CloseTime`/`NewDest` semantics.
 - M122 exact-pinned Yosemite Y004; M124 exact-pins Yosemite Y005 `59140a2277bf296928d2e8ce39a148182eeff044` through the optional I2PControl-only alias; ordinary Yosemite remains registry 0.7.0.
-- Current M095 matrix remains `284 apply / 98 blocked_primitive / 458 not_applicable`.
+- Current M095 matrix is `284 apply / 96 blocked_primitive / 460 not_applicable` after M125 reclassified two server-role `AllowInternalSSL` cells as not applicable.
 - Full Proposal 170 status remains **partial**.
 
 ## Post-M122 corrective findings
@@ -83,10 +83,10 @@ M123 M120 commit-phase cancellation atomicity   [CLOSED]       |
 M124 Y005 exact-pin adoption                    [CLOSED]
   |
   v
-focused M113/LeaseSet capability/crypto audit   [AUTHORIZED / NOT YET REGISTERED]
+M125 M113 capability/crypto ownership audit     [CLOSED — 2 CELLS RECLASSIFIED]
   |
   v
-remaining residual implementation + new final reclosure       [FUTURE]
+remaining residual implementation + new final reclosure       [FUTURE / 96 BLOCKED]
 ```
 
 ## Current Emissary handoff — M123
@@ -109,6 +109,18 @@ Objective:
 - preserve M120 validation order, secret confinement and current matrix counts.
 
 M123 is closed. M124 is now closed after Yosemite Y005 closure and independent consumer review.
+
+M125 is closed after the focused M113 capability/crypto-ownership audit. It corrected the
+`AllowInternalSSL` server-role classification and confirmed that no safe encrypted LeaseSet,
+per-client address, or multihoming owner is available for the remaining M113 cells.
+
+## Recently closed plan — M125
+
+Plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/125-m113-capability-crypto-ownership-audit.md`
+
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/125-closure.md`.
 
 ## Recently closed plan — M124
 
@@ -138,18 +150,21 @@ Y005 freezes and enforces the relationship among LeaseSet type, `leaseSetAuthTyp
 
 ## Residual Proposal state
 
-Current blocked count 98 remains:
+Current blocked count 96 remains:
 
 - 4 M111 `UseSSL` cells;
 - 10 M121-demoted `SigType` cells;
 - 63 M112 client proxy/profile/reduction/lifecycle cells, including 18 M121-demoted `Close`/`CloseTime`/`NewDest` cells;
-- 21 M113 presentation/routing/LeaseSet cells.
+- 19 M113 presentation/routing/LeaseSet cells; the two server-role `AllowInternalSSL` cells
+  are not applicable because Proposal 170 places that option under HTTP client filtering.
 
-M123, Y005 and M124 are correctness/infrastructure work and do not promote any cell.
+M123, Y005 and M124 are correctness/infrastructure work and do not promote any cell. M125
+reclassifies only the two misclassified server-role `AllowInternalSSL` cells; it promotes no
+runtime capability.
 
-The focused M113/LeaseSet capability/crypto-ownership audit is authorized to proceed as read-only
-planning work now that M124 is closed. Current Emissary `SamSession` still lacks an accepted
-encrypted/authenticated LeaseSet construction owner; serializer capability alone is not support.
+M125 found no dependency-ready M113 successor. Current Emissary `SamSession` still lacks an
+accepted encrypted/authenticated LeaseSet construction owner; serializer capability alone is
+not support.
 
 ## Recently closed / superseded claims
 
@@ -157,21 +172,22 @@ encrypted/authenticated LeaseSet construction owner; serializer capability alone
 |---|---|
 | M119 | closed |
 | M120 | historical closed; cancellation-atomicity claim requires M123 corrective |
-| M121 | closed at 284/98/458 |
+| M121 | historical closed at 284/98/458; current matrix corrected by M125 |
 | M122 | closed at exact Y004 pin; transport only |
 | M123 | closed |
 | M124 | closed at exact Y005 pin; focused M113 capability/crypto audit authorized |
+| M125 | closed; corrected two `AllowInternalSSL` classifications and froze remaining M113 blockers |
 
 Historical closure records remain unchanged. Corrective closures supersede only affected claims.
 
 ## Registry rules
 
-1. M123 and M124 are closed; the focused M113 capability/crypto-ownership audit is the next authorized read-only activity.
+1. M123, M124 and M125 are closed; no M113 successor implementation is dependency-ready.
 2. Yosemite Y005 is closed at `59140a2277bf296928d2e8ce39a148182eeff044`.
 3. Current Emissary uses exact Y005 only through the optional I2PControl alias; no floating/fork-head dependency is authorized.
 4. Historical closure records remain unchanged; M124 supersedes only the Y004 consumer-pin readiness claim.
-5. Matrix remains `284 / 98 / 458`; correctness infrastructure is not capability evidence.
-6. No M113/LeaseSet router implementation plan is registered until the focused crypto/ownership audit lands and freezes a safe canonical owner.
+5. Matrix is `284 / 96 / 460`; correctness infrastructure is not capability evidence.
+6. No M113/LeaseSet router implementation plan is registered because M125 found no safe canonical owner and exact runtime contract.
 7. Keep Proposal policy in `emissary-cli/src/i2pcontrol/**` wherever possible; M123 is I2PControl-only.
 8. No global Yosemite patch/replacement/vendor/path dependency is permitted.
 9. All external/upstream sources are read-only; no upstream issue/PR/review/submission/merge/adoption/contact/release activity is authorized.

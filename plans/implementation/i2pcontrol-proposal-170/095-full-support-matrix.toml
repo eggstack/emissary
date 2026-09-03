@@ -14,8 +14,8 @@ current_production_head = "21f4070cbe4eb71a7482e01ec0fdf512e2b2536b"
 [current_matrix_counts]
 total = 840
 apply = 284
-blocked_primitive = 98
-not_applicable = 458
+blocked_primitive = 96
+not_applicable = 460
 
 [contract_counts]
 router_info_total = 43
@@ -1326,12 +1326,10 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "residual-option-line"
-current_or_planned_disposition = "blocked_primitive_or_not_applicable"
-blocked_primitive = "no bounded server-side TLS trust/termination owner in the supported Yosemite/I2PControl path"
-blocking_milestone = "M097"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "This type is not an HTTP client/server filter role.", "httpclient" = "The accepted HTTP client data plane is HTTP-only; no client TLS role exists, so this is not applicable.", "ircclient" = "This type is not an HTTP client/server filter role.", "socks" = "This type is not an HTTP client/server filter role.", "socksirc" = "This type is not an HTTP client/server filter role.", "connectclient" = "This type is not an HTTP client/server filter role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP client/server filter role.", "httpserver" = "Blocked: no supported server-side TLS trust/termination owner.", "httpbidirserver" = "Blocked: no supported server-side TLS trust/termination owner.", "ircserver" = "This type is not an HTTP client/server filter role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+completion_owner = "M125"
+current_or_planned_disposition = "not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP client/server filter role.", "httpclient" = "The accepted HTTP client data plane is HTTP-only; no client TLS role exists, so this is not applicable.", "ircclient" = "This type is not an HTTP client/server filter role.", "socks" = "This type is not an HTTP client/server filter role.", "socksirc" = "This type is not an HTTP client/server filter role.", "connectclient" = "This type is not an HTTP client/server filter role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "Proposal 170 places AllowInternalSSL under HTTP client filtering; it is not a server-role option.", "httpserver" = "Proposal 170 places AllowInternalSSL under HTTP client filtering; this server cell is not applicable.", "httpbidirserver" = "Proposal 170 places AllowInternalSSL under HTTP client filtering; this server cell is not applicable.", "ircserver" = "This type is not an HTTP client/server filter role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
 canonical_key = "WebsiteHostname"

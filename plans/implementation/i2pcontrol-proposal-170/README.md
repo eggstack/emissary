@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support**. Current authoritative M095 matrix: `284 apply / 98 blocked_primitive / 458 not_applicable`.
+Status: **partial Proposal 170 support**. Current authoritative M095 matrix: `284 apply / 96 blocked_primitive / 460 not_applicable`.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -50,14 +50,15 @@ Full Proposal 170 support is not claimed.
 | M122 | closed | exact Y004 dependency adoption; transport only |
 | **M123** | **closed** | M120 commit-phase cancellation/lifecycle atomicity corrective |
 | **M124** | **closed** | exact Y005 dependency adoption; no Proposal mapping |
+| **M125** | **closed** | focused M113 capability/crypto-ownership audit; 2 cells reclassified, no successor implementation |
 
 Yosemite independently registers:
 
 - **Y005 closed** at `59140a2277bf296928d2e8ce39a148182eeff044` — `eggstack/yosemite:plans/implementation/005-y004-leaseset-auth-mode-consistency-corrective.md`.
 
-M123 and M124 are closed. The focused M113/LeaseSet capability and crypto-ownership audit is
-now the next authorized read-only planning activity; no implementation plan is registered until
-that audit freezes a safe owner and exact runtime semantics.
+M123, M124 and M125 are closed. M125 completed the focused M113/LeaseSet capability and
+crypto-ownership audit. No successor implementation plan is registered because the audit did not
+freeze a safe owner and exact runtime semantics.
 
 ## M123 — server commit cancellation atomicity
 
@@ -91,16 +92,18 @@ M124 may not implement M113 LeaseSet features or change M095 counts.
 
 ## Residual Proposal ownership
 
-Current 98 blocked cells are:
+Current 96 blocked cells are:
 
 - 4 `UseSSL` cells;
 - 10 `SigType` cells;
 - 63 client proxy/profile/reduction/lifecycle cells, including 18 `Close`/`CloseTime`/`NewDest` cells;
-- 21 server presentation/routing/LeaseSet cells.
+- 19 server presentation/routing/LeaseSet cells; the two server-role `AllowInternalSSL` cells are
+  not applicable under Proposal 170's HTTP-client filtering classification.
 
-The focused M113/LeaseSet capability/crypto-ownership audit is unblocked for read-only
-execution now that M124 is closed. Serializer capability is not runtime support, and no
-M113-successor implementation plan is yet registered.
+M125 found that serializer reachability is transport capability only: current Emissary still has
+no accepted encrypted/authenticated LeaseSet construction owner. The two server-role
+`AllowInternalSSL` cells were corrected to `not_applicable`; all other M113 residuals remain
+explicitly blocked before allocation.
 
 ## Containment
 

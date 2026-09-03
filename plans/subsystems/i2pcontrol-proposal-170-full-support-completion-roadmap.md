@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M114, M115-M124 closed; M097/M104/M112/M113/M114 closed as blocked; focused M113 capability/crypto-ownership audit authorized but no successor implementation plan registered
+Status: active; M095-M114, M115-M125 closed; M097/M104/M112/M113/M114 closed as blocked; M125 capability/crypto-ownership audit closed with no successor implementation plan ready
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -10,6 +10,7 @@ M117 implementation head: `22c893a`.
 M118 implementation head: `e7f3e04`.
 M112 implementation head: `5b2f3caa6af8767ef393254f20ca010211a8de3a`.
 M113 implementation head: `82368ea` (closure-only; no production delta).
+M125 audit head: `97083896f6170962a8c9610d056e8fc2dd57646d` (audit baseline; no production delta).
 
 Pinned external authority:
 
@@ -63,8 +64,8 @@ The current authoritative M095 matrix records:
 
 - 70 option rows × 12 canonical tunnel types = 840 cells;
 - 284 `apply`;
-- 98 `blocked_primitive`;
-- 458 `not_applicable`;
+- 96 `blocked_primitive`;
+- 460 `not_applicable`;
 - 0 planned/unknown/unsupported/accept-inert cells.
 
 M116 closed with exact counts of 248 `apply`, 134 `blocked_primitive`, and 458 `not_applicable`. M111 then applied 40 SAM session-wire cells, and M112 applied 24 portable TCP client lifecycle cells, leaving 312 `apply`, 70 `blocked_primitive`, and 458 `not_applicable`. Post-M110 review found and M116 corrected defects in:
@@ -181,9 +182,9 @@ M095/M105 plus M110's completion ledger are current cell evidence, subject to M1
 | M110 | `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile` | 31 promoted cells | historically closed; M116 corrective authority |
 | M111 | `UseSSL`, `TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions` | 4 blocked after 40 applied | closed; UseSSL remains blocked with exact semantic reason |
 | M112 | proxy/plugin/jump + client `ConnectDelay`/`Profile`/remaining `DelayOpen`/`Reduce*`/`Close*`/`NewDest` | 45 blocked | closed as blocked; 24 TCP lifecycle cells applied, Streamr and unsupported owner cells retained |
-| M113 | server presentation/address-routing/LeaseSet | 21 blocked | closed as blocked; corrected SAM transport at Y004 `c2db73d` (M122), still no safe TLS/multihoming/LeaseSet router primitive |
+| M113 | server presentation/address-routing/LeaseSet | 19 blocked; 2 not applicable | historical closure retained; M125 corrected the two server-role `AllowInternalSSL` cells and confirmed no safe TLS/multihoming/LeaseSet router primitive |
 
-Current blocked count is 70 = 4 + 45 + 21.
+Current blocked count is 96 = 4 + 10 + 63 + 19.
 
 M116 returned M110 cells to `blocked_primitive` where exact semantics were absent. In particular:
 
@@ -222,11 +223,11 @@ M111 SAM session-wire options                       [CLOSED — 40 APPLY / 4 Use
 M112 client proxy/session-lifecycle residuals       [CLOSED AS BLOCKED — 24 APPLY / 45 REMAIN]
   |
   v
-M113 server presentation + LeaseSet residuals       [CLOSED AS BLOCKED — 0 APPLY / 21 REMAIN; 82368ea]
+M113 server presentation + LeaseSet residuals       [CLOSED AS BLOCKED — 19 REMAIN; M125 AUDITED]
   |
   | zero applicable residual cells + no open corrective
   v
-M114 live/reference interoperability + reclosure    [CLOSED AS BLOCKED — 70 residual cells; reference/public evidence unavailable]
+M114 live/reference interoperability + reclosure    [CLOSED AS BLOCKED — 96 residual cells; reference/public evidence unavailable]
 ```
 
 M110-M114 were numbered before later correctives M115/M116. Identifiers remain stable; execution order changes without renumbering.
@@ -328,12 +329,11 @@ Plan: `plans/implementation/i2pcontrol-proposal-170/113-server-presentation-addr
 
 Status: **closed as blocked**.
 
-Current result: 0 cells applied; 21 cells remain blocked with exact presentation/routing and LeaseSet primitive reasons. `AllowInternalSSL`, `UniqueLocalAddressPerClient`, and `MultiHoming` remain blocked because no bounded TLS termination or safe per-client/multihomed routing owner exists without weakening M093 loopback confinement; `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` remain blocked because, although Yosemite Y004's canonical generic encrypted-LeaseSet/client-auth fields were adopted by M122 and Y005 auth-mode consistency was adopted by M124, no Proposal path maps them and no router encrypted-LeaseSet construction owner exists. Closure: `plans/closure/i2pcontrol-proposal-170/113-closure.md`; dependency updates: `plans/closure/i2pcontrol-proposal-170/122-closure.md` and `plans/closure/i2pcontrol-proposal-170/124-closure.md`.
+Current result: 0 cells applied; 19 cells remain blocked and 2 server-role cells are not applicable. Proposal 170 places `AllowInternalSSL` under HTTP client filtering, so those two cells were corrected by M125. `UniqueLocalAddressPerClient` and `MultiHoming` remain blocked because no bounded per-client/multihomed routing owner exists without weakening M093 loopback confinement; `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` remain blocked because, although Yosemite Y004's canonical generic encrypted-LeaseSet/client-auth fields were adopted by M122 and Y005 auth-mode consistency was adopted by M124, no Proposal path maps them and no router encrypted-LeaseSet construction owner exists. Closure: `plans/closure/i2pcontrol-proposal-170/113-closure.md`; corrective audit: `plans/closure/i2pcontrol-proposal-170/125-closure.md`.
 
 M124 closed the exact Y005 optional dependency adoption without promoting any Proposal cell.
-The focused M113 capability/crypto-ownership audit is authorized to begin as read-only planning
-work; no M113-successor implementation plan is registered until it freezes an exact LeaseSet
-type/crypto/owner/lifecycle/runtime contract.
+M125 completed the focused capability/crypto-ownership audit. It found no exact LeaseSet
+type/crypto/owner/lifecycle/runtime contract that would safely unblock a successor plan.
 
 ## 14. M114 — final live/reference reclosure
 

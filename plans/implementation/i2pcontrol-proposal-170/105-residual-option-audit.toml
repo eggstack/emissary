@@ -77,6 +77,14 @@ post_m121_demoted_families = ["SigType", "Close", "CloseTime", "NewDest"]
 post_m121_demoted_tunnel_types = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient", "server", "httpserver", "httpbidirserver", "ircserver"]
 post_m121_blocking_milestone = "M121"
 post_m121_closure = "plans/closure/i2pcontrol-proposal-170/121-closure.md"
+post_m125_matrix_apply_cells = 284
+post_m125_matrix_blocked_primitive_cells = 96
+post_m125_matrix_not_applicable_cells = 460
+post_m125_reclassified_cell_count = 2
+post_m125_reclassified_option = "AllowInternalSSL"
+post_m125_reclassified_tunnel_types = ["httpserver", "httpbidirserver"]
+post_m125_reclassification = "Proposal 170 and Java configuration place AllowInternalSSL under HTTP client filtering; the two server-role cells were incorrectly retained as residual blockers."
+post_m125_closure = "plans/closure/i2pcontrol-proposal-170/125-closure.md"
 
 [[cells]]
 canonical_option = "Shared"

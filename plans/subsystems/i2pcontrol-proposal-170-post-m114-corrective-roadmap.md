@@ -1,10 +1,12 @@
 # I2PControl Proposal 170 — Post-M114 Corrective Roadmap
 
-Status: active corrective workstream; M119-M124 closed; focused M113 capability/crypto-ownership audit authorized but not yet registered
+Status: active corrective workstream; M119-M125 closed; no M113 successor implementation plan is dependency-ready
 
 Original corrective baseline: `feafc6a1d9650887015a01f87bf21b57a4e92085`
 
 Current planning baseline for M123/M124: `045d1e8b4eba1141d2488882f99c5ce994db91a8`
+
+M125 audit baseline: `97083896f6170962a8c9610d056e8fc2dd57646d`
 
 Pinned Proposal 170 revision: `2026-05-20` (Open).
 
@@ -41,7 +43,7 @@ The first corrective sequence closed:
 - Yosemite Y004 — canonical LeaseSet wire vocabulary and DH/PSK representation;
 - M122 — exact optional I2PControl-only Y004 pin adoption.
 
-M121 established the current authoritative matrix:
+M121 established the historical matrix before the M125 classification correction:
 
 `284 apply / 98 blocked_primitive / 458 not_applicable`.
 
@@ -125,15 +127,16 @@ M123 commit-phase cancellation atomicity        [CLOSED]       |
 M124 Y005 exact-pin adoption                    [CLOSED]
   |
   v
-focused M113/LeaseSet capability/crypto audit   [AUTHORIZED / NOT YET REGISTERED]
+M125 M113 capability/crypto ownership audit     [CLOSED — 2 CELLS RECLASSIFIED]
   |
   v
-residual implementations + new final reclosure [FUTURE]
+residual implementations + new final reclosure [FUTURE / 96 BLOCKED]
 ```
 
-M123 is closed. Yosemite Y005 is closed, and M124 has independently adopted its exact reviewed
-revision. The focused M113 capability/crypto-ownership audit is now authorized to proceed as
-read-only planning work, but no implementation plan is dependency-ready until that audit lands.
+M123 is closed. Yosemite Y005 is closed, and M124 independently adopted its exact reviewed
+revision. M125 completed the focused M113 capability/crypto-ownership audit, corrected two
+server-role `AllowInternalSSL` classifications, and found no dependency-ready successor
+implementation owner for the remaining 19 M113 cells.
 
 ## 6. M123 — commit-phase cancellation atomicity
 
@@ -196,13 +199,32 @@ M124 completed the following:
 
 M124 did not map Proposal LeaseSet fields and did not change M095 counts.
 
-## 9. LeaseSet capability work remains deferred
+## 9. M125 — M113 capability and crypto-ownership audit
+
+Plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/125-m113-capability-crypto-ownership-audit.md`
+
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/125-closure.md`.
+
+M125 established that Yosemite Y005 supplies bounded SAM transport serialization and validation
+for canonical LeaseSet fields, but not Proposal-170 semantics, encrypted-LeaseSet construction,
+NetDb publication/query ownership, or client-auth key lifecycle. It also confirmed that
+per-client address allocation and multihoming presentation-routing owners are absent. The two
+server-role `AllowInternalSSL` cells were reclassified to `not_applicable` from Proposal 170's
+HTTP-client filtering section. The authoritative matrix is now `284 / 96 / 460`.
+
+No M113 successor implementation plan is unblocked. M114 remains blocked pending a future
+implementation and live/reference interoperability evidence.
+
+## 10. LeaseSet capability work remains deferred
 
 The current Yosemite fork can transport canonical LeaseSet settings, but current Emissary `SamSession` still locally constructs a normal LeaseSet2 and has no accepted encrypted/authenticated LeaseSet construction owner.
 
 Do not register an M113-successor implementation merely because Y005/M124 make the client-to-SAM API coherent.
 
-With M124 closed, perform the already-authorized focused read-only capability/crypto-ownership audit. A new neutral-core plan is warranted only if it can freeze:
+M125 completed the focused read-only capability/crypto-ownership audit. A new neutral-core plan is
+warranted only if it can freeze:
 
 - exact LeaseSet type(s) required by remaining Proposal cells;
 - existing vs missing crypto primitives;
@@ -216,18 +238,20 @@ With M124 closed, perform the already-authorized focused read-only capability/cr
 
 If those cannot be bounded cleanly, M113 LeaseSet cells remain truthfully blocked.
 
-## 10. Residual Proposal state
+## 11. Residual Proposal state
 
-Current blocked count 98 consists of:
+Current blocked count 96 consists of:
 
 - 4 M111 `UseSSL` cells;
 - 10 M121-demoted `SigType` cells;
 - 63 M112 client proxy/profile/reduction/lifecycle cells, including 18 M121-demoted `Close`/`CloseTime`/`NewDest` cells;
-- 21 M113 presentation/routing/LeaseSet cells.
+- 19 M113 presentation/routing/LeaseSet cells; the two server-role `AllowInternalSSL` cells are
+  not applicable under Proposal 170's HTTP-client filtering classification.
 
 M123, Y005 and M124 are correctness/infrastructure milestones and do not reduce these counts.
+M125 corrected a classification only and did not promote a runtime capability.
 
-## 11. Verification and closure policy
+## 12. Verification and closure policy
 
 Every milestone gets a separate closure record containing:
 
@@ -243,7 +267,7 @@ Every milestone gets a separate closure record containing:
 
 The final Proposal 170 certification must be a **new numbered reclosure**, not a rewrite of M114. It becomes ready only after zero applicable residuals, no open high/medium Proposal-scoped corrective, local runtime evidence and required external/reference interoperability evidence.
 
-## 12. External-interaction boundary
+## 13. External-interaction boundary
 
 Writes are authorized only to `eggstack/emissary` and, under its own registry, `eggstack/yosemite`. All I2P/upstream Emissary/upstream Yosemite sources and maintainer channels are read-only.
 

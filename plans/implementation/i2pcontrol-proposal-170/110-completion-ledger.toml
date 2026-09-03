@@ -120,6 +120,37 @@ unchanged_blocked_cells = [
 reclassification_reason = "M117 Yosemite 8026f5b serializes the generic session-wire fields and M118 supplies neutral variance/backup runtime effect; Emissary core supports only signature type 7; Proposal UseSSL remains blocked because its local application/session TLS semantics are not Yosemite SAM-control TLS."
 closure = "plans/closure/i2pcontrol-proposal-170/111-closure.md"
 
+[post_m121]
+status = "closed"
+matrix_before_apply = 312
+matrix_before_blocked_primitive = 70
+matrix_before_not_applicable = 458
+matrix_after_apply = 284
+matrix_after_blocked_primitive = 98
+matrix_after_not_applicable = 458
+demoted_cell_count = 28
+demoted_options = ["SigType", "Close", "CloseTime", "NewDest"]
+reclassified_cells = [
+    "SigType:client",
+    "SigType:httpclient",
+    "SigType:ircclient",
+    "SigType:socks",
+    "SigType:socksirc",
+    "SigType:connectclient",
+    "SigType:server",
+    "SigType:httpserver",
+    "SigType:httpbidirserver",
+    "SigType:ircserver",
+    "Close:client", "Close:httpclient", "Close:ircclient", "Close:socks",
+    "Close:socksirc", "Close:connectclient", "CloseTime:client",
+    "CloseTime:httpclient", "CloseTime:ircclient", "CloseTime:socks",
+    "CloseTime:socksirc", "CloseTime:connectclient", "NewDest:client",
+    "NewDest:httpclient", "NewDest:ircclient", "NewDest:socks",
+    "NewDest:socksirc", "NewDest:connectclient",
+]
+reclassification_reason = "M121 Outcome C (SigType) and §5.2 (Close/CloseTime/NewDest): singleton type-7 domain is inert, not configurable support, and local TCP-handler-count idle is not reference I2P-session idle; no local observation primitive exists without core/Yosemite change."
+closure = "plans/closure/i2pcontrol-proposal-170/121-closure.md"
+
 [ownership]
 session_registry = "emissary-cli/src/i2pcontrol/backends/runtime/session.rs::SharedClientSessionRegistry"
 stream_listener_owner = "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"

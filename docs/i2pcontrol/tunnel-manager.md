@@ -343,20 +343,27 @@ with at most two distinct values and at most one ML-KEM variant.
 M111 adds the generic session-wire controls supplied by the accepted Yosemite fork:
 `TunnelVariance` (−2–2) and `TunnelBackupQuantity` (0–3) reach inbound/outbound
 `SESSION CREATE` options and are consumed by the neutral tunnel-pool owner;
-`SigType` is supported for the Emissary router's canonical type 7 and is emitted
-for both destination and session generation. `CustomOptions` accepts at most 32
+`CustomOptions` accepts at most 32
 validated `i2cp.*` token pairs (64-byte keys, 256-byte values), rejects duplicate
-or typed/reserved keys, and reaches the same Yosemite session serializer. All are
+or typed/reserved keys, and reaches the same Yosemite session serializer. `SigType`
+was promoted by M111 for the router-native type 7 and was demoted by M121
+(Outcome C) to blocked for all ten applicable families: configurable signing
+semantics require non-Ed25519 key generation/signing Emissary cannot produce
+end-to-end, so a singleton domain is inert rather than support. Any supplied
+`SigType` value fails before allocation. All are
 validated before session/listener allocation and participate in shared-session
 compatibility.
 
 `UseSSL` remains fail-closed: Proposal 170's local application/session TLS meaning
 is distinct from Yosemite's SAM control-connection TLS field and has no accepted
-Emissary owner. M112 adds bounded `ConnectDelay`, `Close`, and `CloseTime` behavior
-to the six streaming client listeners. `NewDest=true` is accepted only with
-`Close=true` and `PersistentClientKey=false`; after an owned idle close, the next
-session uses a fresh transient destination. `Shared=true` cannot be combined with
-`Close=true`, because one member must not close a session owned by another member.
+Emissary owner. M112 added bounded `ConnectDelay` behavior
+to the six streaming client listeners; M121 demotes M112's `Close`, `CloseTime`,
+and `NewDest` cells to blocked (§5.2) because reference closeOnIdle observes
+I2P-session activity while the local owner can only count accepted TCP handler
+tasks and Yosemite exposes no session-activity observation primitive. Any supplied
+`Close`/`CloseTime`/`NewDest` value fails before allocation. `ConnectDelay`
+(0–60,000 ms) remains applied via the generation-local outbound connector.
+`Shared=true` cannot be combined with `Close=true`, because one member must not close a session owned by another member.
 M113 re-validated the remaining server presentation/routing and LeaseSet cells and
 closed them as blocked: `AllowInternalSSL`, `UniqueLocalAddressPerClient`, and
 `MultiHoming` have no bounded TLS termination or safe per-client/multihomed
@@ -370,8 +377,8 @@ are declaration-only). All 21 cells fail before allocation with no downgrade.
 |---|---|
 | Parsed and round-tripped | `Description`, `StartOnLoad`, `TargetDestination`, `Destination`, `TargetPort`, `ReachableBy`, `Port`, `TargetHost`, `Host` |
 | Applied by accepted client proxy/filter runtimes | `ProxyList`, `ProxyAuth`, `ProxyUsername`, `ProxyPassword`, `OutproxyAuth`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `AllowUserAgent`, `AllowReferer`, `AllowAccept` |
-| Applied by six streaming client lifecycle owners | `ConnectDelay` (0–60,000 ms), `Close`, `CloseTime` (1 ms–7 days), `NewDest` under its lifecycle constraints |
-| Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, `SSLProxies`, `JumpList`, `Profile`, `Reduce`, `ReduceCount`, `ReduceTime`, Streamr `DelayOpen`, `Close`, `CloseTime`, and `NewDest` cells without a meaningful Streamr equivalent |
+| Applied by six streaming client lifecycle owners | `ConnectDelay` (0–60,000 ms) |
+| Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, `SSLProxies`, `JumpList`, `Profile`, `Reduce`, `ReduceCount`, `ReduceTime`, `Close`, `CloseTime`, `NewDest`, Streamr `DelayOpen`, Streamr `Close`, `CloseTime`, and `NewDest` cells without a meaningful Streamr equivalent; `SigType` for all applicable families |
 | Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime` |
 | Rejected before allocation as residual server blockers | `AllowInternalSSL`, `UniqueLocalAddressPerClient`, `MultiHoming`, `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
 | Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |

@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; M109, M115, M110, M116, M117, M118, and M111 are closed; M112, M113, and M114 are closed as blocked with 45, 21, and 70 named residual/evidence blockers; M095 currently records `312 apply / 70 blocked_primitive / 458 not_applicable`
+Status: partial Proposal 170 production support; M109, M115, M110, M116, M117, M118, and M111 are closed; M112, M113, and M114 are closed as blocked with 45, 21, and 70 named residual/evidence blockers; M121 is the current corrective handoff and demotes 28 cells; M095 currently records `284 apply / 98 blocked_primitive / 458 not_applicable`
 
 This directory contains bounded internal implementation, audit, corrective, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -59,12 +59,12 @@ No standalone crate split, router-core API, Yosemite patch/vendor, parallel SAM 
 
 Current M095 matrix is:
 
-- 312 `apply`;
-- 70 `blocked_primitive`;
+- 284 `apply`;
+- 98 `blocked_primitive`;
 - 458 `not_applicable`;
 - 0 planned/unknown/unsupported/accept-inert cells.
 
-M116 closure records the exact reclassification: seven client `NewDest` cells moved from `apply` to `blocked_primitive` under M112.
+M116 closure records the exact reclassification: seven client `NewDest` cells moved from `apply` to `blocked_primitive` under M112. M121 demotes a further 28 cells (10 `SigType`, 6 `Close`, 6 `CloseTime`, 6 `NewDest`) to `blocked_primitive`.
 
 Official status remains **partial Proposal 170 support**.
 
@@ -92,8 +92,8 @@ Official status remains **partial Proposal 170 support**.
 | **M116** | **closed** | M110 concurrency/cancellation/identity/Streamr/NewDest/secret corrective; closure recorded |
 | **M117** | **closed** | ADR-0005-authorized exact Yosemite fork pin and I2PControl adapter integration; no matrix promotion |
 | **M118** | **closed** | neutral SAM tunnel variance and standby/failover capability; no matrix promotion |
-| **M111** | **closed** | Yosemite SAM session-wire completion; 40 SessionWire cells applied, four UseSSL cells remain explicitly blocked |
-| M112 | closed as blocked | six TCP client families apply `ConnectDelay`, `Close`, `CloseTime`, and `NewDest`; 45 M112 residual cells remain blocked |
+| **M111** | **closed; corrected by M121** | Yosemite SAM session-wire completion; 40 SessionWire cells applied, four UseSSL cells remain explicitly blocked; M121 demotes the 10 `SigType` cells to blocked (Outcome C) |
+| M112 | closed as blocked; corrected by M121 | six TCP client families apply `ConnectDelay`; `Close`, `CloseTime`, and `NewDest` demoted by M121; 45 M112 residual cells remain blocked plus 18 demoted |
 | M113 | closed as blocked | server presentation/routing/LeaseSet; 21 cells remain blocked |
 | M114 | closed as blocked | final reclosure; 70 applicable cells and external interoperability evidence remain unresolved |
 
@@ -149,14 +149,13 @@ A cell becomes/remains `apply` only with request→real-runtime evidence. Diffic
 
 ## M111 — SAM session-wire options
 
-M111 is closed. M117 supplies the accepted internal generic Yosemite API through ADR-0005 and M118 supplies the neutral variance/backup runtime effect. `TunnelVariance`, `TunnelBackupQuantity`, `SigType` (router-supported type 7), and bounded `CustomOptions` reach the real Yosemite `SESSION CREATE` path for all 40 applicable cells. `UseSSL` remains blocked because Proposal local application/session TLS is not Yosemite SAM-control TLS; no accepted Emissary owner exists. No raw/parallel SAM stack or Proposal-shaped core seam was added. Closure: `plans/closure/i2pcontrol-proposal-170/111-closure.md`.
+M111 is closed. M117 supplies the accepted internal generic Yosemite API through ADR-0005 and M118 supplies the neutral variance/backup runtime effect. `TunnelVariance`, `TunnelBackupQuantity`, and bounded `CustomOptions` reach the real Yosemite `SESSION CREATE` path for the retained applicable cells. `SigType` was promoted for router-native type 7 and is demoted by M121 Outcome C to blocked for all ten families; `UseSSL` remains blocked because Proposal local application/session TLS is not Yosemite SAM-control TLS; no accepted Emissary owner exists. No raw/parallel SAM stack or Proposal-shaped core seam was added. Closure: `plans/closure/i2pcontrol-proposal-170/111-closure.md`; corrective: `plans/closure/i2pcontrol-proposal-170/121-closure.md`.
 
 ## M112 — client proxy/lifecycle residuals
 
-M112 is closed as blocked. It applied portable `ConnectDelay`, `Close`, `CloseTime`,
-and `NewDest` behavior for six TCP client families. Proxy/plugin/TLS-jump,
+M112 is closed as blocked. It applied portable `ConnectDelay` behavior for six TCP client families; M121 demotes its `Close`, `CloseTime`, and `NewDest` cells to blocked (§5.2) because local TCP-handler-count idle is not reference I2P-session idle and no observation primitive exists. Proxy/plugin/TLS-jump,
 `Profile`, `Reduce*`, and Streamr lifecycle cells remain explicitly blocked; see
-`plans/closure/i2pcontrol-proposal-170/112-closure.md`.
+`plans/closure/i2pcontrol-proposal-170/112-closure.md` and `plans/closure/i2pcontrol-proposal-170/121-closure.md`.
 
 ## M113 — server presentation/LeaseSet residuals
 

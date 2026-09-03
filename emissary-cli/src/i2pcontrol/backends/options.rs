@@ -10,7 +10,6 @@ use std::fmt;
 use crate::i2pcontrol::domain::tunnel::{TunnelOptions, TunnelType};
 use yosemite_i2pcontrol::SessionOption;
 
-const SUPPORTED_SIGNATURE_TYPE: u16 = 7;
 const MAX_CUSTOM_OPTIONS: usize = 32;
 const MAX_CUSTOM_OPTION_KEY_LENGTH: usize = 64;
 const MAX_CUSTOM_OPTION_VALUE_LENGTH: usize = 256;
@@ -204,13 +203,12 @@ pub fn validate_common_options(
             return Err(common_unsupported(tunnel_type, "TunnelBackupQuantity"));
         }
     }
-    if let Some(value) = options.sig_type.as_deref() {
-        if is_streamr {
-            return Err(common_unsupported(tunnel_type, "SigType"));
-        }
-        if value.parse::<u16>().ok() != Some(SUPPORTED_SIGNATURE_TYPE) || value != "7" {
-            return Err(common_unsupported(tunnel_type, "SigType"));
-        }
+    // M121 Outcome C: SigType is demoted to blocked_primitive for all tunnel
+    // families. Emissary only generates/signs Ed25519 (type 7) end-to-end;
+    // configurable semantics require values it cannot produce. Any supplied
+    // value — including "7" — fails before allocation; there is no fallback.
+    if options.sig_type.is_some() {
+        return Err(common_unsupported(tunnel_type, "SigType"));
     }
     if !options.custom_options.is_empty() && !valid_custom_options(&options.custom_options) {
         return Err(common_unsupported(tunnel_type, "CustomOptions"));
@@ -228,10 +226,12 @@ pub fn validate_common_options(
             return Err(common_unsupported(tunnel_type, field));
         }
     }
-    // NewDest is coupled to M112's close-on-idle/resume lifecycle owner. It is
-    // only meaningful for streaming client generations; in particular, do not
-    // rotate a destination merely because a manual start was staged.
-    if options.new_dest.is_some() && (!tunnel_type.is_client() || is_streamr) {
+    // M121 §5.2: NewDest is demoted to blocked_primitive for all families.
+    // Reference newDestOnResume allocates a new identity only on resume after
+    // an actual I2P-session idle close; the local TCP-handler-count heuristic
+    // cannot observe that trigger without a lower-layer session-activity
+    // primitive. Any supplied value fails before allocation.
+    if options.new_dest.is_some() {
         return Err(common_unsupported(tunnel_type, "NewDest"));
     }
     // PersistentClientKey and Shared are meaningful only for the control-plane
@@ -548,23 +548,10 @@ mod tests {
     }
 
     #[test]
-    fn new_dest_is_rejected_for_non_streaming_client_families() {
-        for tunnel_type in [
-            TunnelType::StreamrClient,
-            TunnelType::Server,
-            TunnelType::HttpServer,
-            TunnelType::HttpBidirServer,
-            TunnelType::IrcServer,
-            TunnelType::StreamrServer,
-        ] {
-            let options = TunnelOptions {
-                new_dest: Some(true),
-                ..Default::default()
-            };
-            let error = validate_common_options(tunnel_type, &options).unwrap_err();
-            assert_eq!(error.to_string(), format!("{tunnel_type} does not support option NewDest"));
-        }
-
+    fn new_dest_is_rejected_for_all_families_after_m121_demotion() {
+        // M121 §5.2: NewDest is blocked_primitive for every family. Reference
+        // newDestOnResume allocates only on resume after an actual I2P-session
+        // idle close; no local observation primitive exists.
         for tunnel_type in [
             TunnelType::Client,
             TunnelType::HttpClient,
@@ -572,12 +559,24 @@ mod tests {
             TunnelType::Socks,
             TunnelType::SocksIrc,
             TunnelType::ConnectClient,
+            TunnelType::StreamrClient,
+            TunnelType::Server,
+            TunnelType::HttpServer,
+            TunnelType::HttpBidirServer,
+            TunnelType::IrcServer,
+            TunnelType::StreamrServer,
         ] {
-            let options = TunnelOptions {
-                new_dest: Some(true),
-                ..Default::default()
-            };
-            assert!(validate_common_options(tunnel_type, &options).is_ok());
+            for value in [true, false] {
+                let options = TunnelOptions {
+                    new_dest: Some(value),
+                    ..Default::default()
+                };
+                let error = validate_common_options(tunnel_type, &options).unwrap_err();
+                assert_eq!(
+                    error.to_string(),
+                    format!("{tunnel_type} does not support option NewDest")
+                );
+            }
         }
     }
 
@@ -631,8 +630,55 @@ mod tests {
             "client does not support option SigType"
         );
 
-        options.sig_type = Some("7".to_owned());
-        assert!(validate_common_options(TunnelType::Client, &options).is_ok());
+        // M121 Outcome C: even the router-native "7" is blocked as a
+        // configurable Proposal option. Emissary cannot generate/sign any
+        // other type end-to-end, so a singleton domain is inert, not support.
+        for value in ["7", "07", " 7", "EdDSA_SHA512_Ed25519", "1", "0", "11"] {
+            options.sig_type = Some(value.to_owned());
+            let error = validate_common_options(TunnelType::Client, &options).unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "client does not support option SigType",
+                "SigType value {value:?} must fail before allocation"
+            );
+            assert!(
+                !error.to_string().contains(value.trim()),
+                "rejection must not echo the value"
+            );
+        }
+        options.sig_type = Some(String::new());
+        assert_eq!(
+            validate_common_options(TunnelType::Client, &options)
+                .unwrap_err()
+                .to_string(),
+            "client does not support option SigType"
+        );
+    }
+
+    #[test]
+    fn m121_sigtype_is_blocked_for_all_applicable_families_without_fallback() {
+        for tunnel_type in [
+            TunnelType::Client,
+            TunnelType::HttpClient,
+            TunnelType::IrcClient,
+            TunnelType::Socks,
+            TunnelType::SocksIrc,
+            TunnelType::ConnectClient,
+            TunnelType::Server,
+            TunnelType::HttpServer,
+            TunnelType::HttpBidirServer,
+            TunnelType::IrcServer,
+        ] {
+            let options = TunnelOptions {
+                sig_type: Some("7".to_owned()),
+                ..Default::default()
+            };
+            let error = validate_common_options(tunnel_type, &options).unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                format!("{tunnel_type} does not support option SigType")
+            );
+        }
     }
 
     #[test]

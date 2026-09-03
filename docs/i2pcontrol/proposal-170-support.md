@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; residual option cells remain (70 blocked: 4 UseSSL + 45 client + 21 server LeaseSet/presentation)
+Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion recorded; residual option cells remain (98 blocked: 4 UseSSL + 10 SigType + 63 client lifecycle/proxy + 21 server LeaseSet/presentation)
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -505,9 +505,10 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M084 | closed | merged-head integration/planning corrective (test fixture, M062 bookkeeping, status reconciliation); see `plans/closure/i2pcontrol-proposal-170/084-closure.md` |
 | M085 | closed | independently audited actual post-M084 merged head; tunnel runtime/security line complete against the pinned Proposal 170 revision and current internal fork head; see `plans/closure/i2pcontrol-proposal-170/085-closure.md` |
 | M086 | closed | documentation/evidence reconciliation only; trusted-peer documentation and closure errata corrected without reopening runtime/security; see `plans/closure/i2pcontrol-proposal-170/086-closure.md` |
-| M111 | closed | SAM session-wire completion; 40 apply / 4 UseSSL blocked; see `plans/closure/i2pcontrol-proposal-170/111-closure.md` |
-| M112 | closed as blocked | client proxy and session-lifecycle residuals; 24 apply / 45 blocked; see `plans/closure/i2pcontrol-proposal-170/112-closure.md` |
+| M111 | closed | SAM session-wire completion; 40 apply / 4 UseSSL blocked; see `plans/closure/i2pcontrol-proposal-170/111-closure.md`; M121 later demotes the 10 `SigType` cells to blocked (Outcome C) |
+| M112 | closed as blocked | client proxy and session-lifecycle residuals; 24 apply / 45 blocked; see `plans/closure/i2pcontrol-proposal-170/112-closure.md`; M121 later demotes the 18 `Close`/`CloseTime`/`NewDest` cells to blocked (§5.2), leaving `ConnectDelay` applied |
 | M113 | closed as blocked | server presentation/routing/LeaseSet residuals; 0 apply / 21 blocked; see `plans/closure/i2pcontrol-proposal-170/113-closure.md` |
+| M121 | closed | M111/M112 semantic truthfulness corrective; demotes 28 cells (`SigType` × 10, `Close`/`CloseTime`/`NewDest` × 18) to blocked; matrix is 284 apply / 98 blocked / 458 not_applicable; see `plans/closure/i2pcontrol-proposal-170/121-closure.md` |
 
 ## Final-status rule
 

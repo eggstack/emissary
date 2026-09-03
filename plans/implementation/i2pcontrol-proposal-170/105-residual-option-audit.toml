@@ -69,6 +69,14 @@ post_m113_completed_cell_count = 0
 post_m113_applied_families = []
 post_m113_remaining_m113_cells = 21
 post_m113_closure = "plans/closure/i2pcontrol-proposal-170/113-closure.md"
+post_m121_matrix_apply_cells = 284
+post_m121_matrix_blocked_primitive_cells = 98
+post_m121_matrix_not_applicable_cells = 458
+post_m121_demoted_cell_count = 28
+post_m121_demoted_families = ["SigType", "Close", "CloseTime", "NewDest"]
+post_m121_demoted_tunnel_types = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient", "server", "httpserver", "httpbidirserver", "ircserver"]
+post_m121_blocking_milestone = "M121"
+post_m121_closure = "plans/closure/i2pcontrol-proposal-170/121-closure.md"
 
 [[cells]]
 canonical_option = "Shared"

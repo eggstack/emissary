@@ -230,7 +230,42 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         .difference(&m112_applied)
         .cloned()
         .collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m112);
+    // M121 demotes 10 SigType + 18 Close/CloseTime/NewDest cells back to
+    // blocked_primitive. The M105 input inventory is historical (164 rows);
+    // the current matrix blocked set must equal the post-M112 blocked set
+    // plus exactly the M121 demoted cells.
+    let m121_demoted: BTreeSet<(String, String)> = ["SigType"]
+        .into_iter()
+        .flat_map(|option| {
+            [
+                "client",
+                "httpclient",
+                "ircclient",
+                "socks",
+                "socksirc",
+                "connectclient",
+                "server",
+                "httpserver",
+                "httpbidirserver",
+                "ircserver",
+            ]
+            .into_iter()
+            .map(move |tunnel_type| (option.to_owned(), tunnel_type.to_owned()))
+        })
+        .chain(
+            ["Close", "CloseTime", "NewDest"].into_iter().flat_map(|option| {
+                ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient"]
+                    .into_iter()
+                    .map(move |tunnel_type| (option.to_owned(), tunnel_type.to_owned()))
+            }),
+        )
+        .collect();
+    assert_eq!(m121_demoted.len(), 28);
+    let expected_post_m121 = expected_post_m112
+        .union(&m121_demoted)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m121);
     assert_eq!(audit["summary"]["post_m116_reclassified_cells"].as_integer(), Some(7));
     assert_eq!(audit["summary"]["post_m116_blocking_milestone"].as_str(), Some("M112"));
     assert_eq!(audit["summary"]["post_m112_matrix_apply_cells"].as_integer(), Some(312));
@@ -239,4 +274,10 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         Some(70)
     );
     assert_eq!(audit["summary"]["post_m112_completed_cell_count"].as_integer(), Some(24));
+    assert_eq!(audit["summary"]["post_m121_matrix_apply_cells"].as_integer(), Some(284));
+    assert_eq!(
+        audit["summary"]["post_m121_matrix_blocked_primitive_cells"].as_integer(),
+        Some(98)
+    );
+    assert_eq!(audit["summary"]["post_m121_demoted_cell_count"].as_integer(), Some(28));
 }

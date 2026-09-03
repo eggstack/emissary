@@ -22,15 +22,16 @@ type StreamSession = Arc<Mutex<Session<style::Stream>>>;
 
 const DATAGRAM_BUFFER_SIZE: usize = 4095;
 const MAX_CONNECT_DELAY: u64 = 60_000;
-const MAX_CLOSE_IDLE_TIME: u64 = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_CLOSE_IDLE_TIME: Duration = Duration::from_secs(30 * 60);
 
 /// Generation-local lifecycle controls for streaming client listeners.
 ///
-/// The close policy is implemented by the I2PControl session owner itself.
-/// Reduction remains rejected because Yosemite 0.7.0 does not consume its
-/// similarly named declaration. Streamr has a separate datagram owner and
-/// does not use this type.
+/// Only `ConnectDelay` remains an applied Proposal lifecycle effect. `Close`,
+/// `CloseTime`, and `NewDest` are M121-demoted to `blocked_primitive`: the
+/// reference idle policy observes I2P-session activity while the local owner
+/// can only count accepted TCP handler tasks, and Yosemite exposes no
+/// session-activity observation primitive. Any supplied close/new-dest value
+/// fails before allocation (see `client_lifecycle_config`).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ClientLifecycleConfig {
     pub(crate) connect_delay: Option<Duration>,
@@ -687,10 +688,10 @@ fn option_error(error: super::super::options::OptionValidationError) -> BackendE
 }
 
 /// Parse the residual client lifecycle fields before any runtime allocation.
-/// Values are stored in the canonical raw configuration because they are
-/// still Proposal fields rather than part of the public Emissary domain
-/// model. The returned policy is nevertheless typed before it reaches a
-/// listener generation.
+/// `ConnectDelay` remains applied; `Close`, `CloseTime`, and `NewDest` are
+/// M121-demoted to `blocked_primitive` and any supplied value fails here,
+/// before listener/session allocation. Values remain in canonical raw config
+/// for lossless round-trip, but no close/new-dest runtime effect is claimed.
 pub(crate) fn client_lifecycle_config(
     definition: &TunnelDefinition,
 ) -> BackendResult<ClientLifecycleConfig> {
@@ -713,52 +714,33 @@ pub(crate) fn client_lifecycle_config(
         0,
         MAX_CONNECT_DELAY,
     )?;
-    let close_on_idle = match definition.raw_config.get("Close") {
-        None => false,
-        Some(value) => value.as_bool().ok_or_else(|| BackendError::UnsupportedOption {
+    // M121 §5.2 demotion: reference closeOnIdle observes I2P-session activity
+    // (bytes/messages), not accepted local TCP handler count, and Yosemite
+    // exposes no session-activity observation primitive. Fail closed.
+    if definition.raw_config.contains_key("Close") {
+        return Err(BackendError::UnsupportedOption {
             tunnel_type,
             option: "Close".to_owned(),
-        })?,
-    };
-    let close_idle_time = raw_duration(
-        definition,
-        "CloseTime",
-        1,
-        MAX_CLOSE_IDLE_TIME,
-    )?
-    .unwrap_or(DEFAULT_CLOSE_IDLE_TIME);
-    if definition.raw_config.contains_key("CloseTime") && !close_on_idle {
+        });
+    }
+    if definition.raw_config.contains_key("CloseTime") {
         return Err(BackendError::UnsupportedOption {
             tunnel_type,
             option: "CloseTime".to_owned(),
         });
     }
-
-    let new_dest_on_resume = definition.options.new_dest.unwrap_or(false);
-    if new_dest_on_resume && !close_on_idle {
+    if definition.options.new_dest.is_some() {
         return Err(BackendError::UnsupportedOption {
             tunnel_type,
             option: "NewDest".to_owned(),
-        });
-    }
-    if new_dest_on_resume && definition.options.persistent_client_key.unwrap_or(false) {
-        return Err(BackendError::UnsupportedOption {
-            tunnel_type,
-            option: "NewDest".to_owned(),
-        });
-    }
-    if close_on_idle && definition.options.shared.unwrap_or(false) {
-        return Err(BackendError::UnsupportedOption {
-            tunnel_type,
-            option: "Close".to_owned(),
         });
     }
 
     Ok(ClientLifecycleConfig {
         connect_delay,
-        close_on_idle,
-        close_idle_time,
-        new_dest_on_resume,
+        close_on_idle: false,
+        close_idle_time: DEFAULT_CLOSE_IDLE_TIME,
+        new_dest_on_resume: false,
     })
 }
 
@@ -837,6 +819,75 @@ mod tests {
     }
 
     #[test]
+    fn m121_sigtype_seven_is_blocked_before_allocation_without_fallback() {
+        // M121 Outcome C: even "7" fails as a configurable Proposal option.
+        for value in ["7", "07", "1", "0", "11", "EdDSA_SHA512_Ed25519", ""] {
+            let mut definition = definition();
+            definition.options.sig_type = Some(value.to_owned());
+            let error =
+                build_session_options(&definition, 7656, false, DestinationKind::Transient)
+                    .unwrap_err();
+            assert!(
+                matches!(error, BackendError::UnsupportedOption { option, .. } if option == "SigType"),
+                "SigType {value:?} must fail before allocation"
+            );
+        }
+        // Omitted SigType still builds with the Yosemite default (7) — that
+        // default is router behavior, not Proposal SigType support.
+        let definition = definition();
+        let options =
+            build_session_options(&definition, 7656, false, DestinationKind::Transient).unwrap();
+        assert_eq!(options.signature_type, 7);
+    }
+
+    #[test]
+    fn m121_close_closetime_newdest_fail_before_allocation_for_all_clients() {
+        use crate::i2pcontrol::domain::tunnel::TunnelType::*;
+        for tunnel_type in [
+            Client,
+            HttpClient,
+            IrcClient,
+            Socks,
+            SocksIrc,
+            ConnectClient,
+        ] {
+            let mut close_def = definition();
+            close_def.tunnel_type = tunnel_type;
+            close_def.raw_config.insert("Close".to_owned(), serde_json::json!(true));
+            assert!(matches!(
+                client_lifecycle_config(&close_def),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "Close"
+            ));
+
+            let mut close_time_def = definition();
+            close_time_def.tunnel_type = tunnel_type;
+            close_time_def
+                .raw_config
+                .insert("CloseTime".to_owned(), serde_json::json!(1_000));
+            assert!(matches!(
+                client_lifecycle_config(&close_time_def),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "CloseTime"
+            ));
+
+            let mut new_dest_def = definition();
+            new_dest_def.tunnel_type = tunnel_type;
+            new_dest_def.options.new_dest = Some(true);
+            assert!(matches!(
+                client_lifecycle_config(&new_dest_def),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
+            ));
+            // validate_common_options is the earlier gate in production start
+            // ordering (production.rs validates before stage/backend preflight).
+            let error = crate::i2pcontrol::backends::options::validate_common_options(
+                tunnel_type,
+                &new_dest_def.options,
+            )
+            .unwrap_err();
+            assert_eq!(error.to_string(), format!("{tunnel_type} does not support option NewDest"));
+        }
+    }
+
+    #[test]
     fn supported_session_controls_translate_and_use_ssl_stays_blocked() {
         let mut definition = definition();
         definition.options.tunnel_variance = Some(1);
@@ -857,34 +908,28 @@ mod tests {
 
     #[test]
     fn client_lifecycle_controls_are_bounded_and_fail_before_allocation() {
+        // ConnectDelay remains applied; Close/CloseTime/NewDest are M121
+        // demoted: any supplied value fails before allocation.
         let mut valid = definition();
         valid
             .raw_config
             .insert("ConnectDelay".to_owned(), serde_json::json!(60_000));
-        valid
-            .raw_config
-            .insert("Close".to_owned(), serde_json::json!(true));
-        valid
-            .raw_config
-            .insert("CloseTime".to_owned(), serde_json::json!(1_000));
-        valid.options.new_dest = Some(true);
         let lifecycle = client_lifecycle_config(&valid).unwrap();
         assert_eq!(lifecycle.connect_delay, Some(Duration::from_secs(60)));
-        assert!(lifecycle.close_on_idle);
-        assert_eq!(lifecycle.close_idle_time, Duration::from_secs(1));
-        assert!(lifecycle.new_dest_on_resume);
+        assert!(!lifecycle.close_on_idle);
+        assert!(!lifecycle.new_dest_on_resume);
 
         for (key, value) in [
             ("ConnectDelay", serde_json::json!(60_001)),
             ("ConnectDelay", serde_json::json!(-1)),
+            ("Close", serde_json::json!(true)),
+            ("Close", serde_json::json!(false)),
             ("Close", serde_json::json!("true")),
             ("CloseTime", serde_json::json!(0)),
+            ("CloseTime", serde_json::json!(1)),
         ] {
             let mut invalid = definition();
             invalid.raw_config.insert(key.to_owned(), value);
-            if key == "CloseTime" {
-                invalid.raw_config.insert("Close".to_owned(), serde_json::json!(true));
-            }
             assert!(matches!(
                 client_lifecycle_config(&invalid),
                 Err(BackendError::UnsupportedOption { option, .. }) if option == key
@@ -907,6 +952,15 @@ mod tests {
             Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
         ));
 
+        // M121: NewDest=false is also blocked (no accept-inert). Close is
+        // blocked even with Shared (fail on Close first).
+        let mut new_dest_false = definition();
+        new_dest_false.options.new_dest = Some(false);
+        assert!(matches!(
+            client_lifecycle_config(&new_dest_false),
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
+        ));
+
         let mut shared_close = definition();
         shared_close
             .raw_config
@@ -918,9 +972,6 @@ mod tests {
         ));
 
         let mut persistent_new_dest = definition();
-        persistent_new_dest
-            .raw_config
-            .insert("Close".to_owned(), serde_json::json!(true));
         persistent_new_dest.options.new_dest = Some(true);
         persistent_new_dest.options.persistent_client_key = Some(true);
         assert!(matches!(

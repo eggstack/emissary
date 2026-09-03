@@ -423,13 +423,14 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "i2p.tunnel.listenPort",
         "DelayOpen",
         "ConnectDelay",
-        "Close",
-        "CloseTime",
         "Shared",
-        "NewDest",
         "PersistentClientKey",
         "PrivKeyFile",
     ];
+    // M121: "Close", "CloseTime", and "NewDest" are demoted to
+    // blocked_primitive (reference I2P-session idle semantics have no local
+    // observation primitive). Any supplied value fails in
+    // client_lifecycle_config / validate_common_options before allocation.
     const METADATA: &[&str] = &[
         "name",
         "type",

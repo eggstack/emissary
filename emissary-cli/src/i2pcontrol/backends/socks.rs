@@ -1124,11 +1124,13 @@ fn validate_raw_options(
         "Description",
         "StartOnLoad",
         "DelayOpen",
+        "ConnectDelay",
         "Shared",
-        "NewDest",
         "PersistentClientKey",
         "PrivKeyFile",
     ];
+    // M121: "Close", "CloseTime", and "NewDest" demoted to blocked_primitive;
+    // "ConnectDelay" remains applied via the shared lifecycle connector.
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
             continue;

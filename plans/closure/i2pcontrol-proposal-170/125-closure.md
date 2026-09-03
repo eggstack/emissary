@@ -17,7 +17,8 @@ Repository baseline reviewed: `97083896f6170962a8c9610d056e8fc2dd57646d`
 
 Implementation commits or pull requests:
 
-- Documentation/matrix audit commit — recorded after verification.
+- `08dc475fd09ebadde3d482f474a782319ca792af` — documentation, matrix, test,
+  and active-roadmap audit update; no production code.
 
 ## 1. Executive finding
 

@@ -18,7 +18,9 @@ use super::{
     },
     http_client::make_no_outproxy_handler,
     http_server::{make_accepted_handler, normalize_loopback_target, PostLimiter},
-    options::{validate_options, OptionValidationError, HTTP_BIDIR_SERVER_OPTIONS},
+    options::{
+        validate_common_options, validate_options, OptionValidationError, HTTP_BIDIR_SERVER_OPTIONS,
+    },
     runtime::{
         run_accepted_server, run_client_listener, AcceptedServerRuntimeConfig,
         AcceptedServerRuntimeError, ClientListenerRuntimeConfig, ClientListenerRuntimeError,
@@ -673,7 +675,27 @@ impl TunnelBackend for HttpBidirServerTunnelBackend {
         TunnelType::HttpBidirServer
     }
 
+    fn validate_start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
+        validate_common_options(TunnelType::HttpBidirServer, &definition.options)
+            .map_err(option_error)?;
+        let _ = self.config_without_destination(definition)?;
+        let _ = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            true,
+            DestinationKind::Transient,
+        )?;
+        let _ = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            false,
+            DestinationKind::Transient,
+        )?;
+        Ok(())
+    }
+
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
+        self.validate_start(definition)?;
         let mut config = self.config_without_destination(definition)?;
         let identity = definition
             .raw_config
@@ -848,6 +870,19 @@ mod tests {
             },
             raw_config: Default::default(),
         }
+    }
+
+    #[test]
+    fn preflight_matches_start_without_identity_or_session() {
+        let backend = HttpBidirServerTunnelBackend::new(1, ServerDestinationStore::new("."), None);
+        assert!(backend.validate_start(&definition()).is_ok());
+
+        let mut bad = definition();
+        bad.raw_config.insert("SignatureType".to_owned(), serde_json::json!("x"));
+        assert!(matches!(
+            backend.validate_start(&bad),
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "SignatureType"
+        ));
     }
 
     #[test]

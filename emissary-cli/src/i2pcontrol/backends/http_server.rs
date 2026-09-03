@@ -23,7 +23,10 @@ use super::{
         copy_body, copy_response_body, read_and_filter_response, read_and_sanitize_request,
         AccessOption, HttpServerPolicy,
     },
-    options::{validate_options, CustomOptionPolicy, OptionCapabilities, OptionValidationError},
+    options::{
+        validate_common_options, validate_options, CustomOptionPolicy, OptionCapabilities,
+        OptionValidationError,
+    },
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
 use crate::i2pcontrol::{
@@ -547,7 +550,7 @@ impl HttpServerTunnelBackend {
         }
     }
 
-    async fn config_without_destination(
+    fn config_without_destination(
         &self,
         definition: &TunnelDefinition,
     ) -> BackendResult<HttpServerConfig> {
@@ -674,8 +677,26 @@ impl TunnelBackend for HttpServerTunnelBackend {
         TunnelType::HttpServer
     }
 
+    fn validate_start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
+        // Pure preflight mirroring `start` before identity/store/runtime work.
+        // Filter-file reads are bounded local filesystem validation, never
+        // network I/O, secret generation/import, or runtime reservation.
+        validate_common_options(TunnelType::HttpServer, &definition.options)
+            .map_err(option_error)?;
+        let _ = self.config_without_destination(definition)?;
+        let _ = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            true,
+            DestinationKind::Transient,
+        )?;
+        Ok(())
+    }
+
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
-        let mut config = self.config_without_destination(definition).await?;
+        // Reuse the exact preflight helpers so validation cannot drift.
+        self.validate_start(definition)?;
+        let mut config = self.config_without_destination(definition)?;
         let identity = definition
             .raw_config
             .get(SERVER_IDENTITY_KEY)
@@ -906,12 +927,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn preflight_matches_start_without_identity_or_session() {
+        let root = tempfile::tempdir().unwrap();
+        let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
+        assert!(backend.validate_start(&definition(&[])).is_ok());
+
+        let bad = definition(&[("TargetDestination", serde_json::json!("bogus"))]);
+        assert!(matches!(
+            backend.validate_start(&bad),
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "TargetDestination"
+        ));
+        assert!(matches!(
+            backend.start(&bad).await,
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "TargetDestination"
+        ));
+    }
+
+    #[tokio::test]
     async fn option_validation_rejects_unsupported_security_modes_before_destination_lookup() {
         let root = tempfile::tempdir().unwrap();
         let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
         let result = backend
-            .config_without_destination(&definition(&[("UseSSL", serde_json::json!(true))]))
-            .await;
+            .config_without_destination(&definition(&[("UseSSL", serde_json::json!(true))]));
         assert!(matches!(
             result,
             Err(BackendError::UnsupportedOption {
@@ -929,8 +966,7 @@ mod tests {
             .config_without_destination(&definition(&[(
                 "TargetHost",
                 serde_json::json!("10.0.0.1"),
-            )]))
-            .await;
+            )]));
         assert!(matches!(
             result,
             Err(BackendError::UnsupportedOption { .. })
@@ -947,13 +983,11 @@ mod tests {
                 "TargetHost",
                 serde_json::json!("localhost"),
             )]))
-            .await
             .unwrap();
         assert_eq!(localhost.target_address, IpAddr::V4(Ipv4Addr::LOCALHOST));
 
         let ipv6 = backend
             .config_without_destination(&definition(&[("TargetHost", serde_json::json!("::1"))]))
-            .await
             .unwrap();
         assert_eq!(ipv6.target_address, IpAddr::V6(Ipv6Addr::LOCALHOST));
     }
@@ -964,7 +998,7 @@ mod tests {
         let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
         let mut definition = definition(&[]);
         definition.options.hosting_destination = Some("published-server-destination".to_owned());
-        let config = backend.config_without_destination(&definition).await.unwrap();
+        let config = backend.config_without_destination(&definition).unwrap();
         assert_eq!(config.target_address, IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
 
@@ -973,8 +1007,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
         let result = backend
-            .config_without_destination(&definition(&[("TargetHost", serde_json::json!(true))]))
-            .await;
+            .config_without_destination(&definition(&[("TargetHost", serde_json::json!(true))]));
         assert!(matches!(
             result,
             Err(BackendError::Internal { message }) if message.contains("TargetHost")
@@ -990,7 +1023,6 @@ mod tests {
                 "MaxConcurrentConns",
                 serde_json::json!(7),
             )]))
-            .await
             .unwrap();
         assert_eq!(config.admission.max_concurrent_connections(), 7);
 
@@ -998,8 +1030,7 @@ mod tests {
             .config_without_destination(&definition(&[(
                 "MaxConcurrentConns",
                 serde_json::json!(0),
-            )]))
-            .await;
+            )]));
         assert!(
             matches!(invalid, Err(BackendError::Internal { message }) if message.contains("MaxConcurrentConns"))
         );

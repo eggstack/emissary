@@ -44,6 +44,12 @@ impl TunnelBackend for UnsupportedTunnelBackend {
         self.tunnel_type
     }
 
+    fn validate_start(&self, _definition: &TunnelDefinition) -> BackendResult<()> {
+        Err(BackendError::NotImplemented {
+            tunnel_type: self.tunnel_type,
+        })
+    }
+
     async fn start(&self, _definition: &TunnelDefinition) -> BackendResult<()> {
         Err(BackendError::NotImplemented {
             tunnel_type: self.tunnel_type,

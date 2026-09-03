@@ -66,6 +66,12 @@ impl fmt::Display for StoredDestination {
 #[derive(Debug)]
 struct StoreState {
     entries: BTreeMap<String, String>,
+    /// Staged but not yet committed secrets for one in-flight server start
+    /// transaction. `get` observes staged values so the backend reads the
+    /// candidate identity; `commit` persists them and `discard` drops them
+    /// without touching durable state. Pending never survives `load` and is
+    /// never pruned into durability.
+    pending: BTreeMap<String, String>,
 }
 
 /// Backend-owned persistent destination identity store.
@@ -93,6 +99,7 @@ impl ServerDestinationStore {
             root: state_root.into().join(STORE_DIRECTORY),
             state: std::sync::Arc::new(tokio::sync::Mutex::new(StoreState {
                 entries: BTreeMap::new(),
+                pending: BTreeMap::new(),
             })),
             mutation: std::sync::Arc::new(tokio::sync::Mutex::new(())),
         }
@@ -120,17 +127,105 @@ impl ServerDestinationStore {
         };
         let mut state = self.state.lock().await;
         state.entries = entries;
+        state.pending.clear();
         Ok(())
     }
 
     /// Look up private material by the stable internal identity.
+    ///
+    /// Staged (not yet committed) values shadow durable entries so a backend
+    /// started from a prepared definition observes the candidate secret. All
+    /// other callers observe the same view; staging is bounded to one
+    /// in-flight start per identity by the control-plane per-name lifecycle
+    /// lock, and `load` clears any leftover staging.
     pub async fn get(&self, identity: &str) -> Result<Option<StoredDestination>, String> {
         validate_identity(identity)?;
         let state = self.state.lock().await;
+        if let Some(staged) = state.pending.get(identity) {
+            return Ok(Some(StoredDestination(staged.clone())));
+        }
         Ok(state.entries.get(identity).cloned().map(StoredDestination))
     }
 
+    /// Stage a candidate secret in memory without touching durable state.
+    ///
+    /// No file I/O happens here; `commit` persists and `discard` drops the
+    /// candidate. Staging a second candidate for the same identity replaces
+    /// the previous staged value; the durable entry is untouched until commit.
+    pub async fn stage(&self, identity: &str, destination: StoredDestination) -> Result<(), String> {
+        validate_identity(identity)?;
+        validate_destination(destination.as_str())?;
+        let mut state = self.state.lock().await;
+        if !state.entries.contains_key(identity)
+            && !state.pending.contains_key(identity)
+            && state.entries.len() >= MAX_ENTRIES
+        {
+            return Err("server destination store capacity exhausted".to_string());
+        }
+        state.pending.insert(identity.to_string(), destination.0);
+        Ok(())
+    }
+
+    /// Commit a previously staged candidate to durable state.
+    ///
+    /// Without a staged candidate this is a no-op. Failures leave the staged
+    /// candidate intact so the caller can retry or `discard` it.
+    pub async fn commit(&self, identity: &str) -> Result<(), String> {
+        validate_identity(identity)?;
+        let _guard = self.mutation.lock().await;
+        let staged = self.state.lock().await.pending.get(identity).cloned();
+        let Some(staged) = staged else { return Ok(()) };
+        validate_destination(&staged)?;
+        let entries = {
+            let state = self.state.lock().await;
+            let mut entries = state.entries.clone();
+            if !entries.contains_key(identity) && entries.len() >= MAX_ENTRIES {
+                return Err("server destination store capacity exhausted".to_string());
+            }
+            entries.insert(identity.to_string(), staged);
+            entries
+        };
+        self.publish(&entries).await?;
+        let mut state = self.state.lock().await;
+        state.entries = entries;
+        state.pending.remove(identity);
+        Ok(())
+    }
+
+    /// Drop a staged candidate without touching durable state.
+    pub async fn discard(&self, identity: &str) {
+        if validate_identity(identity).is_err() {
+            return;
+        }
+        self.state.lock().await.pending.remove(identity);
+    }
+
+    /// Drop a staged candidate without awaiting, for cancellation/drop guards.
+    ///
+    /// Uses `try_lock`; if the state lock is momentarily contended the staged
+    /// value is left for the next explicit `discard` or `load`. State locks
+    /// are held only for short in-memory updates, never across network or
+    /// file I/O, so contention is not expected on the cancellation path.
+    pub fn discard_sync(&self, identity: &str) {
+        if validate_identity(identity).is_err() {
+            return;
+        }
+        if let Ok(mut state) = self.state.try_lock() {
+            state.pending.remove(identity);
+        }
+    }
+
+    /// Return the number of staged (uncommitted) candidates, for tests.
+    #[cfg(test)]
+    pub async fn staged_count(&self) -> usize {
+        self.state.lock().await.pending.len()
+    }
+
     /// Publish or replace one validated identity.
+    ///
+    /// Direct durable write retained for setup/delete paths and tests. The
+    /// transactional start path uses `stage`/`commit`/`discard` instead.
+    /// A direct write supersedes any staged candidate for the same identity.
     pub async fn put(&self, identity: &str, destination: StoredDestination) -> Result<(), String> {
         validate_identity(identity)?;
         validate_destination(destination.as_str())?;
@@ -145,13 +240,16 @@ impl ServerDestinationStore {
             entries
         };
         self.publish(&entries).await?;
-        self.state.lock().await.entries = entries;
+        let mut state = self.state.lock().await;
+        state.entries = entries;
+        state.pending.remove(identity);
         Ok(())
     }
 
     /// Import private destination material from the confined administrative
     /// import root. The returned value is only intended for an immediate
-    /// subsequent `put`; runtime use never follows the external file.
+    /// subsequent `stage` (transactional start) or `put`; runtime use never
+    /// follows the external file.
     pub async fn import_reference(&self, reference: &str) -> Result<StoredDestination, String> {
         validate_reference(reference)?;
         let import_root = self
@@ -205,7 +303,9 @@ impl ServerDestinationStore {
             entries
         };
         self.publish(&entries).await?;
-        self.state.lock().await.entries = entries;
+        let mut state = self.state.lock().await;
+        state.entries = entries;
+        state.pending.remove(identity);
         Ok(true)
     }
 
@@ -483,5 +583,95 @@ mod tests {
         restarted.load().await.unwrap();
         assert!(restarted.get(&first).await.unwrap().is_some());
         assert!(restarted.get(&second).await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn staged_candidate_shadows_durability_until_commit_or_discard() {
+        let root = tempfile::tempdir().unwrap();
+        let store = ServerDestinationStore::new(root.path());
+        store.load().await.unwrap();
+        let identity = ServerDestinationStore::new_identity();
+        let durable = StoredDestination(base64_encode([11u8; 128]));
+        let candidate = StoredDestination(base64_encode([22u8; 128]));
+        store.put(&identity, durable.clone()).await.unwrap();
+
+        // Staging performs no file I/O: the durable file still holds the old
+        // secret while readers observe the candidate.
+        store.stage(&identity, candidate.clone()).await.unwrap();
+        assert_eq!(store.staged_count().await, 1);
+        assert_eq!(
+            store.get(&identity).await.unwrap().unwrap().as_str(),
+            candidate.as_str()
+        );
+
+        // Discard restores the durable view without touching the file.
+        store.discard(&identity).await;
+        assert_eq!(store.staged_count().await, 0);
+        assert_eq!(
+            store.get(&identity).await.unwrap().unwrap().as_str(),
+            durable.as_str()
+        );
+
+        // Commit persists the candidate exactly once.
+        store.stage(&identity, candidate.clone()).await.unwrap();
+        store.commit(&identity).await.unwrap();
+        assert_eq!(store.staged_count().await, 0);
+        assert_eq!(
+            store.get(&identity).await.unwrap().unwrap().as_str(),
+            candidate.as_str()
+        );
+        let restarted = ServerDestinationStore::new(root.path());
+        restarted.load().await.unwrap();
+        assert_eq!(
+            restarted.get(&identity).await.unwrap().unwrap().as_str(),
+            candidate.as_str()
+        );
+    }
+
+    #[tokio::test]
+    async fn fresh_stage_writes_nothing_durable_until_commit() {
+        let root = tempfile::tempdir().unwrap();
+        let store = ServerDestinationStore::new(root.path());
+        store.load().await.unwrap();
+        let identity = ServerDestinationStore::new_identity();
+        store.stage(&identity, secret()).await.unwrap();
+        assert!(!store.directory().join(CURRENT_FILE).exists());
+        assert_eq!(store.staged_count().await, 1);
+        // A synchronous drop-guard discard also clears staging.
+        store.discard_sync(&identity);
+        assert_eq!(store.staged_count().await, 0);
+        assert!(store.get(&identity).await.unwrap().is_none());
+        assert!(!store.directory().join(CURRENT_FILE).exists());
+
+        // Commit without staging is a no-op.
+        store.commit(&identity).await.unwrap();
+        assert!(store.get(&identity).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn direct_put_supersedes_staging_and_load_clears_it() {
+        let root = tempfile::tempdir().unwrap();
+        let store = ServerDestinationStore::new(root.path());
+        store.load().await.unwrap();
+        let identity = ServerDestinationStore::new_identity();
+        let staged = StoredDestination(base64_encode([33u8; 128]));
+        let direct = StoredDestination(base64_encode([44u8; 128]));
+        store.stage(&identity, staged).await.unwrap();
+        store.put(&identity, direct.clone()).await.unwrap();
+        assert_eq!(store.staged_count().await, 0);
+        assert_eq!(
+            store.get(&identity).await.unwrap().unwrap().as_str(),
+            direct.as_str()
+        );
+
+        store.stage(&identity, secret()).await.unwrap();
+        assert_eq!(store.staged_count().await, 1);
+        let restarted = ServerDestinationStore::new(root.path());
+        restarted.load().await.unwrap();
+        assert_eq!(restarted.staged_count().await, 0);
+        assert_eq!(
+            restarted.get(&identity).await.unwrap().unwrap().as_str(),
+            direct.as_str()
+        );
     }
 }

@@ -785,6 +785,53 @@ pub struct ProductionTunnelManagerControl {
     lifecycle: Arc<tokio::sync::Mutex<BTreeMap<String, Arc<tokio::sync::Mutex<()>>>>>,
 }
 
+/// Bounded server-start transaction state.
+///
+/// `Fresh` carries a staged (not yet committed) identity whose durable
+/// definition was never persisted. `Replacement` carries a staged candidate
+/// shadowing the durable secret plus the retained previous secret bytes for
+/// commit-phase restore. Both are bounded to one `start_locked` call.
+enum ServerStartKind {
+    NotServer,
+    ExistingUnchanged,
+    Fresh { identity: String },
+    Replacement { identity: String, previous_private: String },
+}
+
+/// In-memory prepared server definition with its transaction evidence.
+struct PreparedServerStart {
+    definition: TunnelDefinition,
+    kind: ServerStartKind,
+    _guard: ServerStartGuard,
+}
+
+impl PreparedServerStart {
+    /// Disarm the cancellation guard once explicit commit/rollback ownership
+    /// begins. Explicit async paths manage staging themselves; the guard
+    /// remains only for cancellation between staging and this point.
+    fn disarm(&mut self) {
+        self._guard.store.take();
+    }
+}
+
+/// Cancellation guard for staged server secrets.
+///
+/// Held from staging through commit/rollback so cancellation, panic-unwind
+/// cleanup, or an early explicit return still drops the staged candidate.
+/// The synchronous `discard_sync` never blocks on network or file I/O; state
+/// locks are held only for short in-memory updates.
+struct ServerStartGuard {
+    store: Option<(ServerDestinationStore, String)>,
+}
+
+impl Drop for ServerStartGuard {
+    fn drop(&mut self) {
+        if let Some((store, identity)) = self.store.take() {
+            store.discard_sync(&identity);
+        }
+    }
+}
+
 impl ProductionTunnelManagerControl {
     /// Create a new production tunnel manager control plane.
     #[allow(dead_code)]
@@ -1026,12 +1073,23 @@ impl ProductionTunnelManagerControl {
             let store = self.inner.lock().await;
             store
                 .get(name)
-                .ok_or_else(|| format!("error - tunnel '{}' not found", name))?
+                .ok_or_else(|| format!("error - tunnel '{name}' not found"))?
                 .clone()
         };
-        let definition = self.prepare_server_definition(definition).await?;
+        // Deterministic option validation precedes any secret allocation.
         if let Err(error) = validate_common_options(definition.tunnel_type, &definition.options) {
             return Ok(format!("error - {error}"));
+        }
+        // Pure backend preflight precedes generation/import/persistence.
+        // No listener/session/task allocation, no network I/O, no secret or
+        // runtime-map mutation happens inside `validate_start`.
+        let backend = self.registry.get(definition.tunnel_type);
+        match backend.validate_start(&definition) {
+            Ok(()) => {}
+            Err(BackendError::NotImplemented { tunnel_type }) => {
+                return Ok(format!("error - {} not implemented", tunnel_type.as_str()));
+            }
+            Err(error) => return Ok(format!("error - {error}")),
         }
         if definition.tunnel_type.is_client() {
             self.client_destinations
@@ -1040,49 +1098,62 @@ impl ProductionTunnelManagerControl {
                 })?)
                 .await?;
         }
-        let backend = self.registry.get(definition.tunnel_type);
-        match backend.start(&definition).await {
+        // Stage the server identity mutation without durable effects. The
+        // returned guard clears any staged candidate if this future is
+        // cancelled or dropped before commit, so a failed/uncommitted
+        // replacement never becomes authoritative.
+        let prepared = self.prepare_server_start(definition).await?;
+        let backend = self.registry.get(prepared.definition.tunnel_type);
+        match backend.start(&prepared.definition).await {
             Ok(()) => {
-                if definition.tunnel_type.is_client() {
-                    if let Err(error) = self.client_destinations.commit(definition.name.as_str()).await {
-                        let _ = backend.stop(&definition).await;
-                        self.client_destinations.discard(definition.name.as_str()).await;
+                if prepared.definition.tunnel_type.is_client() {
+                    if let Err(error) = self
+                        .client_destinations
+                        .commit(prepared.definition.name.as_str())
+                        .await
+                    {
+                        let _ = backend.stop(&prepared.definition).await;
+                        self.client_destinations
+                            .discard(prepared.definition.name.as_str())
+                            .await;
                         return Ok(format!("error - {error}"));
                     }
                 }
-                if matches!(
-                    definition.tunnel_type,
-                    TunnelType::Server
-                        | TunnelType::HttpServer
-                        | TunnelType::HttpBidirServer
-                        | TunnelType::IrcServer
-                        | TunnelType::StreamrServer
-                ) {
-                    let status = backend.inspect(&definition);
+                if prepared.definition.tunnel_type.is_server() {
+                    let status = backend.inspect(&prepared.definition);
                     let Some(destination) = status.destination else {
-                        let _ = backend.stop(&definition).await;
+                        let _ = backend.stop(&prepared.definition).await;
+                        self.rollback_server_start(prepared).await;
                         return Ok("error - server runtime did not publish a destination".into());
                     };
                     if let Err(error) = self
-                        .persist_server_public_destination(definition.clone(), destination)
+                        .commit_server_start(prepared, destination)
                         .await
                     {
-                        let _ = backend.stop(&definition).await;
                         return Ok(format!("error - {error}"));
                     }
                 }
                 Ok("ok".to_string())
             }
-            Err(BackendError::NotImplemented { tunnel_type }) =>
-                {
-                    if definition.tunnel_type.is_client() {
-                        self.client_destinations.discard(definition.name.as_str()).await;
-                    }
-                    Ok(format!("error - {} not implemented", tunnel_type.as_str()))
+            Err(BackendError::NotImplemented { tunnel_type }) => {
+                if prepared.definition.tunnel_type.is_client() {
+                    self.client_destinations
+                        .discard(prepared.definition.name.as_str())
+                        .await;
                 }
+                if prepared.definition.tunnel_type.is_server() {
+                    self.rollback_server_start(prepared).await;
+                }
+                Ok(format!("error - {} not implemented", tunnel_type.as_str()))
+            }
             Err(error) => {
-                if definition.tunnel_type.is_client() {
-                    self.client_destinations.discard(definition.name.as_str()).await;
+                if prepared.definition.tunnel_type.is_client() {
+                    self.client_destinations
+                        .discard(prepared.definition.name.as_str())
+                        .await;
+                }
+                if prepared.definition.tunnel_type.is_server() {
+                    self.rollback_server_start(prepared).await;
                 }
                 Ok(format!("error - {error}"))
             }
@@ -1143,19 +1214,25 @@ impl ProductionTunnelManagerControl {
         definition
     }
 
-    async fn prepare_server_definition(
+    /// Stage a server start without durable effects.
+    ///
+    /// Fresh identities are generated/imported into the secret-store staging
+    /// area and given an in-memory identity key; the durable `TunnelStore`
+    /// copy is left untouched until commit. Existing identities without a
+    /// `PrivKeyFile` replacement need no staging. A `PrivKeyFile`
+    /// replacement imports the candidate and stages it over the durable
+    /// secret without overwriting durability until commit. No `TunnelStore`
+    /// or secret-store durable mutation happens here.
+    async fn prepare_server_start(
         &self,
-        mut definition: TunnelDefinition,
-    ) -> Result<TunnelDefinition, String> {
-        if !matches!(
-            definition.tunnel_type,
-            TunnelType::Server
-                | TunnelType::HttpServer
-                | TunnelType::HttpBidirServer
-                | TunnelType::IrcServer
-                | TunnelType::StreamrServer
-        ) {
-            return Ok(definition);
+        definition: TunnelDefinition,
+    ) -> Result<PreparedServerStart, String> {
+        if !definition.tunnel_type.is_server() {
+            return Ok(PreparedServerStart {
+                definition,
+                kind: ServerStartKind::NotServer,
+                _guard: ServerStartGuard { store: None },
+            });
         }
         let identity = definition
             .raw_config
@@ -1167,19 +1244,41 @@ impl ProductionTunnelManagerControl {
                 return Err("server destination identity is unavailable".to_string());
             }
             if let Some(reference) = definition.options.priv_key_file.as_deref() {
-                let private = self.server_destinations.import_reference(reference).await?;
-                self.server_destinations.put(&identity, private).await?;
+                let candidate = self.server_destinations.import_reference(reference).await?;
+                let previous = self
+                    .server_destinations
+                    .get(&identity)
+                    .await?
+                    .ok_or_else(|| "server destination identity is unavailable".to_string())?;
+                // Retain the previous secret bytes only for commit-phase
+                // restore; durable state still holds the previous secret
+                // until `commit` and no secret is logged or exposed.
+                let previous_private = previous.as_str().to_owned();
+                self.server_destinations.stage(&identity, candidate).await?;
+                let guard = ServerStartGuard {
+                    store: Some((self.server_destinations.clone(), identity.clone())),
+                };
+                return Ok(PreparedServerStart {
+                    definition,
+                    kind: ServerStartKind::Replacement {
+                        identity,
+                        previous_private,
+                    },
+                    _guard: guard,
+                });
             }
-            return Ok(definition);
+            return Ok(PreparedServerStart {
+                definition,
+                kind: ServerStartKind::ExistingUnchanged,
+                _guard: ServerStartGuard { store: None },
+            });
         }
 
         let sam_tcp_port = self
             .sam_tcp_port
             .ok_or_else(|| "server backend requires the router SAM listener".to_string())?;
-        let private = if let Some(reference) = definition.options.priv_key_file.as_deref() {
-            self.server_destinations
-                .import_reference(reference)
-                .await?
+        let candidate = if let Some(reference) = definition.options.priv_key_file.as_deref() {
+            self.server_destinations.import_reference(reference).await?
         } else {
             crate::tunnel_server::generate_persistent_destination(sam_tcp_port)
                 .await
@@ -1187,23 +1286,113 @@ impl ProductionTunnelManagerControl {
                 .map(StoredDestination::from_private)?
         };
         let identity = ServerDestinationStore::new_identity();
-        self.server_destinations.put(&identity, private).await?;
-        definition.raw_config.insert(
-            crate::i2pcontrol::backends::server::SERVER_IDENTITY_KEY.to_string(),
-            serde_json::json!(identity),
-        );
-        let result = {
-            let mut store = self.inner.lock().await;
-            store
-                .upsert(definition.clone())
-                .await
-                .map_err(|error| format!("store upsert: {error}"))
+        self.server_destinations.stage(&identity, candidate).await?;
+        let guard = ServerStartGuard {
+            store: Some((self.server_destinations.clone(), identity.clone())),
         };
-        if let Err(error) = result {
-            let _ = self.server_destinations.remove(&identity).await;
-            return Err(error);
+        let mut prepared = definition;
+        prepared.raw_config.insert(
+            crate::i2pcontrol::backends::server::SERVER_IDENTITY_KEY.to_string(),
+            serde_json::json!(identity.clone()),
+        );
+        Ok(PreparedServerStart {
+            definition: prepared,
+            kind: ServerStartKind::Fresh { identity },
+            _guard: guard,
+        })
+    }
+
+    /// Drop staged state after a failed start before any commit.
+    ///
+    /// Durable secret and definition state are untouched for fresh starts
+    /// (the identity was never persisted) and for replacements (the staged
+    /// candidate shadowed durability without overwriting it).
+    async fn rollback_server_start(&self, prepared: PreparedServerStart) {
+        match &prepared.kind {
+            ServerStartKind::Fresh { identity }
+            | ServerStartKind::Replacement { identity, .. } => {
+                self.server_destinations.discard(identity).await;
+            }
+            ServerStartKind::NotServer | ServerStartKind::ExistingUnchanged => {}
         }
-        Ok(definition)
+        drop(prepared);
+    }
+
+    /// Commit a staged server start after the runtime published a destination.
+    ///
+    /// Secret commit precedes durable definition persistence. Any failure
+    /// stops the runtime and restores exact previous state: fresh commits
+    /// remove a just-committed secret, replacement commits restore the
+    /// retained previous secret, and the durable definition is only updated
+    /// after the secret is safely committed.
+    async fn commit_server_start(
+        &self,
+        mut prepared: PreparedServerStart,
+        destination: String,
+    ) -> Result<(), String> {
+        // Explicit ownership starts here; disarm the drop guard so it cannot
+        // clear staging underneath the async commit below.
+        prepared.disarm();
+        let backend = self.registry.get(prepared.definition.tunnel_type);
+        match prepared.kind {
+            ServerStartKind::NotServer | ServerStartKind::ExistingUnchanged => {
+                let definition = prepared.definition.clone();
+                drop(prepared);
+                if let Err(error) = self
+                    .persist_server_public_destination(definition.clone(), destination)
+                    .await
+                {
+                    let _ = backend.stop(&definition).await;
+                    return Err(error);
+                }
+                Ok(())
+            }
+            ServerStartKind::Fresh { ref identity } => {
+                let identity = identity.clone();
+                let definition = prepared.definition.clone();
+                drop(prepared);
+                if let Err(error) = self.server_destinations.commit(&identity).await {
+                    let _ = backend.stop(&definition).await;
+                    self.server_destinations.discard(&identity).await;
+                    return Err(error);
+                }
+                if let Err(error) = self
+                    .persist_server_public_destination(definition.clone(), destination)
+                    .await
+                {
+                    let _ = backend.stop(&definition).await;
+                    let _ = self.server_destinations.remove(&identity).await;
+                    return Err(error);
+                }
+                Ok(())
+            }
+            ServerStartKind::Replacement {
+                ref identity,
+                ref previous_private,
+            } => {
+                let identity = identity.clone();
+                let previous_private = previous_private.clone();
+                let definition = prepared.definition.clone();
+                drop(prepared);
+                if let Err(error) = self.server_destinations.commit(&identity).await {
+                    let _ = backend.stop(&definition).await;
+                    self.server_destinations.discard(&identity).await;
+                    return Err(error);
+                }
+                if let Err(error) = self
+                    .persist_server_public_destination(definition.clone(), destination)
+                    .await
+                {
+                    let _ = backend.stop(&definition).await;
+                    let _ = self
+                        .server_destinations
+                        .put(&identity, StoredDestination::from_private(previous_private))
+                        .await;
+                    return Err(error);
+                }
+                Ok(())
+            }
+        }
     }
 
     async fn persist_server_public_destination(
@@ -2271,5 +2460,666 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    // --- M120 server preallocation + secret transactionality regressions ---
+
+    fn m120_server_definition(name: &str, tunnel_type: TunnelType) -> TunnelDefinition {
+        use crate::i2pcontrol::domain::tunnel::{
+            StartIntent, TunnelName, TunnelOptions, TunnelOwnership, TunnelRuntimeState,
+        };
+        let mut options = TunnelOptions::default();
+        match tunnel_type {
+            TunnelType::Server | TunnelType::IrcServer => {
+                options.target_port = Some(6667);
+            }
+            TunnelType::HttpServer => {
+                options.target_port = Some(8080);
+            }
+            TunnelType::HttpBidirServer => {
+                options.target_port = Some(8080);
+                options.listen_port = Some(0);
+            }
+            TunnelType::StreamrServer => {
+                options.listen_port = Some(0);
+            }
+            _ => panic!("m120 helper only builds server families"),
+        }
+        TunnelDefinition {
+            name: TunnelName::new(name).unwrap(),
+            tunnel_type,
+            ownership: TunnelOwnership::ControlPlane,
+            runtime_state: TunnelRuntimeState::Stopped,
+            start_intent: StartIntent::DoNotStart,
+            options,
+            raw_config: Default::default(),
+        }
+    }
+
+    fn m120_secret(seed: u8) -> String {
+        emissary_core::crypto::base64_encode([seed; 128])
+    }
+
+    fn m120_write_import(state_root: &std::path::Path, filename: &str, secret_b64: &str) {
+        std::fs::create_dir_all(state_root.join("server-key-imports")).unwrap();
+        std::fs::write(state_root.join("server-key-imports").join(filename), secret_b64).unwrap();
+    }
+
+    async fn m120_counting_sam() -> (
+        u16,
+        std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = count.clone();
+        let task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                drop(stream);
+            }
+        });
+        (port, count, task)
+    }
+
+    async fn m120_succeeding_sam() -> (u16, tokio::task::JoinHandle<()>) {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                tokio::spawn(async move {
+                    let (read_half, mut write_half) = stream.into_split();
+                    let mut reader = BufReader::new(read_half);
+                    let mut line = String::new();
+                    loop {
+                        line.clear();
+                        if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                            break;
+                        }
+                        if line.starts_with("HELLO") {
+                            if write_half
+                                .write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n")
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+                        } else if line.starts_with("DEST GENERATE") {
+                            let private = emissary_core::crypto::base64_encode([9u8; 128]);
+                            let reply = format!("DEST REPLY PUB=destination PRIV={private}\n");
+                            if write_half.write_all(reply.as_bytes()).await.is_err() {
+                                break;
+                            }
+                        } else if line.starts_with("SESSION CREATE") {
+                            if write_half
+                                .write_all(
+                                    b"SESSION STATUS RESULT=OK DESTINATION=server-destination\n",
+                                )
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+                        } else if write_half.write_all(b"STREAM STATUS RESULT=OK\n").await.is_err() {
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+        (port, task)
+    }
+
+    async fn m120_failing_sam() -> (u16, tokio::task::JoinHandle<()>) {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                tokio::spawn(async move {
+                    let (read_half, mut write_half) = stream.into_split();
+                    let mut reader = BufReader::new(read_half);
+                    let mut line = String::new();
+                    loop {
+                        line.clear();
+                        if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                            break;
+                        }
+                        if line.starts_with("HELLO") {
+                            if write_half
+                                .write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n")
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+                        } else if line.starts_with("DEST GENERATE") {
+                            let private = emissary_core::crypto::base64_encode([9u8; 128]);
+                            let reply = format!("DEST REPLY PUB=destination PRIV={private}\n");
+                            if write_half.write_all(reply.as_bytes()).await.is_err() {
+                                break;
+                            }
+                        } else {
+                            // Fail session establishment fast: close without a
+                            // response so `start` returns without timeout.
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+        (port, task)
+    }
+
+    async fn m120_manager_with_sam(
+        tmp: &tempfile::TempDir,
+        sam_port: u16,
+    ) -> ProductionTunnelManagerControl {
+        let manager = ProductionTunnelManagerControl::new_with_startup_inventory_and_sam_port(
+            tmp.path().join("tunnels"),
+            StartupTunnelInventory::default(),
+            Some(sam_port),
+        )
+        .unwrap();
+        manager.load().await.unwrap();
+        manager
+    }
+
+    fn m120_identity_of(definition: &TunnelDefinition) -> Option<String> {
+        definition
+            .raw_config
+            .get(crate::i2pcontrol::backends::server::SERVER_IDENTITY_KEY)
+            .and_then(|value| value.as_str())
+            .map(str::to_string)
+    }
+
+    #[tokio::test]
+    async fn m120_common_option_fails_before_secret_allocation_for_all_server_families() {
+        use crate::i2pcontrol::domain::tunnel::TunnelType;
+        for tunnel_type in [
+            TunnelType::Server,
+            TunnelType::HttpServer,
+            TunnelType::HttpBidirServer,
+            TunnelType::IrcServer,
+            TunnelType::StreamrServer,
+        ] {
+            let tmp = tempfile::tempdir().unwrap();
+            let (sam_port, sam_count, sam_task) = m120_counting_sam().await;
+            let manager = m120_manager_with_sam(&tmp, sam_port).await;
+            let mut definition = m120_server_definition("fresh-common", tunnel_type);
+            definition.options.use_ssl = Some(true);
+            manager.create(definition).await.unwrap();
+
+            let result = manager.start("fresh-common").await.unwrap();
+            assert!(
+                result.contains("UseSSL"),
+                "{tunnel_type} common rejection must name UseSSL, got: {result}"
+            );
+            let stored = manager.get("fresh-common").await.unwrap().unwrap();
+            assert!(
+                m120_identity_of(&stored).is_none(),
+                "{tunnel_type} must not allocate an identity key"
+            );
+            assert!(
+                !stored.raw_config.contains_key(
+                    crate::i2pcontrol::backends::server::SERVER_PUBLIC_DESTINATION_KEY,
+                ),
+                "{tunnel_type} must not publish a destination"
+            );
+            assert_eq!(
+                manager.server_destinations.staged_count().await,
+                0,
+                "{tunnel_type} must leave no staged secret"
+            );
+            assert_eq!(
+                sam_count.load(std::sync::atomic::Ordering::SeqCst),
+                0,
+                "{tunnel_type} must not contact SAM before validation"
+            );
+            assert!(
+                !result.contains("true"),
+                "{tunnel_type} error must not echo option values"
+            );
+            sam_task.abort();
+        }
+    }
+
+    #[tokio::test]
+    async fn m120_raw_option_fails_before_generation_for_each_server_shape() {
+        use crate::i2pcontrol::domain::tunnel::TunnelType;
+        let cases = [
+            (TunnelType::Server, "SignatureType"),
+            (TunnelType::HttpServer, "TargetDestination"),
+            (TunnelType::HttpBidirServer, "SignatureType"),
+            (TunnelType::IrcServer, "SignatureType"),
+            (TunnelType::StreamrServer, "SigType"),
+        ];
+        for (tunnel_type, bad_key) in cases {
+            let tmp = tempfile::tempdir().unwrap();
+            let (sam_port, sam_count, sam_task) = m120_counting_sam().await;
+            let manager = m120_manager_with_sam(&tmp, sam_port).await;
+            let mut definition = m120_server_definition("fresh-raw", tunnel_type);
+            definition.raw_config.insert(bad_key.to_owned(), serde_json::json!("bogus"));
+            manager.create(definition).await.unwrap();
+
+            let result = manager.start("fresh-raw").await.unwrap();
+            assert!(
+                result.contains(bad_key),
+                "{tunnel_type} raw rejection must name {bad_key}, got: {result}"
+            );
+            let stored = manager.get("fresh-raw").await.unwrap().unwrap();
+            assert!(m120_identity_of(&stored).is_none());
+            assert_eq!(manager.server_destinations.staged_count().await, 0);
+            assert_eq!(sam_count.load(std::sync::atomic::Ordering::SeqCst), 0);
+            sam_task.abort();
+        }
+    }
+
+    #[tokio::test]
+    async fn m120_i2cp_and_import_order_fail_before_allocation() {
+        // Deterministic I2CP rejection precedes generation.
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, sam_count, sam_task) = m120_counting_sam().await;
+        let manager = m120_manager_with_sam(&tmp, sam_port).await;
+        let mut definition =
+            m120_server_definition("fresh-i2cp", crate::i2pcontrol::domain::tunnel::TunnelType::Server);
+        definition.options.i2cp_options.insert("bogus".to_owned(), "1".to_owned());
+        manager.create(definition).await.unwrap();
+        let result = manager.start("fresh-i2cp").await.unwrap();
+        assert!(result.contains("I2CPOptions"), "I2CP rejection, got: {result}");
+        assert!(m120_identity_of(&manager.get("fresh-i2cp").await.unwrap().unwrap()).is_none());
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+        assert_eq!(sam_count.load(std::sync::atomic::Ordering::SeqCst), 0);
+        sam_task.abort();
+
+        // Validation precedes import: a missing import file plus an invalid
+        // option must report the option, not the import failure.
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, _, sam_task) = m120_counting_sam().await;
+        let manager = m120_manager_with_sam(&tmp, sam_port).await;
+        let mut definition = m120_server_definition(
+            "fresh-import-order",
+            crate::i2pcontrol::domain::tunnel::TunnelType::Server,
+        );
+        definition.options.use_ssl = Some(true);
+        definition.options.priv_key_file = Some("missing.key".to_owned());
+        manager.create(definition).await.unwrap();
+        let result = manager.start("fresh-import-order").await.unwrap();
+        assert!(
+            result.contains("UseSSL"),
+            "validation must precede import, got: {result}"
+        );
+        assert!(!result.contains("missing.key"));
+        assert!(
+            m120_identity_of(
+                &manager.get("fresh-import-order").await.unwrap().unwrap()
+            )
+            .is_none()
+        );
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m120_failed_start_never_persists_identity_keys() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, _, sam_task) = m120_counting_sam().await;
+        let manager = m120_manager_with_sam(&tmp, sam_port).await;
+        let mut definition = m120_server_definition(
+            "no-identity",
+            crate::i2pcontrol::domain::tunnel::TunnelType::Server,
+        );
+        definition.raw_config.insert("SignatureType".to_owned(), serde_json::json!("x"));
+        manager.create(definition).await.unwrap();
+        let result = manager.start("no-identity").await.unwrap();
+        assert!(result.starts_with("error"));
+        let stored = manager.get("no-identity").await.unwrap().unwrap();
+        assert!(m120_identity_of(&stored).is_none());
+        assert!(
+            !stored.raw_config.contains_key(
+                crate::i2pcontrol::backends::server::SERVER_PUBLIC_DESTINATION_KEY,
+            )
+        );
+        // Reload proves nothing durable was written.
+        drop(manager);
+        let reloaded = ProductionTunnelManagerControl::new_with_startup_inventory_and_sam_port(
+            tmp.path().join("tunnels"),
+            StartupTunnelInventory::default(),
+            Some(sam_port),
+        )
+        .unwrap();
+        reloaded.load().await.unwrap();
+        let stored = reloaded.get("no-identity").await.unwrap().unwrap();
+        assert!(m120_identity_of(&stored).is_none());
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m120_existing_replacement_failure_restores_previous_secret() {
+        let secret_old = m120_secret(0xA1);
+        let secret_new = m120_secret(0xB2);
+        assert_ne!(secret_old, secret_new);
+
+        // Commit the original identity with a succeeding SAM.
+        let tmp = tempfile::tempdir().unwrap();
+        let (good_port, good_task) = m120_succeeding_sam().await;
+        let manager = m120_manager_with_sam(&tmp, good_port).await;
+        m120_write_import(tmp.path(), "old.key", &secret_old);
+        let mut definition = m120_server_definition(
+            "replace-server",
+            crate::i2pcontrol::domain::tunnel::TunnelType::Server,
+        );
+        definition.options.priv_key_file = Some("old.key".to_owned());
+        manager.create(definition).await.unwrap();
+        assert_eq!(manager.start("replace-server").await.unwrap(), "ok");
+        let committed = manager.get("replace-server").await.unwrap().unwrap();
+        let identity = m120_identity_of(&committed).expect("identity committed");
+        assert_eq!(
+            manager.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
+            secret_old
+        );
+        manager.stop("replace-server").await.unwrap();
+        drop(manager);
+        good_task.abort();
+
+        // Fail the replacement with a SAM that closes session setup.
+        let (bad_port, bad_task) = m120_failing_sam().await;
+        let manager = m120_manager_with_sam(&tmp, bad_port).await;
+        m120_write_import(tmp.path(), "new.key", &secret_new);
+        {
+            let mut store = manager.inner.lock().await;
+            let mut definition = store.get("replace-server").cloned().unwrap();
+            definition.options.priv_key_file = Some("new.key".to_owned());
+            store.upsert(definition).await.unwrap();
+        }
+        let result = manager.start("replace-server").await.unwrap();
+        assert!(result.starts_with("error"), "replacement must fail, got: {result}");
+        assert!(!result.contains(&secret_old));
+        assert!(!result.contains(&secret_new));
+        assert!(!result.contains("new.key"));
+        // Exact previous secret and durable definition are restored.
+        assert_eq!(
+            manager.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
+            secret_old
+        );
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+        let stored = manager.get("replace-server").await.unwrap().unwrap();
+        assert_eq!(m120_identity_of(&stored).as_deref(), Some(identity.as_str()));
+        bad_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m120_fresh_import_failure_leaves_no_secret_or_definition() {
+        let secret_new = m120_secret(0xC3);
+        let tmp = tempfile::tempdir().unwrap();
+        let (bad_port, bad_task) = m120_failing_sam().await;
+        let manager = m120_manager_with_sam(&tmp, bad_port).await;
+        m120_write_import(tmp.path(), "fresh.key", &secret_new);
+        let mut definition = m120_server_definition(
+            "fresh-failure",
+            crate::i2pcontrol::domain::tunnel::TunnelType::Server,
+        );
+        definition.options.priv_key_file = Some("fresh.key".to_owned());
+        manager.create(definition).await.unwrap();
+
+        let result = manager.start("fresh-failure").await.unwrap();
+        assert!(result.starts_with("error"), "fresh start must fail, got: {result}");
+        assert!(!result.contains(&secret_new));
+        let stored = manager.get("fresh-failure").await.unwrap().unwrap();
+        assert!(m120_identity_of(&stored).is_none());
+        assert!(
+            !stored.raw_config.contains_key(
+                crate::i2pcontrol::backends::server::SERVER_PUBLIC_DESTINATION_KEY,
+            )
+        );
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+        assert!(
+            !tmp.path().join("server-destinations").join("current.json").exists(),
+            "no durable secret may be written before commit"
+        );
+        bad_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m120_fresh_generated_failure_removes_secret_and_restores_definition() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Generation succeeds (DEST GENERATE) but session setup fails.
+        let (bad_port, bad_task) = m120_failing_sam().await;
+        let manager = m120_manager_with_sam(&tmp, bad_port).await;
+        let definition = m120_server_definition(
+            "fresh-generated",
+            crate::i2pcontrol::domain::tunnel::TunnelType::Server,
+        );
+        manager.create(definition).await.unwrap();
+
+        let result = manager.start("fresh-generated").await.unwrap();
+        assert!(result.starts_with("error"), "generated start must fail, got: {result}");
+        let stored = manager.get("fresh-generated").await.unwrap().unwrap();
+        assert!(m120_identity_of(&stored).is_none());
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+        assert!(
+            !tmp.path().join("server-destinations").join("current.json").exists(),
+            "failed generation must not leave a durable secret"
+        );
+        bad_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m120_public_destination_persistence_failure_rolls_back() {
+        let secret = m120_secret(0xD4);
+        let tmp = tempfile::tempdir().unwrap();
+        let (good_port, good_task) = m120_succeeding_sam().await;
+        let manager = m120_manager_with_sam(&tmp, good_port).await;
+        m120_write_import(tmp.path(), "persist.key", &secret);
+        let mut definition = m120_server_definition(
+            "persist-failure",
+            crate::i2pcontrol::domain::tunnel::TunnelType::Server,
+        );
+        definition.options.priv_key_file = Some("persist.key".to_owned());
+        manager.create(definition).await.unwrap();
+
+        // Break durable definition persistence after the backend succeeds.
+        let tunnels_dir = tmp.path().join("tunnels");
+        std::fs::remove_dir_all(&tunnels_dir).unwrap();
+        std::fs::write(&tunnels_dir, b"blocker").unwrap();
+
+        let result = manager.start("persist-failure").await.unwrap();
+        assert!(result.starts_with("error"), "persist must fail, got: {result}");
+        assert!(!result.contains(&secret));
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+        // The just-committed secret is removed again; the store returns to empty.
+        let store_file = tmp.path().join("server-destinations").join("current.json");
+        if store_file.exists() {
+            let bytes = std::fs::read(&store_file).unwrap();
+            let envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(
+                envelope["entries"],
+                serde_json::json!({}),
+                "committed secret must be rolled back"
+            );
+        }
+        // Runtime was stopped again.
+        let stored = manager.get("persist-failure").await.unwrap().unwrap();
+        assert_eq!(
+            stored.runtime_state,
+            crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopped
+        );
+        assert!(m120_identity_of(&stored).is_none());
+        good_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m120_success_commits_once_and_survives_stop_restart_reload() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (good_port, good_task) = m120_succeeding_sam().await;
+        let manager = m120_manager_with_sam(&tmp, good_port).await;
+        let definition = m120_server_definition(
+            "stable-server",
+            crate::i2pcontrol::domain::tunnel::TunnelType::Server,
+        );
+        manager.create(definition).await.unwrap();
+        assert_eq!(manager.start("stable-server").await.unwrap(), "ok");
+
+        let committed = manager.get("stable-server").await.unwrap().unwrap();
+        let identity = m120_identity_of(&committed).expect("identity committed");
+        let public = committed
+            .raw_config
+            .get(crate::i2pcontrol::backends::server::SERVER_PUBLIC_DESTINATION_KEY)
+            .and_then(|value| value.as_str())
+            .expect("public destination committed")
+            .to_owned();
+        assert_eq!(public, "server-destination");
+        let secret = manager.server_destinations.get(&identity).await.unwrap().unwrap();
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+
+        manager.stop("stable-server").await.unwrap();
+        let stopped = manager.get("stable-server").await.unwrap().unwrap();
+        assert_eq!(m120_identity_of(&stopped).as_deref(), Some(identity.as_str()));
+
+        assert_eq!(manager.start("stable-server").await.unwrap(), "ok");
+        let restarted = manager.get("stable-server").await.unwrap().unwrap();
+        assert_eq!(m120_identity_of(&restarted).as_deref(), Some(identity.as_str()));
+        assert_eq!(
+            manager.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
+            secret.as_str()
+        );
+        manager.stop("stable-server").await.unwrap();
+        drop(manager);
+
+        let reloaded = m120_manager_with_sam(&tmp, good_port).await;
+        let stored = reloaded.get("stable-server").await.unwrap().unwrap();
+        assert_eq!(m120_identity_of(&stored).as_deref(), Some(identity.as_str()));
+        assert_eq!(
+            reloaded.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
+            secret.as_str()
+        );
+        good_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m120_concurrent_same_name_starts_commit_once() {
+        let secret = m120_secret(0xE5);
+        let tmp = tempfile::tempdir().unwrap();
+        let (good_port, good_task) = m120_succeeding_sam().await;
+        let manager = m120_manager_with_sam(&tmp, good_port).await;
+        m120_write_import(tmp.path(), "race.key", &secret);
+        let mut definition = m120_server_definition(
+            "race-server",
+            crate::i2pcontrol::domain::tunnel::TunnelType::Server,
+        );
+        definition.options.priv_key_file = Some("race.key".to_owned());
+        manager.create(definition).await.unwrap();
+
+        let first = manager.clone();
+        let second = manager.clone();
+        let (left, right) = tokio::join!(first.start("race-server"), second.start("race-server"));
+        let outcomes = [left.unwrap(), right.unwrap()];
+        assert_eq!(
+            outcomes.iter().filter(|result| *result == "ok").count(),
+            1,
+            "exactly one concurrent start must win, got: {outcomes:?}"
+        );
+        assert!(outcomes.iter().any(|result| result.starts_with("error")));
+        for outcome in &outcomes {
+            assert!(!outcome.contains(&secret));
+        }
+        let stored = manager.get("race-server").await.unwrap().unwrap();
+        let identity = m120_identity_of(&stored).expect("winner committed");
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+        assert!(
+            manager.server_destinations.get(&identity).await.unwrap().is_some(),
+            "winner secret must be committed"
+        );
+        let store_file = tmp.path().join("server-destinations").join("current.json");
+        let bytes = std::fs::read(&store_file).unwrap();
+        let envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(envelope["entries"].as_object().unwrap().len(), 1);
+        manager.stop("race-server").await.unwrap();
+        good_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m120_cancellation_after_staging_leaves_no_pending_secret() {
+        use std::time::Duration;
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        // SAM answers HELLO then hangs before session setup.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let hanging_port = listener.local_addr().unwrap().port();
+        let hanging = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                tokio::spawn(async move {
+                    let (read_half, mut write_half) = stream.into_split();
+                    let mut reader = BufReader::new(read_half);
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                        return;
+                    }
+                    let _ = write_half.write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n").await;
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                });
+            }
+        });
+        let secret = m120_secret(0xF6);
+        let tmp = tempfile::tempdir().unwrap();
+        let manager = m120_manager_with_sam(&tmp, hanging_port).await;
+        m120_write_import(tmp.path(), "cancel.key", &secret);
+        let mut definition = m120_server_definition(
+            "cancel-server",
+            crate::i2pcontrol::domain::tunnel::TunnelType::Server,
+        );
+        definition.options.priv_key_file = Some("cancel.key".to_owned());
+        manager.create(definition).await.unwrap();
+
+        let worker = tokio::spawn(async move { manager.start("cancel-server").await });
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        worker.abort();
+        let _ = worker.await;
+        hanging.abort();
+
+        let checker = m120_manager_with_sam(&tmp, hanging_port).await;
+        assert_eq!(checker.server_destinations.staged_count().await, 0);
+        let stored = checker.get("cancel-server").await.unwrap().unwrap();
+        assert!(m120_identity_of(&stored).is_none());
+        assert!(
+            !tmp.path().join("server-destinations").join("current.json").exists(),
+            "cancelled staging must not reach durability"
+        );
+    }
+
+    #[tokio::test]
+    async fn m120_startup_managed_server_path_is_unchanged() {
+        let tmp = tempfile::tempdir().unwrap();
+        let startup = StartupTunnelInventory::from_configs(
+            &[],
+            &[crate::i2pcontrol::production::StartupServerConfig {
+                name: "startup-srv".to_owned(),
+                port: 8080,
+            }],
+        )
+        .unwrap();
+        let manager = ProductionTunnelManagerControl::new_with_startup_inventory(
+            tmp.path().join("tunnels"),
+            startup,
+        )
+        .unwrap();
+        manager.load().await.unwrap();
+        let result = manager.start("startup-srv").await;
+        assert!(result.is_err(), "startup path stays externally managed");
+        assert_eq!(manager.server_destinations.staged_count().await, 0);
+        assert!(manager.startup.get("startup-srv").unwrap().is_some());
     }
 }

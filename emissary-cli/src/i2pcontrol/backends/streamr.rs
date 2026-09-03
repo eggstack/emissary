@@ -786,7 +786,20 @@ impl TunnelBackend for StreamrServerTunnelBackend {
         TunnelType::StreamrServer
     }
 
+    fn validate_start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
+        // Pure preflight: the dummy destination is never used for I/O; it
+        // only lets the shared config validator run without store access.
+        let _ = self.config(
+            definition,
+            StoredDestination::from_private(String::new()),
+        )?;
+        Ok(())
+    }
+
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
+        // Reuse the exact preflight validator so deterministic failures
+        // precede identity/store/runtime work.
+        self.validate_start(definition)?;
         let identity = Self::identity(definition)?;
         let destination = self
             .destinations
@@ -979,6 +992,24 @@ mod tests {
             options: TunnelOptions::default(),
             raw_config: Default::default(),
         }
+    }
+
+    #[test]
+    fn streamr_server_preflight_matches_start_without_store() {
+        let root = tempfile::tempdir().unwrap();
+        let backend =
+            StreamrServerTunnelBackend::new(1, ServerDestinationStore::new(root.path()));
+        let mut valid = definition(TunnelType::StreamrServer);
+        valid.options.listen_port = Some(0);
+        assert!(backend.validate_start(&valid).is_ok());
+
+        let mut bad = definition(TunnelType::StreamrServer);
+        bad.options.listen_port = Some(0);
+        bad.raw_config.insert("SigType".to_owned(), serde_json::json!("x"));
+        assert!(matches!(
+            backend.validate_start(&bad),
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "SigType"
+        ));
     }
 
     #[test]

@@ -19,7 +19,9 @@ use yosemite_i2pcontrol::{DestinationKind, SessionOptions};
 
 use super::{
     filters::irc::{command_and_params, normalize_line, read_bounded_line, rewrite_server_user},
-    options::{validate_options, OptionValidationError, IRC_SERVER_OPTIONS},
+    options::{
+        validate_common_options, validate_options, OptionValidationError, IRC_SERVER_OPTIONS,
+    },
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
 use crate::i2pcontrol::{
@@ -560,8 +562,22 @@ impl TunnelBackend for IrcServerTunnelBackend {
         TunnelType::IrcServer
     }
 
+    fn validate_start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
+        validate_common_options(TunnelType::IrcServer, &definition.options)
+            .map_err(option_error)?;
+        let _ = self.config_without_destination(definition)?;
+        let _ = super::runtime::session::build_session_options(
+            definition,
+            self.sam_tcp_port,
+            true,
+            DestinationKind::Transient,
+        )?;
+        Ok(())
+    }
+
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
-        let mut config = self.config_without_destination(definition).await?;
+        self.validate_start(definition)?;
+        let mut config = self.config_without_destination(definition)?;
         let identity = definition
             .raw_config
             .get(SERVER_IDENTITY_KEY)
@@ -607,7 +623,7 @@ impl TunnelBackend for IrcServerTunnelBackend {
 }
 
 impl IrcServerTunnelBackend {
-    async fn config_without_destination(
+    fn config_without_destination(
         &self,
         definition: &TunnelDefinition,
     ) -> BackendResult<IrcServerConfig> {
@@ -753,6 +769,23 @@ mod tests {
                 serde_json::json!(identity),
             )]),
         }
+    }
+
+    #[tokio::test]
+    async fn preflight_matches_start_without_store_or_session() {
+        let backend = IrcServerTunnelBackend::new(1, ServerDestinationStore::new("."));
+        assert!(backend.validate_start(&definition("identity")).is_ok());
+
+        let mut bad = definition("identity");
+        bad.raw_config.insert("SignatureType".to_owned(), serde_json::json!("x"));
+        assert!(matches!(
+            backend.validate_start(&bad),
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "SignatureType"
+        ));
+        assert!(matches!(
+            backend.start(&bad).await,
+            Err(BackendError::UnsupportedOption { option, .. }) if option == "SignatureType"
+        ));
     }
 
     #[tokio::test]
@@ -990,7 +1023,7 @@ mod tests {
         definition
             .raw_config
             .insert("TargetHost".to_owned(), serde_json::json!("localhost"));
-        let config = backend.config_without_destination(&definition).await.unwrap();
+        let config = backend.config_without_destination(&definition).unwrap();
         assert_eq!(
             config.target_address,
             "127.0.0.1".parse::<IpAddr>().unwrap()
@@ -1005,7 +1038,7 @@ mod tests {
             .raw_config
             .insert("TargetHost".to_owned(), serde_json::json!("10.0.0.1"));
         assert!(matches!(
-            backend.config_without_destination(&definition).await,
+            backend.config_without_destination(&definition),
             Err(BackendError::Internal { message })
                 if message == "ircserver target host must be loopback"
         ));
@@ -1016,7 +1049,7 @@ mod tests {
         let backend = IrcServerTunnelBackend::new(1, ServerDestinationStore::new("."));
         let mut definition = definition("identity");
         definition.options.hosting_destination = Some("published-router-info".to_owned());
-        let config = backend.config_without_destination(&definition).await.unwrap();
+        let config = backend.config_without_destination(&definition).unwrap();
         assert_eq!(
             config.target_address,
             "127.0.0.1".parse::<IpAddr>().unwrap()

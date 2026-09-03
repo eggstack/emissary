@@ -143,12 +143,30 @@ pub struct BackendStatus {
 ///   unsupported backends.
 /// - `stop` of an inactive definition must be safe and resource-free.
 /// - `inspect` must return the current state without side effects.
+/// - `validate_start` must be pure: no listener/session/task allocation, no
+///   network I/O, no private destination generation/import/store mutation, and
+///   no runtime-map reservation. It validates every deterministic
+///   definition-shape, raw-option, I2CP-option, common-option, and typed
+///   constraint that `start` would otherwise reject before resource
+///   lookup/allocation. `start` reuses the same validation helpers so
+///   preflight and actual start cannot drift. Dynamic conditions such as port
+///   availability, SAM reachability, or secret-store I/O remain runtime
+///   failures owned by `start` with rollback at the control-plane layer.
 /// - All methods must honor caller deadlines without blocking.
 #[allow(dead_code)]
 #[async_trait::async_trait]
 pub trait TunnelBackend: Send + Sync {
     /// Return the tunnel type this backend handles.
     fn tunnel_type(&self) -> TunnelType;
+
+    /// Validate a definition without allocating resources or mutating stores.
+    ///
+    /// The default implementation accepts everything; server families override
+    /// it with their exact deterministic prefix so the control plane can fail
+    /// before private destination allocation/import/persistence.
+    fn validate_start(&self, _definition: &TunnelDefinition) -> BackendResult<()> {
+        Ok(())
+    }
 
     /// Start a tunnel with the given definition.
     ///

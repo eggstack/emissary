@@ -12,7 +12,7 @@ use tokio::{
 use yosemite_i2pcontrol::{DestinationKind, SessionOptions};
 
 use super::{
-    options::{validate_options, OptionValidationError, SERVER_OPTIONS},
+    options::{validate_common_options, validate_options, OptionValidationError, SERVER_OPTIONS},
     runtime::{
         run_accepted_server, AcceptedServerConnection, AcceptedServerHandler,
         AcceptedServerRuntimeConfig, AcceptedServerRuntimeError, ServerAccessPolicy,
@@ -399,18 +399,34 @@ impl TunnelBackend for ServerTunnelBackend {
         TunnelType::Server
     }
 
-    async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
-        if definition.ownership != TunnelOwnership::ControlPlane {
-            return Err(BackendError::InvalidState {
-                tunnel_type: TunnelType::Server,
-                current_state: definition.runtime_state,
-                attempted_action: "start",
-            });
-        }
+    fn validate_start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
+        // Pure preflight: every deterministic gate `start` would reject before
+        // secret-store lookup or runtime-map reservation. No store access, no
+        // supervisor reservation, no network I/O.
+        validate_common_options(TunnelType::Server, &definition.options)
+            .map_err(option_error)?;
         validate_raw_options(definition)?;
         validate_i2cp_options(definition)?;
         validate_options(TunnelType::Server, &definition.options, SERVER_OPTIONS)
             .map_err(option_error)?;
+        // Port, loopback, admission, access, and LeaseSet shape.
+        let _ = self.runtime_config(definition)?;
+        // Session-wire ranges (tunnel length/quantity, EncType, SigType,
+        // variance, custom options) with a dummy destination so no secret is
+        // required.
+        let _ = super::runtime::session::build_session_options(
+            definition,
+            self.supervisor.sam_tcp_port,
+            true,
+            DestinationKind::Transient,
+        )?;
+        Ok(())
+    }
+
+    async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
+        // Reuse the exact preflight helpers so validation cannot drift from
+        // the fail-before-allocation gate the control plane runs first.
+        self.validate_start(definition)?;
         let (target_port, admission, access, lease_set_enc_type) =
             self.runtime_config(definition)?;
         let store = self.destinations.as_ref().ok_or_else(|| BackendError::Internal {
@@ -700,6 +716,51 @@ mod tests {
                 serde_json::json!(identity),
             )]),
         }
+    }
+
+    #[tokio::test]
+    async fn preflight_matches_start_without_store_or_session_allocation() {
+        let backend = ServerTunnelBackend::without_store(1);
+        // Valid shape passes preflight even though no store is composed;
+        // store lookup stays a dynamic `start` failure.
+        let valid = definition("preflight-valid", "identity");
+        assert!(backend.validate_start(&valid).is_ok());
+
+        // Deterministic failures agree between preflight and start, before
+        // any store or session work.
+        let mut invalid = definition("preflight-invalid", "identity");
+        invalid.options.is_private = Some(true);
+        assert!(matches!(
+            backend.validate_start(&invalid),
+            Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::Server,
+                option
+            }) if option == "IsPrivate"
+        ));
+        assert!(matches!(
+            backend.start(&invalid).await,
+            Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::Server,
+                option
+            }) if option == "IsPrivate"
+        ));
+
+        let mut raw = definition("preflight-raw", "identity");
+        raw.raw_config.insert("SignatureType".to_owned(), serde_json::json!("secret"));
+        assert!(matches!(
+            backend.validate_start(&raw),
+            Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::Server,
+                option
+            }) if option == "SignatureType"
+        ));
+        assert!(matches!(
+            backend.start(&raw).await,
+            Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::Server,
+                option
+            }) if option == "SignatureType"
+        ));
     }
 
     #[tokio::test]

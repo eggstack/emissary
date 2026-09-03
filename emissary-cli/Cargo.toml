@@ -50,7 +50,7 @@ toml = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 yosemite = { workspace = true }
-yosemite-i2pcontrol = { package = "yosemite", git = "https://github.com/eggstack/yosemite", rev = "c2db73dba35dd9392947af5c74df29b0b556775f", features = ["async-extra"], optional = true }
+yosemite-i2pcontrol = { package = "yosemite", git = "https://github.com/eggstack/yosemite", rev = "59140a2277bf296928d2e8ce39a148182eeff044", features = ["async-extra"], optional = true }
 dioxus = { version = "=0.7.3", optional = true }
 dioxus-core = { version = "=0.7.3", optional = true }
 dioxus-liveview = { version = "=0.7.3", features = ["axum"], optional = true }

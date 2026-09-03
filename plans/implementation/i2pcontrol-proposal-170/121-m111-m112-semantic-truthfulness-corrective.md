@@ -1,6 +1,6 @@
 # M121 — M111/M112 Semantic Truthfulness Corrective
 
-Status: **proposed / blocked on M120 closure**
+Status: **ready**
 
 Class: corrective / Proposal conformance / lifecycle truthfulness
 

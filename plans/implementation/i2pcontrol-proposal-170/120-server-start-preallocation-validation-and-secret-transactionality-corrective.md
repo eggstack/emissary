@@ -1,6 +1,8 @@
 # M120 — Server Start Preallocation Validation and Secret Transactionality Corrective
 
-Status: **ready**
+Status: **closed**
+
+Closure: `plans/closure/i2pcontrol-proposal-170/120-closure.md`
 
 Class: corrective / I2PControl lifecycle / secret transactionality
 

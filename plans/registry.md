@@ -42,7 +42,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
 | I2PControl Proposal 170 full-support completion | active / partial | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | historical M114 closed as blocked | corrective line below must close before another final reclosure |
-| Proposal 170 post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M120 ready** | M121 → M122; Y004 proceeds separately in Yosemite |
+| Proposal 170 post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M121 ready** | M122; Y004 proceeds separately in Yosemite |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority | every corrective must retain exact path/dependency ownership |
 | I2PControl tunnel security | closed at M093 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | regression authority | M119/M120/M121 must preserve tunnel/secret/proxy boundaries |
 
@@ -56,7 +56,8 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 - M109/M115 startup lifecycle and M110/M116 shared-session/destination ownership corrective line are closed.
 - M117 exact I2PControl-only Yosemite fork integration is closed at Y002 revision `8026f5b424fc178d683e63555335f8b33e0aba04`.
 - M118 neutral tunnel variance/backup capability is closed historically and corrected by M119 standby-expiry/variance semantics.
-- M119 neutral tunnel-pool correctness is closed; M120 server transaction work is ready.
+- M119 neutral tunnel-pool correctness is closed; M120 server transaction work is closed.
+- M120 server preallocation/secret transactionality is closed; M121 semantic truthfulness work is ready.
 - M111 is historically closed with 40 SessionWire cells applied and four `UseSSL` cells blocked; M121 will re-audit `SigType` truthfulness.
 - M112 is historically closed as blocked after applying 24 TCP client lifecycle cells; M121 will re-audit the 18 `Close`/`CloseTime`/`NewDest` cells.
 - M113 is historically closed as blocked with 21 server presentation/routing/LeaseSet cells.
@@ -94,11 +95,11 @@ M119 M118 standby-expiry + variance semantics            |
   |                                                      |
   v                                                      |
 M120 server validation + secret transactionality         |
-[READY]                                                  |
+[CLOSED]                                                 |
   |                                                      |
   v                                                      |
 M121 M111/M112 semantic truthfulness                     |
-[PROPOSED / BLOCKED ON M120]                             |
+[READY]                                                  |
   |                                                      |
   +------------------------------+-----------------------+
                                  |
@@ -113,11 +114,11 @@ fresh M113/LeaseSet neutral-capability audit/plan        [FUTURE / NOT YET AUTHO
 remaining residual implementation + new final reclosure [FUTURE]
 ```
 
-## Current Emissary handoff — M120
+## Current Emissary handoff — M121
 
 Plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/120-server-start-preallocation-validation-and-secret-transactionality-corrective.md`
+- `plans/implementation/i2pcontrol-proposal-170/121-m111-m112-semantic-truthfulness-corrective.md`
 
 Status: **ready**.
 
@@ -127,23 +128,13 @@ Baseline:
 
 Objective:
 
-- fail every deterministically invalid/unsupported server start before private destination allocation/import/persistence;
-- make remaining server-secret mutation transactional across runtime start failure;
-- remain I2PControl-only with no core/router/Yosemite change and no matrix promotion.
-
-M120 is the sole dependency-ready Emissary implementation handoff. M119 is closed by `plans/closure/i2pcontrol-proposal-170/119-closure.md`.
-
-## Registered future corrective plans — not ready
-
-### M121
-
-`plans/implementation/i2pcontrol-proposal-170/121-m111-m112-semantic-truthfulness-corrective.md`
-
-Status: proposed/blocked on M120 closure.
-
-Objective: independently settle `SigType` support classification and reference `Close`/`CloseTime`/`NewDest` idle-session semantics. Preserve truthfulness over counts: affected cells may be returned to `blocked_primitive` if exact semantics require unavailable lower-layer primitives.
+- independently settle `SigType` support classification and reference `Close`/`CloseTime`/`NewDest` idle-session semantics. Preserve truthfulness over counts: affected cells may be returned to `blocked_primitive` if exact semantics require unavailable lower-layer primitives.
 
 No core/Yosemite/crypto implementation is authorized by M121.
+
+M121 is the sole dependency-ready Emissary implementation handoff. M120 is closed by `plans/closure/i2pcontrol-proposal-170/120-closure.md`.
+
+## Registered future corrective plans — not ready
 
 ### M122
 
@@ -180,6 +171,7 @@ Emissary agents must not implement Y004 in this repository and must not pin Y003
 | M117 | closed at exact Y002 pin |
 | M118 | historical closed; corrected by M119 |
 | M119 | closed; M120 corrective required |
+| M120 | closed; M121 corrective ready |
 
 Historical closure records remain unchanged. Later corrective closures supersede only the affected claims.
 
@@ -199,9 +191,9 @@ A cell becomes `apply` only with real request → validated mapping → actual r
 
 ## Registry maintenance rules
 
-1. M120 is the sole dependency-ready Emissary handoff.
+1. M121 is the sole dependency-ready Emissary handoff.
 2. Yosemite Y004 is separately ready only in `eggstack/yosemite`.
-3. M121 and M122 must not execute until their named gates close and this registry promotes the specific next plan.
+3. M122 must not execute until its named gates close and this registry promotes the specific next plan.
 4. Do not consume Yosemite Y003. Current fork pin remains Y002 until M122.
 5. Treat `312 / 70 / 458` as current artifact state only; M121 may legitimately alter it.
 6. Keep Proposal 170 policy under `emissary-cli/src/i2pcontrol/**` wherever possible. M119 was a specifically bounded neutral-core corrective to M118.

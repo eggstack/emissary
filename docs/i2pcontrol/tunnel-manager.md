@@ -368,10 +368,14 @@ M113 re-validated the remaining server presentation/routing and LeaseSet cells a
 closed them as blocked: `AllowInternalSSL`, `UniqueLocalAddressPerClient`, and
 `MultiHoming` have no bounded TLS termination or safe per-client/multihomed
 routing owner without weakening M093 loopback confinement, and
-`EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` have no Yosemite
-`SESSION CREATE` serializer at the accepted `8026f5b` revision (only
-`i2cp.leaseSetEncType` is emitted; `encrypt_lease_set` and auth/secret/key fields
-are declaration-only). All 21 cells fail before allocation with no downgrade.
+`EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` have no Proposal
+mapping or router encrypted-LeaseSet construction owner. The underlying SAM
+transport is no longer the blocker: Yosemite Y004 (`c2db73d`, adopted by M122)
+serializes the corrected generic fields (`i2cp.leaseSetPrivateKey`,
+`i2cp.leaseSetSigningPrivateKey`, mode-aware `i2cp.leaseSetClient.dh/psk`
+entries, reference-backed type domains), proven reachable by I2PControl adapter
+tests — but no Proposal path maps them and no downgrade is permitted, so all 21
+cells fail before allocation.
 
 | Disposition | Proposal 170 fields |
 |---|---|

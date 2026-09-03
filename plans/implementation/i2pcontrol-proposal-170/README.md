@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: partial Proposal 170 production support; M109, M115, M110, M116, M117, M118, and M111 are closed; M112, M113, and M114 are closed as blocked with 45, 21, and 70 named residual/evidence blockers; M121 is the current corrective handoff and demotes 28 cells; M095 currently records `284 apply / 98 blocked_primitive / 458 not_applicable`
+Status: partial Proposal 170 production support; M109, M115, M110, M116, M117, M118, M111, M121, and M122 are closed; M112, M113, and M114 are closed as blocked with 63, 21, and 70 named residual/evidence blockers at the post-M121 baseline; M121 demoted 28 cells; M122 adopts the Y004 Yosemite pin with no matrix change; M095 currently records `284 apply / 98 blocked_primitive / 458 not_applicable`
 
 This directory contains bounded internal implementation, audit, corrective, and closure handoffs for the I2PControl Proposal 170 subsystem.
 
@@ -94,8 +94,12 @@ Official status remains **partial Proposal 170 support**.
 | **M118** | **closed** | neutral SAM tunnel variance and standby/failover capability; no matrix promotion |
 | **M111** | **closed; corrected by M121** | Yosemite SAM session-wire completion; 40 SessionWire cells applied, four UseSSL cells remain explicitly blocked; M121 demotes the 10 `SigType` cells to blocked (Outcome C) |
 | M112 | closed as blocked; corrected by M121 | six TCP client families apply `ConnectDelay`; `Close`, `CloseTime`, and `NewDest` demoted by M121; 45 M112 residual cells remain blocked plus 18 demoted |
-| M113 | closed as blocked | server presentation/routing/LeaseSet; 21 cells remain blocked |
+| M113 | closed as blocked | server presentation/routing/LeaseSet; 21 cells remain blocked (Y004/M122 supply corrected SAM transport only, no router mapping) |
 | M114 | closed as blocked | final reclosure; 70 applicable cells and external interoperability evidence remain unresolved |
+| M119 | closed | M118 standby-expiry/variance corrective (neutral core) |
+| M120 | closed | server preallocation/secret-transactionality corrective |
+| M121 | closed | M111/M112 semantic truthfulness corrective; 28 cells demoted (Outcome C + §5.2) |
+| **M122** | **closed** | corrected Yosemite Y004 pin adoption (`c2db73d`); fake-SAM LeaseSet wire reachability; no matrix promotion |
 
 M110-M114 were reserved before the later M115/M116 correctives. Execution order is M109 → M115 → M110 → M116 → M111 → M112 → M113 → M114.
 
@@ -112,8 +116,9 @@ Plans in this completion line:
 - `118-neutral-sam-tunnel-pool-variance-backup-capability.md`
 
 Per `plans/003-planning-process.md`, M112 is closed as blocked. M113-M114 retain
-their independent blockers; no future Emissary handoff is dependency-ready from
-this closure.
+their independent blockers; no future Emissary implementation handoff is
+dependency-ready. The M122 closure authorizes a focused read-only M113/LeaseSet
+capability/crypto-ownership audit, which is not yet registered.
 
 M118 closure: `plans/closure/i2pcontrol-proposal-170/118-closure.md`. It records the
 read-only reference freeze, exact neutral owner paths, standby promotion/replenishment
@@ -159,7 +164,7 @@ M112 is closed as blocked. It applied portable `ConnectDelay` behavior for six T
 
 ## M113 — server presentation/LeaseSet residuals
 
-M113 is closed as blocked and remains security-sensitive. LeaseSet encryption/client authorization requires real accepted primitives with no downgrade. Presentation/address-routing may not relax literal-loopback/no-SSRF boundaries.
+M113 is closed as blocked and remains security-sensitive. LeaseSet encryption/client authorization requires real accepted primitives with no downgrade. Presentation/address-routing may not relax literal-loopback/no-SSRF boundaries. M122 advances the I2PControl Yosemite alias to Y004 (`c2db73d`), whose corrected generic LeaseSet serialization is proven reachable by adapter tests, but no Proposal path maps `EncryptLeaseSet`/`LeaseSetClientAuths` and no router encrypted-LeaseSet owner exists, so all 21 cells remain blocked. Closure: `plans/closure/i2pcontrol-proposal-170/122-closure.md`.
 
 ## M114 — final reclosure
 

@@ -42,7 +42,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff | Blocker/next transition |
 |---|---|---|---|---|
 | I2PControl Proposal 170 full-support completion | active / partial | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | historical M114 closed as blocked | corrective line below must close before another final reclosure |
-| Proposal 170 post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M121 closed; M122 blocked on Y004** | Y004 proceeds separately in Yosemite |
+| Proposal 170 post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M122 closed; no implementation handoff ready** | focused LeaseSet capability/crypto-ownership audit authorized but not yet registered |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority | every corrective must retain exact path/dependency ownership |
 | I2PControl tunnel security | closed at M093 | `plans/subsystems/i2pcontrol-proposal-170-tunnel-security-hardening-roadmap.md` | regression authority | M119/M120/M121 must preserve tunnel/secret/proxy boundaries |
 
@@ -54,7 +54,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 - All six ClientServicesInfo selectors are operational.
 - API 1-only negotiation and M107/M108 managed TLS hardening are operational.
 - M109/M115 startup lifecycle and M110/M116 shared-session/destination ownership corrective line are closed.
-- M117 exact I2PControl-only Yosemite fork integration is closed at Y002 revision `8026f5b424fc178d683e63555335f8b33e0aba04`.
+- M117 exact I2PControl-only Yosemite fork integration is closed at Y002 revision `8026f5b424fc178d683e63555335f8b33e0aba04`; M122 advances the alias to Y004 revision `c2db73dba35dd9392947af5c74df29b0b556775f` with corrected LeaseSet wire reachability and no matrix change.
 - M118 neutral tunnel variance/backup capability is closed historically and corrected by M119 standby-expiry/variance semantics.
 - M119 neutral tunnel-pool correctness is closed; M120 server transaction work is closed.
 - M120 server preallocation/secret transactionality is closed; M121 semantic truthfulness corrective is closed (284/98/458).
@@ -69,9 +69,9 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 ADR-0005 remains authoritative.
 
-The ordinary workspace Yosemite dependency remains unchanged for non-I2PControl code. I2PControl alone uses optional alias `yosemite-i2pcontrol`, exact-pinned to Y002 implementation `8026f5b424fc178d683e63555335f8b33e0aba04`.
+The ordinary workspace Yosemite dependency remains unchanged for non-I2PControl code. I2PControl alone uses optional alias `yosemite-i2pcontrol`, exact-pinned to Y004 implementation `c2db73dba35dd9392947af5c74df29b0b556775f` (closed Yosemite corrective; supersedes the Y002 pin).
 
-Yosemite Y003 implementation `9ac7d9a0ac2a8d526e363f150466b579b017e116` is **not consumed** by Emissary. Post-closure review found material LeaseSet wire-semantic defects. `eggstack/yosemite` now registers Y004 as the sole ready corrective handoff.
+Yosemite Y003 implementation `9ac7d9a0ac2a8d526e363f150466b579b017e116` was **never consumed** by Emissary. Yosemite Y004 implementation `c2db73dba35dd9392947af5c74df29b0b556775f` is **closed** with canonical I2CP LeaseSet property names, mode-aware DH/PSK client authorization, and reference-backed numeric domains; Emissary M122 adopts exactly this revision for corrected SAM-client transport only.
 
 No `[patch.crates-io]`, workspace replacement, path dependency, vendoring, floating branch/tag, or upstream activity is authorized.
 
@@ -82,11 +82,11 @@ No `[patch.crates-io]`, workspace replacement, path dependency, vendoring, float
 Y003 LeaseSet attempt                         [HISTORICAL CLOSED; CORRECTIVE REQUIRED]
   |
   v
-Y004 canonical LeaseSet wire corrective      [READY IN YOSEMITE]
+Y004 canonical LeaseSet wire corrective      [CLOSED IN YOSEMITE]
   |
   +------------------------------------------------------+
-                                                         |
-                         eggstack/emissary               |
+                                                          |
+                          eggstack/emissary               |
 M114 historical final reclosure                          |
   |                                                      |
   v                                                      |
@@ -102,25 +102,25 @@ M121 M111/M112 semantic truthfulness                     |
 [CLOSED 284/98/458]                                      |
   |                                                      |
   +------------------------------+-----------------------+
-                                  |
-                                  v
+                                   |
+                                   v
 M122 corrected Yosemite exact-pin adoption
-[PROPOSED / BLOCKED ON Y004 ONLY — M121 GATE SATISFIED]
+[CLOSED at Y004 c2db73d — transport only, no matrix change]
   |
   v
-fresh M113/LeaseSet neutral-capability audit/plan        [FUTURE / NOT YET AUTHORIZED]
+fresh M113/LeaseSet neutral-capability audit/plan        [AUTHORIZED / NOT YET REGISTERED]
   |
   v
 remaining residual implementation + new final reclosure [FUTURE]
 ```
 
-## Current Emissary handoff — M121 closed
+## Current Emissary handoff — M122 closed
 
 Plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/121-m111-m112-semantic-truthfulness-corrective.md`
+- `plans/implementation/i2pcontrol-proposal-170/122-corrected-yosemite-leaseset-pin-adoption.md`
 
-Status: **closed** (implementation `21f4070`; closure `plans/closure/i2pcontrol-proposal-170/121-closure.md`).
+Status: **closed** (implementation `548c174`; closure `plans/closure/i2pcontrol-proposal-170/122-closure.md`).
 
 Baseline:
 
@@ -128,19 +128,26 @@ Baseline:
 
 Outcome:
 
-- `SigType` demoted (Outcome C, 10 cells); `Close`/`CloseTime`/`NewDest` demoted (§5.2, 18 cells); matrix is `284 / 98 / 458`. No core/Yosemite/crypto change.
+- Optional I2PControl alias pins exact reviewed Y004 `c2db73dba35dd9392947af5c74df29b0b556775f`; ordinary Yosemite provenance unchanged; corrected LeaseSet API/wire reachable via fake-SAM adapter tests; matrix unchanged at `284 / 98 / 458`. No core/Yosemite/crypto change; no Proposal mapping added.
 
-There is no dependency-ready Emissary implementation handoff. M122 remains proposed/blocked on Yosemite Y004 closure only (M121 gate satisfied) and requires explicit registry promotion before execution.
+There is no dependency-ready Emissary implementation handoff. A focused read-only M113/LeaseSet capability/crypto-ownership audit is authorized by the M122 closure but not yet registered; no M113-successor implementation plan exists.
 
-## Registered future corrective plans — not ready
+## Registered future corrective plans — none ready
 
 ### M122
 
 `plans/implementation/i2pcontrol-proposal-170/122-corrected-yosemite-leaseset-pin-adoption.md`
 
-Status: proposed/blocked on Yosemite Y004 closure only (M121 gate satisfied).
+Status: **closed** (implementation `548c174`; closure `plans/closure/i2pcontrol-proposal-170/122-closure.md`).
 
-Objective: advance only the optional I2PControl Yosemite alias to the exact reviewed Y004 implementation SHA and prove corrected generic LeaseSet wire reachability. M122 is infrastructure only and cannot promote M113 cells.
+Outcome: optional I2PControl Yosemite alias pins exact reviewed Y004 `c2db73dba35dd9392947af5c74df29b0b556775f` with corrected generic LeaseSet wire reachability. Infrastructure only; no M113 cell promoted.
+
+### Next: M113/LeaseSet capability audit (not yet registered)
+
+A focused read-only audit freezing the exact LeaseSet type(s), crypto
+primitives, core owner, secret lifecycle, SAM mapping, no-downgrade rule,
+client-auth bounds, NetDb semantics, and minimal paths is authorized by the
+M122 closure. No implementation plan may be registered until that audit lands.
 
 ## Yosemite current handoff — external/internal dependency
 
@@ -150,9 +157,9 @@ Plan:
 
 - `plans/implementation/004-y003-leaseset-wire-semantics-corrective.md`
 
-Status: **ready in Yosemite**.
+Status: **closed** at implementation `c2db73dba35dd9392947af5c74df29b0b556775f` (closure `plans/closure/004-y003-leaseset-wire-semantics-corrective.md`).
 
-Y004 corrects canonical LeaseSet private/signing-key property names, DH/PSK per-client authorization representation, and guessed type domains while retaining bounded validation/redaction/default compatibility. It implements no router cryptography.
+Y004 corrects canonical LeaseSet private/signing-key property names, DH/PSK per-client authorization representation, and reference-backed type domains while retaining bounded validation/redaction/default compatibility. It implements no router cryptography. Emissary M122 adopts exactly this revision; no Y003 revision was ever consumed.
 
 Emissary agents must not implement Y004 in this repository and must not pin Y003.
 
@@ -170,7 +177,8 @@ Emissary agents must not implement Y004 in this repository and must not pin Y003
 | M118 | historical closed; corrected by M119 |
 | M119 | closed; M120 corrective required |
 | M120 | closed; M121 corrective closed |
-| M121 | closed (284/98/458); M122 blocked on Y004 only |
+| M121 | closed (284/98/458); M122 adoption closed |
+| M122 | closed at Y004 `c2db73d` (transport only, matrix unchanged); LeaseSet capability audit authorized, not yet registered |
 
 Historical closure records remain unchanged. Later corrective closures supersede only the affected claims.
 
@@ -183,19 +191,23 @@ At the current persisted artifact, blocked count 98 consists of:
 - 63 M112 cells (45 proxy/plugin/profile/reduction/Streamr lifecycle + 18 M121-demoted `Close`/`CloseTime`/`NewDest`);
 - 21 M113 presentation/routing/LeaseSet cells.
 
-Y004/M122 provide only corrected SAM-client transport. Current Emissary `SamSession` locally constructs a normal LeaseSet2; there is no accepted encrypted/authenticated LeaseSet construction owner yet. A new neutral-core LeaseSet plan must not be registered until M122 closes and the exact crypto/secret/NetDb owner is frozen. Do not add router crypto merely for matrix parity.
+Y004/M122 provide only corrected SAM-client transport (M122 proves it reachable
+via adapter tests). Current Emissary `SamSession` locally constructs a normal
+LeaseSet2; there is no accepted encrypted/authenticated LeaseSet construction
+owner yet. The focused capability/crypto-ownership audit authorized by the M122
+closure must land before any neutral-core LeaseSet implementation plan is
+registered. Do not add router crypto merely for matrix parity.
 
 A cell becomes `apply` only with real request → validated mapping → actual runtime effect evidence. A serializer/config field alone is not support. No `accept_inert` state is permitted.
 
 ## Registry maintenance rules
 
-1. No Emissary implementation handoff is dependency-ready; M122 requires explicit promotion after Y004 closes.
-2. Yosemite Y004 is separately ready only in `eggstack/yosemite`.
-3. M122 must not execute until its named gates close and this registry promotes the specific next plan.
-4. Do not consume Yosemite Y003. Current fork pin remains Y002 until M122.
-5. Current artifact state is `284 / 98 / 458` after M121 truthful demotion.
-6. Keep Proposal 170 policy under `emissary-cli/src/i2pcontrol/**` wherever possible. M119 was a specifically bounded neutral-core corrective to M118.
-7. No new neutral LeaseSet/core plan is authorized until corrected Y004 adoption and a focused capability/crypto ownership audit.
-8. No global Yosemite patch/replacement/vendor/path dependency is permitted.
-9. Proposal 170 remains pinned to `2026-05-20`; later revisions require a delta audit.
-10. All external/upstream sources are read-only. No upstream issue/PR/review/submission/merge/adoption/contact/release activity is authorized.
+1. No Emissary implementation handoff is dependency-ready; the M113/LeaseSet capability audit is authorized but not yet registered.
+2. Yosemite Y004 is closed at `c2db73d` and adopted by Emissary M122; Y003 was never consumed.
+3. M122 is closed; its transport-only disposition changes no matrix cell.
+4. Current artifact state is `284 / 98 / 458` after M121 truthful demotion.
+5. Keep Proposal 170 policy under `emissary-cli/src/i2pcontrol/**` wherever possible. M119 was a specifically bounded neutral-core corrective to M118.
+6. No new neutral LeaseSet/core implementation plan is registered until the authorized capability/crypto-ownership audit lands.
+7. No global Yosemite patch/replacement/vendor/path dependency is permitted.
+8. Proposal 170 remains pinned to `2026-05-20`; later revisions require a delta audit.
+9. All external/upstream sources are read-only. No upstream issue/PR/review/submission/merge/adoption/contact/release activity is authorized.

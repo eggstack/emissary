@@ -181,7 +181,7 @@ M095/M105 plus M110's completion ledger are current cell evidence, subject to M1
 | M110 | `Shared`, `NewDest`, `PersistentClientKey`, `PrivKeyFile` | 31 promoted cells | historically closed; M116 corrective authority |
 | M111 | `UseSSL`, `TunnelVariance`, `TunnelBackupQuantity`, `SigType`, `CustomOptions` | 4 blocked after 40 applied | closed; UseSSL remains blocked with exact semantic reason |
 | M112 | proxy/plugin/jump + client `ConnectDelay`/`Profile`/remaining `DelayOpen`/`Reduce*`/`Close*`/`NewDest` | 45 blocked | closed as blocked; 24 TCP lifecycle cells applied, Streamr and unsupported owner cells retained |
-| M113 | server presentation/address-routing/LeaseSet | 21 blocked | closed as blocked; no safe TLS/multihoming/LeaseSet primitive at 8026f5b |
+| M113 | server presentation/address-routing/LeaseSet | 21 blocked | closed as blocked; corrected SAM transport at Y004 `c2db73d` (M122), still no safe TLS/multihoming/LeaseSet router primitive |
 
 Current blocked count is 70 = 4 + 45 + 21.
 
@@ -328,7 +328,7 @@ Plan: `plans/implementation/i2pcontrol-proposal-170/113-server-presentation-addr
 
 Status: **closed as blocked**.
 
-Current result: 0 cells applied; 21 cells remain blocked with exact presentation/routing and LeaseSet primitive reasons. `AllowInternalSSL`, `UniqueLocalAddressPerClient`, and `MultiHoming` remain blocked because no bounded TLS termination or safe per-client/multihomed routing owner exists without weakening M093 loopback confinement; `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` remain blocked because Yosemite 8026f5b declares but does not serialize encrypted-LeaseSet/client-auth fields on `SESSION CREATE`. Closure: `plans/closure/i2pcontrol-proposal-170/113-closure.md`.
+Current result: 0 cells applied; 21 cells remain blocked with exact presentation/routing and LeaseSet primitive reasons. `AllowInternalSSL`, `UniqueLocalAddressPerClient`, and `MultiHoming` remain blocked because no bounded TLS termination or safe per-client/multihomed routing owner exists without weakening M093 loopback confinement; `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` remain blocked because, although Yosemite Y004 (`c2db73d`, adopted by M122 with fake-SAM reachability evidence) now serializes the corrected generic encrypted-LeaseSet/client-auth fields on `SESSION CREATE`, no Proposal path maps them and no router encrypted-LeaseSet construction owner exists. Closure: `plans/closure/i2pcontrol-proposal-170/113-closure.md`; dependency update: `plans/closure/i2pcontrol-proposal-170/122-closure.md`.
 
 ## 14. M114 — final live/reference reclosure
 

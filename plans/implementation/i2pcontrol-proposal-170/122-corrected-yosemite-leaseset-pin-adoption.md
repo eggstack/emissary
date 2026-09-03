@@ -1,6 +1,6 @@
 # M122 — Corrected Yosemite LeaseSet Pin Adoption
 
-Status: **proposed / blocked on Yosemite Y004 closure (M121 gate satisfied by `plans/closure/i2pcontrol-proposal-170/121-closure.md`)**
+Status: **closed** — Y004 pin `c2db73dba35dd9392947af5c74df29b0b556775f` adopted (implementation `548c174`); closure `plans/closure/i2pcontrol-proposal-170/122-closure.md`; matrix unchanged at 284/98/458
 
 Class: dependency integration / corrective containment
 

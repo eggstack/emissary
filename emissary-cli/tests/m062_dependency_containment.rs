@@ -586,6 +586,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m116 = is_authorized_m116_path(path);
         let authorized_m117 = is_authorized_m117_path(path);
         let authorized_m118 = is_authorized_m118_path(path);
+        let authorized_m119 = is_authorized_m119_path(path);
         let authorized_m111 = is_authorized_m111_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
@@ -605,6 +606,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m116
                 || authorized_m117
                 || authorized_m118
+                || authorized_m119
                 || authorized_m111
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
@@ -628,6 +630,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m116
                     || authorized_m117
                     || authorized_m118
+                    || authorized_m119
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -850,6 +853,19 @@ fn is_authorized_m118_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+    )
+}
+
+fn is_authorized_m119_path(path: &str) -> bool {
+    matches!(
+        path,
+        "emissary-core/src/tunnel/pool/mod.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/119-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/119-m118-standby-expiry-and-variance-semantics-corrective.md"
+            | "plans/implementation/i2pcontrol-proposal-170/120-server-start-preallocation-validation-and-secret-transactionality-corrective.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md"
     )
 }
 

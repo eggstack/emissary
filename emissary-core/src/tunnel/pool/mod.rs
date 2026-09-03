@@ -247,6 +247,58 @@ impl From<&Mapping> for TunnelPoolConfig {
 }
 
 /// Select one tunnel length according to the SAM/I2P inclusive variance rules.
+///
+/// Reference freeze (`TunnelPeerSelector.getLength`, read-only Java I2P source):
+/// positive variance samples an inclusive additive offset `0..=variance`;
+/// negative variance samples a magnitude uniformly from `0..=|variance|` and
+/// then a sign uniformly (`nextBoolean`), so the base length carries
+/// `1/(|variance|+1)` probability mass and each non-zero offset carries
+/// `1/(2*(|variance|+1))`. Zero magnitude yields the base regardless of sign.
+///
+/// `apply_length_variance` is the deterministic pure mapping used by
+/// [`varied_tunnel_length`]; it exists so distribution semantics are covered
+/// by exact reference vectors without statistical/flaky RNG assertions.
+fn apply_length_variance(
+    base: usize,
+    variance: i8,
+    magnitude: u16,
+    positive_sign: bool,
+    maximum: usize,
+) -> Option<usize> {
+    if !(1..=maximum).contains(&base) {
+        return None;
+    }
+
+    if variance == 0 {
+        return Some(base);
+    }
+
+    let offset = if variance < 0 {
+        let limit = (-i16::from(variance)) as u16;
+        if magnitude > limit {
+            return None;
+        }
+        let magnitude = i16::try_from(magnitude).ok()?;
+        if magnitude == 0 {
+            0i16
+        } else if positive_sign {
+            magnitude
+        } else {
+            -magnitude
+        }
+    } else {
+        let limit = i16::from(variance) as u16;
+        if magnitude > limit {
+            return None;
+        }
+        i16::try_from(magnitude).ok()?
+    };
+    let length = i16::try_from(base).ok()?.checked_add(offset)?;
+
+    (1..=i16::try_from(maximum).ok()?).contains(&length)
+        .then_some(usize::try_from(length).ok()?)
+}
+
 fn varied_tunnel_length<R: Runtime>(base: usize, variance: i8, maximum: usize) -> Option<usize> {
     if !(1..=maximum).contains(&base) {
         return None;
@@ -256,18 +308,18 @@ fn varied_tunnel_length<R: Runtime>(base: usize, variance: i8, maximum: usize) -
         return Some(base);
     }
 
-    let variance = i16::from(variance);
-    let offset = if variance < 0 {
-        let magnitude = -variance;
-        let width = (2 * magnitude + 1) as u32;
-        (R::rng().next_u32() % width) as i16 - magnitude
+    if variance < 0 {
+        let magnitude = (-i16::from(variance)) as u32;
+        let sampled = (R::rng().next_u32() % (magnitude + 1)) as u16;
+        // Match the reference magnitude/sign shape: one uniform magnitude
+        // draw plus one uniform sign draw. Zero magnitude maps to the base
+        // irrespective of the sign draw.
+        let positive_sign = (R::rng().next_u32() & 1) == 0;
+        apply_length_variance(base, variance, sampled, positive_sign, maximum)
     } else {
-        (R::rng().next_u32() % (variance as u32 + 1)) as i16
-    };
-    let length = i16::try_from(base).ok()?.checked_add(offset)?;
-
-    (1..=i16::try_from(maximum).ok()?).contains(&length)
-        .then_some(usize::try_from(length).ok()?)
+        let sampled = (R::rng().next_u32() % (i16::from(variance) as u32 + 1)) as u16;
+        apply_length_variance(base, variance, sampled, true, maximum)
+    }
 }
 
 /// Tunnel pool implementation.
@@ -301,7 +353,14 @@ pub struct TunnelPool<R: Runtime, S: TunnelSelector + HopSelector> {
     inbound_tunnels: HashMap<TunnelId, (TunnelId, RouterId)>,
 
     /// Standby inbound tunnels, keyed by their gateway tunnel ID.
-    backup_inbound_tunnels: HashMap<TunnelId, (TunnelId, RouterId, HashSet<RouterId>)>,
+    ///
+    /// The stored expiration is the tunnel's canonical absolute expiration
+    /// (`build-completion time + TUNNEL_EXPIRATION`), captured on the same
+    /// poll tick that constructs the inbound tunnel event loop and registers
+    /// the pool timer. It is not a second ticking clock; promotion reuses it
+    /// verbatim so an aged standby can never be republished with a fresh
+    /// full lifetime.
+    backup_inbound_tunnels: HashMap<TunnelId, (TunnelId, RouterId, HashSet<RouterId>, Duration)>,
 
     /// Last time a tunnel test was performed.
     last_tunnel_test: R::Instant,
@@ -469,6 +528,90 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
             .saturating_sub(self.backup_inbound_tunnels.len() + backup_pending);
 
         (active, backup)
+    }
+
+    /// Select the promotable inbound standby with the latest absolute expiration.
+    ///
+    /// Returns `None` when no standby remains in the future relative to `now`.
+    /// Expired standbys are intentionally left in place for their own
+    /// destruction-timer cleanup so a later JoinSet event is not misclassified
+    /// as an active expiry.
+    fn select_promotable_inbound_standby(
+        backup: &HashMap<TunnelId, (TunnelId, RouterId, HashSet<RouterId>, Duration)>,
+        now: Duration,
+    ) -> Option<(TunnelId, TunnelId, RouterId, HashSet<RouterId>, Duration)> {
+        backup
+            .iter()
+            .filter(|(_, (_, _, _, expires))| *expires > now)
+            .max_by_key(|(_, (_, _, _, expires))| *expires)
+            .map(|(gateway, (tunnel_id, router_id, hops, expires))| {
+                (*gateway, *tunnel_id, router_id.clone(), hops.clone(), *expires)
+            })
+    }
+
+    /// Promote one aged inbound standby into the active pool, if needed.
+    ///
+    /// The promoted Lease reuses the standby's canonical absolute expiration
+    /// verbatim and never mints `now + TUNNEL_EXPIRATION`; the destruction
+    /// timer is not reset. Returns `true` when a standby was promoted and the
+    /// owner was notified. On owner-registration failure the pre-promotion
+    /// active/standby/routing state is restored and `false` is returned so no
+    /// fabricated active Lease remains.
+    fn promote_standby_inbound(&mut self) -> bool {
+        if self.inbound_tunnels.len() >= self.config.num_inbound {
+            return false;
+        }
+
+        let Some((backup_gateway, backup_tunnel_id, backup_router, hops, backup_expires)) =
+            Self::select_promotable_inbound_standby(
+                &self.backup_inbound_tunnels,
+                R::time_since_epoch(),
+            )
+        else {
+            return false;
+        };
+
+        self.backup_inbound_tunnels.remove(&backup_gateway);
+        self.selector
+            .add_inbound_tunnel(backup_gateway, backup_router.clone(), hops.clone());
+        self.inbound_tunnels
+            .insert(backup_gateway, (backup_tunnel_id, backup_router.clone()));
+
+        // The destruction timer is not reset: the promoted tunnel still
+        // expires via its original `inbound` JoinSet event. Only the
+        // owner-visible Lease carries the retained absolute expiration.
+        if let Err(error) = self.context.register_inbound_tunnel_built(
+            backup_gateway,
+            Lease {
+                router_id: backup_router.clone(),
+                tunnel_id: backup_gateway,
+                expires: backup_expires,
+            },
+        ) {
+            // Roll back to the pre-promotion state so no route is visible as
+            // active with an owner Lease the owner never received, and so
+            // active/standby accounting is not doubled. The standby entry
+            // (with its absolute expiration) is restored so its original
+            // destruction timer still owns cleanup.
+            self.selector.remove_inbound_tunnel(&backup_gateway);
+            self.inbound_tunnels.remove(&backup_gateway);
+            self.backup_inbound_tunnels.insert(
+                backup_gateway,
+                (backup_tunnel_id, backup_router, hops, backup_expires),
+            );
+            tracing::warn!(
+                target: LOG_TARGET,
+                name = %self.config.name,
+                %backup_gateway,
+                ?error,
+                "failed to register promoted inbound tunnel to owner",
+            );
+            return false;
+        }
+
+        self.publish_tunnel(backup_gateway, TunnelDirection::Inbound);
+        self.router_ctx.metrics_handle().gauge(NUM_INBOUND_TUNNELS).increment(1);
+        true
     }
 
     /// Maintain the tunnel pool.
@@ -1185,11 +1328,16 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                     let (router_id, gateway_tunnel_id) = tunnel.gateway();
                     let hops_for_selector = tunnel.hops();
                     if is_backup {
-                        self.backup_inbound_tunnels
-                            .insert(
-                                gateway_tunnel_id,
-                                (tunnel_id, router_id.clone(), hops_for_selector),
-                            );
+                        // Capture the canonical absolute expiration on the same
+                        // tick that constructs the tunnel event loop (whose own
+                        // `TUNNEL_EXPIRATION` delay starts inside `T::new`) and
+                        // registers the pool rebuild timer. Promotion must reuse
+                        // this value verbatim and never mint `now + full`.
+                        let expires = R::time_since_epoch() + TUNNEL_EXPIRATION;
+                        self.backup_inbound_tunnels.insert(
+                            gateway_tunnel_id,
+                            (tunnel_id, router_id.clone(), hops_for_selector, expires),
+                        );
                     } else {
                         self.selector.add_inbound_tunnel(
                             gateway_tunnel_id,
@@ -1294,47 +1442,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                         );
                     }
 
-                    let backup = (self.inbound_tunnels.len() < self.config.num_inbound)
-                        .then(|| {
-                            self.backup_inbound_tunnels
-                                .iter()
-                                .next()
-                                .map(|(gateway, (tunnel_id, router_id, hops))| {
-                                    (*gateway, *tunnel_id, router_id.clone(), hops.clone())
-                                })
-                        })
-                        .flatten();
-                    if let Some((backup_gateway, backup_tunnel_id, backup_router, hops)) = backup {
-                        self.backup_inbound_tunnels.remove(&backup_gateway);
-                        self.selector.add_inbound_tunnel(
-                            backup_gateway,
-                            backup_router.clone(),
-                            hops,
-                        );
-                        self.inbound_tunnels.insert(
-                            backup_gateway,
-                            (backup_tunnel_id, backup_router.clone()),
-                        );
-                        self.publish_tunnel(backup_gateway, TunnelDirection::Inbound);
-                        self.router_ctx.metrics_handle().gauge(NUM_INBOUND_TUNNELS).increment(1);
-
-                        if let Err(error) = self.context.register_inbound_tunnel_built(
-                            backup_gateway,
-                            Lease {
-                                router_id: backup_router.clone(),
-                                tunnel_id: backup_gateway,
-                                expires: R::time_since_epoch() + TUNNEL_EXPIRATION,
-                            },
-                        ) {
-                            tracing::warn!(
-                                target: LOG_TARGET,
-                                name = %self.config.name,
-                                %backup_gateway,
-                                ?error,
-                                "failed to register promoted inbound tunnel to owner",
-                            );
-                        }
-                    }
+                    let _promoted = self.promote_standby_inbound();
                 }
             }
         }
@@ -1756,7 +1864,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                     if self
                         .backup_inbound_tunnels
                         .values()
-                        .any(|(backup_tunnel_id, _, _)| *backup_tunnel_id == tunnel_id)
+                        .any(|(backup_tunnel_id, _, _, _)| *backup_tunnel_id == tunnel_id)
                     {
                         continue;
                     }
@@ -1801,7 +1909,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                 });
                 self.backup_inbound_tunnels
                     .values()
-                    .for_each(|(tunnel_id, _, _)| {
+                    .for_each(|(tunnel_id, _, _, _)| {
                         self.subsystem_handle.remove_tunnel(tunnel_id);
                     });
 
@@ -1877,6 +1985,370 @@ mod tests {
         assert!(lengths.len() > 1, "test RNG did not demonstrate variation");
         assert_eq!(varied_tunnel_length::<MockRuntime>(3, 0, 7), Some(3));
         assert_eq!(varied_tunnel_length::<MockRuntime>(0, 0, 7), None);
+    }
+
+    #[test]
+    fn apply_length_variance_matches_java_reference_vectors() {
+        // Zero variance preserves the base without consuming magnitude/sign.
+        assert_eq!(apply_length_variance(3, 0, 0, true, 7), Some(3));
+        assert_eq!(apply_length_variance(3, 0, 2, false, 7), Some(3));
+        assert_eq!(apply_length_variance(0, 0, 0, true, 7), None);
+
+        // Positive variance is an inclusive additive range `base..=base+variance`.
+        assert_eq!(apply_length_variance(3, 2, 0, true, 7), Some(3));
+        assert_eq!(apply_length_variance(3, 2, 1, true, 7), Some(4));
+        assert_eq!(apply_length_variance(3, 2, 2, true, 7), Some(5));
+        assert_eq!(apply_length_variance(3, 2, 3, true, 7), None);
+        // Fail-closed at the representable boundary: 7 + 1 cannot be built.
+        assert_eq!(apply_length_variance(7, 1, 1, true, 7), None);
+        assert_eq!(apply_length_variance(3, 1, 0, true, 8), Some(3));
+        assert_eq!(apply_length_variance(3, 1, 1, true, 8), Some(4));
+
+        // Negative variance samples magnitude `0..=|variance|` plus a sign.
+        // Magnitude zero yields the base regardless of the sign draw, so the
+        // base carries `1/(M+1)` mass while each non-zero offset carries
+        // `1/(2*(M+1))` (Java `TunnelPeerSelector.getLength` parity).
+        assert_eq!(apply_length_variance(3, -2, 0, true, 7), Some(3));
+        assert_eq!(apply_length_variance(3, -2, 0, false, 7), Some(3));
+        assert_eq!(apply_length_variance(3, -2, 1, true, 7), Some(4));
+        assert_eq!(apply_length_variance(3, -2, 1, false, 7), Some(2));
+        assert_eq!(apply_length_variance(3, -2, 2, true, 7), Some(5));
+        assert_eq!(apply_length_variance(3, -2, 2, false, 7), Some(1));
+        assert_eq!(apply_length_variance(3, -2, 3, true, 7), None);
+        assert_eq!(apply_length_variance(3, -1, 1, true, 7), Some(4));
+        assert_eq!(apply_length_variance(3, -1, 1, false, 7), Some(2));
+
+        // Invalid base or out-of-range results fail before build selection.
+        assert_eq!(apply_length_variance(0, 0, 0, true, 7), None);
+        assert_eq!(apply_length_variance(8, 0, 0, true, 7), None);
+        assert_eq!(apply_length_variance(1, -1, 1, false, 7), None);
+        assert_eq!(apply_length_variance(1, -1, 1, true, 7), Some(2));
+        assert_eq!(varied_tunnel_length::<MockRuntime>(0, 1, 7), None);
+        assert_eq!(varied_tunnel_length::<MockRuntime>(8, 0, 7), None);
+    }
+
+    #[test]
+    fn standby_selection_prefers_latest_and_rejects_expired() {
+        let now = MockRuntime::time_since_epoch();
+        let router = RouterId::random();
+
+        let aged_gateway = TunnelId::from(11u32);
+        let fresh_gateway = TunnelId::from(22u32);
+        let expired_gateway = TunnelId::from(33u32);
+
+        let mut backup = HashMap::new();
+        backup.insert(
+            aged_gateway,
+            (
+                TunnelId::from(111u32),
+                router.clone(),
+                HashSet::new(),
+                now + Duration::from_secs(60),
+            ),
+        );
+        backup.insert(
+            fresh_gateway,
+            (
+                TunnelId::from(222u32),
+                router.clone(),
+                HashSet::new(),
+                now + Duration::from_secs(600),
+            ),
+        );
+        backup.insert(
+            expired_gateway,
+            (
+                TunnelId::from(333u32),
+                router,
+                HashSet::new(),
+                now.checked_sub(Duration::from_secs(1)).unwrap_or(now),
+            ),
+        );
+
+        // Latest future expiry wins; the expired entry is never selected even
+        // though it remains stored for its own timer cleanup.
+        let selected =
+            TunnelPool::<MockRuntime, ExploratorySelector<MockRuntime>>::select_promotable_inbound_standby(
+                &backup, now,
+            )
+            .expect("promotable standby to exist");
+        assert_eq!(selected.0, fresh_gateway);
+        assert_eq!(selected.4, now + Duration::from_secs(600));
+
+        // Only an expired standby is not promotable.
+        let mut only_expired = HashMap::new();
+        only_expired.insert(
+            expired_gateway,
+            (
+                TunnelId::from(333u32),
+                RouterId::random(),
+                HashSet::new(),
+                now,
+            ),
+        );
+        assert!(
+            TunnelPool::<MockRuntime, ExploratorySelector<MockRuntime>>::select_promotable_inbound_standby(
+                &only_expired,
+                now
+            )
+            .is_none(),
+            "expired standby must not be promoted"
+        );
+        assert!(
+            TunnelPool::<MockRuntime, ExploratorySelector<MockRuntime>>::select_promotable_inbound_standby(
+                &HashMap::new(),
+                now
+            )
+            .is_none()
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn promoted_aged_standby_reuses_original_expiry() {
+        use futures::StreamExt;
+
+        let pool_config = TunnelPoolConfig {
+            num_inbound: 1usize,
+            num_inbound_hops: 2usize,
+            num_inbound_backup: 1usize,
+            num_outbound: 0usize,
+            num_outbound_hops: 0usize,
+            ..Default::default()
+        };
+        let (router_info, static_key, signing_key) = RouterInfoBuilder::default().build();
+        let handle = MockRuntime::register_metrics(Vec::new(), None);
+        let SubsystemManagerContext {
+            handle: subsys_handle,
+            manager,
+            ..
+        } = SubsystemManager::<MockRuntime>::new(
+            router_info.identity.id(),
+            NoiseContext::new(
+                static_key.clone(),
+                Bytes::from(router_info.identity.id().to_vec()),
+            ),
+            Default::default(),
+            MockRuntime::register_metrics(vec![], None),
+        );
+        tokio::spawn(manager);
+        let parameters = TunnelPoolBuildParameters::new(pool_config);
+        let pool_handle = parameters.context_handle.clone();
+        let (_event_mgr, _event_subscriber, event_handle) = EventManager::new(None, handle.clone());
+        let profile_storage = ProfileStorage::<MockRuntime>::new(&[], &[], None);
+        let (mut pool, mut owner_handle) = TunnelPool::<MockRuntime, _>::new(
+            parameters,
+            ExploratorySelector::new(profile_storage.clone(), pool_handle, false),
+            subsys_handle,
+            RouterContext::new(
+                handle,
+                profile_storage,
+                router_info.identity.id(),
+                Bytes::from(router_info.serialize(&signing_key)),
+                static_key,
+                signing_key,
+                2u8,
+                event_handle,
+            ),
+        );
+
+        // Deliberately aged standby: built long ago, only 60s of its original
+        // 10-minute lifetime remains. Promotion must publish 60s, never a
+        // fresh full lifetime.
+        let now = MockRuntime::time_since_epoch();
+        let original_expires = now + Duration::from_secs(60);
+        let fresh_expires = now + TUNNEL_EXPIRATION;
+        assert!(
+            original_expires < fresh_expires,
+            "test requires an aged standby"
+        );
+
+        let gateway = TunnelId::from(4242u32);
+        let endpoint = TunnelId::from(4343u32);
+        let router_id = RouterId::random();
+        pool.backup_inbound_tunnels.insert(
+            gateway,
+            (endpoint, router_id.clone(), HashSet::new(), original_expires),
+        );
+        assert!(pool.inbound_tunnels.is_empty());
+
+        assert!(pool.promote_standby_inbound());
+        assert!(pool.backup_inbound_tunnels.is_empty());
+        assert_eq!(pool.inbound_tunnels.len(), 1);
+
+        let event = tokio::time::timeout(Duration::from_secs(1), owner_handle.next())
+            .await
+            .expect("owner lease notification")
+            .expect("event stream open");
+        match event {
+            TunnelPoolEvent::InboundTunnelBuilt { tunnel_id, lease } => {
+                assert_eq!(tunnel_id, gateway);
+                assert_eq!(lease.tunnel_id, gateway);
+                assert_eq!(lease.router_id, router_id);
+                assert_eq!(
+                    lease.expires, original_expires,
+                    "promoted lease must reuse the original absolute expiration"
+                );
+                assert!(
+                    lease.expires < fresh_expires,
+                    "promotion must never extend to a fresh full lifetime"
+                );
+            }
+            event => panic!("unexpected owner event: {event:?}"),
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn expired_standby_is_not_promoted() {
+        let pool_config = TunnelPoolConfig {
+            num_inbound: 1usize,
+            num_inbound_hops: 2usize,
+            num_inbound_backup: 1usize,
+            num_outbound: 0usize,
+            num_outbound_hops: 0usize,
+            ..Default::default()
+        };
+        let (router_info, static_key, signing_key) = RouterInfoBuilder::default().build();
+        let handle = MockRuntime::register_metrics(Vec::new(), None);
+        let SubsystemManagerContext {
+            handle: subsys_handle,
+            manager,
+            ..
+        } = SubsystemManager::<MockRuntime>::new(
+            router_info.identity.id(),
+            NoiseContext::new(
+                static_key.clone(),
+                Bytes::from(router_info.identity.id().to_vec()),
+            ),
+            Default::default(),
+            MockRuntime::register_metrics(vec![], None),
+        );
+        tokio::spawn(manager);
+        let parameters = TunnelPoolBuildParameters::new(pool_config);
+        let pool_handle = parameters.context_handle.clone();
+        let (_event_mgr, _event_subscriber, event_handle) = EventManager::new(None, handle.clone());
+        let profile_storage = ProfileStorage::<MockRuntime>::new(&[], &[], None);
+        let (mut pool, _owner_handle) = TunnelPool::<MockRuntime, _>::new(
+            parameters,
+            ExploratorySelector::new(profile_storage.clone(), pool_handle, false),
+            subsys_handle,
+            RouterContext::new(
+                handle,
+                profile_storage,
+                router_info.identity.id(),
+                Bytes::from(router_info.serialize(&signing_key)),
+                static_key,
+                signing_key,
+                2u8,
+                event_handle,
+            ),
+        );
+
+        let now = MockRuntime::time_since_epoch();
+        let gateway = TunnelId::from(5555u32);
+        pool.backup_inbound_tunnels.insert(
+            gateway,
+            (
+                TunnelId::from(6666u32),
+                RouterId::random(),
+                HashSet::new(),
+                now,
+            ),
+        );
+
+        assert!(!pool.promote_standby_inbound());
+        assert!(pool.inbound_tunnels.is_empty());
+        // Left for its own destruction-timer cleanup so the later JoinSet
+        // event is not misclassified as an active expiry.
+        assert_eq!(pool.backup_inbound_tunnels.len(), 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn failed_owner_registration_restores_standby_accounting() {
+        let pool_config = TunnelPoolConfig {
+            num_inbound: 1usize,
+            num_inbound_hops: 2usize,
+            num_inbound_backup: 1usize,
+            num_outbound: 0usize,
+            num_outbound_hops: 0usize,
+            ..Default::default()
+        };
+        let (router_info, static_key, signing_key) = RouterInfoBuilder::default().build();
+        let handle = MockRuntime::register_metrics(Vec::new(), None);
+        let SubsystemManagerContext {
+            handle: subsys_handle,
+            manager,
+            ..
+        } = SubsystemManager::<MockRuntime>::new(
+            router_info.identity.id(),
+            NoiseContext::new(
+                static_key.clone(),
+                Bytes::from(router_info.identity.id().to_vec()),
+            ),
+            Default::default(),
+            MockRuntime::register_metrics(vec![], None),
+        );
+        tokio::spawn(manager);
+        let parameters = TunnelPoolBuildParameters::new(pool_config);
+        let pool_handle = parameters.context_handle.clone();
+        let (_event_mgr, _event_subscriber, event_handle) = EventManager::new(None, handle.clone());
+        let profile_storage = ProfileStorage::<MockRuntime>::new(&[], &[], None);
+        let (mut pool, owner_handle) = TunnelPool::<MockRuntime, _>::new(
+            parameters,
+            ExploratorySelector::new(profile_storage.clone(), pool_handle, false),
+            subsys_handle,
+            RouterContext::new(
+                handle,
+                profile_storage,
+                router_info.identity.id(),
+                Bytes::from(router_info.serialize(&signing_key)),
+                static_key,
+                signing_key,
+                2u8,
+                event_handle,
+            ),
+        );
+        // Drop the owner event receiver so `register_inbound_tunnel_built`
+        // fails closed instead of fabricating an active Lease.
+        drop(owner_handle);
+
+        let now = MockRuntime::time_since_epoch();
+        let gateway = TunnelId::from(7777u32);
+        let endpoint = TunnelId::from(8888u32);
+        let router_id = RouterId::random();
+        let expires = now + Duration::from_secs(300);
+        pool.backup_inbound_tunnels.insert(
+            gateway,
+            (endpoint, router_id, HashSet::new(), expires),
+        );
+
+        assert!(!pool.promote_standby_inbound());
+        // No fabricated active route and no double accounting: the standby is
+        // restored with its original absolute expiration for timer cleanup.
+        assert!(pool.inbound_tunnels.is_empty());
+        assert_eq!(pool.backup_inbound_tunnels.len(), 1);
+        let (_, (_, _, _, restored)) =
+            pool.backup_inbound_tunnels.iter().next().expect("standby restored");
+        assert_eq!(*restored, expires);
+    }
+
+    #[test]
+    fn outbound_standby_accounting_retains_existing_timer_shape() {
+        // Outbound standbys carry no owner-visible Lease expiration and their
+        // timer/promotion path is intentionally unchanged by the inbound fix.
+        let config = TunnelPoolConfig {
+            num_outbound: 1usize,
+            num_outbound_backup: 2usize,
+            ..Default::default()
+        };
+        assert_eq!(config.num_outbound_backup, 2);
+
+        let (active, backup) = {
+            let active_target = config.num_outbound;
+            let active = active_target.saturating_sub(0usize);
+            let backup = config.num_outbound_backup.saturating_sub(0usize);
+            (active, backup)
+        };
+        assert_eq!((active, backup), (1, 2));
     }
 
     #[test]

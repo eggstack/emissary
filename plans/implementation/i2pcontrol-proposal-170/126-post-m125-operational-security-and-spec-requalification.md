@@ -1,6 +1,8 @@
 # M126 — Post-M125 Proposal 170 Operational, Security, and Spec Requalification
 
-Status: **ready**
+Status: **closed**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/126-closure.md`
 
 Class: corrective requalification / conformance / security / containment
 

@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | active / partial | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | historical M114 closed as blocked |
-| Post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M126 ready — post-M125 operational/security/spec requalification** |
+| Post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M126 closed; no dependency-ready successor** |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
 
 ## Current production state
@@ -66,7 +66,7 @@ M125 closed the focused M113 capability/crypto-ownership audit and corrected the
 
 **M126** is the evidence-first owner for this requalification. It must independently trace and exercise the currently claimed RouterInfo, AddressBook, TunnelManager and ClientServicesInfo surfaces; re-run authentication/TLS/JSON-RPC/resource adversarial tests; re-check containment; and reconcile active documentation/evidence. Concrete production defects found by M126 require separately registered M127+ correctives rather than opportunistic audit-time fixes.
 
-Known documentation entry condition: active `AGENTS.md` still advertises the older post-M113 `312/70/458` state and must be reconciled by M126 to the current post-M125 authority if the matrix is reproduced.
+M126 reconciled the former `AGENTS.md` post-M113 `312/70/458` entry to the current post-M125 `284/96/460` authority.
 
 ## Dependency graph
 
@@ -94,7 +94,7 @@ M124 Y005 exact-pin adoption                    [CLOSED]
 M125 M113 capability/crypto ownership audit     [CLOSED — 2 CELLS RECLASSIFIED]
   |
   v
-M126 operational/security/spec requalification [READY]
+M126 operational/security/spec requalification [CLOSED]
   |
   +--> concrete defect found: register M127+ focused corrective
   |
@@ -126,6 +126,19 @@ Objective:
 - register narrowly scoped M127+ corrective plans for any concrete production/security defect instead of hiding fixes inside M126.
 
 M126 is a qualification/corrective-planning milestone. It does not implement the 96 blocked cells, broaden router core, or claim full Proposal 170 support.
+
+## Recently closed plan — M126
+
+Plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/126-post-m125-operational-security-and-spec-requalification.md`
+
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/126-closure.md`.
+
+M126 qualified the implemented subset at current head with matrix, production-composition,
+authenticated live-runtime, persistence/lifecycle, RouterInfo/ClientServicesInfo, and
+containment evidence. The partial-support authority remains `284 / 96 / 460`; no M127+ plan
+was needed and no future residual implementation became dependency-ready.
 
 ## Recently closed plan — M125
 
@@ -189,13 +202,13 @@ M126 may correct these counts only from independent cell-level evidence. It may 
 | M123 | closed |
 | M124 | closed at exact Y005 pin; focused M113 capability/crypto audit authorized |
 | M125 | closed; corrected two `AllowInternalSSL` classifications and froze remaining M113 blockers |
-| M126 | ready; current-head operational/security/spec requalification of the implemented subset |
+| M126 | closed; current-head operational/security/spec requalification of the implemented subset |
 
 Historical closure records remain unchanged. Corrective closures supersede only affected claims.
 
 ## Registry rules
 
-1. M126 is the only ready Emissary Proposal 170 implementation handoff at this point; M123-M125 are closed.
+1. M126 is closed; no dependency-ready Emissary Proposal 170 implementation handoff remains. M123-M125 are also closed.
 2. Matrix authority entering M126 is `284 / 96 / 460`; correctness infrastructure, parser acceptance and serializer reachability are not capability evidence.
 3. M126 must reproduce or truthfully correct the matrix before relying on it for closure.
 4. Concrete implementation/security defects discovered by M126 require separately registered M127+ corrective plans; do not opportunistically hide them inside the qualification milestone.

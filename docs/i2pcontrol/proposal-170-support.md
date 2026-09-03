@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion and M125 capability/crypto audit recorded; residual option cells remain (96 blocked: 4 UseSSL + 10 SigType + 63 client lifecycle/proxy + 19 server LeaseSet/presentation)
+Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, and M126 current-head requalification recorded; residual option cells remain (96 blocked: 4 UseSSL + 10 SigType + 63 client lifecycle/proxy + 19 server LeaseSet/presentation)
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -512,6 +512,7 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M113 | historical closed as blocked | server presentation/routing/LeaseSet residuals; historical result 0 apply / 21 blocked; M125 corrected two server-role `AllowInternalSSL` classifications; see `plans/closure/i2pcontrol-proposal-170/113-closure.md` and `plans/closure/i2pcontrol-proposal-170/125-closure.md` |
 | M121 | closed | M111/M112 semantic truthfulness corrective; demotes 28 cells (`SigType` × 10, `Close`/`CloseTime`/`NewDest` × 18) to blocked; matrix is 284 apply / 98 blocked / 458 not_applicable; see `plans/closure/i2pcontrol-proposal-170/121-closure.md` |
 | M125 | closed | focused M113 capability/crypto-ownership audit; reclassifies two server-role `AllowInternalSSL` cells and confirms 19 M113 residual blockers; current matrix is 284 apply / 96 blocked / 460 not_applicable; see `plans/closure/i2pcontrol-proposal-170/125-closure.md` |
+| M126 | closed | current-head operational/security/spec requalification; implemented subset qualified, 96 residual cells remain blocked, and no M127+ corrective was required; see `plans/closure/i2pcontrol-proposal-170/126-closure.md` |
 
 ## Final-status rule
 

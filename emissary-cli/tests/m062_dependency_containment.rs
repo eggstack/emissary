@@ -976,6 +976,9 @@ fn is_authorized_m126_path(path: &str) -> bool {
     matches!(
         path,
         "AGENTS.md"
+            | "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/proposal-170-conformance.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
             | "emissary-cli/tests/adversarial.rs"
             | "emissary-cli/tests/i2pcontrol_live_runtime.rs"
             | "emissary-cli/tests/m061_containment.rs"

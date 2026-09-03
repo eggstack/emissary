@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 — Post-M114 Corrective Roadmap
 
-Status: active corrective workstream; M119-M125 closed; **M126 ready for post-M125 operational/security/spec requalification**
+Status: active corrective workstream; M119-M126 closed; **no dependency-ready successor**
 
 Original corrective baseline: `feafc6a1d9650887015a01f87bf21b57a4e92085`
 
@@ -137,7 +137,7 @@ M124 Y005 exact-pin adoption                    [CLOSED]
 M125 M113 capability/crypto ownership audit     [CLOSED — 284/96/460]
   |
   v
-M126 operational/security/spec requalification [READY]
+M126 operational/security/spec requalification [CLOSED]
   |
   +--> concrete defect: M127+ focused corrective [REGISTER ONLY WHEN EVIDENCED]
   |
@@ -194,7 +194,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/126-post-m125-operational-security-and-spec-requalification.md`
 
-Status: **ready**.
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/126-closure.md`.
 
 M126 independently requalifies the current implemented subset rather than assuming historical closure implies current-head correctness.
 
@@ -209,7 +209,10 @@ Primary gates:
 7. re-audit all non-I2PControl production paths under M061/M062 containment;
 8. reconcile active documentation/evidence, including current matrix counts/status.
 
-Known documentation entry condition: active `AGENTS.md` still states the older post-M113 `312/70/458` matrix while the registry/M125 authority is `284/96/460`. M126 owns this active-doc reconciliation after independently reproducing or correcting the matrix.
+M126 independently reproduced the `284 / 96 / 460` matrix, reconciled active `AGENTS.md` guidance,
+and corrected the M062 historical allowlist so current M125/M126 planning evidence is classified
+as evidence rather than production capability. No production defect or dependency-ready residual
+primitive was found.
 
 M126 introduces no residual feature solely to make qualification pass. Concrete production defects require separately registered M127+ plans before implementation.
 

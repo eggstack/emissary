@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support**. Current authoritative M095 matrix entering M126: `284 apply / 96 blocked_primitive / 460 not_applicable`.
+Status: **partial Proposal 170 support**. M126 is closed against the current implementation head; the authoritative M095 matrix remains `284 apply / 96 blocked_primitive / 460 not_applicable`.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -52,13 +52,13 @@ Full Proposal 170 support is not claimed.
 | M123 | closed | M120 commit-phase cancellation/lifecycle atomicity corrective |
 | M124 | closed | exact Y005 dependency adoption; no Proposal mapping |
 | M125 | closed | focused M113 capability/crypto-ownership audit; 2 cells reclassified, no successor implementation |
-| **M126** | **ready** | current-head operational/security/spec requalification of the implemented subset |
+| M126 | closed | current-head operational/security/spec requalification; implemented subset qualified |
 
 Yosemite independently closed:
 
 - **Y005** at `59140a2277bf296928d2e8ce39a148182eeff044` — `eggstack/yosemite:plans/implementation/005-y004-leaseset-auth-mode-consistency-corrective.md`.
 
-## M126 — current operational/security/spec requalification handoff
+## M126 — closed current-head operational/security/spec requalification
 
 Plan:
 
@@ -83,7 +83,9 @@ It must:
 
 Concrete production/security defects found during M126 require separately registered M127+ corrective plans. M126 does not opportunistically implement them and does not implement the 96 blocked cells.
 
-Known entry inconsistency: `AGENTS.md` still states the older post-M113 `312/70/458` matrix. M126 must reconcile active guidance after independently reproducing or correcting the post-M125 counts.
+M126 independently reproduced the post-M125 counts, corrected the M062 historical allowlist for M125/M126 planning evidence, and reconciled active guidance to the current matrix.
+
+No M127+ corrective plan was required: no current-head production or security defect was found, and no blocked primitive became dependency-ready.
 
 ## Recently closed handoffs
 

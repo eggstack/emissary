@@ -87,10 +87,10 @@ Y004 canonical LeaseSet wire corrective              [READY IN YOSEMITE]
 M114 historical final reclosure                                  |
   |                                                               |
   v                                                               |
-M119 M118 standby-expiry/variance corrective          [READY]     |
+M119 M118 standby-expiry/variance corrective          [CLOSED]    |
   |                                                               |
   v                                                               |
-M120 server preallocation/secret transaction          [BLOCKED]   |
+M120 server preallocation/secret transaction          [READY]     |
   |                                                               |
   v                                                               |
 M121 M111/M112 semantic truthfulness                  [BLOCKED]   |
@@ -107,7 +107,7 @@ fresh M113/LeaseSet capability audit + plan           [NOT YET AUTHORIZED]
 remaining residual plans / new final reclosure        [FUTURE]
 ```
 
-Only M119 is the current Emissary implementation handoff. Y004 is separately ready in the authorized Yosemite fork and may proceed in parallel.
+Only M120 is the current Emissary implementation handoff. Y004 is separately ready in the authorized Yosemite fork and may proceed in parallel. M119 is closed by `plans/closure/i2pcontrol-proposal-170/119-closure.md`.
 
 ## 5. M119 — neutral tunnel-pool correctness
 
@@ -115,7 +115,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/119-m118-standby-expiry-and-variance-semantics-corrective.md`.
 
-Status: **ready**.
+Status: **closed**.
 
 Owner: `emissary-core/src/tunnel/pool/mod.rs` only, plus tests/containment/planning evidence.
 
@@ -132,7 +132,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/120-server-start-preallocation-validation-and-secret-transactionality-corrective.md`.
 
-Status: proposed/blocked on M119 closure.
+Status: **ready**.
 
 Owner: I2PControl only.
 

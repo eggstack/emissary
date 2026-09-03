@@ -1,6 +1,6 @@
 # M120 — Server Start Preallocation Validation and Secret Transactionality Corrective
 
-Status: **proposed / blocked on M119 closure**
+Status: **ready**
 
 Class: corrective / I2PControl lifecycle / secret transactionality
 

@@ -1,6 +1,6 @@
 # M119 — M118 Standby Expiry and Variance Semantics Corrective
 
-Status: **ready**
+Status: **closed**
 
 Class: corrective / neutral router capability / tunnel-pool correctness
 
@@ -216,3 +216,15 @@ External I2P/reference sources are read-only evidence. Writes are internal to `e
 ## 15. Closure evidence required
 
 Record changed paths, exact lifetime data flow, deterministic variance reference evidence, focused/broad test outcomes, M061/M062/M093 invariant review, matrix non-change (or stop disposition), unresolved findings, implementation SHA, and M120 readiness.
+
+## 16. Closure disposition
+
+M119 is closed by implementation commit `282c059dc15c727aeceba1acb50aa7d82c5fc087` and
+closure record `plans/closure/i2pcontrol-proposal-170/119-closure.md`.
+
+The lifetime data flow retains the canonical absolute expiration beside each
+inbound standby and reuses it verbatim on promotion; the destruction timer is
+never reset and registration failure rolls back to pre-promotion accounting.
+Negative variance implements the frozen Java `TunnelPeerSelector.getLength`
+magnitude/sign rule with deterministic reference vectors. M095 remains
+`312 apply / 70 blocked_primitive / 458 not_applicable` and M120 is ready.

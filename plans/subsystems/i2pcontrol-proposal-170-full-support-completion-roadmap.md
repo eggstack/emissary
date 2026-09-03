@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: active; M095-M114, M115-M118 closed; M097/M104/M112/M113/M114 closed as blocked; no subsequent Emissary handoff is dependency-ready
+Status: active; M095-M114, M115-M124 closed; M097/M104/M112/M113/M114 closed as blocked; focused M113 capability/crypto-ownership audit authorized but no successor implementation plan registered
 
 Planning origin: M094 closed planning head `630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207`.
 
@@ -59,11 +59,11 @@ The fork currently has:
 - M109 named startup lifecycle/mixed `All=true` and M115 runtime-disable/lifecycle corrections;
 - M110 I2PControl-local shared-client session and destination/key ownership.
 
-M095 currently records:
+The current authoritative M095 matrix records:
 
 - 70 option rows × 12 canonical tunnel types = 840 cells;
-- 312 `apply`;
-- 70 `blocked_primitive`;
+- 284 `apply`;
+- 98 `blocked_primitive`;
 - 458 `not_applicable`;
 - 0 planned/unknown/unsupported/accept-inert cells.
 
@@ -328,7 +328,12 @@ Plan: `plans/implementation/i2pcontrol-proposal-170/113-server-presentation-addr
 
 Status: **closed as blocked**.
 
-Current result: 0 cells applied; 21 cells remain blocked with exact presentation/routing and LeaseSet primitive reasons. `AllowInternalSSL`, `UniqueLocalAddressPerClient`, and `MultiHoming` remain blocked because no bounded TLS termination or safe per-client/multihomed routing owner exists without weakening M093 loopback confinement; `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` remain blocked because, although Yosemite Y004 (`c2db73d`, adopted by M122 with fake-SAM reachability evidence) now serializes the corrected generic encrypted-LeaseSet/client-auth fields on `SESSION CREATE`, no Proposal path maps them and no router encrypted-LeaseSet construction owner exists. Closure: `plans/closure/i2pcontrol-proposal-170/113-closure.md`; dependency update: `plans/closure/i2pcontrol-proposal-170/122-closure.md`.
+Current result: 0 cells applied; 21 cells remain blocked with exact presentation/routing and LeaseSet primitive reasons. `AllowInternalSSL`, `UniqueLocalAddressPerClient`, and `MultiHoming` remain blocked because no bounded TLS termination or safe per-client/multihomed routing owner exists without weakening M093 loopback confinement; `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` remain blocked because, although Yosemite Y004's canonical generic encrypted-LeaseSet/client-auth fields were adopted by M122 and Y005 auth-mode consistency was adopted by M124, no Proposal path maps them and no router encrypted-LeaseSet construction owner exists. Closure: `plans/closure/i2pcontrol-proposal-170/113-closure.md`; dependency updates: `plans/closure/i2pcontrol-proposal-170/122-closure.md` and `plans/closure/i2pcontrol-proposal-170/124-closure.md`.
+
+M124 closed the exact Y005 optional dependency adoption without promoting any Proposal cell.
+The focused M113 capability/crypto-ownership audit is authorized to begin as read-only planning
+work; no M113-successor implementation plan is registered until it freezes an exact LeaseSet
+type/crypto/owner/lifecycle/runtime contract.
 
 ## 14. M114 — final live/reference reclosure
 

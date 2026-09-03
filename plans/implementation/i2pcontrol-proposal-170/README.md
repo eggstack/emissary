@@ -36,7 +36,7 @@ Containment/support evidence:
 - API 1-only auth and managed-TLS hardening are operational.
 - M119 corrected M118 standby-expiry/variance semantics.
 - M121 demoted unsupported `SigType` and `Close`/`CloseTime`/`NewDest` semantics instead of retaining approximate support.
-- M122 exact-pins Yosemite Y004 `c2db73dba35dd9392947af5c74df29b0b556775f` only through the optional I2PControl alias; ordinary Yosemite remains registry 0.7.0.
+- M122 exact-pinned Yosemite Y004; M124 now exact-pins Yosemite Y005 `59140a2277bf296928d2e8ce39a148182eeff044` only through the optional I2PControl alias; ordinary Yosemite remains registry 0.7.0.
 
 Full Proposal 170 support is not claimed.
 
@@ -49,13 +49,15 @@ Full Proposal 170 support is not claimed.
 | M121 | closed | semantic truthfulness; matrix 284/98/458 |
 | M122 | closed | exact Y004 dependency adoption; transport only |
 | **M123** | **closed** | M120 commit-phase cancellation/lifecycle atomicity corrective |
-| **M124** | **blocked on Yosemite Y005** | exact Y005 dependency adoption; no Proposal mapping |
+| **M124** | **closed** | exact Y005 dependency adoption; no Proposal mapping |
 
 Yosemite independently registers:
 
-- **Y005 ready** — `eggstack/yosemite:plans/implementation/005-y004-leaseset-auth-mode-consistency-corrective.md`.
+- **Y005 closed** at `59140a2277bf296928d2e8ce39a148182eeff044` — `eggstack/yosemite:plans/implementation/005-y004-leaseset-auth-mode-consistency-corrective.md`.
 
-M123 is closed. M124 remains the next Emissary handoff, blocked until Yosemite Y005 closes.
+M123 and M124 are closed. The focused M113/LeaseSet capability and crypto-ownership audit is
+now the next authorized read-only planning activity; no implementation plan is registered until
+that audit freezes a safe owner and exact runtime semantics.
 
 ## M123 — server commit cancellation atomicity
 
@@ -81,7 +83,9 @@ Plan:
 
 - `124-y005-auth-consistency-pin-adoption.md`
 
-M124 remains blocked until Yosemite Y005 closes. It may only review and exact-pin the Y005 implementation through the existing optional `yosemite-i2pcontrol` alias, update lock/containment evidence, and prove the corrected dependency behavior through I2PControl tests.
+M124 is closed by `plans/closure/i2pcontrol-proposal-170/124-closure.md`. It reviewed and
+exact-pinned Y005 through the existing optional `yosemite-i2pcontrol` alias, updated
+lock/containment evidence, and proved the corrected dependency behavior through I2PControl tests.
 
 M124 may not implement M113 LeaseSet features or change M095 counts.
 
@@ -94,7 +98,9 @@ Current 98 blocked cells are:
 - 63 client proxy/profile/reduction/lifecycle cells, including 18 `Close`/`CloseTime`/`NewDest` cells;
 - 21 server presentation/routing/LeaseSet cells.
 
-The focused M113/LeaseSet capability/crypto-ownership audit remains deferred until M124 closes. Serializer capability is not runtime support.
+The focused M113/LeaseSet capability/crypto-ownership audit is unblocked for read-only
+execution now that M124 is closed. Serializer capability is not runtime support, and no
+M113-successor implementation plan is yet registered.
 
 ## Containment
 

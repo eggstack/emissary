@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 — Post-M114 Corrective Roadmap
 
-Status: active corrective workstream; M119-M123 closed, M124 blocked on Yosemite Y005; Yosemite Y005 ready
+Status: active corrective workstream; M119-M124 closed; focused M113 capability/crypto-ownership audit authorized but not yet registered
 
 Original corrective baseline: `feafc6a1d9650887015a01f87bf21b57a4e92085`
 
@@ -97,10 +97,10 @@ All corrective milestones preserve:
 
 ```text
                            eggstack/yosemite
-Y004 canonical LeaseSet transport              [CLOSED / CURRENT PIN]
+Y004 canonical LeaseSet transport              [CLOSED / HISTORICAL PIN]
   |
   v
-Y005 auth-mode/type consistency                [READY]
+Y005 auth-mode/type consistency                [CLOSED]
   |
   +-----------------------------------------------------------+
                                                               |
@@ -122,16 +122,18 @@ M123 commit-phase cancellation atomicity        [CLOSED]       |
   +-------------------------------+---------------------------+
                                   |
                                   v
-M124 Y005 exact-pin adoption                    [BLOCKED ON Y005]
+M124 Y005 exact-pin adoption                    [CLOSED]
   |
   v
-focused M113/LeaseSet capability/crypto audit   [FUTURE / NOT YET REGISTERED]
+focused M113/LeaseSet capability/crypto audit   [AUTHORIZED / NOT YET REGISTERED]
   |
   v
 residual implementations + new final reclosure [FUTURE]
 ```
 
-M123 is closed. M124 is not dependency-ready because Yosemite Y005 remains open.
+M123 is closed. Yosemite Y005 is closed, and M124 has independently adopted its exact reviewed
+revision. The focused M113 capability/crypto-ownership audit is now authorized to proceed as
+read-only planning work, but no implementation plan is dependency-ready until that audit lands.
 
 ## 6. M123 — commit-phase cancellation atomicity
 
@@ -183,16 +185,16 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/124-y005-auth-consistency-pin-adoption.md`
 
-Status: **proposed / blocked** on Yosemite Y005 closure.
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/124-closure.md`.
 
-M124 may only:
+M124 completed the following:
 
-- review the exact Y004→Y005 Yosemite diff;
-- advance the optional `yosemite-i2pcontrol` `rev` to the exact reviewed Y005 implementation SHA;
-- update the corresponding lock/containment evidence;
-- prove representative Y005 acceptance/rejection at the dependency boundary.
+- reviewed the exact Y004→Y005 Yosemite diff;
+- advanced the optional `yosemite-i2pcontrol` `rev` to the exact reviewed Y005 implementation SHA;
+- updated the corresponding lock/containment evidence;
+- proved representative Y005 acceptance/rejection at the dependency boundary.
 
-M124 does not map Proposal LeaseSet fields and does not change M095 counts.
+M124 did not map Proposal LeaseSet fields and did not change M095 counts.
 
 ## 9. LeaseSet capability work remains deferred
 
@@ -200,7 +202,7 @@ The current Yosemite fork can transport canonical LeaseSet settings, but current
 
 Do not register an M113-successor implementation merely because Y005/M124 make the client-to-SAM API coherent.
 
-After M124 closes, perform the already-authorized focused read-only capability/crypto-ownership audit. A new neutral-core plan is warranted only if it can freeze:
+With M124 closed, perform the already-authorized focused read-only capability/crypto-ownership audit. A new neutral-core plan is warranted only if it can freeze:
 
 - exact LeaseSet type(s) required by remaining Proposal cells;
 - existing vs missing crypto primitives;

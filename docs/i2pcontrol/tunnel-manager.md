@@ -370,8 +370,10 @@ closed them as blocked: `AllowInternalSSL`, `UniqueLocalAddressPerClient`, and
 routing owner without weakening M093 loopback confinement, and
 `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` have no Proposal
 mapping or router encrypted-LeaseSet construction owner. The underlying SAM
-transport is no longer the blocker: Yosemite Y004 (`c2db73d`, adopted by M122)
-serializes the corrected generic fields (`i2cp.leaseSetPrivateKey`,
+transport is no longer the blocker: Yosemite Y004's canonical generic fields were
+adopted by M122, and Yosemite Y005 (`59140a2`, adopted by M124) adds the
+cross-field auth/type consistency validation. The dependency now serializes
+the corrected generic fields (`i2cp.leaseSetPrivateKey`,
 `i2cp.leaseSetSigningPrivateKey`, mode-aware `i2cp.leaseSetClient.dh/psk`
 entries, reference-backed type domains), proven reachable by I2PControl adapter
 tests — but no Proposal path maps them and no downgrade is permitted, so all 21

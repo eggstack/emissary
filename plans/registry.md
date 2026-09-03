@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | active / partial | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | historical M114 closed as blocked |
-| Post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M124 blocked on Yosemite Y005** |
+| Post-M114 corrective line | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M124 closed; focused M113 audit authorized** |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
 
 ## Current production state
@@ -42,7 +42,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 - M109/M115 startup lifecycle and M110/M116 shared-session/destination ownership correctives are closed.
 - M119 corrected M118 standby expiry/variance semantics.
 - M121 truthfully demoted unsupported `SigType` and `Close`/`CloseTime`/`NewDest` semantics.
-- M122 exact-pins Yosemite Y004 `c2db73dba35dd9392947af5c74df29b0b556775f` through the optional I2PControl-only alias; ordinary Yosemite remains registry 0.7.0.
+- M122 exact-pinned Yosemite Y004; M124 exact-pins Yosemite Y005 `59140a2277bf296928d2e8ce39a148182eeff044` through the optional I2PControl-only alias; ordinary Yosemite remains registry 0.7.0.
 - Current M095 matrix remains `284 apply / 98 blocked_primitive / 458 not_applicable`.
 - Full Proposal 170 status remains **partial**.
 
@@ -54,11 +54,11 @@ M120 remains historically closed for deterministic preflight and ordinary error 
 
 **M123** is the corrective owner. Historical M120 closure is not rewritten; M123's closure supersedes only the affected cancellation-atomicity claim.
 
-### Yosemite Y004 auth-mode consistency
+### Yosemite Y004 auth-mode consistency — resolved by Y005/M124
 
 Y004's canonical property spelling/value representation remains valid, but later review found that `lease_set_auth_type` and DH/PSK client entries are not cross-field validated. Yosemite can emit security-relevant entries under namespaces the Java reference does not consume for the selected auth branch.
 
-`eggstack/yosemite` registers **Y005** as its sole ready corrective. Current Emissary has no Proposal LeaseSet client-auth mapping, so this is not an active runtime downgrade, but no future M113 successor may build on the known Y004 inconsistency.
+`eggstack/yosemite` closed **Y005** at `59140a2277bf296928d2e8ce39a148182eeff044`, and M124 independently reviewed and adopted that exact revision. Current Emissary has no Proposal LeaseSet client-auth mapping, so this was not an active runtime downgrade. No high/medium finding remains open.
 
 ## Dependency graph
 
@@ -67,7 +67,7 @@ Y004's canonical property spelling/value representation remains valid, but later
 Y004 canonical LeaseSet transport              [CLOSED / CURRENT EMISSARY PIN]
   |
   v
-Y005 auth-mode/type consistency                [READY IN YOSEMITE]
+Y005 auth-mode/type consistency                [CLOSED IN YOSEMITE]
   |
   +-----------------------------------------------------------+
                                                               |
@@ -80,10 +80,10 @@ M123 M120 commit-phase cancellation atomicity   [CLOSED]       |
   +-------------------------------+---------------------------+
                                   |
                                   v
-M124 Y005 exact-pin adoption                    [BLOCKED ON Y005]
+M124 Y005 exact-pin adoption                    [CLOSED]
   |
   v
-focused M113/LeaseSet capability/crypto audit   [FUTURE / BLOCKED ON M124]
+focused M113/LeaseSet capability/crypto audit   [AUTHORIZED / NOT YET REGISTERED]
   |
   v
 remaining residual implementation + new final reclosure       [FUTURE]
@@ -108,19 +108,19 @@ Objective:
 - eliminate best-effort staged-secret cleanup as a correctness mechanism;
 - preserve M120 validation order, secret confinement and current matrix counts.
 
-M123 is closed. No Emissary implementation handoff is dependency-ready until Yosemite Y005 closes.
+M123 is closed. M124 is now closed after Yosemite Y005 closure and independent consumer review.
 
-## Registered future plan — M124
+## Recently closed plan — M124
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/124-y005-auth-consistency-pin-adoption.md`
 
-Status: **proposed / blocked** on Yosemite Y005 closure.
+Status: **closed**; closure: `plans/closure/i2pcontrol-proposal-170/124-closure.md`.
 
 Objective:
 
-- advance only the optional `yosemite-i2pcontrol` alias from exact Y004 to the exact reviewed Y005 implementation revision;
+- advance only the optional `yosemite-i2pcontrol` alias from exact Y004 to the exact reviewed Y005 implementation revision `59140a2277bf296928d2e8ce39a148182eeff044`;
 - prove Y005's corrected cross-field validation is reachable from the dependency boundary;
 - make no Proposal LeaseSet mapping or matrix change.
 
@@ -132,7 +132,7 @@ Plan:
 
 - `plans/implementation/005-y004-leaseset-auth-mode-consistency-corrective.md`
 
-Status: **ready in Yosemite**.
+Status: **closed in Yosemite** at `59140a2277bf296928d2e8ce39a148182eeff044`.
 
 Y005 freezes and enforces the relationship among LeaseSet type, `leaseSetAuthType`, and numbered DH/PSK entries so typed security material cannot be serialized under a branch where the reference silently ignores it. It implements no router cryptography or Emissary policy.
 
@@ -147,7 +147,9 @@ Current blocked count 98 remains:
 
 M123, Y005 and M124 are correctness/infrastructure work and do not promote any cell.
 
-The focused M113/LeaseSet capability/crypto-ownership audit remains deferred until M124 closes. Current Emissary `SamSession` still lacks an accepted encrypted/authenticated LeaseSet construction owner; serializer capability alone is not support.
+The focused M113/LeaseSet capability/crypto-ownership audit is authorized to proceed as read-only
+planning work now that M124 is closed. Current Emissary `SamSession` still lacks an accepted
+encrypted/authenticated LeaseSet construction owner; serializer capability alone is not support.
 
 ## Recently closed / superseded claims
 
@@ -158,18 +160,18 @@ The focused M113/LeaseSet capability/crypto-ownership audit remains deferred unt
 | M121 | closed at 284/98/458 |
 | M122 | closed at exact Y004 pin; transport only |
 | M123 | closed |
-| M124 | blocked on Yosemite Y005 |
+| M124 | closed at exact Y005 pin; focused M113 capability/crypto audit authorized |
 
 Historical closure records remain unchanged. Corrective closures supersede only affected claims.
 
 ## Registry rules
 
-1. M123 is closed; M124 is the next Emissary handoff once Yosemite Y005 closes.
-2. Yosemite Y005 is separately the sole ready handoff in `eggstack/yosemite`.
-3. M124 must not execute until Yosemite Y005 closes and this registry explicitly promotes it.
-4. Current Emissary pin remains exact Y004 `c2db73d...` until M124; no floating/fork-head dependency is authorized.
+1. M123 and M124 are closed; the focused M113 capability/crypto-ownership audit is the next authorized read-only activity.
+2. Yosemite Y005 is closed at `59140a2277bf296928d2e8ce39a148182eeff044`.
+3. Current Emissary uses exact Y005 only through the optional I2PControl alias; no floating/fork-head dependency is authorized.
+4. Historical closure records remain unchanged; M124 supersedes only the Y004 consumer-pin readiness claim.
 5. Matrix remains `284 / 98 / 458`; correctness infrastructure is not capability evidence.
-6. No M113/LeaseSet router implementation plan is registered until M124 closes and the focused crypto/ownership audit lands.
+6. No M113/LeaseSet router implementation plan is registered until the focused crypto/ownership audit lands and freezes a safe canonical owner.
 7. Keep Proposal policy in `emissary-cli/src/i2pcontrol/**` wherever possible; M123 is I2PControl-only.
 8. No global Yosemite patch/replacement/vendor/path dependency is permitted.
 9. All external/upstream sources are read-only; no upstream issue/PR/review/submission/merge/adoption/contact/release activity is authorized.

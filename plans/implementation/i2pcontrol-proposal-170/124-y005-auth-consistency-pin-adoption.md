@@ -1,12 +1,16 @@
 # M124 — Corrected Yosemite Y005 Auth-Consistency Pin Adoption
 
-Status: **proposed / blocked**
+Status: **closed**
 
 Class: infrastructure / dependency adoption
 
 Repository: `eggstack/emissary`
 
 Planning baseline: `045d1e8b4eba1141d2488882f99c5ce994db91a8`
+
+Closure: `plans/closure/i2pcontrol-proposal-170/124-closure.md`
+
+Implementation commit: pending final internal commit
 
 Source roadmap:
 
@@ -21,7 +25,7 @@ Dependencies:
 Current dependency baseline:
 
 - ordinary workspace Yosemite remains registry `0.7.0`;
-- optional `yosemite-i2pcontrol` alias is exact-pinned to Y004 implementation `c2db73dba35dd9392947af5c74df29b0b556775f`;
+- optional `yosemite-i2pcontrol` alias is exact-pinned to Y005 implementation `59140a2277bf296928d2e8ce39a148182eeff044`;
 - no Proposal LeaseSet client-auth mapping is currently active.
 
 Pinned Proposal 170 revision: `2026-05-20` (Open).
@@ -150,7 +154,7 @@ Update current dependency evidence to Y005 while retaining:
 - matrix `284 / 98 / 458`;
 - M113's 21 cells blocked;
 - no claim that Emissary can construct encrypted/authenticated LeaseSets;
-- future LeaseSet capability/crypto-ownership audit blocked until M124 closes.
+- future LeaseSet capability/crypto-ownership audit is authorized after M124 closes, but no implementation plan is registered until the audit freezes a safe owner.
 
 ## 7. Failure, cancellation, restart and migration semantics
 

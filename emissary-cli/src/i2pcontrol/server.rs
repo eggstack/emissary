@@ -1169,34 +1169,139 @@ pub(crate) async fn handle_jsonrpc(
             .into_response();
     }
 
-    // Parse JSON-RPC request
-    let request = match rpc::parse_request(&body) {
-        Ok(req) => req,
+    // Parse the top-level JSON-RPC envelope: one request object or one
+    // bounded batch array. Empty and over-cap batches are rejected here as
+    // single invalid-request errors before any element executes.
+    let envelope = match rpc::parse_envelope(&body) {
+        Ok(envelope) => envelope,
         Err(err) => return Json(serde_json::to_value(&err).unwrap()).into_response(),
     };
 
-    // Authenticate before method-specific selector/config parsing. The
-    // protected dispatcher receives a sanitized request with Token removed.
-    let response = if request.method == rpc::methods::AUTHENTICATE {
-        handle_authenticate_with_source(&state, &request, Some(peer_addr)).await
-    } else {
-        match authenticate_protected_request(&state, &headers, &request) {
-            Ok(request) => dispatch_protected(&state, &request).await,
-            Err(error) => serde_json::to_value(error).unwrap(),
+    match envelope {
+        rpc::JsonRpcEnvelope::Single(request) => {
+            handle_single_request(&state, &headers, peer_addr, &request).await
         }
-    };
+        rpc::JsonRpcEnvelope::Batch(entries) => {
+            handle_batch_request(&state, &headers, peer_addr, &entries).await
+        }
+    }
+}
 
-    // Execute notifications through the same path as ordinary requests, then
-    // suppress the response. Explicit JSON null remains a response ID and is
-    // therefore not treated as a notification.
-    let dispatch = DispatchResult {
-        response,
-        emit_response: !request.is_notification(),
-    };
+/// Dispatch one single request object and shape its HTTP response.
+///
+/// Notifications execute through the same authenticated path as ordinary
+/// requests, then suppress the response. Explicit JSON null remains a
+/// response ID and is therefore not treated as a notification.
+pub(crate) async fn handle_single_request(
+    state: &I2pControlState,
+    headers: &HeaderMap,
+    peer_addr: SocketAddr,
+    request: &JsonRpcRequest,
+) -> Response {
+    let dispatch = dispatch_one(state, headers, peer_addr, request).await;
     if dispatch.emit_response {
         Json(dispatch.response).into_response()
     } else {
         StatusCode::NO_CONTENT.into_response()
+    }
+}
+
+/// Dispatch one bounded batch sequentially under the single held HTTP
+/// in-flight permit.
+///
+/// Batch semantics (M128):
+/// - each entry is validated with the exact single-request parser, so an
+///   invalid entry contributes a per-entry error without disturbing valid
+///   siblings; non-object entries (scalars, null, nested arrays) are
+///   invalid requests with null ID;
+/// - each successfully parsed entry takes the same `Authenticate` or
+///   protected-auth path as a single request, preserving M127
+///   valid/expired/unknown semantics independently per element;
+/// - authentication is strictly per element: no token, result, state, or
+///   credential is shared or implicitly propagated between entries, even
+///   when an `Authenticate` entry precedes a protected entry;
+/// - structurally valid notifications execute normally but contribute no
+///   response element; an all-notification batch with no invalid entries
+///   therefore emits no JSON-RPC body (`204 No Content`);
+/// - structural entry errors always emit, even for entries without an ID;
+/// - responses preserve input order; no task is spawned per element, so
+///   batch execution cannot exceed one in-flight permit plus bounded
+///   sequential element work under the existing request deadline;
+/// - batching is not a transaction: already committed mutations from
+///   earlier elements are not rolled back because a later element fails.
+pub(crate) async fn handle_batch_request(
+    state: &I2pControlState,
+    headers: &HeaderMap,
+    peer_addr: SocketAddr,
+    entries: &[serde_json::Value],
+) -> Response {
+    debug_assert!(
+        entries.len() <= rpc::MAX_BATCH_ELEMENTS,
+        "over-cap batches must be rejected during envelope parsing"
+    );
+    let mut responses: Vec<serde_json::Value> = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let parsed = rpc::parse_batch_entry(entry);
+        let dispatch = match &parsed {
+            Ok(request) => dispatch_one(state, headers, peer_addr, request).await,
+            Err(error) => DispatchResult {
+                response: error_value(error),
+                emit_response: true,
+            },
+        };
+        if dispatch.emit_response {
+            responses.push(dispatch.response);
+        }
+    }
+
+    if responses.is_empty() {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        Json(serde_json::Value::Array(responses)).into_response()
+    }
+}
+
+/// Serialize an error envelope, falling back to a sanitized static internal
+/// error so a serialization failure can never leak internals or panic the
+/// batch dispatcher.
+fn error_value(error: &JsonRpcErrorResponse) -> serde_json::Value {
+    serde_json::to_value(error).unwrap_or_else(|_| {
+        serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": null,
+            "error": {
+                "code": rpc::error_codes::INTERNAL_ERROR,
+                "message": "Internal error"
+            }
+        })
+    })
+}
+
+/// Run one parsed request through authentication and method dispatch.
+///
+/// Authenticate requests bypass token validation; every other method
+/// requires one valid unambiguous credential, with auth metadata stripped
+/// before method-specific domain validation exactly as for single dispatch.
+async fn dispatch_one(
+    state: &I2pControlState,
+    headers: &HeaderMap,
+    peer_addr: SocketAddr,
+    request: &JsonRpcRequest,
+) -> DispatchResult {
+    // Authenticate before method-specific selector/config parsing. The
+    // protected dispatcher receives a sanitized request with Token removed.
+    let response = if request.method == rpc::methods::AUTHENTICATE {
+        handle_authenticate_with_source(state, request, Some(peer_addr)).await
+    } else {
+        match authenticate_protected_request(state, headers, request) {
+            Ok(request) => dispatch_protected(state, &request).await,
+            Err(error) => error_value(&error),
+        }
+    };
+
+    DispatchResult {
+        response,
+        emit_response: !request.is_notification(),
     }
 }
 
@@ -2290,5 +2395,351 @@ mod tests {
         let sanitized = authenticate_protected_request(&state, &HeaderMap::new(), &req)
             .expect("fresh token must authorize");
         assert!(!sanitized.params.as_ref().unwrap().contains_key("Token"));
+    }
+
+    // --- M128 bounded JSON-RPC batch conformance evidence ---
+
+    async fn post_body(
+        state: &Arc<I2pControlState>,
+        headers: HeaderMap,
+        body: String,
+    ) -> (StatusCode, Option<serde_json::Value>) {
+        let response = handle_jsonrpc(
+            State(Arc::clone(state)),
+            headers,
+            Extension("127.0.0.1:7650".parse().unwrap()),
+            body,
+        )
+        .await;
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), 8 * 1024 * 1024)
+            .await
+            .expect("response body must be readable");
+        let value = if bytes.is_empty() {
+            None
+        } else {
+            Some(serde_json::from_slice(&bytes).expect("response body must be JSON"))
+        };
+        (status, value)
+    }
+
+    fn batch_state() -> Arc<I2pControlState> {
+        let router_info = FakeRouterInfoControl::new();
+        router_info.set_version("Emissary test".to_string());
+        let mut state = I2pControlState::new_test("testpass".to_string());
+        state.set_router_info(Box::new(router_info));
+        Arc::new(state)
+    }
+
+    fn version_of(response: &serde_json::Value) -> &str {
+        response["result"]["i2p.router.version"].as_str().expect("version string")
+    }
+
+    fn err_code(response: &serde_json::Value) -> &serde_json::Value {
+        &response["error"]["code"]
+    }
+
+    #[tokio::test]
+    async fn valid_two_request_batch_returns_two_ordered_responses() {
+        let state = batch_state();
+        let token = state.token_service().issue();
+        let body = serde_json::json!([
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": token, "i2p.router.version": true}, "id": 1},
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": token, "i2p.router.version": true}, "id": "second"},
+        ])
+        .to_string();
+        let (status, body) = post_body(&state, HeaderMap::new(), body).await;
+        assert_eq!(status, StatusCode::OK);
+        let responses = body.expect("batch must return an array").clone();
+        let responses = responses.as_array().expect("batch response must be an array");
+        assert_eq!(responses.len(), 2);
+        assert_eq!(responses[0]["id"], serde_json::json!(1));
+        assert_eq!(version_of(&responses[0]), "Emissary test");
+        assert_eq!(responses[1]["id"], serde_json::json!("second"));
+        assert_eq!(version_of(&responses[1]), "Emissary test");
+    }
+
+    #[tokio::test]
+    async fn mixed_notification_and_request_returns_only_request_response() {
+        let state = batch_state();
+        let token = state.token_service().issue();
+        let body = serde_json::json!([
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": token, "i2p.router.version": true}},
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": token, "i2p.router.version": true}, "id": 7},
+        ])
+        .to_string();
+        let (status, body) = post_body(&state, HeaderMap::new(), body).await;
+        assert_eq!(status, StatusCode::OK);
+        let responses = body.expect("mixed batch must return an array").clone();
+        let responses = responses.as_array().expect("batch response must be an array");
+        assert_eq!(responses.len(), 1);
+        assert_eq!(responses[0]["id"], serde_json::json!(7));
+        assert_eq!(version_of(&responses[0]), "Emissary test");
+    }
+
+    #[tokio::test]
+    async fn all_notification_batch_returns_no_content() {
+        let state = batch_state();
+        let (status, body) = post_body(
+            &state,
+            HeaderMap::new(),
+            serde_json::json!([
+                {"jsonrpc": "2.0", "method": "Authenticate", "params": {"API": 1, "Password": "testpass"}},
+                {"jsonrpc": "2.0", "method": "Authenticate", "params": {"API": 1, "Password": "testpass"}},
+            ])
+            .to_string(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        assert!(body.is_none(), "all-notification batch emits no body");
+        assert_eq!(state.token_service().count(), 2, "notifications execute");
+    }
+
+    #[tokio::test]
+    async fn empty_array_returns_single_invalid_request() {
+        let state = batch_state();
+        let (status, body) = post_body(&state, HeaderMap::new(), "[]".to_string()).await;
+        assert_eq!(status, StatusCode::OK);
+        let body = body.expect("empty batch must return an error object");
+        assert!(body.is_object(), "empty batch error is an object");
+        assert_eq!(body["error"]["code"], rpc::error_codes::INVALID_REQUEST);
+        assert_eq!(body["id"], serde_json::Value::Null);
+    }
+
+    #[tokio::test]
+    async fn invalid_entries_produce_per_entry_errors_without_suppressing_siblings() {
+        let state = batch_state();
+        let token = state.token_service().issue();
+        let body = serde_json::json!([
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": token, "i2p.router.version": true}, "id": 1},
+            42,
+            {"jsonrpc": "2.0", "id": 2},
+            [{"jsonrpc": "2.0", "method": "RouterInfo", "id": 3}],
+            null,
+        ])
+        .to_string();
+        let (status, body) = post_body(&state, HeaderMap::new(), body).await;
+        assert_eq!(status, StatusCode::OK);
+        let responses = body.expect("mixed batch must return an array").clone();
+        let responses = responses.as_array().expect("batch response must be an array");
+        assert_eq!(responses.len(), 5, "one response per entry, in order");
+        assert_eq!(responses[0]["id"], serde_json::json!(1));
+        assert_eq!(version_of(&responses[0]), "Emissary test");
+        for response in &responses[1..] {
+            assert_eq!(err_code(response), rpc::error_codes::INVALID_REQUEST);
+            assert_eq!(response["id"], serde_json::Value::Null);
+        }
+    }
+
+    #[tokio::test]
+    async fn over_cap_batch_executes_zero_elements() {
+        let state = batch_state();
+        let mut entries: Vec<serde_json::Value> = Vec::new();
+        entries.push(serde_json::json!({
+            "jsonrpc": "2.0", "method": "Authenticate",
+            "params": {"API": 1, "Password": "testpass"}, "id": 0,
+        }));
+        for i in 1..=rpc::MAX_BATCH_ELEMENTS {
+            entries.push(serde_json::json!({
+                "jsonrpc": "2.0", "method": "RouterInfo",
+                "params": {"i2p.router.version": true}, "id": i,
+            }));
+        }
+        assert_eq!(entries.len(), rpc::MAX_BATCH_ELEMENTS + 1);
+        let (status, body) = post_body(
+            &state,
+            HeaderMap::new(),
+            serde_json::Value::Array(entries).to_string(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let body = body.expect("over-cap batch must return an error");
+        assert!(body.is_object(), "over-cap rejection is an object");
+        assert_eq!(body["error"]["code"], rpc::error_codes::INVALID_REQUEST);
+        assert_eq!(body["id"], serde_json::Value::Null);
+        let live = state.token_service().count();
+        assert_eq!(live, 0, "over-cap batch executes zero elements");
+    }
+
+    #[tokio::test]
+    async fn maximum_size_batch_is_accepted() {
+        let state = batch_state();
+        let entries: Vec<serde_json::Value> = (0..rpc::MAX_BATCH_ELEMENTS)
+            .map(|i| {
+                serde_json::json!({
+                    "jsonrpc": "2.0", "method": "Authenticate",
+                    "params": {"API": 1, "Password": "wrong"}, "id": i,
+                })
+            })
+            .collect();
+        let (status, body) = post_body(
+            &state,
+            HeaderMap::new(),
+            serde_json::Value::Array(entries).to_string(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let responses = body.expect("max-size batch must return an array").clone();
+        let responses = responses.as_array().expect("batch response must be an array");
+        assert_eq!(responses.len(), rpc::MAX_BATCH_ELEMENTS);
+        for response in responses {
+            assert_eq!(err_code(response), rpc::error_codes::INVALID_PASSWORD);
+        }
+        assert_eq!(state.token_service().count(), 0);
+    }
+
+    #[tokio::test]
+    async fn protected_batch_elements_each_require_valid_auth() {
+        let state = batch_state();
+        let token = state.token_service().issue();
+        let body = serde_json::json!([
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": token, "i2p.router.version": true}, "id": 1},
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"i2p.router.version": true}, "id": 2},
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": "never-issued", "i2p.router.version": true}, "id": 3},
+        ])
+        .to_string();
+        let (status, body) = post_body(&state, HeaderMap::new(), body).await;
+        assert_eq!(status, StatusCode::OK);
+        let responses = body.expect("batch must return an array").clone();
+        let responses = responses.as_array().expect("batch response must be an array");
+        assert_eq!(responses.len(), 3);
+        assert_eq!(version_of(&responses[0]), "Emissary test");
+        assert_eq!(err_code(&responses[1]), rpc::error_codes::NO_TOKEN);
+        assert_eq!(err_code(&responses[2]), rpc::error_codes::INVALID_TOKEN);
+    }
+
+    #[tokio::test]
+    async fn no_implicit_token_propagation_from_authenticate_element() {
+        let state = batch_state();
+        let body = serde_json::json!([
+            {"jsonrpc": "2.0", "method": "Authenticate", "params": {"API": 1, "Password": "testpass"}, "id": "auth"},
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"i2p.router.version": true}, "id": "protected"},
+        ])
+        .to_string();
+        let (status, body) = post_body(&state, HeaderMap::new(), body).await;
+        assert_eq!(status, StatusCode::OK);
+        let responses = body.expect("batch must return an array").clone();
+        let responses = responses.as_array().expect("batch response must be an array");
+        assert_eq!(responses.len(), 2);
+        assert!(responses[0]["result"]["Token"].is_string());
+        assert_eq!(err_code(&responses[1]), rpc::error_codes::NO_TOKEN);
+        let live = state.token_service().count();
+        assert_eq!(live, 1, "only Authenticate issues a token");
+        // The issued token does not retroactively authorize the sibling.
+        let issued = responses[0]["result"]["Token"].as_str().unwrap().to_owned();
+        let validity = state.token_service().validate(&issued);
+        assert_eq!(validity, auth::TokenValidation::Valid);
+    }
+
+    #[tokio::test]
+    async fn conflicting_token_in_one_element_cannot_affect_sibling() {
+        let state = batch_state();
+        let token_a = state.token_service().issue();
+        let token_b = state.token_service().issue();
+        let mut headers = HeaderMap::new();
+        headers.insert("X-I2PControl-Token", token_a.parse().unwrap());
+        let body = serde_json::json!([
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"i2p.router.version": true}, "id": 1},
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": token_b, "i2p.router.version": true}, "id": 2},
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": token_a, "i2p.router.version": true}, "id": 3},
+        ])
+        .to_string();
+        let (status, body) = post_body(&state, headers, body).await;
+        assert_eq!(status, StatusCode::OK);
+        let responses = body.expect("batch must return an array").clone();
+        let responses = responses.as_array().expect("batch response must be an array");
+        assert_eq!(responses.len(), 3);
+        assert_eq!(version_of(&responses[0]), "Emissary test");
+        assert_eq!(err_code(&responses[1]), rpc::error_codes::INVALID_TOKEN);
+        assert_eq!(version_of(&responses[2]), "Emissary test");
+    }
+
+    #[tokio::test]
+    async fn expired_token_returns_expired_for_affected_element_only() {
+        use std::time::Instant;
+        let start = Instant::now();
+        let (manual_service, clock) = auth::TokenService::new_manual_for_test(start);
+        let token = manual_service.issue();
+        let mut state = I2pControlState::new_test("testpass".to_string());
+        let router_info = FakeRouterInfoControl::new();
+        router_info.set_version("Emissary test".to_string());
+        state.set_router_info(Box::new(router_info));
+        state.set_token_service_for_test(manual_service);
+        let state = Arc::new(state);
+        *clock.lock() = start + auth::TOKEN_LIFETIME;
+
+        let body = serde_json::json!([
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": token, "i2p.router.version": true}, "id": 1},
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": "never-issued", "i2p.router.version": true}, "id": 2},
+        ])
+        .to_string();
+        let (status, body) = post_body(&state, HeaderMap::new(), body).await;
+        assert_eq!(status, StatusCode::OK);
+        let responses = body.expect("batch must return an array").clone();
+        let responses = responses.as_array().expect("batch response must be an array");
+        assert_eq!(responses.len(), 2);
+        assert_eq!(err_code(&responses[0]), rpc::error_codes::TOKEN_EXPIRED);
+        let message = responses[0]["error"]["message"].as_str().expect("message string");
+        assert_eq!(message, rpc::error_codes::TOKEN_EXPIRED_MESSAGE);
+        assert_eq!(err_code(&responses[1]), rpc::error_codes::INVALID_TOKEN);
+    }
+
+    #[tokio::test]
+    async fn explicit_null_and_duplicate_ids_are_preserved_independently() {
+        let state = batch_state();
+        let token = state.token_service().issue();
+        let body = serde_json::json!([
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": token, "i2p.router.version": true}, "id": null},
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": token, "i2p.router.version": true}, "id": 5},
+            {"jsonrpc": "2.0", "method": "RouterInfo", "params": {"Token": "never-issued", "i2p.router.version": true}, "id": 5},
+        ])
+        .to_string();
+        let (status, body) = post_body(&state, HeaderMap::new(), body).await;
+        assert_eq!(status, StatusCode::OK);
+        let responses = body.expect("batch must return an array").clone();
+        let responses = responses.as_array().expect("batch response must be an array");
+        assert_eq!(responses.len(), 3, "duplicate IDs must not be deduplicated");
+        assert_eq!(responses[0]["id"], serde_json::Value::Null);
+        let null_id = &responses[0];
+        assert!(null_id.get("result").is_some(), "null ID is a request");
+        assert_eq!(responses[1]["id"], serde_json::json!(5));
+        assert!(responses[1].get("result").is_some());
+        assert_eq!(responses[2]["id"], serde_json::json!(5));
+        assert_eq!(err_code(&responses[2]), rpc::error_codes::INVALID_TOKEN);
+    }
+
+    #[tokio::test]
+    async fn notification_with_invalid_auth_executes_but_emits_no_response() {
+        let state = batch_state();
+        let (status, body) = post_body(
+            &state,
+            HeaderMap::new(),
+            serde_json::json!([
+                {"jsonrpc": "2.0", "method": "Authenticate", "params": {"API": 1, "Password": "wrong"}},
+            ])
+            .to_string(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        assert!(body.is_none());
+        let failures = state.auth_throttle().count();
+        assert_eq!(failures, 1, "notification executes validation");
+        assert_eq!(state.token_service().count(), 0);
+    }
+
+    #[tokio::test]
+    async fn single_request_shape_is_unchanged_by_batch_support() {
+        let state = batch_state();
+        let token = state.token_service().issue();
+        let body = serde_json::json!({
+            "jsonrpc": "2.0", "method": "RouterInfo",
+            "params": {"Token": token, "i2p.router.version": true}, "id": 1,
+        })
+        .to_string();
+        let (status, body) = post_body(&state, HeaderMap::new(), body).await;
+        assert_eq!(status, StatusCode::OK);
+        let body = body.expect("single request must return a response");
+        assert!(body.is_object(), "single response stays an object");
+        assert_eq!(version_of(&body), "Emissary test");
     }
 }

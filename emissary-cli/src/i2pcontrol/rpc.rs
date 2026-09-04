@@ -179,10 +179,64 @@ impl JsonRpcErrorResponse {
     }
 }
 
+/// Maximum number of elements in one JSON-RPC batch request.
+///
+/// Compatibility/resource rationale (M128): a batch holds a single HTTP
+/// in-flight permit while its elements dispatch sequentially, so one batch
+/// must never demand more logical requests than the server would serve
+/// concurrently (`MAX_CONCURRENT_REQUESTS = 64` in `server.rs`). Thirty-two
+/// keeps worst-case per-connection logical work at half that concurrent
+/// budget while covering realistic batch clients. The total body-size cap
+/// remains independently authoritative, and over-cap batches are rejected
+/// before any element executes.
+pub const MAX_BATCH_ELEMENTS: usize = 32;
+
+/// Top-level JSON-RPC envelope: one request object or one batch array.
+///
+/// JSON-RPC 2.0 permits either a single request object or a non-empty array
+/// of request entries. Batch entries are kept as raw values here; each entry
+/// is validated with the exact single-request parser at dispatch time so an
+/// invalid entry contributes a per-entry error without disturbing siblings.
+#[derive(Debug, Clone)]
+pub enum JsonRpcEnvelope {
+    /// A single JSON-RPC request object (request or notification).
+    Single(JsonRpcRequest),
+    /// A non-empty, cardinality-bounded array of raw batch entries.
+    Batch(Vec<serde_json::Value>),
+}
+
 /// Parse a JSON-RPC request from a raw body string.
 ///
 /// Returns the parsed request or an error response.
+///
+/// Top-level arrays remain invalid for this single-request entry point; use
+/// [`parse_envelope`] for batch-aware parsing. This preserves the historical
+/// single-request contract byte-for-byte.
+#[allow(dead_code)]
 pub fn parse_request(body: &str) -> Result<JsonRpcRequest, JsonRpcErrorResponse> {
+    match parse_envelope(body) {
+        Ok(JsonRpcEnvelope::Single(request)) => Ok(request),
+        Ok(JsonRpcEnvelope::Batch(_)) => Err(JsonRpcErrorResponse::new(
+            RequestId::Null,
+            error_codes::INVALID_REQUEST,
+            "Request must be a JSON object",
+        )),
+        Err(error) => Err(error),
+    }
+}
+
+/// Parse a top-level JSON-RPC envelope: one request object or one batch.
+///
+/// Distinctions preserved:
+/// - invalid JSON is a parse error (`-32700`, null ID);
+/// - a top-level empty array is an invalid request (`-32600`, null ID);
+/// - an over-cap batch is an invalid request (`-32600`, null ID) and must
+///   execute zero elements;
+/// - any other non-object top-level value is an invalid request.
+///
+/// Per-entry validation is deferred to dispatch so valid siblings survive
+/// invalid entries.
+pub fn parse_envelope(body: &str) -> Result<JsonRpcEnvelope, JsonRpcErrorResponse> {
     let raw: serde_json::Value = serde_json::from_str(body).map_err(|e| {
         JsonRpcErrorResponse::new(
             RequestId::Null,
@@ -191,15 +245,59 @@ pub fn parse_request(body: &str) -> Result<JsonRpcRequest, JsonRpcErrorResponse>
         )
     })?;
 
-    // Must be a JSON object at top level
-    let obj = raw.as_object().ok_or_else(|| {
-        JsonRpcErrorResponse::new(
+    match &raw {
+        serde_json::Value::Object(obj) => parse_single_object(obj).map(JsonRpcEnvelope::Single),
+        serde_json::Value::Array(entries) => {
+            if entries.is_empty() {
+                return Err(JsonRpcErrorResponse::new(
+                    RequestId::Null,
+                    error_codes::INVALID_REQUEST,
+                    "Batch must not be empty",
+                ));
+            }
+            if entries.len() > MAX_BATCH_ELEMENTS {
+                return Err(JsonRpcErrorResponse::new(
+                    RequestId::Null,
+                    error_codes::INVALID_REQUEST,
+                    format!(
+                        "Batch too large: {} entries exceeds maximum of {MAX_BATCH_ELEMENTS}",
+                        entries.len()
+                    ),
+                ));
+            }
+            Ok(JsonRpcEnvelope::Batch(entries.clone()))
+        }
+        _ => Err(JsonRpcErrorResponse::new(
             RequestId::Null,
             error_codes::INVALID_REQUEST,
             "Request must be a JSON object",
-        )
-    })?;
+        )),
+    }
+}
 
+/// Validate one batch entry with the exact single-request rules.
+///
+/// Non-object entries (scalars, null, nested arrays) are not batch entries
+/// and contribute an invalid-request error with null ID. Object entries run
+/// the same validation as [`parse_request`] so named-params, ID, and
+/// version semantics cannot drift between single and batch dispatch.
+pub fn parse_batch_entry(
+    entry: &serde_json::Value,
+) -> Result<JsonRpcRequest, JsonRpcErrorResponse> {
+    match entry.as_object() {
+        Some(obj) => parse_single_object(obj),
+        None => Err(JsonRpcErrorResponse::new(
+            RequestId::Null,
+            error_codes::INVALID_REQUEST,
+            "Batch entry must be a JSON-RPC request object",
+        )),
+    }
+}
+
+/// Validate one JSON-RPC request object: the shared single/batch rule set.
+fn parse_single_object(
+    obj: &serde_json::Map<String, serde_json::Value>,
+) -> Result<JsonRpcRequest, JsonRpcErrorResponse> {
     // Extract jsonrpc version
     let jsonrpc = obj.get("jsonrpc").and_then(|v| v.as_str()).ok_or_else(|| {
         JsonRpcErrorResponse::new(
@@ -1956,6 +2054,127 @@ mod tests {
             let request = parse_request(&body).unwrap();
             assert_eq!(request.id, Some(RequestId::Number(expected)));
         }
+    }
+
+    // --- M128 bounded batch envelope tests ---
+
+    #[test]
+    fn batch_cardinality_bound_is_within_in_flight_budget() {
+        // The batch bound must never exceed the server's concurrent
+        // in-flight request budget (64); one batch holds a single permit.
+        // Compile-time guard: changing the constant beyond budget fails here.
+        const _: () = assert!(MAX_BATCH_ELEMENTS > 0 && MAX_BATCH_ELEMENTS <= 64);
+        assert_eq!(MAX_BATCH_ELEMENTS, 32);
+    }
+
+    #[test]
+    fn envelope_accepts_single_object() {
+        let body = r#"{"jsonrpc":"2.0","method":"Authenticate","id":1}"#;
+        match parse_envelope(body).unwrap() {
+            JsonRpcEnvelope::Single(request) => assert_eq!(request.method, "Authenticate"),
+            JsonRpcEnvelope::Batch(_) => panic!("object must parse as single"),
+        }
+    }
+
+    #[test]
+    fn envelope_accepts_non_empty_batch() {
+        let body = r#"[{"jsonrpc":"2.0","method":"Authenticate","id":1},
+            {"jsonrpc":"2.0","method":"RouterInfo","id":2}]"#;
+        match parse_envelope(body).unwrap() {
+            JsonRpcEnvelope::Batch(entries) => assert_eq!(entries.len(), 2),
+            JsonRpcEnvelope::Single(_) => panic!("array must parse as batch"),
+        }
+    }
+
+    #[test]
+    fn envelope_rejects_empty_batch_with_invalid_request() {
+        let err = parse_envelope("[]").unwrap_err();
+        assert_eq!(err.error.code, error_codes::INVALID_REQUEST);
+        assert_eq!(err.id, RequestId::Null);
+    }
+
+    #[test]
+    fn envelope_rejects_over_cap_batch_before_execution() {
+        let entries = (0..MAX_BATCH_ELEMENTS + 1)
+            .map(|i| format!(r#"{{"jsonrpc":"2.0","method":"Authenticate","id":{i}}}"#))
+            .collect::<Vec<_>>()
+            .join(",");
+        let err = parse_envelope(&format!("[{entries}]")).unwrap_err();
+        assert_eq!(err.error.code, error_codes::INVALID_REQUEST);
+        assert_eq!(err.id, RequestId::Null);
+    }
+
+    #[test]
+    fn envelope_accepts_maximum_size_batch() {
+        let entries = (0..MAX_BATCH_ELEMENTS)
+            .map(|i| format!(r#"{{"jsonrpc":"2.0","method":"Authenticate","id":{i}}}"#))
+            .collect::<Vec<_>>()
+            .join(",");
+        match parse_envelope(&format!("[{entries}]")).unwrap() {
+            JsonRpcEnvelope::Batch(parsed) => assert_eq!(parsed.len(), MAX_BATCH_ELEMENTS),
+            JsonRpcEnvelope::Single(_) => panic!("array must parse as batch"),
+        }
+    }
+
+    #[test]
+    fn envelope_rejects_scalar_top_level() {
+        for body in ["null", "42", r#""hello""#, "true"] {
+            let err = parse_envelope(body).unwrap_err();
+            assert_eq!(err.error.code, error_codes::INVALID_REQUEST, "body: {body}");
+            assert_eq!(err.id, RequestId::Null);
+        }
+    }
+
+    #[test]
+    fn envelope_preserves_parse_error_distinction() {
+        let err = parse_envelope("not json {{{").unwrap_err();
+        assert_eq!(err.error.code, error_codes::PARSE_ERROR);
+        assert_eq!(err.id, RequestId::Null);
+    }
+
+    #[test]
+    fn batch_entry_reuses_single_request_rules() {
+        // Valid object entry parses exactly like a single request.
+        let valid = serde_json::json!({"jsonrpc": "2.0", "method": "Authenticate", "id": 1});
+        let request = parse_batch_entry(&valid).unwrap();
+        assert_eq!(request.method, "Authenticate");
+
+        // Non-object entries (scalars, null, nested arrays) are invalid
+        // requests with null ID, not sibling-invalidating failures.
+        for entry in [
+            serde_json::json!(42),
+            serde_json::json!("hello"),
+            serde_json::json!(null),
+            serde_json::json!(true),
+            serde_json::json!([{"jsonrpc": "2.0", "method": "Authenticate", "id": 1}]),
+        ] {
+            let err = parse_batch_entry(&entry).unwrap_err();
+            assert_eq!(err.error.code, error_codes::INVALID_REQUEST);
+            assert_eq!(err.id, RequestId::Null);
+        }
+
+        // Object entries keep exact single-request error semantics,
+        // including INVALID_PARAMS with the entry's own ID.
+        let positional = serde_json::json!({
+            "jsonrpc": "2.0", "method": "Authenticate", "params": ["a"], "id": 9,
+        });
+        let err = parse_batch_entry(&positional).unwrap_err();
+        assert_eq!(err.error.code, error_codes::INVALID_PARAMS);
+        assert_eq!(err.id, RequestId::Number(9));
+
+        let missing_method = serde_json::json!({"jsonrpc": "2.0", "id": 7});
+        let err = parse_batch_entry(&missing_method).unwrap_err();
+        assert_eq!(err.error.code, error_codes::INVALID_REQUEST);
+        assert_eq!(err.id, RequestId::Null);
+    }
+
+    #[test]
+    fn single_entry_point_still_rejects_top_level_arrays() {
+        // `parse_request` is the single-only contract: arrays stay invalid
+        // even though `parse_envelope` now accepts bounded batches.
+        let err =
+            parse_request(r#"[{"jsonrpc":"2.0","method":"Authenticate","id":1}]"#).unwrap_err();
+        assert_eq!(err.error.code, error_codes::INVALID_REQUEST);
     }
 
     #[test]

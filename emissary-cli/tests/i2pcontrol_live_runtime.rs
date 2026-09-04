@@ -358,6 +358,7 @@ async fn live_runtime_interoperability() {
     .expect("conflicting token response JSON");
     assert_eq!(conflicting_header_body["error"]["code"], json!(-32003));
 
+    // M128: bounded JSON-RPC batches execute with per-element auth.
     let batch = client
         .post(&endpoint)
         .header(reqwest::header::CONTENT_TYPE, "application/json")
@@ -375,11 +376,59 @@ async fn live_runtime_interoperability() {
         .send()
         .await
         .expect("batch request");
-    let batch_body: Value = serde_json::from_str(
-        &batch.text().await.expect("batch response body"),
-    )
-    .expect("batch response JSON");
-    assert_eq!(batch_body["error"]["code"], json!(-32600));
+    assert!(batch.status().is_success());
+    let text = batch.text().await.expect("batch response body");
+    let batch_body: Value = serde_json::from_str(&text).expect("batch response JSON");
+    let batch_responses = batch_body.as_array().expect("batch response must be an array");
+    assert_eq!(batch_responses.len(), 1);
+    assert_eq!(batch_responses[0]["id"], json!(321));
+    assert!(batch_responses[0].get("result").is_some());
+
+    // M128: mixed valid/invalid batch entries keep independent results.
+    let mixed = client
+        .post(&endpoint)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(
+            json!([
+                {
+                    "jsonrpc": "2.0",
+                    "id": 322,
+                    "method": "RouterInfo",
+                    "params": {"Token": token.clone(), "i2p.router.version": false}
+                },
+                {
+                    "jsonrpc": "2.0",
+                    "id": 323,
+                    "method": "RouterInfo",
+                    "params": {"i2p.router.version": false}
+                }
+            ])
+            .to_string(),
+        )
+        .send()
+        .await
+        .expect("mixed batch request");
+    assert!(mixed.status().is_success());
+    let text = mixed.text().await.expect("mixed batch response body");
+    let mixed_body: Value = serde_json::from_str(&text).expect("mixed batch response JSON");
+    let mixed_responses = mixed_body.as_array().expect("mixed batch must be an array");
+    assert_eq!(mixed_responses.len(), 2);
+    assert!(mixed_responses[0].get("result").is_some());
+    assert_eq!(mixed_responses[1]["error"]["code"], json!(-32002));
+
+    // M128: empty batches remain single invalid-request errors.
+    let empty = client
+        .post(&endpoint)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body("[]")
+        .send()
+        .await
+        .expect("empty batch request");
+    assert!(empty.status().is_success());
+    let text = empty.text().await.expect("empty batch response body");
+    let empty_body: Value = serde_json::from_str(&text).expect("empty batch response JSON");
+    assert!(empty_body.is_object());
+    assert_eq!(empty_body["error"]["code"], json!(-32600));
 
     let id_response = protected(
         &client,

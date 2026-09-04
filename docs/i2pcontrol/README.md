@@ -1,6 +1,6 @@
 # I2PControl for Emissary
 
-Status: partial Proposal 170 support; M095-M096, M098-M103, and M107 closed; M097 and M104 closed as blocked; M126 historical requalification closed; M127 token-lifetime corrective closed; residual option blocker remains
+Status: partial Proposal 170 support; M095-M096, M098-M103, and M107 closed; M097 and M104 closed as blocked; M126 historical requalification closed; M127 token-lifetime corrective closed; M128 bounded batch conformance closed; residual option blocker remains
 
 Proposal 170 remains **Open**. This documentation is pinned to the revision
 created and last updated on `2026-05-20`.
@@ -193,6 +193,34 @@ qualification claim; M126 history is otherwise unchanged.
 JSON-RPC notifications execute validation and side effects but suppress the
 response. An explicit `id: null` remains a request ID rather than a
 notification.
+
+## JSON-RPC batch requests
+
+The HTTP body may contain either one JSON-RPC request object or one
+non-empty batch array of request entries (M128). Batch behavior:
+
+- at most `MAX_BATCH_ELEMENTS = 32` entries per batch (at most half the
+  64-request concurrent in-flight budget; the 1 MiB body cap applies
+  independently);
+- an empty array is a single invalid-request error (`-32600`, null ID);
+- an over-cap batch is a single invalid-request error and executes zero
+  elements;
+- each entry is validated with the exact single-request rules: a non-object
+  entry (scalar, null, nested array) contributes a per-entry
+  invalid-request error with null ID without disturbing valid siblings,
+  while named-object params remain required per entry;
+- authentication is strictly per element with the same valid/expired/unknown
+  semantics as single requests; an `Authenticate` entry never propagates
+  its token to siblings, and request-wide `X-I2PControl-Token` header
+  compatibility is reconciled per element exactly as for single dispatch;
+- responses preserve input order in one JSON array; structurally valid
+  notifications execute but contribute no element, so an all-notification
+  batch with no invalid entries emits no JSON-RPC body (`204 No Content`);
+- elements dispatch sequentially under the single held request permit and
+  deadline; no task is spawned per element;
+- batching is not a transaction: mutations committed by earlier elements
+  are not rolled back because a later element fails or the client
+  disconnects.
 
 ## Current retained implementation
 

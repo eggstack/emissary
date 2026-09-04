@@ -593,12 +593,13 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m124 = is_authorized_m124_path(path);
         let authorized_m125 = is_authorized_m125_path(path);
         let authorized_m126 = is_authorized_m126_path(path);
-        // M128/M129 share the reopened-line budget with M127; fold them
+        // M128/M129/M130 share the reopened-line budget with M127; fold them
         // into this binding so the long milestone chains below keep their
         // reviewed layout.
         let authorized_m127 = is_authorized_m127_path(path)
             || is_authorized_m128_path(path)
-            || is_authorized_m129_path(path);
+            || is_authorized_m129_path(path)
+            || is_authorized_m130_path(path);
         let authorized_m111 = is_authorized_m111_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
@@ -1050,6 +1051,20 @@ fn is_authorized_m129_path(path: &str) -> bool {
 
 fn is_authorized_m111_path(path: &str) -> bool {
     matches!(path, "emissary-cli/tests/m060_containment.rs")
+}
+
+fn is_authorized_m130_path(path: &str) -> bool {
+    matches!(
+        path,
+        "docs/i2pcontrol/README.md"
+            | "emissary-cli/tests/m130_post_corrective_requalification.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/130-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/130-post-m127-m129-corrective-requalification.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md"
+    )
 }
 
 fn is_authorized_m128_path(path: &str) -> bool {

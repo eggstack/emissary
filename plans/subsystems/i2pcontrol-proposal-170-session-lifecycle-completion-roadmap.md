@@ -1,275 +1,244 @@
 # Proposal 170 Session-Lifecycle Completion Roadmap
 
-Status: **active / partial; M132 ready for registration, M133-M134 dependency-blocked**
+Status: **active / partial; M132 ready / registered; M133-M134 dependency-blocked**
 
 Parent roadmap:
 
-- `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`
+- `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`.
+
+Current handoff:
+
+- `plans/implementation/i2pcontrol-proposal-170/132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md` — **ready / registered**.
+
+Future handoffs:
+
+- M133 `133-neutral-sam-idle-close-and-reasoned-termination.md` — deferred, hard-depends M132;
+- M134 `134-newdest-on-proven-idle-resume.md` — deferred, hard-depends M133.
 
 Planning baseline:
 
 - M131 closure head `3a829d7d3d6314ecf09e42dbf0339506f0917c96`;
-- M131 support authority `284 apply / 88 blocked_primitive / 468 not_applicable`;
-- M130 remains the implemented-subset runtime/security qualification authority.
+- M131 matrix `284 apply / 88 blocked_primitive / 468 not_applicable`;
+- M130 remains current implemented-subset runtime/security qualification authority.
 
-Pinned Proposal authority:
-
-- I2P Proposal 170, revision `2026-05-20`, status Open.
+Pinned Proposal authority: I2P Proposal 170 revision `2026-05-20`, status Open.
 
 Architecture/security authority:
 
-- `plans/000-long-term-specification.md`;
-- `plans/001-terminology-and-domain-model.md`;
-- `plans/003-planning-process.md`;
+- canonical plans 000-003;
 - ADR-0001 through ADR-0005;
 - M061/M062 containment;
 - M093 tunnel security;
 - M110/M116 shared-session and destination ownership;
 - M121 semantic-truthfulness correction;
-- M123 commit/cancellation atomicity;
-- M131 residual primitive map and closure.
+- M123 cancellation/commit atomicity;
+- M131 residual primitive map/closure.
 
-All external specifications and reference implementations are read-only evidence. All writes authorized by this roadmap remain internal to `eggstack/emissary`. No upstream issue, pull request, review, contact, release, submission, or adoption activity is authorized.
+External specifications/reference implementations are read-only evidence. Repository writes remain internal to `eggstack/emissary`.
 
-## 1. Purpose
+## 1. Purpose and scope
 
-Complete the Proposal-170 client idle-lifecycle residuals through the smallest neutral lower-layer capability that matches I2P session semantics, while keeping Proposal policy and identity decisions inside `emissary-cli/src/i2pcontrol/**`.
+Resolve the Proposal-170 client idle-lifecycle residuals through the smallest exact neutral lower-layer mechanics, while retaining Proposal policy and destination/key decisions under `emissary-cli/src/i2pcontrol/**`.
 
-The line is intentionally split into three milestones:
+The line is deliberately split:
 
-1. **M132** — generic SAM/I2P-session activity plus dynamic tunnel-pool quantity control, consumed by Proposal `Reduce`, `ReduceCount`, and `ReduceTime`;
-2. **M133** — generic close-on-idle plus a reasoned session termination fact, consumed by Proposal `Close` and `CloseTime`;
-3. **M134** — I2PControl-owned `NewDest` rotation exactly on resume after a proven idle close.
+1. **M132** implements generic session activity and dynamic active tunnel-pool quantity, then consumes that capability for `Reduce`, `ReduceCount`, and `ReduceTime`.
+2. **M133** reuses the M132 activity/timer owner for generic close-on-idle and adds a neutral authoritative termination reason, then consumes it for `Close` and `CloseTime`.
+3. **M134** keeps `NewDest` entirely I2PControl-owned and rotates only on a proven idle-close/resume transaction.
 
-The split prevents destination/key mutation from being mixed into the neutral tunnel-pool primitive and gives each milestone an independently testable contract.
+This split prevents neutral core mechanics, session termination and key mutation from being combined into one oversized milestone.
 
-## 2. Current state and why this line is ready
+## 2. Current-state evidence
 
-M131 established that local accepted TCP handler count is not the correct idle predicate. Direct reference evidence instead places idle reduction/close at the I2P client-session boundary:
+M131 established that local TCP handler count is not the reference idle predicate. Reference I2CP behavior instead tracks activity at the client session payload boundary, reduces both tunnel quantities after an idle threshold, restores configured quantities on subsequent activity, and destroys the session on close-on-idle.
 
-- Java `SessionIdleTimer` observes `I2PSessionImpl.lastActivity()`;
-- outbound I2CP message send calls update activity;
-- inbound delivered payload calls update activity;
-- subsessions delegate activity to their primary session;
-- reduction reconfigures both inbound and outbound tunnel quantity;
-- activity after reduction restores the original configured quantity;
-- close-on-idle destroys the session;
-- `newDestOnResume` is a higher application/I2PTunnel identity policy layered on that close/resume lifecycle.
+Current Emissary owners are sufficient for M132 without a new subsystem:
 
-Current Emissary already has the matching canonical owners:
+- `emissary-core/src/sam/session.rs` owns active SAM sessions and streaming/datagram payload send/receive;
+- `emissary-core/src/destination/mod.rs` owns the client destination and `TunnelPoolHandle`;
+- `emissary-core/src/tunnel/pool/**` owns active/standby pool population;
+- `emissary-cli/src/i2pcontrol/backends/runtime/session.rs` owns Proposal-to-Yosemite session option translation;
+- Yosemite Y005 already provides validated additional SAM/I2CP option serialization.
 
-- `emissary-core/src/sam/session.rs` owns the active SAM session and the actual streaming/datagram I2CP payload send/receive boundary;
-- `emissary-core/src/destination/mod.rs` owns the session destination and its `TunnelPoolHandle`;
-- `emissary-core/src/tunnel/pool/**` owns active/standby tunnel population and maintenance;
-- `emissary-cli/src/i2pcontrol/backends/runtime/session.rs` is the existing Proposal-to-Yosemite session-option boundary;
-- Yosemite Y005 can carry validated additional SAM/I2CP session options without a fork change.
-
-Therefore no new subsystem, raw SAM stack, router-global policy framework, or Yosemite change is required to begin M132.
+Therefore M132 is dependency-ready. M133/M134 are not registered because their required stable interfaces must be proved by preceding closures.
 
 ## 3. Ownership boundary
 
-### 3.1 Neutral lower-layer owner
+### Neutral core
 
-Core may own only generic session/pool mechanics:
+Core may own only generic mechanics:
 
-- monotonic session activity;
-- generic idle-reduction configuration consumed from standard I2CP/SAM option names;
-- dynamic active inbound/outbound tunnel quantity target;
-- restoration to the configured target;
-- generic idle session termination and a neutral termination reason in M133.
+- session activity state;
+- standard I2CP/SAM idle option consumption;
+- generation-local monotonic idle state/timers;
+- live active inbound/outbound quantity targets;
+- restoration to configured targets;
+- generic close-on-idle and a neutral termination reason in M133.
 
-Core APIs and state MUST NOT contain `TunnelManager`, Proposal-170 field names such as `ReduceCount`, or I2PControl administrative concepts.
+No core API/type may contain Proposal field names, JSON-RPC concepts, TunnelManager policy or I2PControl key lifecycle.
 
-### 3.2 I2PControl owner
+### I2PControl
 
-I2PControl continues to own:
+I2PControl owns:
 
-- Proposal field validation and presence semantics;
-- mapping `Reduce`/`ReduceCount`/`ReduceTime` and later `Close`/`CloseTime` to standard I2CP/SAM options;
-- fail-before-allocation behavior for unsupported/invalid combinations;
-- support-matrix promotion only after end-to-end evidence;
-- persistent `NewDest` policy, successor-key creation, rollback and restart semantics;
-- shared-definition membership/compatibility policy.
+- Proposal field validation/presence semantics;
+- mapping to standard I2CP/SAM options;
+- shared-definition compatibility policy;
+- matrix/support claims;
+- all `NewDest` key staging/commit/rollback and persistence conflicts.
 
-### 3.3 Yosemite boundary
+### Yosemite
 
-Yosemite remains the sole accepted SAM client. M132-M134 MUST NOT add a parallel SAM encoder. The exact Y005 alias remains unchanged unless a later separately registered Yosemite plan proves a missing generic serialization capability. Current evidence shows `SessionOptions::additional_options` is sufficient for the standard idle options.
+Yosemite remains the sole accepted SAM client. No raw parallel SAM encoder is authorized. Y005 remains exact-pinned behind `yosemite-i2pcontrol`; M132-M134 authorize no Yosemite change.
 
-## 4. Canonical semantic contract
+## 4. Frozen lifecycle semantics
 
-Reference contract frozen for this line:
+The line must preserve the reference contract:
 
-- `i2cp.reduceOnIdle` enables idle reduction;
-- `i2cp.reduceIdleTime` is milliseconds; Java default 20 minutes and minimum 5 minutes;
-- `i2cp.reduceQuantity` defaults to 1 and is at least 1 in the Java reference;
-- reduction applies to both inbound and outbound active tunnel quantity;
-- configured base quantities remain the restore target;
-- subsequent session activity restores the original configured quantities;
+- `i2cp.reduceOnIdle` enables reduction;
+- default reduce time 20 minutes; reference minimum 5 minutes;
+- reduced quantity default 1;
+- reduction reconfigures inbound and outbound quantity;
+- later session activity restores configured quantities;
 - `i2cp.closeOnIdle` enables idle close;
-- `i2cp.closeIdleTime` is milliseconds; Java default 30 minutes and minimum 5 minutes;
-- when both are enabled and close time is less than or equal to reduce time, the Java reference suppresses reduction;
+- default close time 30 minutes; reference minimum 5 minutes;
+- if close time is <= reduce time while both are enabled, reduction is suppressed;
 - close-on-idle destroys the session;
-- `newDestOnResume` is only meaningful after a close-on-idle/reopen cycle and must not rotate identity on ordinary manual stop/start or unrelated failure.
+- `newDestOnResume` is higher-level identity policy and qualifies only after an actual idle close/reopen cycle.
 
-Each implementation milestone MUST re-check the exact pinned reference snapshot before production edits. A reference disagreement is a stop condition, not permission to approximate.
+Each milestone rechecks the exact pinned reference before production edits. Ambiguity is a stop condition.
 
-## 5. Activity semantics
+## 5. Activity contract
 
-The neutral activity predicate is the SAM/I2P application-protocol payload boundary, not local listener occupancy.
+The neutral activity clock follows the I2CP application-protocol payload boundary, not local listener occupancy.
 
-M132 must count the events equivalent to reference I2CP send/deliver activity:
+It includes:
 
-- outbound streaming protocol packets emitted through the SAM session, including control/retransmit packets that become I2CP payload messages;
-- accepted outbound datagram payload requests, including a payload queued while a LeaseSet lookup is pending;
+- outbound streaming packets that become I2CP payload messages, including streaming control/retransmit packets;
+- accepted outbound datagram payloads, including payloads queued pending LeaseSet lookup;
 - inbound successfully decoded I2CP streaming/datagram payloads delivered into the session protocol manager.
 
-The following do not by themselves reset the idle clock:
+It excludes naming lookups, SAM PING/PONG/control traffic, tunnel maintenance/build traffic, unrelated NetDb work and local handler count.
 
-- naming lookups;
-- SAM PING/PONG/control commands;
-- tunnel maintenance/build traffic;
-- NetDb lookups unrelated to an application payload;
-- local TCP listener existence or handler count.
-
-Primary/subsession activity must aggregate at the owning primary session as in the reference. A shared Yosemite session naturally aggregates activity for all I2PControl members using that one session.
+Primary/subsession activity aggregates at the owning primary session. I2PControl definitions sharing one Yosemite session therefore share one activity clock and idle policy.
 
 ## 6. Target architecture
 
-### 6.1 Session idle state
+### Session state
 
-`SamSession` owns generation-local idle state and runtime timers. No global timer registry is introduced.
+`SamSession` owns one generation-local idle state machine. M132 adds reduction; M133 extends that same owner with close. No second timer subsystem.
 
-M132 adds only reduction state. M133 extends the same state machine with close-on-idle; it must not create an independent competing timer.
+### Pool live target
 
-### 6.2 Dynamic tunnel-pool target
+`TunnelPoolConfig` remains immutable configured/base authority. `TunnelPool` gains a separate live active inbound/outbound target. The pool alone owns build deficit, retirement/expiry, selection and standby promotion.
 
-`TunnelPoolConfig` remains the immutable configured/base target. The live pool maintains a separate actor-local active quantity target for inbound and outbound tunnels.
+Control delivery must be bounded and latest-state-safe. Prefer a coalescing/watch-style desired target so activity-triggered restoration cannot be lost behind stale reduction commands.
 
-A neutral control path may change only the live active target and restore it to the configured target. Backup quantity remains separately configured standby capacity.
+Backup quantity remains separate standby capacity.
 
-The control path must be bounded and latest-state-safe: a restoration request after activity must not be silently lost behind a full queue. Prefer a coalescing/watch-style target or another bounded actor-local mechanism over an unbounded command queue. If implementation chooses a finite command channel, the plan must prove deterministic saturation/retry semantics and that restore cannot be lost.
+### LeaseSet correctness
 
-The pool remains the only owner that decides how excess active tunnels retire and how capacity is replenished. M132 must freeze the reference router behavior before choosing immediate retirement versus natural expiry/no-rebuild.
+Inbound quantity changes must remain truthful to the LeaseSet owner. Removed/nonusable tunnels cannot remain advertised indefinitely; restoration cannot publish leases before tunnels exist. If exact behavior requires a broad LeaseSet redesign, stop rather than approximate.
 
-### 6.3 LeaseSet correctness
+### Reasoned close
 
-Inbound quantity changes must remain truthful to the LeaseSet owner. A reduction must not leave permanently advertised leases for tunnels the pool has removed, and restoration must not publish nonexistent leases. Existing LeaseSet creation/update behavior is reused where possible.
+M133 may extend the existing passive SAM lifecycle observation seam or equivalent narrow in-process result with a neutral reason. It must not invent a SAM wire extension. Unknown remains unknown.
 
-If exact reduced-pool LeaseSet maintenance requires a broad LeaseSet redesign outside the named destination/pool owner, M132 stops and closes the affected slice blocked.
+### NewDest transaction
 
-### 6.4 Reasoned idle termination
+M134 consumes only a proven M133 idle-close fact. Successor identity staging/commit/discard remains under the existing I2PControl secret owner and commit transaction. Manual stop/start, restart, process restart and non-idle failure never imply rotation.
 
-M133 may extend existing neutral SAM lifecycle observation with a bounded termination reason, or add an equivalently narrow in-process fact owned by the SAM session. It MUST NOT invent a SAM wire extension merely so I2PControl can distinguish idle close.
-
-The reason must distinguish at least:
-
-- idle-policy close;
-- ordinary control/manual termination;
-- transport/session failure when the owner can identify it without inference.
-
-Unknown remains unknown; no reason is fabricated.
-
-### 6.5 New destination on resume
-
-M134 consumes only a proven idle-close fact. Identity rotation stays in the existing I2PControl destination/key owner and shared-session registry.
-
-A new identity is staged/committed exactly once for the successful resume generation. Failed/cancelled resume does not consume or publish a successor identity. Manual stop/start and non-idle failure do not rotate.
-
-## 7. Milestone sequence
+## 7. Dependency graph
 
 ```text
 M131 residual primitive re-freeze                 [CLOSED AS BLOCKED]
   |
   v
-M132 SAM idle reduction + dynamic pool target     [READY / NEXT HANDOFF]
+M132 SAM idle reduction + dynamic pool target     [READY / REGISTERED]
   |
   v
-M133 SAM idle close + reasoned termination        [DEFERRED; HARD-DEPENDS M132]
+M133 SAM idle close + reasoned termination        [DEFERRED / UNREGISTERED]
   |
   v
-M134 NewDest on proven idle-resume                [DEFERRED; HARD-DEPENDS M133]
+M134 NewDest on proven idle resume                [DEFERRED / UNREGISTERED]
 ```
 
-Only M132 is dependency-ready and should be registered now.
+Only M132 is authorized for execution.
 
-## 8. M132 exit
+## 8. M132 exit conditions
 
 M132 closes only when:
 
-- the exact activity predicate is implemented at the real SAM/I2CP payload boundary;
-- idle reduction changes real active inbound/outbound pool targets;
-- configured quantities restore on subsequent activity;
+- the exact activity predicate is implemented at real SAM/I2CP payload boundaries;
+- reduction changes real active inbound/outbound pool targets;
+- configured targets restore on qualifying activity;
 - backup capacity and unrelated pools remain unchanged;
-- shared-session activity is aggregated correctly;
-- invalid Proposal values fail before allocation;
-- end-to-end tests prove the runtime effect rather than only SAM serialization;
-- M061/M062 path containment is amended and green;
-- the matrix is mechanically updated only for cells with proven reference applicability;
-- M133 readiness is re-audited from the actual M132 closure head.
+- LeaseSet behavior remains truthful;
+- shared-session activity/policy is exact;
+- malformed Proposal inputs fail before allocation;
+- matrix promotions have end-to-end evidence;
+- M061/M062 exact-path containment is green;
+- closure explicitly decides M133 readiness.
 
-## 9. M133 exit
+## 9. M133 exit conditions
 
 M133 closes only when:
 
-- close-on-idle uses the M132 activity clock/state machine;
-- idle close tears down the correct SAM session and pool with bounded cleanup;
-- manual stop/network/session failure cannot be mislabeled as idle close;
-- a neutral reason is available to an in-process consumer without a new wire extension;
-- `Close`/`CloseTime` cells are promoted only where exact applicability is proven;
-- M134 can consume a stable idle-close/reopen contract.
+- it reuses M132 activity/timer state;
+- idle close performs bounded authoritative session/pool teardown;
+- manual/failure teardown is not mislabeled idle;
+- a neutral in-process termination reason is stable for M134;
+- Close/CloseTime promotions have exact evidence;
+- closure explicitly decides M134 readiness.
 
-## 10. M134 exit
+## 10. M134 exit conditions
 
 M134 closes only when:
 
-- `NewDest` rotates only on successful resume after a proven idle close;
-- exactly one successor identity is committed per qualifying resume generation;
-- failed/cancelled resumes roll back staged identity state;
-- manual stop/start and unrelated failure preserve identity;
-- persistent-key and shared-session interactions are explicit and fail-closed;
-- the six non-Streamr `NewDest` cells are promoted only with end-to-end evidence; Streamr remains not applicable under M131 authority.
+- exactly one fresh identity is committed per successful qualifying idle resume;
+- failed/cancelled resume rolls back staged successor state;
+- manual stop/start, explicit restart, process restart and unrelated failure preserve identity;
+- persistent/import/shared conflicts are exact and fail before allocation;
+- the six non-Streamr NewDest cells have end-to-end evidence;
+- Streamr NewDest remains not applicable under M131 authority.
 
 ## 11. Failure, cancellation, restart and contention
 
-All three milestones preserve:
+Across the line:
 
-- one owner for each mutable state machine;
-- no lock across network I/O, timer waits, joins or filesystem synchronization;
-- generation-local timers/control state;
-- bounded queues/state with explicit overload behavior;
-- no orphan pool/session task after stop/restart;
-- edit/start/restart transactionality and last-known-good behavior;
-- creator-cancellation safety from M116/M123;
-- shared-session member bounds and compatibility equality;
-- no destination secret in logs, events, Debug or matrix fixtures.
-
-Process restart does not resume an old idle timer. A restarted tunnel starts a new session generation from persisted configuration. `NewDest` rotation is never inferred from process restart.
+- timers/control/reasons are generation-local;
+- state/queues are bounded with explicit overload behavior;
+- no lock spans network I/O, timer waits, joins or filesystem synchronization;
+- pool/session shutdown is idempotent and leaves no orphan task/control state;
+- stale generation controls/reasons cannot affect replacement generations;
+- shared-session creation/release remains cancellation-safe under M116/M123;
+- process restart never persists or reconstructs an old idle timer/reason;
+- key material remains redacted and confined.
 
 ## 12. Compatibility and migration
 
-No public API version, tunnel type, action, or storage format change is required by the roadmap itself.
+No public API version, method, action or tunnel type change is required. Core behavior is unchanged when standard idle options are absent.
 
-M132/M133 may consume residual raw Proposal configuration through the existing I2PControl parser/definition model rather than adding public persistence fields solely for implementation convenience. If a typed field is needed to preserve validation/round-trip semantics, it must remain I2PControl-local and backwards-compatible with existing stored definitions.
+Residual Proposal fields may continue using the existing raw-definition round-trip representation unless a typed I2PControl-local field is needed for exact validation. Any such addition must deserialize old state without migration or provide an explicit bounded migration plan.
 
-Core behavior is unchanged when idle options are absent. Non-I2PControl SAM clients gain only standard generic I2CP idle semantics when they explicitly supply those options.
+No Yosemite/Cargo dependency change is authorized.
 
-## 13. Security and anonymity
+## 13. Security requirements
 
-This line MUST NOT:
+The line must not:
 
-- weaken proxy routing, DNS, local-target or loopback confinement;
-- expose mutable `TunnelPoolHandle` internals outside the neutral owner;
-- let an unauthenticated external caller control another session's pool;
-- add router-global administrative APIs;
-- change tunnel cryptography, hop selection, peer profiling or build protocol;
-- log session keys, private destinations or raw secret-bearing options;
-- silently fall back when idle policy cannot be honored.
-
-Reducing tunnel count is an operator-selected privacy/performance tradeoff already represented by the pinned contract. The implementation must never reduce an unrelated destination or exploratory/participating pool.
+- expose general router/pool control;
+- permit one destination to modify another's pool;
+- affect exploratory/participating pools;
+- alter tunnel cryptography, hop selection or peer profiling;
+- weaken proxy/DNS/local-target confinement;
+- expose secrets in events/logs/Debug/RPC;
+- use passive observation failure as a reason to block authoritative teardown;
+- silently downgrade unsupported idle/key semantics.
 
 ## 14. Verification policy
 
-Each milestone adds focused deterministic tests and runs, at minimum:
+Each milestone runs focused deterministic tests plus:
 
 ```text
 cargo check -p emissary-core
@@ -278,6 +247,7 @@ cargo check -p emissary-cli --no-default-features --features i2pcontrol
 cargo check -p emissary-cli --no-default-features
 cargo check
 cargo test -p emissary-cli --no-default-features --features i2pcontrol --no-fail-fast
+cargo test -p emissary-cli --no-default-features --features i2pcontrol --test i2pcontrol_live_runtime -- --nocapture
 cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m061_containment --test m062_dependency_containment --test m095_full_support_matrix --test m105_residual_option_audit --no-fail-fast
 cargo clippy -p emissary-core --all-targets -- -D warnings
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
@@ -285,17 +255,17 @@ cargo fmt --all -- --check
 git diff --check
 ```
 
-Known repository-wide stable/nightly rustfmt drift is recorded rather than normalized through unrelated churn.
+Known repository-wide stable/nightly rustfmt drift is recorded, not normalized through unrelated churn.
 
 ## 15. Deferred work
 
-This roadmap does not authorize or solve:
+This roadmap does not authorize:
 
-- Streamr `ConnectDelay` if still semantically ambiguous after this line;
-- `Profile` / streaming max-window;
+- unresolved Streamr `ConnectDelay`;
+- `Profile`;
 - presentation `UseSSL`;
 - HTTP `SSLProxies`/`JumpList`;
-- outproxy plugin/provider integration;
+- outproxy provider/plugin integration;
 - `UniqueLocalAddressPerClient`;
 - `MultiHoming`/`shouldBundleReplyInfo`;
 - `SigType`;
@@ -303,6 +273,6 @@ This roadmap does not authorize or solve:
 
 Those remain separate M131 primitive clusters.
 
-## 16. Final rule
+## 16. Completion rule
 
-This roadmap is complete only after M134 closure or a truthful blocked disposition for any remaining cells in this lifecycle cluster. It does not by itself make Proposal 170 complete. Full support remains governed by the parent full-support roadmap and a future whole-surface requalification after all applicable residuals are resolved.
+This roadmap closes after M134 closure or a truthful blocked disposition for remaining lifecycle cells. It does not itself establish full Proposal 170 support. Whole-surface completion remains governed by the parent roadmap and future requalification after all applicable residual clusters are resolved.

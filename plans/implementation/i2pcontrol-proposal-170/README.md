@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; post-M126 corrective line reopened**. M127-M128 closed; M129 is the current registered handoff. The authoritative M095 matrix remains `284 apply / 96 blocked_primitive / 460 not_applicable`.
+Status: **partial Proposal 170 support; post-M126 corrective line reopened**. M127-M129 closed; M130 is the current registered handoff. The authoritative M095 matrix remains `284 apply / 96 blocked_primitive / 460 not_applicable`.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -36,7 +36,7 @@ Containment/support evidence:
 - M121 truthfully demoted unsupported `SigType` and `Close`/`CloseTime`/`NewDest` semantics instead of retaining approximate support.
 - M124 exact-pins Yosemite Y005 `59140a2277bf296928d2e8ce39a148182eeff044` only through the optional I2PControl alias; ordinary Yosemite remains registry 0.7.0.
 - M125 corrected two server-role `AllowInternalSSL` applicability cells and left 96 blocked cells with no dependency-ready owner.
-- M126 is historical current-head evidence, but subsequent review found three shared-control-plane defects/gaps; its clean auth/TLS/JSON-RPC qualification is superseded pending M129-M130 (C10 resolved by closed M127, C11 resolved by closed M128).
+- M126 is historical current-head evidence, but subsequent review found three shared-control-plane defects/gaps; its clean auth/TLS/JSON-RPC qualification is superseded pending M130 (C10 resolved by closed M127, C11 resolved by closed M128, C12 resolved by closed M129).
 
 Full Proposal 170 support is not claimed.
 
@@ -46,14 +46,14 @@ Full Proposal 170 support is not claimed.
 |---|---|---|
 | M127 | **closed** | finite API-1 token lifetime; expired-vs-unknown behavior; auth bounds |
 | M128 | **closed** | bounded JSON-RPC batch conformance and per-element auth/resource rules |
-| M129 | **ready / registered** | non-loopback bind requires explicit TLS certificate/key; managed TLS loopback-only |
-| M130 | blocked / unregistered | integrated post-M127-M129 current-head requalification |
+| M129 | **closed** | non-loopback bind requires explicit TLS certificate/key; managed TLS loopback-only |
+| M130 | **ready / registered** | integrated post-M127-M129 current-head requalification |
 
 Source roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md`
 
-Only M129 is registered now, consistent with `plans/003-planning-process.md`. Later plan files are written to make the full corrective line explicit, but their implementation status remains gated until predecessor closure.
+Only M130 is registered now, consistent with `plans/003-planning-process.md`. Later plan files are written to make the full corrective line explicit, but their implementation status remains gated until predecessor closure.
 
 ## M127 — closed corrective
 
@@ -102,32 +102,38 @@ with bounded JSON-RPC 2.0 batch behavior:
 M128 supersedes only M126's affected batch-conformance qualification
 claim. Historical M126/M127 closures remain unchanged.
 
-## M129 — current registered handoff
+## M129 — closed corrective
 
 Plan:
 
 - `129-nonloopback-managed-tls-fail-closed-corrective.md`
 
-Status: **ready / registered** (promoted on M128 closure).
+Closure:
 
-M129 makes the managed self-signed identity explicitly loopback-only.
-It starts from the closed-M128 head.
+- `plans/closure/i2pcontrol-proposal-170/129-closure.md` (implementation `39ccdd7`).
 
-## M129 — queued remote TLS fail-closed corrective
-
-Plan:
-
-- `129-nonloopback-managed-tls-fail-closed-corrective.md`
-
-M129 is written and registered as the current handoff after M128. It makes the managed self-signed identity explicitly loopback-only:
+M129 started from the closed-M128 head and inherited the corrected
+token-lifetime and batch semantics. It made the managed self-signed
+identity explicitly loopback-only:
 
 - loopback bind may use managed or explicit TLS material;
 - non-loopback bind requires complete explicit certificate + private key paths;
 - invalid remote/managed configuration fails before listener/task/managed-file side effects;
-- explicit remote TLS remains supported;
-- no automatic SAN discovery, CA/trust management, mTLS or plaintext fallback is added.
+- explicit remote TLS remains supported with verified TLS evidence;
+- no automatic SAN discovery, CA/trust management, mTLS or plaintext fallback was added.
 
-## M130 — blocked integrated requalification
+M129 supersedes only M126/M108's affected managed-TLS qualification
+claim. Historical M126/M127/M128 closures remain unchanged.
+
+## M130 — current registered handoff
+
+Plan:
+
+- `130-post-m127-m129-corrective-requalification.md`
+
+Status: **ready / registered** (promoted on M129 closure).
+
+## M130 — integrated requalification
 
 Plan:
 
@@ -154,9 +160,10 @@ The reopened line therefore fixes only shared base behavior required by the exte
 | M123 | closed — commit-phase cancellation/lifecycle atomicity |
 | M124 | closed — exact Y005 dependency adoption; no Proposal mapping |
 | M125 | closed — M113 capability/crypto audit; two cells reclassified |
-| M126 | historical closed — later C10-C12 findings supersede its clean shared-control-plane qualification (C10 resolved by M127, C11 resolved by M128) |
+| M126 | historical closed — later C10-C12 findings supersede its clean shared-control-plane qualification (C10 resolved by M127, C11 resolved by M128, C12 resolved by M129) |
 | M127 | closed — finite token lifetime, expired/unknown mapping, bounds; matrix unchanged |
 | M128 | closed — bounded batch conformance (`MAX_BATCH_ELEMENTS = 32`), per-element auth, notification/no-content rules; matrix unchanged |
+| M129 | closed — non-loopback managed-TLS fail-closed; managed loopback-only; explicit remote only; matrix unchanged |
 
 Historical closure records are retained unchanged.
 

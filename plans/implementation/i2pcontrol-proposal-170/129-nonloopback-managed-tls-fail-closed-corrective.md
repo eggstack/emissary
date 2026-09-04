@@ -1,6 +1,8 @@
 # M129 — Non-Loopback Managed-TLS Fail-Closed Corrective
 
-Status: **ready / registered** (promoted on M128 closure; see `plans/closure/i2pcontrol-proposal-170/128-closure.md` §11)
+Status: **closed**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/129-closure.md`
 
 Class: corrective / TLS configuration / operational security
 

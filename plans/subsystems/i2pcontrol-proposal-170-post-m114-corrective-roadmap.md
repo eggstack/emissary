@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 — Post-M114 Corrective Roadmap
 
-Status: **active corrective workstream; M127-M128 closed; M129 ready; M130 blocked on corrective closure**
+Status: **active corrective workstream; M127-M129 closed; M130 ready; requalification pending**
 
 Original corrective baseline: `feafc6a1d9650887015a01f87bf21b57a4e92085`
 
@@ -79,13 +79,11 @@ The corrective added bounded batch cardinality (`MAX_BATCH_ELEMENTS = 32`), per-
 
 Owner: **M128** — **closed** (`plans/closure/i2pcontrol-proposal-170/128-closure.md`, implementation `0ed60eb`).
 
-### C12 — non-loopback bind may use a loopback-only managed certificate
+### C12 — non-loopback bind may use a loopback-only managed certificate (resolved)
 
-Managed TLS generates an identity for `localhost`, `127.0.0.1`, and `::1`. Current configuration still permits a non-loopback bind with only a warning. A correctly validating remote client cannot authenticate the managed loopback identity for the remote endpoint, creating pressure to disable certificate verification.
+Managed TLS generates an identity for `localhost`, `127.0.0.1`, and `::1`. M129 now requires complete explicit certificate/key configuration for every non-loopback bind and rejects invalid remote/managed configuration before listener/TLS-file side effects. Managed TLS remains loopback-only.
 
-The fail-closed correction is to require complete explicit certificate/key configuration for every non-loopback bind. Managed TLS remains loopback-only.
-
-Owner: **M129** — **ready / registered** (promoted on M128 closure).
+Owner: **M129** — **closed** (`plans/closure/i2pcontrol-proposal-170/129-closure.md`, implementation `39ccdd7`).
 
 After M127-M129 close, **M130** performs a new current-head operational/security/spec requalification and supersedes M126 only for current authority. Historical M126 evidence remains intact.
 
@@ -161,7 +159,7 @@ No M127-M130 production behavior belongs below the I2PControl application layer.
 ## 7. Dependency graph and classes
 
 ```text
-M126 post-M125 requalification                 [HISTORICAL CLOSED; C10 RESOLVED BY M127, C11 RESOLVED BY M128, C12 OPEN]
+M126 post-M125 requalification                 [HISTORICAL CLOSED; C10/C11/C12 RESOLVED BY M127/M128/M129]
 M127 token-lifetime corrective                 [CLOSED]
   |
   | sequencing dependency satisfied: batch inherits corrected token authority
@@ -170,10 +168,10 @@ M128 JSON-RPC batch corrective                 [CLOSED]
   |
   | sequencing dependency for linear shared-control-plane closure
   v
-M129 non-loopback TLS fail-closed corrective   [READY / REGISTERED]
+M129 non-loopback TLS fail-closed corrective   [CLOSED]
   |
   v
-M130 post-corrective requalification           [BLOCKED; HARD DEPENDS M127-M129]
+M130 post-corrective requalification           [READY / REGISTERED; HARD DEPENDS M127-M129 SATISFIED]
   |
   +--> no defect/new residual owner: retain partial 284/96/460
   |
@@ -187,7 +185,7 @@ Dependency classes:
 - M129 is technically independent but intentionally sequencing-gated after M128 to keep one active implementation handoff and one closure authority at a time.
 - M130 has hard dependencies on closed M127, M128, and M129 implementations/closures.
 
-Only M129 is registered as the current handoff under `plans/003-planning-process.md`.
+Only M130 is registered as the current handoff under `plans/003-planning-process.md`.
 
 ## 8. M127 — finite authentication token lifetime
 
@@ -232,14 +230,14 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/129-nonloopback-managed-tls-fail-closed-corrective.md`
 
-Status: **ready / registered** (promoted on M128 closure; see `plans/closure/i2pcontrol-proposal-170/128-closure.md` §11).
+Status: **closed**; closure `plans/closure/i2pcontrol-proposal-170/129-closure.md`, implementation `39ccdd7`.
 
-Primary exit conditions:
+Primary exit conditions (all met; see closure):
 
 - managed TLS remains allowed only for loopback binds;
 - non-loopback binds require complete explicit certificate/key paths;
 - rejection occurs before listener/task/managed-file side effects;
-- explicit remote TLS remains supported;
+- explicit remote TLS remains supported with verified TLS evidence;
 - no TLS failure falls back to plaintext;
 - no automated remote SAN/trust/mTLS scope expansion.
 
@@ -249,7 +247,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/130-post-m127-m129-corrective-requalification.md`
 
-Status: **blocked / unregistered**.
+Status: **ready / registered** (promoted on M129 closure).
 
 M130 freezes the actual merged post-M129 head and requalifies:
 
@@ -322,8 +320,10 @@ Mitigation is the milestone decomposition above plus a new M130 integrated requa
 
 ## 16. Closure and successor policy
 
-M127 closed on the `098c9d1` head with no matrix change; M128 is now the
-registered handoff. Every milestone gets a separate closure record with:
+M127 closed on the `098c9d1` head with no matrix change; M128 closed on
+the `0ed60eb` head with no matrix change; M129 closed on the `39ccdd7`
+head with no matrix change; M130 is now the registered handoff. Every
+milestone gets a separate closure record with:
 
 - exact implementation commit(s);
 - requirement-to-evidence table;
@@ -335,7 +335,7 @@ registered handoff. Every milestone gets a separate closure record with:
 - next-readiness disposition;
 - internal-only external-interaction attestation.
 
-M127 closure promotes M128; M128 closure promotes M129; M129 closure promotes M130. Registry updates should occur only when the predecessor closes.
+M127 closure promotes M128; M128 closure promotes M129; M129 closure promotes M130 (done: M130 ready/registered). Registry updates should occur only when the predecessor closes.
 
 M130 clean closure restores current-head qualification but does not equal full Proposal 170 completion while applicable residuals remain blocked.
 

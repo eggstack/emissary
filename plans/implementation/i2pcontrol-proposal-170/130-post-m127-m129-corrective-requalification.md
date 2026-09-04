@@ -1,6 +1,6 @@
 # M130 — Post-M127–M129 Corrective Requalification
 
-Status: **blocked / unregistered**
+Status: **ready / registered** (promoted on M129 closure; see `plans/closure/i2pcontrol-proposal-170/129-closure.md` §11)
 
 Class: corrective requalification / conformance / security / containment
 

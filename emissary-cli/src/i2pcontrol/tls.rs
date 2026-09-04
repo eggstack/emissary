@@ -63,6 +63,17 @@ impl TlsConfig {
     pub fn is_explicit(&self) -> bool {
         self.certificate.is_some() || self.private_key.is_some()
     }
+
+    /// Returns true only when both explicit certificate and private-key
+    /// paths are present.
+    ///
+    /// M129 uses this to decide whether a non-loopback bind may proceed to
+    /// explicit TLS loading. Partial material (certificate-only or
+    /// key-only) never satisfies the remote-service requirement and must
+    /// fail before any managed-TLS side effect.
+    pub fn has_complete_explicit_material(&self) -> bool {
+        self.certificate.is_some() && self.private_key.is_some()
+    }
 }
 
 /// Load or generate TLS material and build a `ServerConfig`.
@@ -448,6 +459,33 @@ mod tests {
             private_key: None,
         };
         assert!(c2.is_explicit());
+    }
+
+    #[test]
+    fn tls_complete_material_requires_both_paths() {
+        let none = TlsConfig {
+            certificate: None,
+            private_key: None,
+        };
+        assert!(!none.has_complete_explicit_material());
+
+        let cert_only = TlsConfig {
+            certificate: Some(PathBuf::from("/cert")),
+            private_key: None,
+        };
+        assert!(!cert_only.has_complete_explicit_material());
+
+        let key_only = TlsConfig {
+            certificate: None,
+            private_key: Some(PathBuf::from("/key")),
+        };
+        assert!(!key_only.has_complete_explicit_material());
+
+        let complete = TlsConfig {
+            certificate: Some(PathBuf::from("/cert")),
+            private_key: Some(PathBuf::from("/key")),
+        };
+        assert!(complete.has_complete_explicit_material());
     }
 
     #[cfg(unix)]

@@ -97,6 +97,14 @@ pub struct I2pControlConfig {
 
 impl I2pControlConfig {
     /// Validate the configuration.
+    ///
+    /// M129 fail-closed boundary: a non-loopback bind may not use the
+    /// loopback-only managed TLS identity (`localhost`, `127.0.0.1`,
+    /// `::1`). When enabled on a non-loopback address, both explicit
+    /// certificate and private-key paths are required. Rejection happens
+    /// here, before listener bind and before managed certificate
+    /// generation/reuse. The error carries no filesystem or secret
+    /// material beyond the requirement statement itself.
     pub fn validate(&self) -> Result<(), I2pControlError> {
         if self.enabled && self.password.is_empty() {
             return Err(I2pControlError::Config(
@@ -104,8 +112,21 @@ impl I2pControlConfig {
             ));
         }
 
-        // Warn on non-loopback binding
+        // Fail closed before any listener/TLS-file side effect: managed
+        // TLS is loopback-only, so every non-loopback bind (including
+        // wildcard/unspecified binds, which are not loopback) requires
+        // complete explicit certificate + private-key configuration.
         if self.enabled && !self.bind.ip().is_loopback() {
+            if !self.tls.has_complete_explicit_material() {
+                return Err(I2pControlError::Config(
+                    "I2PControl non-loopback bind requires explicit TLS certificate \
+                     and private-key paths; managed TLS identity is loopback-only"
+                        .into(),
+                ));
+            }
+
+            // Explicit remote material remains intentionally visible: the
+            // operator accepted remote exposure with their own identity.
             tracing::warn!(
                 target: LOG_TARGET,
                 bind = %self.bind,
@@ -792,6 +813,12 @@ impl ServerInitContext {
 /// Directory creation, adapter construction, or store load failure aborts
 /// I2PControl initialization. No partially constructed server state is
 /// returned. No fake adapters are substituted on failure.
+///
+/// M129: non-loopback binds without complete explicit TLS material are
+/// rejected by [`I2pControlConfig::validate`] before TLS setup, directory
+/// creation, adapter construction, store loads, and listener bind. No
+/// managed certificate directory or file is created, reused, or mutated
+/// on that path, and no listener or service task is started.
 pub async fn init_server(
     config: &I2pControlConfig,
     base_path: &std::path::Path,
@@ -1557,6 +1584,152 @@ mod tests {
             },
         };
         assert!(config.validate().is_ok());
+    }
+
+    // --- M129 non-loopback managed-TLS fail-closed truth table ---
+
+    fn m129_config(bind: &str, cert: bool, key: bool) -> I2pControlConfig {
+        I2pControlConfig {
+            enabled: true,
+            bind: bind.parse().unwrap(),
+            password: "testpass".to_string(),
+            tls: TlsConfig {
+                certificate: cert.then(|| std::path::PathBuf::from("/operator/cert.pem")),
+                private_key: key.then(|| std::path::PathBuf::from("/operator/key.pem")),
+            },
+        }
+    }
+
+    #[test]
+    fn m129_loopback_managed_is_allowed() {
+        for bind in ["127.0.0.1:7650", "[::1]:7650"] {
+            assert!(
+                m129_config(bind, false, false).validate().is_ok(),
+                "loopback managed must stay allowed: {bind}"
+            );
+        }
+    }
+
+    #[test]
+    fn m129_loopback_explicit_is_allowed() {
+        for bind in ["127.0.0.1:7650", "[::1]:7650"] {
+            assert!(
+                m129_config(bind, true, true).validate().is_ok(),
+                "loopback explicit must stay allowed: {bind}"
+            );
+        }
+    }
+
+    #[test]
+    fn m129_loopback_partial_passes_config_and_fails_at_tls_load() {
+        // Existing explicit-TLS completeness rules own the loopback
+        // partial-material rejection (no M129 remote-policy involvement).
+        for (cert, key) in [(true, false), (false, true)] {
+            let config = m129_config("127.0.0.1:7650", cert, key);
+            assert!(
+                config.validate().is_ok(),
+                "loopback partial must reach explicit TLS loading"
+            );
+            let dir = tempfile::tempdir().unwrap();
+            let err = super::super::tls::build_tls_config(&config.tls, dir.path())
+                .expect_err("partial explicit TLS must fail at load");
+            assert!(
+                !err.to_string().contains("non-loopback"),
+                "loopback partial must use loader errors, not remote policy: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn m129_non_loopback_managed_is_rejected() {
+        for bind in [
+            "192.0.2.10:7650",
+            "203.0.113.7:7650",
+            "[2001:db8::1]:7650",
+            "0.0.0.0:7650",
+            "[::]:7650",
+        ] {
+            let err = m129_config(bind, false, false)
+                .validate()
+                .expect_err("non-loopback managed must fail closed");
+            let message = err.to_string();
+            assert!(
+                message.contains("non-loopback") && message.contains("explicit"),
+                "error must state the explicit-material requirement: {message}"
+            );
+            assert!(
+                message.contains("loopback-only"),
+                "error must state managed identity is loopback-only: {message}"
+            );
+        }
+    }
+
+    #[test]
+    fn m129_non_loopback_partial_is_rejected() {
+        for bind in [
+            "192.0.2.10:7650",
+            "[2001:db8::1]:7650",
+            "0.0.0.0:7650",
+            "[::]:7650",
+        ] {
+            for (cert, key) in [(true, false), (false, true)] {
+                assert!(
+                    m129_config(bind, cert, key).validate().is_err(),
+                    "non-loopback partial must fail: {bind} cert={cert} key={key}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn m129_non_loopback_complete_explicit_passes_validation() {
+        for bind in [
+            "192.0.2.10:7650",
+            "[2001:db8::1]:7650",
+            "0.0.0.0:7650",
+            "[::]:7650",
+        ] {
+            assert!(
+                m129_config(bind, true, true).validate().is_ok(),
+                "complete explicit material must pass validation: {bind}"
+            );
+        }
+    }
+
+    #[test]
+    fn m129_disabled_non_loopback_is_not_rejected() {
+        let config = I2pControlConfig {
+            enabled: false,
+            bind: "0.0.0.0:7650".parse().unwrap(),
+            password: String::new(),
+            tls: TlsConfig {
+                certificate: None,
+                private_key: None,
+            },
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn m129_rejection_emits_no_secret_or_filesystem_material() {
+        let password = "m129-secret-password".to_string();
+        let config = I2pControlConfig {
+            enabled: true,
+            bind: "192.0.2.10:7650".parse().unwrap(),
+            password: password.clone(),
+            tls: TlsConfig {
+                certificate: None,
+                private_key: None,
+            },
+        };
+        let err = config.validate().expect_err("must reject");
+        let message = err.to_string();
+        assert!(!message.contains(&password), "error must not echo password");
+        assert!(!message.contains("Token"), "error must not mention tokens");
+        assert!(
+            !message.contains("i2pcontrol-certs"),
+            "error must not leak managed internals: {message}"
+        );
     }
 
     #[test]

@@ -24,6 +24,23 @@ I2PControl uses JSON-RPC authentication with opaque tokens:
 
 See [README.md](README.md) for authentication details.
 
+## Remote TLS exposure
+
+- Managed I2PControl certificates are loopback-only identities
+  (`localhost`, `127.0.0.1`, `::1`).
+- Every non-loopback bind, including wildcard/unspecified binds
+  (`0.0.0.0`, `::`), requires complete explicit `certificate` and
+  `private_key` configuration.
+- Invalid remote/managed configuration fails during configuration
+  validation, before listener bind, service-task creation, and managed
+  certificate generation/reuse. Existing managed material is left
+  unmutated on that path.
+- Emissary performs no automatic remote SAN synthesis, certificate-authority
+  or trust-store management, mTLS, reverse-proxy protocol handling, or
+  client verification weakening. Operators must issue explicit material
+  matching the client-visible endpoint/trust model.
+- TLS failures never fall back to plaintext or to managed TLS.
+
 ## Secret handling
 
 ### Redacted values

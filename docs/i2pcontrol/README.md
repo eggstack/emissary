@@ -1,6 +1,6 @@
 # I2PControl for Emissary
 
-Status: partial Proposal 170 support; M095-M096, M098-M103, and M107 closed; M097 and M104 closed as blocked; M126 historical requalification closed; M127 token-lifetime corrective closed; M128 bounded batch conformance closed; residual option blocker remains
+Status: partial Proposal 170 support; M095-M096, M098-M103, and M107 closed; M097 and M104 closed as blocked; M126 historical requalification closed; M127 token-lifetime corrective closed; M128 bounded batch conformance closed; M129 non-loopback managed-TLS fail-closed corrective closed; residual option blocker remains
 
 Proposal 170 remains **Open**. This documentation is pinned to the revision
 created and last updated on `2026-05-20`.
@@ -97,7 +97,13 @@ password = "your-secure-password"
 ### Security notes
 
 - Default binding is loopback only.
-- Non-loopback binding requires explicit configuration and produces a warning.
+- Non-loopback binding (including wildcard/unspecified binds) requires
+  complete explicit `certificate` and `private_key` configuration and fails
+  closed before listener/TLS-file side effects otherwise; allowed explicit
+  remote binds still produce a warning.
+- Managed TLS identity is loopback-only (see below); operators serving a
+  non-loopback endpoint must issue explicit material matching the
+  client-visible endpoint/trust model.
 - Empty password is rejected when the service is enabled.
 - Existing configurations without `[i2pcontrol]` remain valid.
 - Authentication, token placement, secret persistence, and response redaction
@@ -111,7 +117,7 @@ I2PControl is served over HTTPS.
 
 1. When `certificate` and `private_key` are configured, those files are loaded.
 2. Otherwise, a managed self-signed certificate is generated under
-   `<base_path>/i2pcontrol-certs/`.
+   `<base_path>/i2pcontrol-certs/`, but only for loopback binds.
 3. Managed material is generated only when I2PControl starts, is written
    atomically, remains stable across restart, and is regenerated when invalid.
    The generated certificate covers `localhost`, `127.0.0.1`, and `::1`; on
@@ -119,8 +125,19 @@ I2PControl is served over HTTPS.
    directory is owner-only (`0700`) when created. Managed symlinks and other
    non-regular paths fail closed. Explicit certificate and key paths retain
    their operator-owned behavior.
+4. Managed certificates are loopback-only identities. A non-loopback bind
+   with no explicit paths, certificate-only, or private-key-only paths is
+   rejected during configuration validation, before listener bind and before
+   managed certificate generation/reuse. Operators remain responsible for
+   issuing explicit material matching the client-visible endpoint/trust
+   model. Emissary performs no automatic remote certificate identity
+   synthesis (no wildcard, host-derived, DNS-resolved, interface-enumerated,
+   or request-controlled names), no trust-store modification, and no client
+   verification weakening. Operator-provided certificate hostname/SAN policy
+   is not inspected beyond loading the supplied files.
 
-There is no plaintext HTTP fallback.
+There is no plaintext HTTP fallback. Explicit TLS failures never fall back
+to managed TLS or plaintext.
 
 ## Authentication
 

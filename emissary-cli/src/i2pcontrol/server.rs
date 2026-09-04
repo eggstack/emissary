@@ -296,6 +296,15 @@ impl I2pControlState {
         &self.auth_throttle
     }
 
+    /// Replace the token service (unit tests only, for deterministic expiry).
+    ///
+    /// Production composition always uses the real monotonic clock via
+    /// `TokenService::new`; this setter is unavailable outside tests.
+    #[cfg(test)]
+    pub(crate) fn set_token_service_for_test(&mut self, token_service: TokenService) {
+        self.token_service = token_service;
+    }
+
     /// Get a reference to the router info control.
     pub fn router_info(&self) -> &dyn RouterInfoControl {
         &*self.router_info
@@ -1384,12 +1393,22 @@ fn authenticate_protected_request(
         }
     };
 
-    if !state.token_service.validate(&token) {
-        return Err(JsonRpcErrorResponse::new(
-            id,
-            rpc::error_codes::INVALID_TOKEN,
-            rpc::error_codes::INVALID_TOKEN_MESSAGE,
-        ));
+    match state.token_service.validate(&token) {
+        auth::TokenValidation::Valid => {}
+        auth::TokenValidation::Expired => {
+            return Err(JsonRpcErrorResponse::new(
+                id,
+                rpc::error_codes::TOKEN_EXPIRED,
+                rpc::error_codes::TOKEN_EXPIRED_MESSAGE,
+            ));
+        }
+        auth::TokenValidation::Unknown => {
+            return Err(JsonRpcErrorResponse::new(
+                id,
+                rpc::error_codes::INVALID_TOKEN,
+                rpc::error_codes::INVALID_TOKEN_MESSAGE,
+            ));
+        }
     }
 
     let mut sanitized = request.clone();
@@ -2144,5 +2163,132 @@ mod tests {
             "no fallback directories should exist in temp: {:?}",
             entries
         );
+    }
+
+    // --- M127 token-lifetime dispatch evidence ---
+
+    #[tokio::test]
+    async fn protected_dispatch_returns_expired_then_unknown() {
+        use std::time::Instant;
+        let start = Instant::now();
+        let (manual_service, clock) = auth::TokenService::new_manual_for_test(start);
+        let token = manual_service.issue();
+        let mut state = I2pControlState::new_test("testpass".to_string());
+        state.set_token_service_for_test(manual_service);
+
+        // Valid before expiry.
+        let valid = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"Token": token, "i2p.router.version": true}),
+            Some(RequestId::Number(1)),
+        );
+        assert!(authenticate_protected_request(&state, &HeaderMap::new(), &valid).is_ok());
+
+        // Expire deterministically.
+        *clock.lock() = start + auth::TOKEN_LIFETIME;
+        let expired = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"Token": token, "i2p.router.version": true}),
+            Some(RequestId::Number(2)),
+        );
+        let expired = authenticate_protected_request(&state, &HeaderMap::new(), &expired)
+            .unwrap_err();
+        assert_eq!(expired.error.code, rpc::error_codes::TOKEN_EXPIRED);
+        assert_eq!(
+            expired.error.message,
+            rpc::error_codes::TOKEN_EXPIRED_MESSAGE
+        );
+
+        // Second use of the same (now removed) token is unknown, not expired.
+        let again = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"Token": token, "i2p.router.version": true}),
+            Some(RequestId::Number(3)),
+        );
+        let again =
+            authenticate_protected_request(&state, &HeaderMap::new(), &again).unwrap_err();
+        assert_eq!(again.error.code, rpc::error_codes::INVALID_TOKEN);
+        assert_eq!(again.error.message, rpc::error_codes::INVALID_TOKEN_MESSAGE);
+    }
+
+    #[tokio::test]
+    async fn expired_token_never_authorizes_protected_dispatch() {
+        use std::time::Instant;
+        let start = Instant::now();
+        let (manual_service, clock) = auth::TokenService::new_manual_for_test(start);
+        let token = manual_service.issue();
+        let mut state = I2pControlState::new_test("testpass".to_string());
+        state.set_token_service_for_test(manual_service);
+        *clock.lock() = start + auth::TOKEN_LIFETIME + std::time::Duration::from_secs(1);
+
+        let expired = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"Token": token, "i2p.router.version": true}),
+            Some(RequestId::Number(1)),
+        );
+        let sanitized = authenticate_protected_request(&state, &HeaderMap::new(), &expired);
+        assert!(sanitized.is_err());
+        // No sanitized request (with Token stripped) is produced for expired input.
+    }
+
+    #[tokio::test]
+    async fn oversized_token_fails_as_unknown_without_echo() {
+        let state = I2pControlState::new_test("testpass".to_string());
+        let oversized = "x".repeat(auth::MAX_PRESENTED_TOKEN_LEN + 16);
+        let req = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"Token": oversized, "i2p.router.version": true}),
+            Some(RequestId::Number(1)),
+        );
+        let err = authenticate_protected_request(&state, &HeaderMap::new(), &req).unwrap_err();
+        assert_eq!(err.error.code, rpc::error_codes::INVALID_TOKEN);
+        assert_eq!(err.error.message, rpc::error_codes::INVALID_TOKEN_MESSAGE);
+        assert!(!err.error.message.contains(&oversized));
+    }
+
+    #[tokio::test]
+    async fn valid_header_only_params_only_and_equal_both_still_work() {
+        let state = I2pControlState::new_test("testpass".to_string());
+        let token = state.token_service().issue();
+
+        // Params-only.
+        let params_only = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"Token": token, "i2p.router.version": true}),
+            Some(RequestId::Number(1)),
+        );
+        assert!(authenticate_protected_request(&state, &HeaderMap::new(), &params_only).is_ok());
+
+        // Header-only.
+        let mut headers = HeaderMap::new();
+        headers.insert("X-I2PControl-Token", token.parse().unwrap());
+        let header_only = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"i2p.router.version": true}),
+            Some(RequestId::Number(2)),
+        );
+        assert!(authenticate_protected_request(&state, &headers, &header_only).is_ok());
+
+        // Equal header + params.
+        let both = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"Token": token, "i2p.router.version": true}),
+            Some(RequestId::Number(3)),
+        );
+        assert!(authenticate_protected_request(&state, &headers, &both).is_ok());
+    }
+
+    #[tokio::test]
+    async fn live_issued_token_authorizes_before_expiry() {
+        let state = I2pControlState::new_test("testpass".to_string());
+        let token = state.token_service().issue();
+        let req = request(
+            rpc::methods::ROUTER_INFO,
+            serde_json::json!({"Token": token, "i2p.router.version": true}),
+            Some(RequestId::Number(1)),
+        );
+        let sanitized = authenticate_protected_request(&state, &HeaderMap::new(), &req)
+            .expect("fresh token must authorize");
+        assert!(!sanitized.params.as_ref().unwrap().contains_key("Token"));
     }
 }

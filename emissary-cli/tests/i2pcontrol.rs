@@ -124,12 +124,13 @@ fn parse_json_array_returns_error() {
 /// Token service issue/validate cycle.
 #[test]
 fn token_service_basic() {
+    use emissary_cli::i2pcontrol::auth::TokenValidation;
     let svc = emissary_cli::i2pcontrol::auth::TokenService::new();
     let token = svc.issue();
-    assert!(svc.validate(&token));
-    assert!(!svc.validate("invalid"));
+    assert_eq!(svc.validate(&token), TokenValidation::Valid);
+    assert_eq!(svc.validate("invalid"), TokenValidation::Unknown);
     svc.invalidate(&token);
-    assert!(!svc.validate(&token));
+    assert_eq!(svc.validate(&token), TokenValidation::Unknown);
 }
 
 /// Token service clears on restart.

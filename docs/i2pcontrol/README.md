@@ -1,6 +1,6 @@
 # I2PControl for Emissary
 
-Status: partial Proposal 170 support; M095-M096, M098-M103, and M107 closed; M097 and M104 closed as blocked; M126 current-head requalification closed; residual option blocker remains
+Status: partial Proposal 170 support; M095-M096, M098-M103, and M107 closed; M097 and M104 closed as blocked; M126 historical requalification closed; M127 token-lifetime corrective closed; residual option blocker remains
 
 Proposal 170 remains **Open**. This documentation is pinned to the revision
 created and last updated on `2026-05-20`.
@@ -176,12 +176,19 @@ Authentication failures use the I2PControl-specific error inventory:
 - invalid password: `-32001`;
 - missing token: `-32002`;
 - unknown token: `-32003`;
-- expired token: `-32004` when applicable;
+- expired token: `-32004` on first use after expiry;
 - missing API version: `-32005`;
 - unsupported API version: `-32006`.
 
-Tokens are cryptographically random, bounded, in-memory only, and invalidated
-on process restart.
+Tokens are cryptographically random, bounded (1024 live entries, deterministic
+oldest eviction), in-memory only, and invalidated on process restart. Every
+issued token has finite monotonic in-process validity of one day
+(`TOKEN_LIFETIME`; reference-compatible). The first protected use after
+expiry atomically removes the token and returns `-32004`; later uses of the
+same value return `-32003` and clients must re-authenticate. Presented
+credentials over 256 bytes fail as unknown without echo or unbounded
+allocation. M127 supersedes only M126's affected authentication-lifetime
+qualification claim; M126 history is otherwise unchanged.
 
 JSON-RPC notifications execute validation and side effects but suppress the
 response. An explicit `id: null` remains a request ID rather than a

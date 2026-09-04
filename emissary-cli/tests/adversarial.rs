@@ -396,22 +396,24 @@ fn password_timing_resistance() {
 
 #[test]
 fn token_service_issue_and_validate() {
+    use emissary_cli::i2pcontrol::auth::TokenValidation;
     let _svc = rpc::RequestId::Number(1); // placeholder
     let token_svc = emissary_cli::i2pcontrol::auth::TokenService::new();
     let token1 = token_svc.issue();
     let token2 = token_svc.issue();
     assert_ne!(token1, token2, "tokens must be unique");
-    assert!(token_svc.validate(&token1));
-    assert!(token_svc.validate(&token2));
+    assert_eq!(token_svc.validate(&token1), TokenValidation::Valid);
+    assert_eq!(token_svc.validate(&token2), TokenValidation::Valid);
 }
 
 #[test]
 fn token_invalidation() {
+    use emissary_cli::i2pcontrol::auth::TokenValidation;
     let token_svc = emissary_cli::i2pcontrol::auth::TokenService::new();
     let token = token_svc.issue();
-    assert!(token_svc.validate(&token));
+    assert_eq!(token_svc.validate(&token), TokenValidation::Valid);
     token_svc.invalidate(&token);
-    assert!(!token_svc.validate(&token));
+    assert_eq!(token_svc.validate(&token), TokenValidation::Unknown);
 }
 
 #[test]
@@ -427,10 +429,14 @@ fn token_clear_on_restart() {
 
 #[test]
 fn invalid_token_rejected() {
+    use emissary_cli::i2pcontrol::auth::TokenValidation;
     let token_svc = emissary_cli::i2pcontrol::auth::TokenService::new();
-    assert!(!token_svc.validate("invalid-token"));
-    assert!(!token_svc.validate(""));
-    assert!(!token_svc.validate("abc123"));
+    assert_eq!(
+        token_svc.validate("invalid-token"),
+        TokenValidation::Unknown
+    );
+    assert_eq!(token_svc.validate(""), TokenValidation::Unknown);
+    assert_eq!(token_svc.validate("abc123"), TokenValidation::Unknown);
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -736,6 +742,7 @@ fn selector_with_trailing_space() {
 fn token_service_concurrent_access() {
     use std::{sync::Arc, thread};
 
+    use emissary_cli::i2pcontrol::auth::TokenValidation;
     let svc = Arc::new(emissary_cli::i2pcontrol::auth::TokenService::new());
     let mut handles = vec![];
 
@@ -744,9 +751,9 @@ fn token_service_concurrent_access() {
         handles.push(thread::spawn(move || {
             for _ in 0..100 {
                 let token = svc.issue();
-                assert!(svc.validate(&token));
+                assert_eq!(svc.validate(&token), TokenValidation::Valid);
                 svc.invalidate(&token);
-                assert!(!svc.validate(&token));
+                assert_eq!(svc.validate(&token), TokenValidation::Unknown);
             }
         }));
     }

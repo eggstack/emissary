@@ -1,6 +1,8 @@
 # M136 — M132 Corrective: SAM Idle Reduction and Proposal Reduce Completion
 
-Status: **dependency-ready / unregistered; M135 gate satisfied, registers on its own step**
+Status: **closed as complete**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/136-closure.md`
 
 M135 closure `plans/closure/i2pcontrol-proposal-170/135-closure.md` proves all
 §2 gate items (destination-scoped update/restore, immutable base,

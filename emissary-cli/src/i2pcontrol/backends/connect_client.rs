@@ -21,12 +21,11 @@ use super::{
 };
 use crate::i2pcontrol::{
     address_book_runtime::RuntimeAddressBookHandle,
-    client_secret_store::ClientDestinationStore,
     backends::runtime::{
         client_lifecycle_config, ClientConnectionHandler, ClientLifecycleConfig,
-        ClientListenerRuntimeConfig,
-        ClientListenerRuntimeError,
+        ClientListenerRuntimeConfig, ClientListenerRuntimeError,
     },
+    client_secret_store::ClientDestinationStore,
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
 };
 use yosemite_i2pcontrol::SessionOptions;
@@ -269,28 +268,30 @@ impl RuntimeSupervisor {
         let handler = make_handler(config.clone());
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
-            let result = std::panic::AssertUnwindSafe(super::runtime::run_client_listener_with_shared_session(
-                ClientListenerRuntimeConfig {
-                    name: config.name,
-                    bind_address: config.bind_address,
-                    port: config.port,
-                    destination: "unused-connectclient-destination".to_owned(),
-                    destination_port: 1,
-                    sam_tcp_port: config.sam_tcp_port,
-                    session_options: config.session_options,
-                    delay_open: config.delay_open,
-                    connect_delay: config.lifecycle.connect_delay,
-                    close_on_idle: config.lifecycle.close_on_idle,
-                    close_idle_time: config.lifecycle.close_idle_time,
-                    new_dest_on_resume: config.lifecycle.new_dest_on_resume,
-                    max_connections: MAX_CONNECTIONS,
-                    handler,
-                },
-                ready_cancellation.clone(),
-                ready_tx,
-                shared_registry,
-                shared,
-            ))
+            let result = std::panic::AssertUnwindSafe(
+                super::runtime::run_client_listener_with_shared_session(
+                    ClientListenerRuntimeConfig {
+                        name: config.name,
+                        bind_address: config.bind_address,
+                        port: config.port,
+                        destination: "unused-connectclient-destination".to_owned(),
+                        destination_port: 1,
+                        sam_tcp_port: config.sam_tcp_port,
+                        session_options: config.session_options,
+                        delay_open: config.delay_open,
+                        connect_delay: config.lifecycle.connect_delay,
+                        close_on_idle: config.lifecycle.close_on_idle,
+                        close_idle_time: config.lifecycle.close_idle_time,
+                        new_dest_on_resume: config.lifecycle.new_dest_on_resume,
+                        max_connections: MAX_CONNECTIONS,
+                        handler,
+                    },
+                    ready_cancellation.clone(),
+                    ready_tx,
+                    shared_registry,
+                    shared,
+                ),
+            )
             .catch_unwind()
             .await
             .unwrap_or(Err(ClientListenerRuntimeError::Panicked));
@@ -723,11 +724,15 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "StartOnLoad",
         "DelayOpen",
         "ConnectDelay",
+        "Reduce",
+        "ReduceCount",
+        "ReduceTime",
         "Shared",
         "PersistentClientKey",
         "PrivKeyFile",
     ];
     // M121: "Close", "CloseTime", and "NewDest" demoted to blocked_primitive.
+    // M136: "Reduce"/"ReduceCount"/"ReduceTime" supported via idle owner.
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
             continue;

@@ -1,6 +1,6 @@
 # M137 — M133 Corrective: SAM Idle Close and Reasoned Termination
 
-Status: **deferred / unregistered; hard-depends on successful M136 closure**
+Status: **dependency-ready / unregistered; M136 gate satisfied, registers on its own step**
 
 Class: corrective implementation / neutral lifecycle close + I2PControl consumer
 

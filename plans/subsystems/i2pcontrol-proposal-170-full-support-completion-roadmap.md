@@ -1,14 +1,15 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M135 closed as complete, M136 dependency-ready**
+Status: **active / partial; M135/M136 closed as complete, M137 dependency-ready**
 
 Current handoff:
 
-- M136 `plans/implementation/i2pcontrol-proposal-170/136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md` — **dependency-ready / unregistered** (M135 gate satisfied; registers on its own step).
+- M137 `plans/implementation/i2pcontrol-proposal-170/137-m133-corrective-sam-idle-close-and-reasoned-termination.md` — **dependency-ready / unregistered** (M136 gate satisfied; registers on its own step).
 
-Closed corrective primitive:
+Closed correctives:
 
-- M135 closed as complete (`plans/closure/i2pcontrol-proposal-170/135-closure.md`), zero promotions.
+- M135 closed as complete (`plans/closure/i2pcontrol-proposal-170/135-closure.md`), zero promotions;
+- M136 closed as complete (`plans/closure/i2pcontrol-proposal-170/136-closure.md`), 21 `Reduce*` promotions.
 
 Focused lifecycle roadmap:
 
@@ -16,8 +17,7 @@ Focused lifecycle roadmap:
 
 Corrective successors already planned but unregistered:
 
-- M136 `136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md` — hard-depends on M135;
-- M137 `137-m133-corrective-sam-idle-close-and-reasoned-termination.md` — hard-depends on M136.
+- M137 `137-m133-corrective-sam-idle-close-and-reasoned-termination.md` — dependency-ready; hard-depended on M136 (now satisfied).
 
 Historical lifecycle attempts:
 
@@ -29,8 +29,8 @@ Current authorities:
 
 - runtime/security qualification: M130 closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
 - residual applicability/primitive authority: M131 closure `plans/closure/i2pcontrol-proposal-170/131-closure.md` and `131-residual-primitive-map.toml`;
-- current matrix: `284 apply / 88 blocked_primitive / 468 not_applicable`;
-- current pre-M135 corrective baseline: `517decf733352dfc2bf24ad349c5ab4cf9315742`.
+- current matrix: `305 apply / 67 blocked_primitive / 468 not_applicable`;
+- M136 closure: `plans/closure/i2pcontrol-proposal-170/136-closure.md`.
 
 Pinned external authority:
 

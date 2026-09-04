@@ -1,6 +1,6 @@
 # Proposal 170 Session-Lifecycle Completion Roadmap
 
-Status: **active / partial; M135 closed as complete, M136 dependency-ready**
+Status: **active / partial; M135/M136 closed as complete, M137 dependency-ready**
 
 Parent roadmap:
 
@@ -8,15 +8,16 @@ Parent roadmap:
 
 Current handoff:
 
-- M136 `plans/implementation/i2pcontrol-proposal-170/136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md` — **dependency-ready / unregistered** (M135 gate satisfied; registers on its own step).
+- M137 `plans/implementation/i2pcontrol-proposal-170/137-m133-corrective-sam-idle-close-and-reasoned-termination.md` — **dependency-ready / unregistered** (M136 gate satisfied; registers on its own step).
 
-Closed corrective primitive:
+Closed correctives:
 
-- M135 `plans/implementation/i2pcontrol-proposal-170/135-neutral-live-tunnel-quantity-and-leaseset-reconfiguration-primitive.md` — **closed as complete** (`plans/closure/i2pcontrol-proposal-170/135-closure.md`), zero promotions, matrix `284/88/468` unchanged.
+- M135 `plans/implementation/i2pcontrol-proposal-170/135-neutral-live-tunnel-quantity-and-leaseset-reconfiguration-primitive.md` — **closed as complete** (`plans/closure/i2pcontrol-proposal-170/135-closure.md`), zero promotions, matrix `284/88/468` at closure;
+- M136 `plans/implementation/i2pcontrol-proposal-170/136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md` — **closed as complete** (`plans/closure/i2pcontrol-proposal-170/136-closure.md`), 21 promotions, matrix `305/67/468`.
 
 Deferred corrective successors:
 
-- M136 — dependency-ready/unregistered; M135 closure satisfies its gate;
+- M137 — dependency-ready/unregistered; M136 closure satisfies its gate;
 - M137 `137-m133-corrective-sam-idle-close-and-reasoned-termination.md` — deferred/unregistered; hard-depends on successful M136 closure;
 - M134 `134-newdest-on-proven-idle-resume.md` — historical deferred plan; must be explicitly rebased/amended after M137 or superseded by a corrective M138.
 
@@ -27,8 +28,7 @@ Failed/blocked predecessor evidence:
 
 Planning baseline:
 
-- current pre-corrective head `517decf733352dfc2bf24ad349c5ab4cf9315742`;
-- current matrix `284 apply / 88 blocked_primitive / 468 not_applicable`;
+- M136 closure matrix `305 apply / 67 blocked_primitive / 468 not_applicable`;
 - M130 remains implemented-subset runtime/security authority;
 - M131 remains residual applicability/primitive authority.
 

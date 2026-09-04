@@ -4,11 +4,7 @@
 //! tunnel options and Yosemite's `SessionOptions`. It intentionally exposes
 //! no Proposal 170 types to the router or core crates.
 
-use std::{
-    collections::BTreeMap,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use parking_lot::Mutex;
 use tokio::sync::{broadcast, mpsc, oneshot, Notify};
@@ -23,6 +19,17 @@ type StreamSession = Arc<Mutex<Session<style::Stream>>>;
 const DATAGRAM_BUFFER_SIZE: usize = 4095;
 const MAX_CONNECT_DELAY: u64 = 60_000;
 const DEFAULT_CLOSE_IDLE_TIME: Duration = Duration::from_secs(30 * 60);
+
+/// Reference idle-reduction defaults frozen from I2CP/Java evidence.
+///
+/// - default reduction delay 20 minutes (1200000 ms);
+/// - minimum reduction delay 5 minutes (300000 ms);
+/// - default reduced quantity 1, coerced to at least 1 in core.
+const REDUCE_DEFAULT_IDLE_TIME_MS: u64 = 1_200_000;
+const REDUCE_MIN_IDLE_TIME_MS: u64 = 300_000;
+const REDUCE_DEFAULT_QUANTITY: u64 = 1;
+/// Proposal-valid reduced quantity range, matching `TunnelQuantity` 1..6.
+const REDUCE_MAX_QUANTITY: u64 = 6;
 
 /// Generation-local lifecycle controls for streaming client listeners.
 ///
@@ -136,9 +143,7 @@ impl SharedDatagramSession {
             })
             .await
             .map_err(|_| "shared datagram session is closed".to_owned())?;
-        receiver
-            .await
-            .map_err(|_| "shared datagram session is closed".to_owned())?
+        receiver.await.map_err(|_| "shared datagram session is closed".to_owned())?
     }
 }
 
@@ -277,7 +282,9 @@ impl SharedClientSessionRegistry {
                 if let Some(entry) = state.entries.get_mut(&key) {
                     if let Some(SessionHandle::Stream(session)) = &entry.session {
                         if entry.members >= MAX_SHARED_MEMBERS {
-                            return Err("shared client session member capacity exhausted".to_string());
+                            return Err(
+                                "shared client session member capacity exhausted".to_string()
+                            );
                         }
                         entry.members += 1;
                         return Ok(SharedStreamSessionLease {
@@ -359,7 +366,9 @@ impl SharedClientSessionRegistry {
                 if let Some(entry) = state.entries.get_mut(&key) {
                     if let Some(SessionHandle::Datagram(session)) = &entry.session {
                         if entry.members >= MAX_SHARED_MEMBERS {
-                            return Err("shared client session member capacity exhausted".to_string());
+                            return Err(
+                                "shared client session member capacity exhausted".to_string()
+                            );
                         }
                         entry.members += 1;
                         return Ok(SharedDatagramSessionLease {
@@ -433,7 +442,9 @@ impl SharedClientSessionRegistry {
     fn cancel_creation(&self, key: &CompatibilityKey) {
         let notify = {
             let mut state = self.state.lock();
-            let Some(entry) = state.entries.get(key) else { return };
+            let Some(entry) = state.entries.get(key) else {
+                return;
+            };
             if !entry.creating || entry.session.is_some() {
                 return;
             }
@@ -447,7 +458,9 @@ impl SharedClientSessionRegistry {
     fn release(&self, key: &CompatibilityKey) {
         let session = {
             let mut state = self.state.lock();
-            let Some(entry) = state.entries.get_mut(key) else { return };
+            let Some(entry) = state.entries.get_mut(key) else {
+                return;
+            };
             entry.members = entry.members.saturating_sub(1);
             if entry.members == 0 && !entry.creating {
                 state.entries.remove(key).and_then(|entry| entry.session)
@@ -541,9 +554,12 @@ pub(crate) async fn build_client_session_options(
                 message: "client destination owner unavailable".to_string(),
             });
         };
-        store.active(definition.name.as_str()).await.map_err(|_| BackendError::Internal {
-            message: "client destination owner unavailable".to_string(),
-        })?
+        store
+            .active(definition.name.as_str())
+            .await
+            .map_err(|_| BackendError::Internal {
+                message: "client destination owner unavailable".to_string(),
+            })?
     } else {
         None
     };
@@ -553,6 +569,119 @@ pub(crate) async fn build_client_session_options(
         }
     });
     build_session_options(definition, sam_tcp_port, false, destination)
+}
+
+/// Validated Proposal idle-reduction policy for one definition.
+///
+/// `None` means reduction disabled (no timer/work). `Some` carries the exact
+/// standard `i2cp.reduce*` values to serialize via Yosemite's validated
+/// generic additional-session-option path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ReducePolicy {
+    idle_time_ms: u64,
+    quantity: u64,
+}
+
+/// Parse and validate Proposal `Reduce`/`ReduceTime`/`ReduceCount`.
+///
+/// Frozen semantics (M095/M105 + pinned Proposal + Java/I2CP reference):
+/// - `Reduce` boolean is the master switch; absent or `false` disables;
+/// - `ReduceTime` duration in milliseconds, minimum 300000, default
+///   1200000 when `Reduce` is true and the field is absent;
+/// - `ReduceCount` integer quantity 1..=6 (matching `TunnelQuantity`),
+///   default 1 when `Reduce` is true and the field is absent;
+/// - `ReduceTime`/`ReduceCount` without `Reduce=true` fail before
+///   allocation (no silent enable, no accept-inert ignore);
+/// - server families reject any `Reduce*` presence (not applicable);
+/// - malformed types fail before allocation.
+///
+/// Core remains fail-safe for non-I2PControl SAM input, but I2PControl
+/// enforces Proposal-valid values here before listener/session allocation.
+fn parse_reduce_policy(definition: &TunnelDefinition) -> BackendResult<Option<ReducePolicy>> {
+    let tunnel_type = definition.tunnel_type;
+    let has_reduce = definition.raw_config.contains_key("Reduce");
+    let has_count = definition.raw_config.contains_key("ReduceCount");
+    let has_time = definition.raw_config.contains_key("ReduceTime");
+
+    if !tunnel_type.is_client() {
+        if has_reduce || has_count || has_time {
+            let option = if has_reduce {
+                "Reduce"
+            } else if has_count {
+                "ReduceCount"
+            } else {
+                "ReduceTime"
+            };
+            return Err(BackendError::UnsupportedOption {
+                tunnel_type,
+                option: option.to_owned(),
+            });
+        }
+        return Ok(None);
+    }
+
+    let enabled = match definition.raw_config.get("Reduce") {
+        None => false,
+        Some(value) => value.as_bool().ok_or_else(|| BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "Reduce".to_owned(),
+        })?,
+    };
+
+    if !enabled {
+        if has_time {
+            return Err(BackendError::UnsupportedOption {
+                tunnel_type,
+                option: "ReduceTime".to_owned(),
+            });
+        }
+        if has_count {
+            return Err(BackendError::UnsupportedOption {
+                tunnel_type,
+                option: "ReduceCount".to_owned(),
+            });
+        }
+        return Ok(None);
+    }
+
+    let quantity = match definition.raw_config.get("ReduceCount") {
+        None => REDUCE_DEFAULT_QUANTITY,
+        Some(value) => {
+            let parsed = value.as_u64().ok_or_else(|| BackendError::UnsupportedOption {
+                tunnel_type,
+                option: "ReduceCount".to_owned(),
+            })?;
+            if !(1..=REDUCE_MAX_QUANTITY).contains(&parsed) {
+                return Err(BackendError::UnsupportedOption {
+                    tunnel_type,
+                    option: "ReduceCount".to_owned(),
+                });
+            }
+            parsed
+        }
+    };
+
+    let idle_time_ms = match definition.raw_config.get("ReduceTime") {
+        None => REDUCE_DEFAULT_IDLE_TIME_MS,
+        Some(value) => {
+            let parsed = value.as_u64().ok_or_else(|| BackendError::UnsupportedOption {
+                tunnel_type,
+                option: "ReduceTime".to_owned(),
+            })?;
+            if parsed < REDUCE_MIN_IDLE_TIME_MS {
+                return Err(BackendError::UnsupportedOption {
+                    tunnel_type,
+                    option: "ReduceTime".to_owned(),
+                });
+            }
+            parsed
+        }
+    };
+
+    Ok(Some(ReducePolicy {
+        idle_time_ms,
+        quantity,
+    }))
 }
 
 /// Build the Yosemite session settings for one validated definition.
@@ -567,6 +696,22 @@ pub fn build_session_options(
     destination: DestinationKind,
 ) -> BackendResult<SessionOptions> {
     validate_common_options(definition.tunnel_type, &definition.options).map_err(option_error)?;
+
+    // M121 §5.2 remains authoritative: `Close`/`CloseTime` are blocked for
+    // every family, including Streamr which bypasses `client_lifecycle_config`.
+    // M136 must not close a session; M137 owns close semantics.
+    if definition.raw_config.contains_key("Close") {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type: definition.tunnel_type,
+            option: "Close".to_owned(),
+        });
+    }
+    if definition.raw_config.contains_key("CloseTime") {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type: definition.tunnel_type,
+            option: "CloseTime".to_owned(),
+        });
+    }
 
     if definition.options.tunnel_length.is_some_and(|value| value > 3) {
         return Err(BackendError::UnsupportedOption {
@@ -610,6 +755,36 @@ pub fn build_session_options(
 
     apply_session_wire_options(&mut options, &definition.options, definition.tunnel_type)?;
 
+    // M136: map validated Proposal `Reduce*` through Yosemite's existing
+    // validated generic additional-session-option path. No Yosemite change,
+    // no raw SAM command construction.
+    if let Some(policy) = parse_reduce_policy(definition)? {
+        options
+            .add_session_option("i2cp.reduceOnIdle".to_owned(), "true".to_owned())
+            .map_err(|_| BackendError::UnsupportedOption {
+                tunnel_type: definition.tunnel_type,
+                option: "Reduce".to_owned(),
+            })?;
+        options
+            .add_session_option(
+                "i2cp.reduceIdleTime".to_owned(),
+                policy.idle_time_ms.to_string(),
+            )
+            .map_err(|_| BackendError::UnsupportedOption {
+                tunnel_type: definition.tunnel_type,
+                option: "ReduceTime".to_owned(),
+            })?;
+        options
+            .add_session_option(
+                "i2cp.reduceQuantity".to_owned(),
+                policy.quantity.to_string(),
+            )
+            .map_err(|_| BackendError::UnsupportedOption {
+                tunnel_type: definition.tunnel_type,
+                option: "ReduceCount".to_owned(),
+            })?;
+    }
+
     Ok(options)
 }
 
@@ -629,10 +804,11 @@ pub(crate) fn apply_session_wire_options(
         options.outbound_backup_quantity = value as usize;
     }
     if let Some(value) = &tunnel_options.sig_type {
-        options.signature_type = value.parse::<u16>().map_err(|_| BackendError::UnsupportedOption {
-            tunnel_type,
-            option: "SigType".to_owned(),
-        })?;
+        options.signature_type =
+            value.parse::<u16>().map_err(|_| BackendError::UnsupportedOption {
+                tunnel_type,
+                option: "SigType".to_owned(),
+            })?;
     }
     for (key, value) in &tunnel_options.custom_options {
         options.add_session_option(key.clone(), value.clone()).map_err(|_| {
@@ -708,12 +884,7 @@ pub(crate) fn client_lifecycle_config(
         return Ok(ClientLifecycleConfig::DISABLED);
     }
 
-    let connect_delay = raw_duration(
-        definition,
-        "ConnectDelay",
-        0,
-        MAX_CONNECT_DELAY,
-    )?;
+    let connect_delay = raw_duration(definition, "ConnectDelay", 0, MAX_CONNECT_DELAY)?;
     // M121 §5.2 demotion: reference closeOnIdle observes I2P-session activity
     // (bytes/messages), not accepted local TCP handler count, and Yosemite
     // exposes no session-activity observation primitive. Fail closed.
@@ -824,9 +995,8 @@ mod tests {
         for value in ["7", "07", "1", "0", "11", "EdDSA_SHA512_Ed25519", ""] {
             let mut definition = definition();
             definition.options.sig_type = Some(value.to_owned());
-            let error =
-                build_session_options(&definition, 7656, false, DestinationKind::Transient)
-                    .unwrap_err();
+            let error = build_session_options(&definition, 7656, false, DestinationKind::Transient)
+                .unwrap_err();
             assert!(
                 matches!(error, BackendError::UnsupportedOption { option, .. } if option == "SigType"),
                 "SigType {value:?} must fail before allocation"
@@ -883,7 +1053,10 @@ mod tests {
                 &new_dest_def.options,
             )
             .unwrap_err();
-            assert_eq!(error.to_string(), format!("{tunnel_type} does not support option NewDest"));
+            assert_eq!(
+                error.to_string(),
+                format!("{tunnel_type} does not support option NewDest")
+            );
         }
     }
 
@@ -901,8 +1074,7 @@ mod tests {
 
         definition.options.use_ssl = Some(true);
         assert!(
-            build_session_options(&definition, 7656, false, DestinationKind::Transient)
-                .is_err()
+            build_session_options(&definition, 7656, false, DestinationKind::Transient).is_err()
         );
     }
 
@@ -911,9 +1083,7 @@ mod tests {
         // ConnectDelay remains applied; Close/CloseTime/NewDest are M121
         // demoted: any supplied value fails before allocation.
         let mut valid = definition();
-        valid
-            .raw_config
-            .insert("ConnectDelay".to_owned(), serde_json::json!(60_000));
+        valid.raw_config.insert("ConnectDelay".to_owned(), serde_json::json!(60_000));
         let lifecycle = client_lifecycle_config(&valid).unwrap();
         assert_eq!(lifecycle.connect_delay, Some(Duration::from_secs(60)));
         assert!(!lifecycle.close_on_idle);
@@ -962,9 +1132,7 @@ mod tests {
         ));
 
         let mut shared_close = definition();
-        shared_close
-            .raw_config
-            .insert("Close".to_owned(), serde_json::json!(true));
+        shared_close.raw_config.insert("Close".to_owned(), serde_json::json!(true));
         shared_close.options.shared = Some(true);
         assert!(matches!(
             client_lifecycle_config(&shared_close),
@@ -1028,10 +1196,7 @@ mod tests {
             let mut line = String::new();
             reader.read_line(&mut line).await.unwrap();
             assert_eq!(line, "HELLO VERSION\n");
-            write_half
-                .write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n")
-                .await
-                .unwrap();
+            write_half.write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n").await.unwrap();
             line.clear();
             reader.read_line(&mut line).await.unwrap();
             command_tx.send(line).unwrap();
@@ -1079,10 +1244,7 @@ mod tests {
             let mut line = String::new();
             reader.read_line(&mut line).await.unwrap();
             assert_eq!(line, "HELLO VERSION\n");
-            write_half
-                .write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n")
-                .await
-                .unwrap();
+            write_half.write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n").await.unwrap();
             line.clear();
             reader.read_line(&mut line).await.unwrap();
             command_tx.send(line).unwrap();
@@ -1382,5 +1544,346 @@ mod tests {
         );
         drop(CreationReservation::new(registry.clone(), key));
         assert_eq!(registry.session_count(), 0);
+    }
+
+    fn reduce_definition(
+        tunnel_type: TunnelType,
+        entries: &[(&str, serde_json::Value)],
+    ) -> TunnelDefinition {
+        TunnelDefinition {
+            name: TunnelName::new("reduce-test").unwrap(),
+            tunnel_type,
+            ownership: TunnelOwnership::ControlPlane,
+            runtime_state: TunnelRuntimeState::Stopped,
+            start_intent: StartIntent::DoNotStart,
+            options: TunnelOptions::default(),
+            raw_config: entries.iter().map(|(k, v)| (k.to_string(), v.clone())).collect(),
+        }
+    }
+
+    #[test]
+    fn m136_reduce_absent_or_false_is_disabled_without_wire() {
+        for tunnel_type in [
+            TunnelType::Client,
+            TunnelType::HttpClient,
+            TunnelType::IrcClient,
+            TunnelType::Socks,
+            TunnelType::SocksIrc,
+            TunnelType::ConnectClient,
+            TunnelType::StreamrClient,
+        ] {
+            let absent = reduce_definition(tunnel_type, &[]);
+            assert!(parse_reduce_policy(&absent).unwrap().is_none());
+            let options =
+                build_session_options(&absent, 7656, false, DestinationKind::Transient).unwrap();
+            assert!(options.additional_options.is_empty());
+
+            let disabled = reduce_definition(tunnel_type, &[("Reduce", serde_json::json!(false))]);
+            assert!(parse_reduce_policy(&disabled).unwrap().is_none());
+            let options =
+                build_session_options(&disabled, 7656, false, DestinationKind::Transient).unwrap();
+            assert!(options.additional_options.is_empty());
+        }
+    }
+
+    #[test]
+    fn m136_reduce_true_maps_defaults_through_generic_path() {
+        let def = reduce_definition(TunnelType::Client, &[("Reduce", serde_json::json!(true))]);
+        let policy = parse_reduce_policy(&def).unwrap().expect("enabled");
+        assert_eq!(policy.idle_time_ms, REDUCE_DEFAULT_IDLE_TIME_MS);
+        assert_eq!(policy.quantity, REDUCE_DEFAULT_QUANTITY);
+
+        let options = build_session_options(&def, 7656, false, DestinationKind::Transient).unwrap();
+        let keys: Vec<_> = options
+            .additional_options
+            .iter()
+            .map(|o| (o.key().to_owned(), o.value().to_owned()))
+            .collect();
+        assert!(keys.contains(&("i2cp.reduceOnIdle".to_owned(), "true".to_owned())));
+        assert!(keys.contains(&(
+            "i2cp.reduceIdleTime".to_owned(),
+            REDUCE_DEFAULT_IDLE_TIME_MS.to_string()
+        )));
+        assert!(keys.contains(&(
+            "i2cp.reduceQuantity".to_owned(),
+            REDUCE_DEFAULT_QUANTITY.to_string()
+        )));
+    }
+
+    #[test]
+    fn m136_reduce_true_with_custom_valid_time_and_count() {
+        let def = reduce_definition(
+            TunnelType::Client,
+            &[
+                ("Reduce", serde_json::json!(true)),
+                ("ReduceTime", serde_json::json!(600_000)),
+                ("ReduceCount", serde_json::json!(2)),
+            ],
+        );
+        let policy = parse_reduce_policy(&def).unwrap().expect("enabled");
+        assert_eq!(policy.idle_time_ms, 600_000);
+        assert_eq!(policy.quantity, 2);
+
+        let options = build_session_options(&def, 7656, false, DestinationKind::Transient).unwrap();
+        let map: std::collections::BTreeMap<_, _> = options
+            .additional_options
+            .iter()
+            .map(|o| (o.key().to_owned(), o.value().to_owned()))
+            .collect();
+        assert_eq!(
+            map.get("i2cp.reduceIdleTime").map(String::as_str),
+            Some("600000")
+        );
+        assert_eq!(
+            map.get("i2cp.reduceQuantity").map(String::as_str),
+            Some("2")
+        );
+    }
+
+    #[test]
+    fn m136_reduce_time_or_count_without_reduce_fails_before_allocation() {
+        use TunnelType::*;
+        for tunnel_type in [
+            Client,
+            HttpClient,
+            IrcClient,
+            Socks,
+            SocksIrc,
+            ConnectClient,
+            StreamrClient,
+        ] {
+            for (key, value) in [
+                ("ReduceTime", serde_json::json!(600_000)),
+                ("ReduceCount", serde_json::json!(1)),
+            ] {
+                let def = reduce_definition(tunnel_type, &[(key, value)]);
+                let err = parse_reduce_policy(&def).unwrap_err();
+                assert!(
+                    matches!(err, BackendError::UnsupportedOption { ref option, .. } if option == key),
+                    "{tunnel_type} {key} without Reduce must fail"
+                );
+                assert!(matches!(
+                    build_session_options(&def, 7656, false, DestinationKind::Transient),
+                    Err(BackendError::UnsupportedOption { option, .. }) if option == key
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn m136_malformed_reduce_values_fail_before_allocation() {
+        // Reduce must be boolean.
+        for value in [
+            serde_json::json!("true"),
+            serde_json::json!(1),
+            serde_json::json!(null),
+        ] {
+            let def = reduce_definition(TunnelType::Client, &[("Reduce", value)]);
+            assert!(matches!(
+                parse_reduce_policy(&def),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "Reduce"
+            ));
+        }
+        // ReduceCount must be 1..=6.
+        for value in [
+            serde_json::json!(0),
+            serde_json::json!(7),
+            serde_json::json!(9999),
+            serde_json::json!(-1),
+            serde_json::json!("1"),
+            serde_json::json!(1.5),
+        ] {
+            let def = reduce_definition(
+                TunnelType::Client,
+                &[("Reduce", serde_json::json!(true)), ("ReduceCount", value)],
+            );
+            assert!(matches!(
+                parse_reduce_policy(&def),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "ReduceCount"
+            ));
+        }
+        // ReduceTime must be u64 >= 300000.
+        for value in [
+            serde_json::json!(0),
+            serde_json::json!(299_999),
+            serde_json::json!(-1),
+            serde_json::json!("600000"),
+            serde_json::json!(600_000.5),
+        ] {
+            let def = reduce_definition(
+                TunnelType::Client,
+                &[("Reduce", serde_json::json!(true)), ("ReduceTime", value)],
+            );
+            assert!(matches!(
+                parse_reduce_policy(&def),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "ReduceTime"
+            ));
+        }
+    }
+
+    #[test]
+    fn m136_server_families_reject_reduce_as_not_applicable() {
+        use TunnelType::*;
+        for tunnel_type in [
+            Server,
+            HttpServer,
+            HttpBidirServer,
+            IrcServer,
+            StreamrServer,
+        ] {
+            for (key, value) in [
+                ("Reduce", serde_json::json!(true)),
+                ("Reduce", serde_json::json!(false)),
+                ("ReduceCount", serde_json::json!(1)),
+                ("ReduceTime", serde_json::json!(600_000)),
+            ] {
+                let def = reduce_definition(tunnel_type, &[(key, value)]);
+                assert!(parse_reduce_policy(&def).is_err());
+                assert!(
+                    build_session_options(&def, 7656, false, DestinationKind::Transient).is_err()
+                );
+            }
+            // Absent Reduce still builds (no effect, unpublished unchanged).
+            let absent = reduce_definition(tunnel_type, &[]);
+            assert!(parse_reduce_policy(&absent).unwrap().is_none());
+        }
+    }
+
+    #[test]
+    fn m136_all_seven_client_families_translate_reduce_end_to_end() {
+        use TunnelType::*;
+        for tunnel_type in [
+            Client,
+            HttpClient,
+            IrcClient,
+            Socks,
+            SocksIrc,
+            ConnectClient,
+            StreamrClient,
+        ] {
+            let def = reduce_definition(
+                tunnel_type,
+                &[
+                    ("Reduce", serde_json::json!(true)),
+                    ("ReduceTime", serde_json::json!(600_000)),
+                    ("ReduceCount", serde_json::json!(2)),
+                ],
+            );
+            let options =
+                build_session_options(&def, 7656, false, DestinationKind::Transient).unwrap();
+            let map: std::collections::BTreeMap<_, _> = options
+                .additional_options
+                .iter()
+                .map(|o| (o.key().to_owned(), o.value().to_owned()))
+                .collect();
+            assert_eq!(
+                map.get("i2cp.reduceOnIdle").map(String::as_str),
+                Some("true")
+            );
+            assert_eq!(
+                map.get("i2cp.reduceIdleTime").map(String::as_str),
+                Some("600000")
+            );
+            assert_eq!(
+                map.get("i2cp.reduceQuantity").map(String::as_str),
+                Some("2")
+            );
+        }
+    }
+
+    #[test]
+    fn m136_differing_reduce_policies_do_not_share() {
+        let base = reduce_definition(TunnelType::Client, &[("Reduce", serde_json::json!(true))]);
+        let base_options =
+            build_session_options(&base, 7656, false, DestinationKind::Transient).unwrap();
+        let different_time = reduce_definition(
+            TunnelType::Client,
+            &[
+                ("Reduce", serde_json::json!(true)),
+                ("ReduceTime", serde_json::json!(900_000)),
+            ],
+        );
+        let different_time_options =
+            build_session_options(&different_time, 7656, false, DestinationKind::Transient)
+                .unwrap();
+        let different_count = reduce_definition(
+            TunnelType::Client,
+            &[
+                ("Reduce", serde_json::json!(true)),
+                ("ReduceCount", serde_json::json!(3)),
+            ],
+        );
+        let different_count_options =
+            build_session_options(&different_count, 7656, false, DestinationKind::Transient)
+                .unwrap();
+        let disabled = reduce_definition(TunnelType::Client, &[]);
+        let disabled_options =
+            build_session_options(&disabled, 7656, false, DestinationKind::Transient).unwrap();
+
+        let base_key = compatibility_key(&base_options, "stream");
+        assert_ne!(
+            base_key,
+            compatibility_key(&different_time_options, "stream")
+        );
+        assert_ne!(
+            base_key,
+            compatibility_key(&different_count_options, "stream")
+        );
+        assert_ne!(base_key, compatibility_key(&disabled_options, "stream"));
+        // Identical policies share.
+        let same = reduce_definition(TunnelType::Client, &[("Reduce", serde_json::json!(true))]);
+        let same_options =
+            build_session_options(&same, 7656, false, DestinationKind::Transient).unwrap();
+        assert_eq!(base_key, compatibility_key(&same_options, "stream"));
+    }
+
+    #[tokio::test]
+    async fn m136_reduce_wire_uses_exact_standard_keys_without_injection() {
+        let def = reduce_definition(
+            TunnelType::Client,
+            &[
+                ("Reduce", serde_json::json!(true)),
+                ("ReduceTime", serde_json::json!(600_000)),
+                ("ReduceCount", serde_json::json!(2)),
+            ],
+        );
+        let mut options =
+            build_session_options(&def, 7656, false, DestinationKind::Transient).unwrap();
+        // Use a fresh ephemeral SAM port per attempt via the fake helper.
+        options.nickname = "m136-reduce-wire".to_owned();
+        let command = fake_sam_session_create_command(options).await;
+        assert!(command.contains("i2cp.reduceOnIdle=true"));
+        assert!(command.contains("i2cp.reduceIdleTime=600000"));
+        assert!(command.contains("i2cp.reduceQuantity=2"));
+        // No raw Proposal spelling leaks onto the wire.
+        assert!(!command.contains(" Reduce="));
+        assert!(!command.contains(" ReduceCount="));
+        assert!(!command.contains(" ReduceTime="));
+    }
+
+    #[test]
+    fn m136_close_remains_blocked_for_all_clients_including_streamr() {
+        use TunnelType::*;
+        for tunnel_type in [
+            Client,
+            HttpClient,
+            IrcClient,
+            Socks,
+            SocksIrc,
+            ConnectClient,
+            StreamrClient,
+        ] {
+            let close = reduce_definition(tunnel_type, &[("Close", serde_json::json!(true))]);
+            assert!(matches!(
+                build_session_options(&close, 7656, false, DestinationKind::Transient),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "Close"
+            ));
+            let close_time =
+                reduce_definition(tunnel_type, &[("CloseTime", serde_json::json!(600_000))]);
+            assert!(matches!(
+                build_session_options(&close_time, 7656, false, DestinationKind::Transient),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "CloseTime"
+            ));
+        }
     }
 }

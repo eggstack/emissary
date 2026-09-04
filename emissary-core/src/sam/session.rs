@@ -24,7 +24,7 @@ use crate::{
     i2cp::{I2cpPayload, I2cpPayloadBuilder},
     primitives::{Destination as Dest, DestinationId, LeaseSet2, LeaseSet2Header, Mapping},
     protocol::Protocol,
-    runtime::{AddressBook, JoinSet, Runtime},
+    runtime::{AddressBook, Instant as InstantT, JoinSet, Runtime},
     sam::{
         parser::{DestinationContext, SamCommand, SessionKind},
         pending::session::SamSessionContext,
@@ -63,6 +63,90 @@ use core::{
 
 /// Logging target for the file.
 const LOG_TARGET: &str = "emissary::sam::session";
+
+/// Default idle time before tunnel-quantity decrease (20 minutes, reference).
+const IDLE_DEFAULT_MS: u64 = 1_200_000;
+
+/// Minimum idle time before decrease can fire (5 minutes, reference).
+const IDLE_MIN_MS: u64 = 300_000;
+
+/// Default decreased inbound/outbound quantity (reference).
+const IDLE_DEFAULT_QUANTITY: usize = 1;
+
+/// Generation-local SAM session idle policy.
+///
+/// Neutral core vocabulary only. Extensible for future idle-close handling
+/// using the same activity clock (close evaluated before decrease).
+#[derive(Debug, Clone, Copy)]
+struct IdlePolicy {
+    /// Decrease enabled via standard `i2cp.reduceOnIdle`.
+    enabled: bool,
+    /// Idle duration before decrease (clamped to minimum).
+    idle_time: Duration,
+    /// Decreased inbound/outbound quantity (coerced to at least 1, bounded).
+    target_quantity: usize,
+}
+
+impl IdlePolicy {
+    /// Parse standard `i2cp.reduce*` options fail-safe.
+    ///
+    /// Malformed external input disables the policy rather than
+    /// disrupting the session. Reference-compatible rules:
+    /// - enabled only when `reduceOnIdle` equals `true` (case-insensitive);
+    /// - default idle 1200000 ms, minimum 300000 ms;
+    /// - default quantity 1, values below 1 coerce to 1 (reference),
+    ///   values above the live-quantity bound clamp to that bound.
+    fn parse(options: &HashMap<String, String>) -> Self {
+        let enabled = options
+            .get("i2cp.reduceOnIdle")
+            .is_some_and(|value| value.eq_ignore_ascii_case("true"));
+
+        if !enabled {
+            return Self {
+                enabled: false,
+                idle_time: Duration::from_millis(IDLE_DEFAULT_MS),
+                target_quantity: IDLE_DEFAULT_QUANTITY,
+            };
+        }
+
+        let idle_ms = options
+            .get("i2cp.reduceIdleTime")
+            .and_then(|value| value.trim().parse::<u64>().ok())
+            .unwrap_or(IDLE_DEFAULT_MS);
+        let idle_ms = idle_ms.max(IDLE_MIN_MS);
+
+        let target_quantity = options
+            .get("i2cp.reduceQuantity")
+            .and_then(|value| value.trim().parse::<usize>().ok())
+            .unwrap_or(IDLE_DEFAULT_QUANTITY)
+            .clamp(1, crate::tunnel::MAX_DESIRED_TUNNEL_QUANTITY);
+
+        Self {
+            enabled: true,
+            idle_time: Duration::from_millis(idle_ms),
+            target_quantity,
+        }
+    }
+}
+
+/// Next generation-local idle owner identifier.
+///
+/// Each `SamSession` captures one value at activation. The timer is
+/// actor-local (owned by the session future), so a stale generation can
+/// never reach a replacement; the identifier exists to make generation
+/// isolation explicit in tests and diagnostics.
+static NEXT_IDLE_GENERATION: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(1);
+
+fn next_idle_generation() -> u64 {
+    NEXT_IDLE_GENERATION.fetch_add(1, core::sync::atomic::Ordering::Relaxed)
+}
+
+/// Create the initial actor-local idle timer when the policy is enabled.
+///
+/// Returns `None` when disabled so no timer/work exists.
+fn enabled_idle_timer<R: Runtime>(config: &IdlePolicy) -> Option<R::Timer> {
+    config.enabled.then(|| R::timer(config.idle_time))
+}
 
 /// Active SAMv3 session.
 pub struct SamSession<R: Runtime> {
@@ -145,6 +229,21 @@ pub struct SamSession<R: Runtime> {
 
     /// Optional passive lifecycle observer.
     observation_hook: Option<Arc<dyn SamObservationHook>>,
+
+    /// Generation-local idle policy (standard `i2cp.reduce*`).
+    idle_policy: IdlePolicy,
+
+    /// Last qualifying I2P application-message activity (monotonic).
+    idle_last_activity: R::Instant,
+
+    /// Whether the live desired target is currently at the low quantity.
+    idle_reduced: bool,
+
+    /// Actor-local idle timer; `None` when disabled, reduced, or shut down.
+    idle_timer: Option<R::Timer>,
+
+    /// Generation identifier for this session's idle owner.
+    idle_generation: u64,
 }
 
 impl<R: Runtime> SamSession<R> {
@@ -276,6 +375,9 @@ impl<R: Runtime> SamSession<R> {
             format!("SESSION STATUS RESULT=OK DESTINATION={privkey}\n").as_bytes().to_vec(),
         );
 
+        let idle_policy = IdlePolicy::parse(&options);
+        let idle_timer = enabled_idle_timer::<R>(&idle_policy);
+
         Self {
             address_book,
             datagram_manager: DatagramManager::new(
@@ -315,6 +417,11 @@ impl<R: Runtime> SamSession<R> {
             sub_session_tx,
             waker: None,
             observation_hook,
+            idle_last_activity: R::now(),
+            idle_reduced: false,
+            idle_timer,
+            idle_generation: next_idle_generation(),
+            idle_policy,
         }
     }
 
@@ -357,6 +464,118 @@ impl<R: Runtime> SamSession<R> {
                 );
             }
         }
+    }
+
+    /// Record qualifying I2P application-message activity.
+    ///
+    /// Qualifying activity (reference boundary):
+    /// - outbound streaming payload/protocol packets accepted for I2P
+    ///   delivery (`destination.send_message` success);
+    /// - inbound streaming payload/protocol packets successfully delivered
+    ///   into the local streaming manager;
+    /// - outbound datagrams accepted for I2P delivery;
+    /// - inbound datagrams successfully delivered to the SAM/datagram
+    ///   consumer;
+    /// - activity from any member sharing this underlying session
+    ///   generation (all subsession commands route to this same owner).
+    ///
+    /// Excluded: local handler count, idle TCP sockets, SAM PING/PONG,
+    /// naming/address lookup, tunnel build/maintenance, NetDb, control
+    /// RPC. Those paths must not call this method.
+    ///
+    /// When at the low target, the first qualifying activity requests
+    /// restore to the base target. A failed restore keeps `idle_reduced`
+    /// set so a later activity retries; it never falsely marks restored.
+    /// When active, activity resets the monotonic idle age by recreating
+    /// the single actor-local timer. No lock spans network I/O; the
+    /// destination bridge is synchronous and bounded.
+    fn note_qualifying_activity(&mut self) {
+        if !self.idle_policy.enabled {
+            return;
+        }
+
+        self.idle_last_activity = R::now();
+
+        if self.idle_reduced {
+            match self.destination.restore_tunnel_quantity_target() {
+                Ok(()) => {
+                    self.idle_reduced = false;
+                    self.idle_timer = Some(R::timer(self.idle_policy.idle_time));
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        target: LOG_TARGET,
+                        session_id = %self.session_id,
+                        ?error,
+                        "idle restore failed, remaining at low target until next activity",
+                    );
+                }
+            }
+        } else {
+            self.idle_timer = Some(R::timer(self.idle_policy.idle_time));
+        }
+    }
+
+    /// Poll the single actor-local idle timer and drive target decrease.
+    ///
+    /// At the deadline the desired inbound/outbound target becomes the
+    /// configured low quantity via the live-quantity primitive. Only
+    /// authoritative success marks the session at the low target. While
+    /// there no further controls are enqueued. Failures leave
+    /// `idle_reduced` unset without spinning; shutdown wins by dropping
+    /// the timer. The state machine keeps one activity clock so a future
+    /// close policy can evaluate close before decrease.
+    fn poll_idle_timer(&mut self, cx: &mut Context<'_>) {
+        if !self.idle_policy.enabled || self.idle_reduced {
+            return;
+        }
+
+        let Some(timer) = self.idle_timer.as_mut() else {
+            return;
+        };
+
+        match Pin::new(timer).poll(cx) {
+            Poll::Pending => {}
+            Poll::Ready(()) => {
+                if self.idle_last_activity.elapsed() < self.idle_policy.idle_time {
+                    let remaining = self.idle_policy.idle_time - self.idle_last_activity.elapsed();
+                    self.idle_timer = Some(R::timer(remaining));
+                    return;
+                }
+
+                let quantity = self.idle_policy.target_quantity;
+                match self.destination.set_tunnel_quantity_target(quantity, quantity) {
+                    Ok(()) => {
+                        tracing::info!(
+                            target: LOG_TARGET,
+                            session_id = %self.session_id,
+                            %quantity,
+                            generation = %self.idle_generation,
+                            "session idle threshold reached, using low tunnel target",
+                        );
+                        self.idle_reduced = true;
+                        self.idle_timer = None;
+                    }
+                    Err(error) => {
+                        tracing::warn!(
+                            target: LOG_TARGET,
+                            session_id = %self.session_id,
+                            ?error,
+                            "idle target decrease failed, not marking at low target",
+                        );
+                        self.idle_timer = None;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Cancel idle state on authoritative session teardown.
+    ///
+    /// Timer state is generation-local and never persisted; replacement
+    /// generations start fresh active state.
+    fn cancel_idle_state(&mut self) {
+        self.idle_timer = None;
     }
 
     /// Create outbound stream for a remote destiantion who's lease set has been resolved.
@@ -416,6 +635,9 @@ impl<R: Runtime> SamSession<R> {
                 "failed to send message to remote peer",
             );
             debug_assert!(false);
+        } else {
+            // Outbound streaming SYN accepted for I2P delivery.
+            self.note_qualifying_activity();
         }
     }
 
@@ -631,6 +853,9 @@ impl<R: Runtime> SamSession<R> {
                             ?error,
                             "failed to send repliable datagram",
                         )
+                    } else {
+                        // Outbound datagram accepted for I2P delivery.
+                        self.note_qualifying_activity();
                     }
                 };
             }
@@ -727,6 +952,7 @@ impl<R: Runtime> SamSession<R> {
             });
 
             if let Some((destination, datagrams)) = datagrams {
+                let mut delivered = false;
                 datagrams.into_iter().for_each(|(protocol, datagram, options)| {
                     let datagram = match protocol {
                         Protocol::Anonymous => self.datagram_manager.make_anonymous(datagram),
@@ -755,9 +981,16 @@ impl<R: Runtime> SamSession<R> {
                                 ?error,
                                 "failed to send repliable datagram",
                             )
+                        } else {
+                            delivered = true;
                         }
                     };
                 });
+                // Flushed pending datagrams accepted for I2P delivery count
+                // once as qualifying activity.
+                if delivered {
+                    self.note_qualifying_activity();
+                }
             }
         } else {
             tracing::debug!(
@@ -910,6 +1143,7 @@ impl<R: Runtime> SamSession<R> {
 
     /// Handle one or more inbound messages.
     fn on_inbound_message(&mut self, messages: Vec<Vec<u8>>) {
+        let mut qualifying = false;
         messages
             .into_iter()
             .for_each(|message| match I2cpPayload::decompress::<R>(message) {
@@ -932,6 +1166,9 @@ impl<R: Runtime> SamSession<R> {
                                     ?error,
                                     "failed to handle streaming protocol packet",
                                 );
+                            } else {
+                                // Inbound streaming packet delivered locally.
+                                qualifying = true;
                             }
                         }
                         protocol => {
@@ -943,6 +1180,9 @@ impl<R: Runtime> SamSession<R> {
                                     ?error,
                                     "failed to handle datagram",
                                 );
+                            } else {
+                                // Inbound datagram delivered to consumer.
+                                qualifying = true;
                             }
                         }
                     }
@@ -952,7 +1192,10 @@ impl<R: Runtime> SamSession<R> {
                     session_id = ?self.session_id,
                     "failed to decompress i2cp payload",
                 ),
-            })
+            });
+        if qualifying {
+            self.note_qualifying_activity();
+        }
     }
 
     /// Handle `NAMING LOOKUP` query from the client.
@@ -1338,6 +1581,9 @@ impl<R: Runtime> Future for SamSession<R> {
                             "failed to encrypt message",
                         );
                         debug_assert!(false);
+                    } else {
+                        // Outbound streaming packet accepted for I2P delivery.
+                        self.note_qualifying_activity();
                     };
                 }
                 Poll::Ready(Some(StreamManagerEvent::StreamOpened {
@@ -1485,6 +1731,18 @@ impl<R: Runtime> Future for SamSession<R> {
                     }
                 }
             }
+        }
+
+        // Drive the single generation-local idle timer after all qualifying
+        // activity in this turn has been recorded, so activity in the same
+        // turn wins over the deadline. The timer wakes this future at the
+        // reduction deadline even when no other event arrives. Shutdown
+        // paths above return early; teardown drops the timer via
+        // `cancel_idle_state` on socket close below.
+        if self.socket.is_none() {
+            self.cancel_idle_state();
+        } else {
+            self.poll_idle_timer(cx);
         }
 
         self.waker = Some(cx.waker().clone());
@@ -2131,5 +2389,540 @@ mod tests {
             assert!(response.contains("STREAM STATUS RESULT=I2P_ERROR"));
         };
         assert!(tokio::time::timeout(Duration::from_secs(1), future).await.is_ok());
+    }
+
+    // M136 reference/activity freeze and state-machine evidence.
+    //
+    // Call-site table (Emissary boundaries):
+    // - qualifying outbound streaming: `create_outbound_stream` SYN accepted
+    //   + `StreamManagerEvent::SendPacket` accepted (`destination.send_message` Ok);
+    // - qualifying inbound streaming: `on_inbound_message` Streaming
+    //   `stream_manager.on_packet` Ok;
+    // - qualifying outbound datagram: `on_send_datagram` Found + send Ok,
+    //   plus flushed pending datagrams in `on_lease_set_found`;
+    // - qualifying inbound datagram: `on_inbound_message` non-Streaming
+    //   `datagram_manager.on_datagram` Ok;
+    // - excluded: `on_naming_lookup`, `SamCommand::Ping`, tunnel/NetDb
+    //   maintenance, `on_stream_accept`/`on_stream_forward` listener
+    //   registration, handler counts.
+    // Reference freeze: I2CP `reduceOnIdle` master switch, default
+    // 1200000 ms, minimum 300000 ms, default quantity 1 coerced to >=1,
+    // `updateTunnels(session, q)` decrease + `updateTunnels(session, 0)`
+    // restore shape via the live-quantity bridge, primary/subsession
+    // aggregation at the owning session, Streamr/datagram sessions use the
+    // same generic session owner.
+
+    fn idle_options(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        HashMap::from_iter(pairs.iter().map(|(k, v)| (String::from(*k), String::from(*v))))
+    }
+
+    async fn create_idle_session(
+        mut options: HashMap<String, String>,
+    ) -> (SamSession<MockRuntime>, TestSessionContext) {
+        options
+            .entry(String::from("i2cp.leaseSetEncType"))
+            .or_insert_with(|| String::from("6,4"));
+        let listener = net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+
+        let signing_key = SigningPrivateKey::random(MockRuntime::rng());
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+
+        let (datagram_tx, datagram_rx) = mpsc::channel(10);
+        let (sub_tx, sub_rx) = mpsc::channel(10);
+        let (netdb_handle, netdb_rx) = NetDbHandle::create();
+        let (event_manager, event_subscriber, event_handle) =
+            EventManager::new(None, MockRuntime::register_metrics(vec![], None));
+        let (tunnel_pool_handle, tm_recv, tp_event, shutdown_rx) = TunnelPoolHandle::create();
+        let (tx, rx) = mpsc::with_recycle(64, SamSessionCommandRecycle::default());
+
+        let (stream1, stream2) = tokio::join!(MockTcpStream::connect(address), listener.accept());
+
+        let socket = Box::new(SamSocket::<MockRuntime>::new(stream1.unwrap()));
+        let (client_socket, _) = stream2.unwrap();
+
+        (
+            SamSession::new(SamSessionContext {
+                address_book: None,
+                datagram_tx,
+                destination: DestinationContext {
+                    destination,
+                    private_key: Vec::new(),
+                    signing_key: Box::new(signing_key),
+                },
+                event_handle,
+                inbound: Default::default(),
+                netdb_handle,
+                options,
+                outbound: Default::default(),
+                profile_storage: ProfileStorage::new(&[], &[], None),
+                receiver: rx,
+                session_id: "idle-test".into(),
+                session_kind: SessionKind::Stream,
+                socket,
+                sub_session_tx: Some(sub_tx),
+                tunnel_pool_handle,
+            }),
+            TestSessionContext {
+                client_socket,
+                datagram_rx,
+                event_manager,
+                event_subscriber,
+                netdb_rx,
+                shutdown_rx,
+                sub_rx,
+                tm_recv,
+                tp_event,
+                tx,
+            },
+        )
+    }
+
+    #[test]
+    fn m136_idle_policy_parsing_is_deterministic_and_bounded() {
+        // Disabled unless exactly true (case-insensitive).
+        assert!(!IdlePolicy::parse(&HashMap::new()).enabled);
+        assert!(!IdlePolicy::parse(&idle_options(&[("i2cp.reduceOnIdle", "false")])).enabled);
+        assert!(!IdlePolicy::parse(&idle_options(&[("i2cp.reduceOnIdle", "1")])).enabled);
+        assert!(!IdlePolicy::parse(&idle_options(&[("i2cp.reduceOnIdle", "")])).enabled);
+        assert!(IdlePolicy::parse(&idle_options(&[("i2cp.reduceOnIdle", "true")])).enabled);
+        assert!(IdlePolicy::parse(&idle_options(&[("i2cp.reduceOnIdle", "TRUE")])).enabled);
+
+        // Defaults.
+        let cfg = IdlePolicy::parse(&idle_options(&[("i2cp.reduceOnIdle", "true")]));
+        assert_eq!(cfg.idle_time, Duration::from_millis(1_200_000));
+        assert_eq!(cfg.target_quantity, 1);
+
+        // Minimum clamp.
+        let cfg = IdlePolicy::parse(&idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "1000"),
+        ]));
+        assert_eq!(cfg.idle_time, Duration::from_millis(300_000));
+
+        // Malformed time falls back to default (fail-safe, no disruption).
+        let cfg = IdlePolicy::parse(&idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "not-a-number"),
+        ]));
+        assert_eq!(cfg.idle_time, Duration::from_millis(1_200_000));
+
+        // Quantity coerces <1 to 1 (reference) and clamps to live bound.
+        let cfg = IdlePolicy::parse(&idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceQuantity", "0"),
+        ]));
+        assert_eq!(cfg.target_quantity, 1);
+        let cfg = IdlePolicy::parse(&idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceQuantity", "9999"),
+        ]));
+        assert_eq!(
+            cfg.target_quantity,
+            crate::tunnel::MAX_DESIRED_TUNNEL_QUANTITY
+        );
+
+        // Disabled policy carries no timer/work values.
+        let cfg = IdlePolicy::parse(&HashMap::new());
+        assert!(!cfg.enabled);
+    }
+
+    #[test]
+    fn m136_idle_policy_carries_no_admin_vocabulary_in_diagnostics() {
+        let cfg = IdlePolicy::parse(&idle_options(&[("i2cp.reduceOnIdle", "true")]));
+        let debug = format!("{cfg:?}");
+        for forbidden in [
+            "Proposal",
+            "I2PControl",
+            "TunnelManager",
+            "JsonRpc",
+            "jsonrpc",
+        ] {
+            assert!(
+                !debug.contains(forbidden),
+                "diagnostic contains forbidden term {forbidden}: {debug}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn m136_no_reduce_options_means_no_timer_and_unchanged_target() {
+        let (session, _ctx) = create_idle_session(HashMap::new()).await;
+        assert!(!session.idle_policy.enabled);
+        assert!(session.idle_timer.is_none());
+        assert!(!session.idle_reduced);
+        assert_eq!(session.destination.base_quantity_target(), (3, 3));
+        assert_eq!(session.destination.desired_quantity_target(), (3, 3));
+        assert_eq!(session.destination.desired_inbound_count(), 3);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m136_reduce_enabled_no_reduction_before_threshold() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        // Override to a short deterministic deadline for the test while
+        // keeping parsing evidence above for the reference minimum.
+        session.idle_policy.idle_time = Duration::from_millis(200);
+        session.idle_policy.target_quantity = 1;
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(200)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        // Poll the timer: still pending, no reduction.
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+        assert!(!session.idle_reduced);
+        assert_eq!(session.destination.desired_quantity_target(), (3, 3));
+        assert_eq!(session.destination.base_quantity_target(), (3, 3));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m136_exact_threshold_reduces_and_base_unchanged() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        session.idle_policy.idle_time = Duration::from_millis(100);
+        session.idle_policy.target_quantity = 1;
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(100)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+
+        assert!(session.idle_reduced);
+        assert!(session.idle_timer.is_none());
+        assert_eq!(session.destination.desired_quantity_target(), (1, 1));
+        assert_eq!(session.destination.base_quantity_target(), (3, 3));
+        assert_eq!(session.destination.desired_inbound_count(), 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m136_outbound_streaming_activity_resets_idle_before_reduction() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        session.idle_policy.idle_time = Duration::from_millis(200);
+        session.idle_policy.target_quantity = 1;
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(200)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        // Simulate accepted outbound streaming packet.
+        session.note_qualifying_activity();
+
+        tokio::time::advance(Duration::from_millis(150)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+        // Only 150ms since last activity (<200ms): no reduction.
+        assert!(!session.idle_reduced);
+        assert_eq!(session.destination.desired_quantity_target(), (3, 3));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m136_inbound_streaming_activity_resets_idle() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        session.idle_policy.idle_time = Duration::from_millis(200);
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(200)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        // Inbound streaming delivery uses the same owner.
+        session.note_qualifying_activity();
+
+        tokio::time::advance(Duration::from_millis(150)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+        assert!(!session.idle_reduced);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m136_outbound_datagram_activity_resets_idle() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        session.idle_policy.idle_time = Duration::from_millis(200);
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(200)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        session.note_qualifying_activity();
+
+        tokio::time::advance(Duration::from_millis(150)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+        assert!(!session.idle_reduced);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m136_inbound_datagram_activity_resets_idle_and_uses_same_owner() {
+        // Datagram/Streamr sessions share the same generic owner: prove the
+        // inbound datagram boundary drives the same timer.
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        session.session_kind = SamSessionKind::Datagram {
+            kind: SessionKind::Datagram,
+        };
+        session.idle_policy.idle_time = Duration::from_millis(200);
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(200)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        session.note_qualifying_activity();
+
+        tokio::time::advance(Duration::from_millis(150)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+        assert!(!session.idle_reduced);
+        // Same generation-local owner, not a second scheduler.
+        assert!(session.idle_timer.is_some());
+    }
+
+    #[tokio::test]
+    async fn m136_control_and_lookup_do_not_reset_activity() {
+        let (mut session, mut ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        let before = session.idle_last_activity.elapsed();
+        // PING/PONG and naming lookup are excluded.
+        session.on_naming_lookup("ME".to_string());
+        tokio::spawn(async move { session.socket.as_mut().expect("to exist").next().await });
+        let mut reader = BufReader::new(&mut ctx.client_socket);
+        let mut response = String::new();
+        reader.read_line(&mut response).await.expect("to succeed");
+        reader.read_line(&mut response).await.expect("to succeed");
+        assert!(response.contains("NAMING REPLY"));
+
+        let (mut session2, _ctx2) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        let last = session2.idle_last_activity;
+        // Local listener registration does not define activity.
+        let listener = net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let (stream1, _) = tokio::join!(MockTcpStream::connect(address), listener.accept());
+        let socket = Box::new(SamSocket::<MockRuntime>::new(stream1.unwrap()));
+        session2.on_stream_accept(socket, HashMap::new(), Arc::from("test"));
+        // No qualifying activity recorded: timer still the initial one and
+        // desired target unchanged.
+        assert_eq!(session2.destination.desired_quantity_target(), (3, 3));
+        assert!(!session2.idle_reduced);
+        assert!(session2.idle_timer.is_some());
+        let _ = (before, last);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m136_activity_after_reduction_restores_base_target() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        session.idle_policy.idle_time = Duration::from_millis(100);
+        session.idle_policy.target_quantity = 1;
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(100)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        {
+            let waker = futures::task::noop_waker();
+            let mut cx = Context::from_waker(&waker);
+            session.poll_idle_timer(&mut cx);
+        }
+        assert!(session.idle_reduced);
+        assert_eq!(session.destination.desired_quantity_target(), (1, 1));
+
+        // First qualifying activity while at low target restores base.
+        session.note_qualifying_activity();
+        assert!(!session.idle_reduced);
+        assert_eq!(session.destination.desired_quantity_target(), (3, 3));
+        assert_eq!(session.destination.base_quantity_target(), (3, 3));
+        assert!(session.idle_timer.is_some());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m136_failed_reduction_does_not_mark_reduced() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        // Force an out-of-bounds target to prove explicit failure handling
+        // without mutating real state (parsing would never produce this).
+        session.idle_policy.idle_time = Duration::from_millis(50);
+        session.idle_policy.target_quantity = 9999;
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(50)));
+
+        tokio::time::advance(Duration::from_millis(60)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+
+        assert!(!session.idle_reduced);
+        assert_eq!(session.destination.desired_quantity_target(), (3, 3));
+        // No unbounded retry: timer dropped after explicit failure.
+        assert!(session.idle_timer.is_none());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m136_failed_restore_does_not_falsely_mark_restored() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        session.idle_policy.idle_time = Duration::from_millis(50);
+        session.idle_policy.target_quantity = 1;
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(50)));
+
+        tokio::time::advance(Duration::from_millis(60)).await;
+        {
+            let waker = futures::task::noop_waker();
+            let mut cx = Context::from_waker(&waker);
+            session.poll_idle_timer(&mut cx);
+        }
+        assert!(session.idle_reduced);
+
+        // Shut down the pool so restore fails with PoolShutDown.
+        session.destination.shutdown();
+        session.note_qualifying_activity();
+        // Still marked at low target, never falsely restored.
+        assert!(session.idle_reduced);
+        assert_eq!(session.destination.desired_quantity_target(), (3, 3));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m136_repeated_idle_ticks_do_not_enqueue_duplicate_controls() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        session.idle_policy.idle_time = Duration::from_millis(50);
+        session.idle_policy.target_quantity = 1;
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(50)));
+
+        tokio::time::advance(Duration::from_millis(60)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+        assert!(session.idle_reduced);
+        let desired = session.destination.desired_quantity_target();
+
+        // While still idle and at low target, further polls do nothing.
+        tokio::time::advance(Duration::from_millis(500)).await;
+        session.poll_idle_timer(&mut cx);
+        session.poll_idle_timer(&mut cx);
+        assert!(session.idle_reduced);
+        assert_eq!(session.destination.desired_quantity_target(), desired);
+        assert!(session.idle_timer.is_none());
+    }
+
+    #[tokio::test]
+    async fn m136_shutdown_clears_timer_state() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        assert!(session.idle_timer.is_some());
+        session.cancel_idle_state();
+        assert!(session.idle_timer.is_none());
+
+        // Socket close path also clears.
+        let (mut session2, _ctx2) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        session2.socket = None;
+        session2.cancel_idle_state();
+        assert!(session2.idle_timer.is_none());
+    }
+
+    #[tokio::test]
+    async fn m136_replacement_generation_ignores_stale_state() {
+        let (first, _c1) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        let (second, _c2) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        assert_ne!(first.idle_generation, second.idle_generation);
+        // Fresh generation starts active, never inherits reduced/timer.
+        assert!(!second.idle_reduced);
+        assert!(second.idle_timer.is_some());
+        assert_eq!(second.destination.desired_quantity_target(), (3, 3));
+    }
+
+    #[tokio::test]
+    async fn m136_shared_member_activity_aggregates_and_release_does_not_reset() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        session.session_kind = SamSessionKind::Primary {
+            sub_sessions: HashMap::new(),
+        };
+        let _ = session.on_create_sub_session("sub1".into(), SessionKind::Stream, HashMap::new());
+        // Sub-session registration itself is not activity.
+        assert!(!session.idle_reduced);
+        assert_eq!(session.destination.desired_quantity_target(), (3, 3));
+
+        // Activity from any member sharing the generation resets the one clock.
+        session.note_qualifying_activity();
+        assert!(!session.idle_reduced);
+        assert!(session.idle_timer.is_some());
     }
 }

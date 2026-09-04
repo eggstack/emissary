@@ -30,10 +30,10 @@ use super::{
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
 use crate::{
+    i2pcontrol::client_secret_store::ClientDestinationStore,
     i2pcontrol::domain::tunnel::{
         TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType,
     },
-    i2pcontrol::client_secret_store::ClientDestinationStore,
     tunnel_client::{ClientRuntimeError, ClientTunnelRuntimeConfig},
 };
 use yosemite_i2pcontrol::SessionOptions;
@@ -241,33 +241,35 @@ impl ClientRuntimeSupervisor {
         let task_name = name.clone();
         let (listener_ready_tx, listener_ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
-            let result = std::panic::AssertUnwindSafe(super::runtime::run_generic_client_with_shared_session(
-                ClientListenerRuntimeConfig {
-                    name: ready_config.name,
-                    bind_address: ready_config
-                        .address
-                        .as_deref()
-                        .unwrap_or("127.0.0.1")
-                        .parse()
-                        .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)),
-                    port: ready_config.port,
-                    destination: ready_config.destination,
-                    destination_port: ready_config.destination_port.unwrap_or(0),
-                    sam_tcp_port: ready_config.sam_tcp_port,
-                    max_connections: 1,
-                    delay_open,
-                    connect_delay: lifecycle.connect_delay,
-                    close_on_idle: lifecycle.close_on_idle,
-                    close_idle_time: lifecycle.close_idle_time,
-                    new_dest_on_resume: lifecycle.new_dest_on_resume,
-                    session_options,
-                    handler: std::sync::Arc::new(|_, _| Box::pin(async {})),
-                },
-                ready_cancellation.clone(),
-                listener_ready_tx,
-                shared_registry,
-                shared,
-            ))
+            let result = std::panic::AssertUnwindSafe(
+                super::runtime::run_generic_client_with_shared_session(
+                    ClientListenerRuntimeConfig {
+                        name: ready_config.name,
+                        bind_address: ready_config
+                            .address
+                            .as_deref()
+                            .unwrap_or("127.0.0.1")
+                            .parse()
+                            .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)),
+                        port: ready_config.port,
+                        destination: ready_config.destination,
+                        destination_port: ready_config.destination_port.unwrap_or(0),
+                        sam_tcp_port: ready_config.sam_tcp_port,
+                        max_connections: 1,
+                        delay_open,
+                        connect_delay: lifecycle.connect_delay,
+                        close_on_idle: lifecycle.close_on_idle,
+                        close_idle_time: lifecycle.close_idle_time,
+                        new_dest_on_resume: lifecycle.new_dest_on_resume,
+                        session_options,
+                        handler: std::sync::Arc::new(|_, _| Box::pin(async {})),
+                    },
+                    ready_cancellation.clone(),
+                    listener_ready_tx,
+                    shared_registry,
+                    shared,
+                ),
+            )
             .catch_unwind()
             .await
             .unwrap_or(Err(ClientListenerRuntimeError::Panicked));
@@ -360,9 +362,7 @@ impl ClientTunnelBackend {
         shared_registry: Arc<super::runtime::session::SharedClientSessionRegistry>,
         client_destinations: ClientDestinationStore,
     ) -> Self {
-        self.supervisor = self
-            .supervisor
-            .with_client_runtime(shared_registry, client_destinations);
+        self.supervisor = self.supervisor.with_client_runtime(shared_registry, client_destinations);
         self
     }
 
@@ -423,6 +423,9 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "i2p.tunnel.listenPort",
         "DelayOpen",
         "ConnectDelay",
+        "Reduce",
+        "ReduceCount",
+        "ReduceTime",
         "Shared",
         "PersistentClientKey",
         "PrivKeyFile",
@@ -431,6 +434,8 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
     // blocked_primitive (reference I2P-session idle semantics have no local
     // observation primitive). Any supplied value fails in
     // client_lifecycle_config / validate_common_options before allocation.
+    // M136: "Reduce"/"ReduceCount"/"ReduceTime" are supported via the
+    // canonical SAM idle owner and Yosemite generic session options.
     const METADATA: &[&str] = &[
         "name",
         "type",

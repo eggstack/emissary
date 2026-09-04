@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 current-head requalification and M131 residual re-freeze recorded; residual option cells remain (88 blocked: 4 UseSSL + 10 SigType + 55 client lifecycle/proxy + 19 server LeaseSet/presentation)
+Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 current-head requalification, M131 residual re-freeze, M135 neutral live-quantity primitive and M136 Reduce completion recorded; residual option cells remain (67 blocked: 4 UseSSL + 10 SigType + 34 client lifecycle/proxy + 19 server LeaseSet/presentation)
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 

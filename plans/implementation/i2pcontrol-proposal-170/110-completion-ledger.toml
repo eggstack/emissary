@@ -166,6 +166,28 @@ matrix_sha256_after = "f038521da9cc685bd38dd502f02dcc81f53586c3a8dd83eb3ba5a8827
 residual_primitive_map = "plans/implementation/i2pcontrol-proposal-170/131-residual-primitive-map.toml"
 closure = "plans/closure/i2pcontrol-proposal-170/131-closure.md"
 
+[post_m136]
+status = "closed as complete"
+matrix_before_apply = 284
+matrix_before_blocked_primitive = 88
+matrix_before_not_applicable = 468
+matrix_after_apply = 305
+matrix_after_blocked_primitive = 67
+matrix_after_not_applicable = 468
+completed_cell_count = 21
+completed_options = ["Reduce", "ReduceCount", "ReduceTime"]
+completed_tunnel_types = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient", "streamrclient"]
+reclassified_cells = [
+    "Reduce:client", "Reduce:httpclient", "Reduce:ircclient",
+    "Reduce:socks", "Reduce:socksirc", "Reduce:connectclient", "Reduce:streamrclient",
+    "ReduceCount:client", "ReduceCount:httpclient", "ReduceCount:ircclient",
+    "ReduceCount:socks", "ReduceCount:socksirc", "ReduceCount:connectclient", "ReduceCount:streamrclient",
+    "ReduceTime:client", "ReduceTime:httpclient", "ReduceTime:ircclient",
+    "ReduceTime:socks", "ReduceTime:socksirc", "ReduceTime:connectclient", "ReduceTime:streamrclient",
+]
+reclassification_reason = "M136 proves one generation-local SAM idle owner with standard i2cp.reduce* consumption through the M135 live-quantity bridge, plus I2PControl fail-before-allocation validation and Yosemite generic additional-option mapping for all seven client families including Streamr with runtime traces."
+closure = "plans/closure/i2pcontrol-proposal-170/136-closure.md"
+
 [ownership]
 session_registry = "emissary-cli/src/i2pcontrol/backends/runtime/session.rs::SharedClientSessionRegistry"
 stream_listener_owner = "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"

@@ -13,8 +13,8 @@ current_production_head = "a68094e128d2b92f0fd5b350e38512ef6b65cb6b"
 
 [current_matrix_counts]
 total = 840
-apply = 284
-blocked_primitive = 88
+apply = 305
+blocked_primitive = 67
 not_applicable = 468
 
 [contract_counts]
@@ -1159,12 +1159,11 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M112"
-current_or_planned_disposition = "blocked_primitive_or_not_applicable"
-cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "blocked on a bounded session-owned resource-reduction primitive.", "httpclient" = "blocked on a bounded session-owned resource-reduction primitive.", "ircclient" = "blocked on a bounded session-owned resource-reduction primitive.", "socks" = "blocked on a bounded session-owned resource-reduction primitive.", "socksirc" = "blocked on a bounded session-owned resource-reduction primitive.", "connectclient" = "blocked on a bounded session-owned resource-reduction primitive.", "streamrclient" = "The Java creator emits a generic reduction field, but the UDP owner has no corresponding resource-reduction consumer; applicability is not affirmatively excluded, so the cell remains blocked.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
-blocked_primitive = "bounded generation-local session resource-reduction authority"
-blocking_milestone = "M112"
+completion_owner = "M136"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "M136 validates Proposal Reduce and maps to standard i2cp.reduceOnIdle via Yosemite generic session options; core SAM idle owner decreases/restores via the live-quantity primitive.", "httpclient" = "M136 validates Proposal Reduce and maps to standard i2cp.reduceOnIdle via Yosemite generic session options; core SAM idle owner decreases/restores via the live-quantity primitive.", "ircclient" = "M136 validates Proposal Reduce and maps to standard i2cp.reduceOnIdle via Yosemite generic session options; core SAM idle owner decreases/restores via the live-quantity primitive.", "socks" = "M136 validates Proposal Reduce and maps to standard i2cp.reduceOnIdle via Yosemite generic session options; core SAM idle owner decreases/restores via the live-quantity primitive.", "socksirc" = "M136 validates Proposal Reduce and maps to standard i2cp.reduceOnIdle via Yosemite generic session options; core SAM idle owner decreases/restores via the live-quantity primitive.", "connectclient" = "M136 validates Proposal Reduce and maps to standard i2cp.reduceOnIdle via Yosemite generic session options; core SAM idle owner decreases/restores via the live-quantity primitive.", "streamrclient" = "M136 validates Proposal Reduce for Streamr and maps to standard i2cp.reduceOnIdle; datagram session uses the same generic idle owner with runtime trace.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+implementation_evidence = "M136 maps Reduce to i2cp.reduceOnIdle via Yosemite additional_options SESSION CREATE; core idle policy decreases/restores desired quantity through the M135 bridge."
 
 [[tunnel_manager.options]]
 canonical_key = "ReduceCount"
@@ -1175,12 +1174,11 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M112"
-current_or_planned_disposition = "blocked_primitive_or_not_applicable"
-cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "blocked on a bounded session-owned resource-reduction primitive.", "httpclient" = "blocked on a bounded session-owned resource-reduction primitive.", "ircclient" = "blocked on a bounded session-owned resource-reduction primitive.", "socks" = "blocked on a bounded session-owned resource-reduction primitive.", "socksirc" = "blocked on a bounded session-owned resource-reduction primitive.", "connectclient" = "blocked on a bounded session-owned resource-reduction primitive.", "streamrclient" = "The Java creator emits a generic reduction count, but the UDP owner has no corresponding resource-reduction consumer; applicability is not affirmatively excluded, so the cell remains blocked.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
-blocked_primitive = "bounded generation-local session resource-reduction authority"
-blocking_milestone = "M112"
+completion_owner = "M136"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "M136 validates Proposal ReduceCount 1..6 and maps to standard i2cp.reduceQuantity; core coerces <1 to 1 and clamps to the live bound.", "httpclient" = "M136 validates Proposal ReduceCount 1..6 and maps to standard i2cp.reduceQuantity; core coerces <1 to 1 and clamps to the live bound.", "ircclient" = "M136 validates Proposal ReduceCount 1..6 and maps to standard i2cp.reduceQuantity; core coerces <1 to 1 and clamps to the live bound.", "socks" = "M136 validates Proposal ReduceCount 1..6 and maps to standard i2cp.reduceQuantity; core coerces <1 to 1 and clamps to the live bound.", "socksirc" = "M136 validates Proposal ReduceCount 1..6 and maps to standard i2cp.reduceQuantity; core coerces <1 to 1 and clamps to the live bound.", "connectclient" = "M136 validates Proposal ReduceCount 1..6 and maps to standard i2cp.reduceQuantity; core coerces <1 to 1 and clamps to the live bound.", "streamrclient" = "M136 validates Proposal ReduceCount for Streamr and maps to standard i2cp.reduceQuantity via the same datagram session owner.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+implementation_evidence = "M136 maps ReduceCount to i2cp.reduceQuantity via Yosemite additional_options; core uses the quantity as the M135 desired target."
 
 [[tunnel_manager.options]]
 canonical_key = "ReduceTime"
@@ -1191,12 +1189,11 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M112"
-current_or_planned_disposition = "blocked_primitive_or_not_applicable"
-cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "blocked on a bounded monotonic generation-local reduction timer and session owner.", "httpclient" = "blocked on a bounded monotonic generation-local reduction timer and session owner.", "ircclient" = "blocked on a bounded monotonic generation-local reduction timer and session owner.", "socks" = "blocked on a bounded monotonic generation-local reduction timer and session owner.", "socksirc" = "blocked on a bounded monotonic generation-local reduction timer and session owner.", "connectclient" = "blocked on a bounded monotonic generation-local reduction timer and session owner.", "streamrclient" = "The Java creator emits a generic reduction timer, but the UDP owner has no corresponding session timer; applicability is not affirmatively excluded, so the cell remains blocked.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
-blocked_primitive = "bounded generation-local session reduction timer and resource owner"
-blocking_milestone = "M112"
+completion_owner = "M136"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "M136 validates Proposal ReduceTime in ms with minimum 300000 and maps to standard i2cp.reduceIdleTime; monotonic generation-local timer drives the decrease.", "httpclient" = "M136 validates Proposal ReduceTime in ms with minimum 300000 and maps to standard i2cp.reduceIdleTime; monotonic generation-local timer drives the decrease.", "ircclient" = "M136 validates Proposal ReduceTime in ms with minimum 300000 and maps to standard i2cp.reduceIdleTime; monotonic generation-local timer drives the decrease.", "socks" = "M136 validates Proposal ReduceTime in ms with minimum 300000 and maps to standard i2cp.reduceIdleTime; monotonic generation-local timer drives the decrease.", "socksirc" = "M136 validates Proposal ReduceTime in ms with minimum 300000 and maps to standard i2cp.reduceIdleTime; monotonic generation-local timer drives the decrease.", "connectclient" = "M136 validates Proposal ReduceTime in ms with minimum 300000 and maps to standard i2cp.reduceIdleTime; monotonic generation-local timer drives the decrease.", "streamrclient" = "M136 validates Proposal ReduceTime for Streamr and maps to standard i2cp.reduceIdleTime via the same session timer owner.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+implementation_evidence = "M136 maps ReduceTime to i2cp.reduceIdleTime via Yosemite additional_options; core monotonic timer fires the M135 target update."
 
 [[tunnel_manager.options]]
 canonical_key = "Close"

@@ -292,7 +292,27 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         .difference(&m131_reclassified)
         .cloned()
         .collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m131);
+    // M136 promotes the 21 Reduce* client cells to apply.
+    let m136_completed: BTreeSet<(String, String)> = ["Reduce", "ReduceCount", "ReduceTime"]
+        .into_iter()
+        .flat_map(|option| {
+            [
+                "client",
+                "httpclient",
+                "ircclient",
+                "socks",
+                "socksirc",
+                "connectclient",
+                "streamrclient",
+            ]
+            .into_iter()
+            .map(move |tunnel_type| (option.to_owned(), tunnel_type.to_owned()))
+        })
+        .collect();
+    assert_eq!(m136_completed.len(), 21);
+    let expected_post_m136 =
+        expected_post_m131.difference(&m136_completed).cloned().collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m136);
     assert_eq!(
         audit["summary"]["post_m116_reclassified_cells"].as_integer(),
         Some(7)

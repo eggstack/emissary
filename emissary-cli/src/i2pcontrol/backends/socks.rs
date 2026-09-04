@@ -23,12 +23,11 @@ use super::{
 };
 use crate::i2pcontrol::{
     address_book_runtime::RuntimeAddressBookHandle,
-    client_secret_store::ClientDestinationStore,
     backends::runtime::{
         client_lifecycle_config, ClientConnectionHandler, ClientLifecycleConfig,
-        ClientListenerRuntimeConfig,
-        ClientListenerRuntimeError, ClientStreamConnector,
+        ClientListenerRuntimeConfig, ClientListenerRuntimeError, ClientStreamConnector,
     },
+    client_secret_store::ClientDestinationStore,
     domain::tunnel::{TunnelDefinition, TunnelOwnership, TunnelRuntimeState, TunnelType},
 };
 use yosemite_i2pcontrol::SessionOptions;
@@ -816,28 +815,30 @@ impl SocksRuntimeSupervisor {
         let handler = make_handler(config.clone(), mode);
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
-            let result = std::panic::AssertUnwindSafe(super::runtime::run_client_listener_with_shared_session(
-                ClientListenerRuntimeConfig {
-                    name: config.name,
-                    bind_address: config.bind_address,
-                    port: config.port,
-                    destination: "unused-socks-destination".to_owned(),
-                    destination_port: 1,
-                    sam_tcp_port: config.sam_tcp_port,
-                    session_options: config.session_options,
-                    delay_open: config.delay_open,
-                    connect_delay: config.lifecycle.connect_delay,
-                    close_on_idle: config.lifecycle.close_on_idle,
-                    close_idle_time: config.lifecycle.close_idle_time,
-                    new_dest_on_resume: config.lifecycle.new_dest_on_resume,
-                    max_connections: MAX_CONNECTIONS,
-                    handler,
-                },
-                ready_cancellation.clone(),
-                ready_tx,
-                shared_registry,
-                shared,
-            ))
+            let result = std::panic::AssertUnwindSafe(
+                super::runtime::run_client_listener_with_shared_session(
+                    ClientListenerRuntimeConfig {
+                        name: config.name,
+                        bind_address: config.bind_address,
+                        port: config.port,
+                        destination: "unused-socks-destination".to_owned(),
+                        destination_port: 1,
+                        sam_tcp_port: config.sam_tcp_port,
+                        session_options: config.session_options,
+                        delay_open: config.delay_open,
+                        connect_delay: config.lifecycle.connect_delay,
+                        close_on_idle: config.lifecycle.close_on_idle,
+                        close_idle_time: config.lifecycle.close_idle_time,
+                        new_dest_on_resume: config.lifecycle.new_dest_on_resume,
+                        max_connections: MAX_CONNECTIONS,
+                        handler,
+                    },
+                    ready_cancellation.clone(),
+                    ready_tx,
+                    shared_registry,
+                    shared,
+                ),
+            )
             .catch_unwind()
             .await
             .unwrap_or(Err(ClientListenerRuntimeError::Panicked));
@@ -1125,12 +1126,16 @@ fn validate_raw_options(
         "StartOnLoad",
         "DelayOpen",
         "ConnectDelay",
+        "Reduce",
+        "ReduceCount",
+        "ReduceTime",
         "Shared",
         "PersistentClientKey",
         "PrivKeyFile",
     ];
     // M121: "Close", "CloseTime", and "NewDest" demoted to blocked_primitive;
     // "ConnectDelay" remains applied via the shared lifecycle connector.
+    // M136: Reduce family supported via the canonical idle owner.
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
             continue;
@@ -1419,15 +1424,9 @@ mod tests {
             runtime_config.sam_tcp_port = sam_port;
             runtime_config.session_options.samv3_tcp_port = sam_port;
             runtime_config.session_options.nickname = name.to_owned();
-            supervisor
-                .start(runtime_config.clone(), mode, None, false)
-                .await
-                .unwrap();
+            supervisor.start(runtime_config.clone(), mode, None, false).await.unwrap();
             assert_eq!(supervisor.inspect(name).0, TunnelRuntimeState::Running);
-            assert!(supervisor
-                .start(runtime_config.clone(), mode, None, false)
-                .await
-                .is_err());
+            assert!(supervisor.start(runtime_config.clone(), mode, None, false).await.is_err());
             supervisor.stop(name).await.unwrap();
             assert_eq!(supervisor.inspect(name).0, TunnelRuntimeState::Stopped);
             supervisor.start(runtime_config, mode, None, false).await.unwrap();

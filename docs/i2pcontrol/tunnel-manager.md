@@ -389,7 +389,8 @@ allocation. M131 closes the residual ledger at `284 apply / 88 blocked /
 | Parsed and round-tripped | `Description`, `StartOnLoad`, `TargetDestination`, `Destination`, `TargetPort`, `ReachableBy`, `Port`, `TargetHost`, `Host` |
 | Applied by accepted client proxy/filter runtimes | `ProxyList`, `ProxyAuth`, `ProxyUsername`, `ProxyPassword`, `OutproxyAuth`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `AllowUserAgent`, `AllowReferer`, `AllowAccept` |
 | Applied by six streaming client lifecycle owners | `ConnectDelay` (0–60,000 ms) |
-| Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, `Profile`, `Reduce`, `ReduceCount`, `ReduceTime`, `Close`, `CloseTime`, `NewDest`, Streamr `ConnectDelay` and other retained Streamr lifecycle cells; `SigType` for all applicable families |
+| Applied by seven client idle owners (M136) | `Reduce` (boolean master switch), `ReduceCount` (1–6, default 1), `ReduceTime` (ms, minimum 300000, default 1200000) via standard `i2cp.reduce*` and the live-quantity primitive; `ReduceTime`/`ReduceCount` without `Reduce=true` fail before allocation |
+| Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, `Profile`, `Close`, `CloseTime`, `NewDest`, Streamr `ConnectDelay` and other retained Streamr lifecycle cells; `SigType` for all applicable families |
 | Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime` |
 | Rejected before allocation as residual server blockers | `UniqueLocalAddressPerClient`, `MultiHoming`, `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
 | Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
@@ -401,11 +402,15 @@ are held in the same typed redacted boundary as `ProxyPassword`; legacy raw
 compatibility values remain response-redacted. Proxy credentials are bounded, separated between the local
 listener and the configured I2P outproxy, and never serialized in canonical
 `get` output. `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, `Profile`, and
-the Reduce family fail before listener/session allocation because no exact
-Emissary-owned primitive currently exists for them. Streamr `DelayOpen` and
-`NewDest` are not applicable by affirmative reference gates; its other retained
+the Close family fail before listener/session allocation because no exact
+Emissary-owned primitive currently exists for them (Close needs M137).
+The Reduce family is applied by M136: idle SAM sessions decrease to the
+configured quantity through the live-quantity primitive and restore on
+activity; malformed or server-family values fail before allocation.
+Streamr `DelayOpen` and `NewDest` are not applicable by affirmative reference gates; its other retained
 lifecycle cells remain explicit blocked responses because generic reference
-setters do not establish a datagram runtime owner. `AllowInternalSSL` is not
+setters do not establish a datagram runtime owner, except Reduce which now
+uses the shared datagram session owner. `AllowInternalSSL` is not
 applicable to the accepted HTTP-only outbound client; server-role cells belong
 to M099.
 

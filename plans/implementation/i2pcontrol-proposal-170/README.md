@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M135 closed as complete, M136 dependency-ready**.
+Status: **partial Proposal 170 support; M135/M136 closed as complete, M137 dependency-ready**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -9,8 +9,9 @@ Current authorities:
 - runtime/security: M130 closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
 - residual applicability/primitive map: M131 closure `plans/closure/i2pcontrol-proposal-170/131-closure.md` and `131-residual-primitive-map.toml`;
 - neutral live-quantity primitive: M135 closure `plans/closure/i2pcontrol-proposal-170/135-closure.md`;
-- current matrix: `284 apply / 88 blocked_primitive / 468 not_applicable`;
-- next handoff: M136 (dependency-ready, registers on its own step).
+- idle reduction: M136 closure `plans/closure/i2pcontrol-proposal-170/136-closure.md`;
+- current matrix: `305 apply / 67 blocked_primitive / 468 not_applicable`;
+- next handoff: M137 (dependency-ready, registers on its own step).
 
 ## Authority order
 
@@ -46,32 +47,31 @@ Source roadmap:
 M135 delivered the neutral lower-layer primitive (desired inbound/outbound
 quantities, reference-compatible convergence, dynamic LeaseSet desired count,
 bounded destination-scoped coordination) with **zero Proposal matrix
-promotions**. Closing matrix `284/88/468` unchanged.
+promotions**. Closing matrix at its closure `284/88/468` (now superseded by
+M136 `305/67/468`).
 
 Pinned read-only Java lifecycle reference snapshot for M135-M137:
 
 - `i2p/i2p.i2p@2c3fd2a9532cd86ec06cb6f2b9f3f813ca752243`.
 
-## Dependency-ready successor — M136
+## Closed corrective — M136
 
 Plan:
 
 - `136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md`.
 
-Status: **dependency-ready / unregistered**; M135 closure satisfies its
-hard-dependency gate. It registers on its own registration step.
+Status: **closed as complete** (`plans/closure/i2pcontrol-proposal-170/136-closure.md`).
 
-M136 corrects the failed combined M132 vertical slice. After M135 proves the lower primitive, M136 adds one generation-local SAM session activity/timer owner, consumes standard `i2cp.reduceOnIdle`, `i2cp.reduceIdleTime`, `i2cp.reduceQuantity`, then maps Proposal `Reduce`, `ReduceTime`, `ReduceCount` through Yosemite's validated generic additional-session-option path.
+M136 corrects the failed combined M132 vertical slice. After M135 proves the lower primitive, M136 adds one generation-local SAM session activity/timer owner, consumes standard `i2cp.reduceOnIdle`, `i2cp.reduceIdleTime`, `i2cp.reduceQuantity`, then maps Proposal `Reduce`, `ReduceTime`, `ReduceCount` through Yosemite's validated generic additional-session-option path. All 21 client cells (six TCP families plus Streamr) promote to `apply` with end-to-end evidence; servers remain `not_applicable`. Closing matrix `305/67/468`.
 
-Direct Java reference evidence now supports session-level applicability to Streamr as well as the six TCP client families, but support/matrix promotion remains end-to-end-evidence driven.
-
-## Deferred corrective successor — M137
+## Dependency-ready successor — M137
 
 Plan:
 
 - `137-m133-corrective-sam-idle-close-and-reasoned-termination.md`.
 
-Status: **deferred / unregistered**; hard-depends on successful M136 closure.
+Status: **dependency-ready / unregistered**; M136 closure satisfies its
+hard-dependency gate. It registers on its own registration step.
 
 M137 extends the same M136 activity/timer owner with standard `i2cp.closeOnIdle` / `i2cp.closeIdleTime`, exact close-before-reduce ordering, canonical real session teardown, and one neutral authoritative generation-local termination cause. It then maps Proposal `Close`/`CloseTime`.
 
@@ -121,7 +121,9 @@ According to current closure authority:
 - all 12 canonical TunnelManager data planes and seven actions exist for the claimed subset;
 - all six ClientServicesInfo selectors operational;
 - M127 finite token lifetime, M128 bounded batch conformance and M129 fail-closed non-loopback TLS are requalified by M130;
-- M131 corrected eight false applicability blockers and retained 88 genuine primitive blockers.
+- M131 corrected eight false applicability blockers and retained 88 genuine primitive blockers at its closure;
+- M135 proved the neutral live-quantity primitive with zero promotions;
+- M136 promotes 21 `Reduce*` client cells (six TCP families plus Streamr) to `apply`; 67 blocked remain.
 
 Full Proposal 170 support is not claimed.
 
@@ -141,10 +143,10 @@ M131 residual primitive re-freeze                    [CLOSED AS BLOCKED — 284/
  M135 neutral live quantity + LeaseSet target       [CLOSED AS COMPLETE]
    |
    v
- M136 M132 corrective Reduce*                       [DEPENDENCY-READY / UNREGISTERED]
+ M136 M132 corrective Reduce*                       [CLOSED AS COMPLETE — 305/67/468]
   |
   v
-M137 M133 corrective Close*                          [DEFERRED / UNREGISTERED]
+M137 M133 corrective Close*                          [DEPENDENCY-READY / UNREGISTERED]
   |
   v
 M134 rebased OR M138 corrective NewDest              [FUTURE / UNREGISTERED]

@@ -1,6 +1,6 @@
 # M132 — Neutral SAM Idle Reduction and Proposal Reduce Completion
 
-Status: **ready / register next**
+Status: **ready / registered**
 
 Class: capability / neutral lower-layer exception / Proposal-170 vertical slice
 

@@ -28,41 +28,61 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
-| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M135 ready / registered** |
-| Proposal 170 session-lifecycle completion | **active / corrective** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | **M135 ready / registered**; M136/M137 deferred |
+| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M136 dependency-ready / unregistered** (M135 closed as complete) |
+| Proposal 170 session-lifecycle completion | **active / corrective** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | **M136 dependency-ready / unregistered**; M137 deferred |
 | Post-M114 shared-control-plane corrective line | closed | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | M130 current runtime/security authority |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
 
 ## Active Proposal-170 implementation handoff
 
-### M135 — neutral live tunnel quantity and LeaseSet reconfiguration primitive
+### M136 — M132 corrective: SAM idle reduction and Proposal Reduce completion (dependency-ready)
 
 Plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/135-neutral-live-tunnel-quantity-and-leaseset-reconfiguration-primitive.md`.
+- `plans/implementation/i2pcontrol-proposal-170/136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md`.
 
-Status: **ready / registered**.
+Status: **dependency-ready / unregistered**; M135 closure
+(`plans/closure/i2pcontrol-proposal-170/135-closure.md`) satisfies its
+hard-dependency gate. It registers on its own registration step; no production
+work is authorized until then.
 
 Baseline:
 
-- pre-M135 planning head `517decf733352dfc2bf24ad349c5ab4cf9315742`;
+- M135 closure head (this handoff);
 - current matrix `284 apply / 88 blocked_primitive / 468 not_applicable`;
 - M132/M133 are closed as blocked and remain immutable historical evidence.
 
-Objective:
+Objective (M136, on registration):
 
-- establish only the generic lower-layer current desired inbound/outbound tunnel quantity plus dynamic LeaseSet desired inbound count;
-- preserve immutable base quantities, normal excess-tunnel expiry/failure convergence and backup semantics;
-- coordinate pool/LeaseSet target updates at the destination owner;
-- create no SAM idle policy and no Proposal support promotion.
+- add one canonical SAM session activity/timer owner and standard
+  `i2cp.reduce*` consumption through the proven M135 primitive;
+- map Proposal `Reduce`/`ReduceTime`/`ReduceCount` through Yosemite's
+  validated generic session-option path with fail-before-allocation.
 
-M135 **must close with M095 unchanged at `284/88/468`**. Any Proposal cell promotion under M135 is a plan violation.
-
-Direct read-only Java reference authority for M135-M137:
+Direct read-only Java reference authority for M136-M137:
 
 - `i2p/i2p.i2p@2c3fd2a9532cd86ec06cb6f2b9f3f813ca752243`.
 
-The corrective reference freeze establishes that Java quantity reduction is a live client-pool settings reconfiguration, existing excess tunnels remain usable until normal lifecycle removal, future build demand follows the new quantity, and LeaseSet wanted count follows current inbound quantity.
+The M135 corrective reference freeze (retained) establishes that Java
+quantity reduction is a live client-pool settings reconfiguration, existing
+excess tunnels remain usable until normal lifecycle removal, future build
+demand follows the new quantity, and LeaseSet wanted count follows current
+inbound quantity.
+
+## Closed primitive
+
+### M135
+
+Plan/closure:
+
+- `135-neutral-live-tunnel-quantity-and-leaseset-reconfiguration-primitive.md`;
+- `plans/closure/i2pcontrol-proposal-170/135-closure.md`.
+
+Status: **closed as complete**, zero promotions, matrix `284/88/468`
+unchanged. M135 proved the stable destination-scoped target update/restore,
+reference-compatible convergence, dynamic LeaseSet desired count, bounded
+generation-local control, clean containment, and no unresolved high/medium
+defect required by the M136 gate.
 
 ## Deferred corrective successors
 
@@ -72,9 +92,10 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md`.
 
-Status: **deferred / unregistered**; hard-depends on successful M135 closure.
+Status: **dependency-ready / unregistered**; M135 closure satisfies the
+hard-dependency gate. Registers on its own registration step.
 
-M136 may register only if M135 proves:
+M135 proved:
 
 - stable destination-scoped target update/restore;
 - reference-compatible excess-tunnel convergence;
@@ -83,7 +104,7 @@ M136 may register only if M135 proves:
 - unchanged matrix and clean containment;
 - no unresolved high/medium primitive defect.
 
-If registered later, M136 adds one canonical SAM session activity/timer owner and standard `i2cp.reduce*` consumption, then maps Proposal `Reduce`/`ReduceTime`/`ReduceCount` through Yosemite's validated generic session-option path. Direct reference supports Streamr session-level applicability, but matrix promotion remains evidence-driven.
+On registration, M136 adds one canonical SAM session activity/timer owner and standard `i2cp.reduce*` consumption, then maps Proposal `Reduce`/`ReduceTime`/`ReduceCount` through Yosemite's validated generic session-option path. Direct reference supports Streamr session-level applicability, but matrix promotion remains evidence-driven.
 
 ### M137 — M133 corrective: SAM idle close and reasoned termination
 
@@ -176,10 +197,10 @@ M131 residual primitive re-freeze                  [CLOSED AS BLOCKED — 284/88
   +--> M133 combined close attempt                 [CLOSED AS BLOCKED]
   |
   v
-M135 neutral live quantity + LeaseSet target       [READY / REGISTERED]
-  |
-  v
-M136 M132 corrective Reduce*                       [DEFERRED / UNREGISTERED]
+ M135 neutral live quantity + LeaseSet target       [CLOSED AS COMPLETE]
+   |
+   v
+ M136 M132 corrective Reduce*                       [DEPENDENCY-READY / UNREGISTERED]
   |
   v
 M137 M133 corrective Close*                        [DEFERRED / UNREGISTERED]
@@ -221,8 +242,9 @@ No successor from these clusters may be smuggled into M135-M137.
 
 ## Registration rules
 
-1. **M135 is the sole active/registered Proposal-170 implementation plan.**
-2. M136 registers only after successful M135 closure explicitly proves its readiness contract.
+1. **M136 is dependency-ready; it becomes the sole active plan on its own
+   registration step (status flip + gate citation).**
+2. M136 registered only because M135 closure explicitly proves its readiness contract.
 3. M137 registers only after successful M136 closure explicitly proves its readiness contract.
 4. NewDest registers only after successful M137 closure proves an authoritative idle-close/reopen contract.
 5. Material path/architecture deviations require plan amendment before code.
@@ -243,6 +265,6 @@ No successor from these clusters may be smuggled into M135-M137.
 | M131 | closed as blocked; residual applicability/primitive re-freeze; matrix 284/88/468 |
 | M132 | closed as blocked; zero reduction promotions |
 | M133 | closed as blocked; zero close promotions |
-| M135 | **ready / registered**; neutral live-quantity/LeaseSet primitive, zero-promotion requirement |
+| M135 | **closed as complete**; neutral live-quantity/LeaseSet primitive, zero promotions, matrix 284/88/468 |
 
 Historical closure files remain unchanged.

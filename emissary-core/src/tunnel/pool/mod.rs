@@ -66,7 +66,10 @@ use core::{
 pub use context::{
     TunnelMessage, TunnelPoolBuildParameters, TunnelPoolContext, TunnelPoolContextHandle,
 };
-pub use handle::{TunnelMessageSender, TunnelPoolEvent, TunnelPoolHandle};
+pub use handle::{
+    QuantityTargetError, TunnelMessageSender, TunnelPoolEvent, TunnelPoolHandle,
+    MAX_DESIRED_TUNNEL_QUANTITY,
+};
 pub use selector::{ClientSelector, ExploratorySelector};
 
 #[cfg(test)]
@@ -412,6 +415,18 @@ pub struct TunnelPool<R: Runtime, S: TunnelSelector + HopSelector> {
 
     /// Passive, bounded lifecycle observation.
     observation: Option<TunnelPoolObservation>,
+
+    /// Generation-local quantity control shared with the owning handle.
+    quantity_control: handle::QuantityTargetControl,
+
+    /// Generation captured at creation; updates from other generations are ignored.
+    quantity_generation: u64,
+
+    /// Current desired active inbound quantity (starts at base config).
+    desired_inbound: usize,
+
+    /// Current desired active outbound quantity (starts at base config).
+    desired_outbound: usize,
 }
 
 impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
@@ -458,6 +473,10 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
             "create tunnel pool",
         );
 
+        let desired_inbound = config.num_inbound;
+        let desired_outbound = config.num_outbound;
+        let (quantity_control, quantity_generation) = tunnel_pool_handle.quantity_control();
+
         (
             Self {
                 config,
@@ -491,14 +510,59 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
                 shutdown_rx: Some(shutdown_rx),
                 tunnel_timers: TunnelTimer::new(),
                 observation,
+                quantity_control,
+                quantity_generation,
+                desired_inbound,
+                desired_outbound,
             },
             tunnel_pool_handle,
         )
     }
 
+    /// Configured/base inbound and outbound quantities (immutable).
+    #[allow(dead_code)]
+    pub fn base_quantity_target(&self) -> (usize, usize) {
+        (self.config.num_inbound, self.config.num_outbound)
+    }
+
+    /// Current desired inbound and outbound quantities.
+    #[allow(dead_code)]
+    pub fn desired_quantity_target(&self) -> (usize, usize) {
+        (self.desired_inbound, self.desired_outbound)
+    }
+
+    /// Synchronize the cached desired target with the owner control cell.
+    ///
+    /// Returns `true` when the target changed. Stale generations are ignored
+    /// and a closed cell leaves the last synchronized target in place. Holds
+    /// the control lock only for a short copy; never across build or network
+    /// I/O.
+    fn sync_quantity_target(&mut self) -> bool {
+        let Some(current) =
+            self.quantity_control.synchronized(self.quantity_generation)
+        else {
+            return false;
+        };
+
+        if current == (self.desired_inbound, self.desired_outbound) {
+            return false;
+        }
+
+        self.desired_inbound = current.0;
+        self.desired_outbound = current.1;
+        tracing::debug!(
+            target: LOG_TARGET,
+            name = %self.config.name,
+            desired_inbound = ?self.desired_inbound,
+            desired_outbound = ?self.desired_outbound,
+            "desired tunnel quantity target updated",
+        );
+        true
+    }
+
     /// Calculate the active and standby outbound tunnel builds that are needed.
     fn calculate_outbound_build_count(&self) -> (usize, usize) {
-        let active_target = self.config.num_outbound + self.expiring_outbound.len();
+        let active_target = self.desired_outbound + self.expiring_outbound.len();
         let active_pending = self
             .pending_outbound
             .len()
@@ -515,7 +579,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
 
     /// Calculate the active and standby inbound tunnel builds that are needed.
     fn calculate_inbound_build_count(&self) -> (usize, usize) {
-        let active_target = self.config.num_inbound + self.expiring_inbound.len();
+        let active_target = self.desired_inbound + self.expiring_inbound.len();
         let active_pending = self
             .pending_inbound
             .len()
@@ -558,7 +622,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> TunnelPool<R, S> {
     /// active/standby/routing state is restored and `false` is returned so no
     /// fabricated active Lease remains.
     fn promote_standby_inbound(&mut self) -> bool {
-        if self.inbound_tunnels.len() >= self.config.num_inbound {
+        if self.inbound_tunnels.len() >= self.desired_inbound {
             return false;
         }
 
@@ -1210,6 +1274,13 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
         // tunnel instead
         let mut num_failed_builds = 0;
 
+        // Remember the owner task waker for prompt quantity-target wake-up and
+        // adopt the newest desired target. The control lock is held only for
+        // short copies; a target increase resumes building through the normal
+        // maintenance path below while a decrease simply stops replacement.
+        self.quantity_control.store_waker(cx.waker());
+        let quantity_changed = self.sync_quantity_target();
+
         // poll pending outbound tunnels
         while let Poll::Ready(Some((tunnel_id, event))) = self.pending_outbound.poll_next_unpin(cx)
         {
@@ -1805,7 +1876,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                         );
                     }
 
-                    if self.outbound.len() < self.config.num_outbound {
+                    if self.outbound.len() < self.desired_outbound {
                         if let Some(backup_tunnel_id) = self.backup_outbound.keys().next().copied() {
                             let backup_tunnel = self
                                 .backup_outbound
@@ -1904,6 +1975,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                     "tunnel pool shutting down",
                 );
 
+                self.quantity_control.mark_closed();
                 self.inbound_tunnels.values().for_each(|(tunnel_id, _)| {
                     self.subsystem_handle.remove_tunnel(tunnel_id);
                 });
@@ -1946,6 +2018,7 @@ impl<R: Runtime, S: TunnelSelector + HopSelector> Future for TunnelPool<R, S> {
                 self.maintain_pool();
             }
             Poll::Pending if num_failed_builds > 0 => self.maintain_pool(),
+            Poll::Pending if quantity_changed => self.maintain_pool(),
             _ => {}
         }
 
@@ -4257,5 +4330,389 @@ mod tests {
             Ok(_) => {}
             _ => panic!("invalid status"),
         }
+    }
+
+    // M135 test helper: minimal pool + owner handle pair.
+    //
+    // Reference vectors (plan §3, roadmap §3): Java quantity change is a live
+    // pool settings reconfiguration; existing tunnels stay usable until
+    // normal expiry/failure; future build demand follows the new quantity;
+    // wanted lease count follows current inbound quantity; restore updates
+    // the same generation without pool recreation.
+    async fn m135_pool_with_config(
+        pool_config: TunnelPoolConfig,
+    ) -> (
+        TunnelPool<MockRuntime, ExploratorySelector<MockRuntime>>,
+        TunnelPoolHandle,
+    ) {
+        let (router_info, static_key, signing_key) = RouterInfoBuilder::default().build();
+        let metrics = MockRuntime::register_metrics(Vec::new(), None);
+        let SubsystemManagerContext {
+            handle: subsys_handle,
+            manager,
+            ..
+        } = SubsystemManager::<MockRuntime>::new(
+            router_info.identity.id(),
+            NoiseContext::new(
+                static_key.clone(),
+                Bytes::from(router_info.identity.id().to_vec()),
+            ),
+            Default::default(),
+            MockRuntime::register_metrics(vec![], None),
+        );
+        tokio::spawn(manager);
+        let parameters = TunnelPoolBuildParameters::new(pool_config);
+        let pool_handle = parameters.context_handle.clone();
+        let (_event_mgr, _event_subscriber, event_handle) =
+            EventManager::new(None, metrics.clone());
+        let profile_storage = ProfileStorage::<MockRuntime>::new(&[], &[], None);
+        TunnelPool::<MockRuntime, _>::new(
+            parameters,
+            ExploratorySelector::new(profile_storage.clone(), pool_handle, false),
+            subsys_handle,
+            RouterContext::new(
+                metrics,
+                profile_storage,
+                router_info.identity.id(),
+                Bytes::from(router_info.serialize(&signing_key)),
+                static_key,
+                signing_key,
+                2u8,
+                event_handle,
+            ),
+        )
+    }
+
+    // M135 §8.1: desired targets initialize to base quantities.
+    #[tokio::test(start_paused = true)]
+    async fn m135_desired_initializes_to_base() {
+        let (pool, handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 3,
+            num_outbound: 2,
+            ..Default::default()
+        })
+        .await;
+
+        assert_eq!(pool.base_quantity_target(), (3, 2));
+        assert_eq!(pool.desired_quantity_target(), (3, 2));
+        assert_eq!(handle.base_quantity_target(), (3, 2));
+        assert_eq!(handle.desired_quantity_target(), (3, 2));
+    }
+
+    // M135 §8.2: lowering target changes future build deficit without
+    // mutating base config.
+    #[tokio::test(start_paused = true)]
+    async fn m135_lowering_changes_deficit_without_mutating_base() {
+        let (mut pool, handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 3,
+            num_outbound: 3,
+            ..Default::default()
+        })
+        .await;
+
+        let (active_before, _) = pool.calculate_inbound_build_count();
+        assert_eq!(active_before, 3);
+        let (ob_before, _) = pool.calculate_outbound_build_count();
+        assert_eq!(ob_before, 3);
+
+        handle.set_quantity_target(1, 2).unwrap();
+        assert!(pool.sync_quantity_target());
+        assert_eq!(pool.desired_quantity_target(), (1, 2));
+        assert_eq!(pool.base_quantity_target(), (3, 3));
+        assert_eq!(handle.base_quantity_target(), (3, 3));
+
+        let (active_after, _) = pool.calculate_inbound_build_count();
+        assert_eq!(active_after, 1);
+        let (ob_after, _) = pool.calculate_outbound_build_count();
+        assert_eq!(ob_after, 2);
+
+        // Hop lengths and variances remain base-owned.
+        assert_eq!(pool.config.num_inbound_hops, 2);
+        assert_eq!(pool.config.num_outbound_hops, 2);
+    }
+
+    // M135 §8.3: lowering does not synchronously remove excess inbound tunnels.
+    #[tokio::test(start_paused = true)]
+    async fn m135_lowering_preserves_excess_inbound() {
+        let (mut pool, handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 3,
+            num_outbound: 0,
+            ..Default::default()
+        })
+        .await;
+
+        for i in 0..3u32 {
+            let gateway = TunnelId::from(1000 + i);
+            pool.inbound_tunnels.insert(
+                gateway,
+                (TunnelId::from(2000 + i), RouterId::random()),
+            );
+            pool.selector.add_inbound_tunnel(
+                gateway,
+                RouterId::random(),
+                HashSet::new(),
+            );
+        }
+        assert_eq!(pool.inbound_tunnels.len(), 3);
+
+        handle.set_quantity_target(1, 0).unwrap();
+        assert!(pool.sync_quantity_target());
+        assert_eq!(pool.inbound_tunnels.len(), 3);
+        let (active, _) = pool.calculate_inbound_build_count();
+        assert_eq!(active, 0, "no replacement above desired target");
+    }
+
+    // M135 §8.4: lowering does not synchronously clear outbound state and
+    // stops replacement above the new target.
+    #[tokio::test(start_paused = true)]
+    async fn m135_lowering_preserves_outbound_state() {
+        let (mut pool, handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 0,
+            num_outbound: 3,
+            ..Default::default()
+        })
+        .await;
+
+        let live_before = pool.outbound.len();
+        handle.set_quantity_target(0, 1).unwrap();
+        assert!(pool.sync_quantity_target());
+        assert_eq!(pool.outbound.len(), live_before);
+        assert_eq!(pool.desired_quantity_target(), (0, 1));
+        assert_eq!(pool.base_quantity_target(), (0, 3));
+        let (active, _) = pool.calculate_outbound_build_count();
+        assert_eq!(active, 1 - live_before.min(1));
+    }
+
+    // M135 §8.5: excess tunnels remain selectable until normal removal.
+    #[tokio::test(start_paused = true)]
+    async fn m135_excess_remains_selectable() {
+        let (mut pool, handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 2,
+            num_outbound: 0,
+            ..Default::default()
+        })
+        .await;
+
+        let first = TunnelId::from(9101u32);
+        let second = TunnelId::from(9102u32);
+        for gateway in [first, second] {
+            pool.inbound_tunnels
+                .insert(gateway, (TunnelId::from(9200u32), RouterId::random()));
+            pool.selector
+                .add_inbound_tunnel(gateway, RouterId::random(), HashSet::new());
+        }
+
+        handle.set_quantity_target(1, 0).unwrap();
+        assert!(pool.sync_quantity_target());
+        assert_eq!(pool.inbound_tunnels.len(), 2);
+        assert!(
+            pool.selector.select_inbound_tunnel().is_some(),
+            "excess tunnels stay in ordinary selection"
+        );
+    }
+
+    // M135 §8.6/§8.7: no replacement at/above target; completed excess does
+    // not trigger another build.
+    #[tokio::test(start_paused = true)]
+    async fn m135_no_replacement_at_or_above_target() {
+        let (mut pool, handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 2,
+            num_outbound: 2,
+            ..Default::default()
+        })
+        .await;
+
+        handle.set_quantity_target(1, 1).unwrap();
+        assert!(pool.sync_quantity_target());
+
+        // At target: one live tunnel each direction means zero deficit,
+        // because pending capacity is included in the same calculation.
+        for i in 0..1u32 {
+            pool.inbound_tunnels.insert(
+                TunnelId::from(9300 + i),
+                (TunnelId::from(9400 + i), RouterId::random()),
+            );
+        }
+        let (active_in, _) = pool.calculate_inbound_build_count();
+        assert_eq!(active_in, 0);
+
+        // Above target after a pending build completes: two live tunnels with
+        // desired one still means zero deficit and no further replacement.
+        pool.inbound_tunnels.insert(
+            TunnelId::from(9309u32),
+            (TunnelId::from(9409u32), RouterId::random()),
+        );
+        let (active_excess, _) = pool.calculate_inbound_build_count();
+        assert_eq!(active_excess, 0);
+    }
+
+    // M135 §8.8: restore resumes deficit toward base quantities.
+    #[tokio::test(start_paused = true)]
+    async fn m135_restore_resumes_deficit() {
+        let (mut pool, handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 3,
+            num_outbound: 2,
+            ..Default::default()
+        })
+        .await;
+
+        handle.set_quantity_target(1, 1).unwrap();
+        assert!(pool.sync_quantity_target());
+        let (reduced_in, _) = pool.calculate_inbound_build_count();
+        assert_eq!(reduced_in, 1);
+
+        handle.restore_quantity_target().unwrap();
+        assert!(pool.sync_quantity_target());
+        assert_eq!(pool.desired_quantity_target(), (3, 2));
+        let (restored_in, _) = pool.calculate_inbound_build_count();
+        let (restored_ob, _) = pool.calculate_outbound_build_count();
+        assert_eq!(restored_in, 3);
+        assert_eq!(restored_ob, 2);
+    }
+
+    // M135 §8.9: backup targets are unchanged across target changes.
+    #[tokio::test(start_paused = true)]
+    async fn m135_backup_targets_unchanged() {
+        let (mut pool, handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 2,
+            num_inbound_backup: 1,
+            num_outbound: 2,
+            num_outbound_backup: 2,
+            ..Default::default()
+        })
+        .await;
+
+        handle.set_quantity_target(1, 1).unwrap();
+        assert!(pool.sync_quantity_target());
+        assert_eq!(pool.config.num_inbound_backup, 1);
+        assert_eq!(pool.config.num_outbound_backup, 2);
+        let (_, backup_in) = pool.calculate_inbound_build_count();
+        let (_, backup_ob) = pool.calculate_outbound_build_count();
+        assert_eq!(backup_in, 1);
+        assert_eq!(backup_ob, 2);
+
+        handle.restore_quantity_target().unwrap();
+        assert!(pool.sync_quantity_target());
+        assert_eq!(pool.config.num_inbound_backup, 1);
+        assert_eq!(pool.config.num_outbound_backup, 2);
+    }
+
+    // M135 §8.10: standby promotion uses desired target, not base.
+    #[tokio::test(start_paused = true)]
+    async fn m135_standby_promotion_uses_desired_target() {
+        let (mut pool, handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 2,
+            num_inbound_backup: 1,
+            num_outbound: 0,
+            ..Default::default()
+        })
+        .await;
+
+        // One active tunnel with base two: promotion allowed at base target.
+        let active = TunnelId::from(9501u32);
+        pool.inbound_tunnels
+            .insert(active, (TunnelId::from(9601u32), RouterId::random()));
+        let standby = TunnelId::from(9502u32);
+        pool.backup_inbound_tunnels.insert(
+            standby,
+            (
+                TunnelId::from(9602u32),
+                RouterId::random(),
+                HashSet::new(),
+                MockRuntime::time_since_epoch() + Duration::from_secs(300),
+            ),
+        );
+
+        // Lower desired to one: active count already satisfies desired, so no
+        // promotion even though below base.
+        handle.set_quantity_target(1, 0).unwrap();
+        assert!(pool.sync_quantity_target());
+        assert!(!pool.promote_standby_inbound());
+        assert_eq!(pool.inbound_tunnels.len(), 1);
+        assert_eq!(pool.backup_inbound_tunnels.len(), 1);
+
+        // Restore to base two: promotion resumes through the normal path.
+        handle.restore_quantity_target().unwrap();
+        assert!(pool.sync_quantity_target());
+        assert!(pool.promote_standby_inbound());
+        assert_eq!(pool.inbound_tunnels.len(), 2);
+        assert!(pool.backup_inbound_tunnels.is_empty());
+    }
+
+    // M135 §8.11/§8.12: per-pool isolation; a client-seam update never
+    // reaches an exploratory pool and never reaches another destination.
+    #[tokio::test(start_paused = true)]
+    async fn m135_pool_targets_are_isolated() {
+        let (mut client, client_handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 3,
+            num_outbound: 3,
+            ..Default::default()
+        })
+        .await;
+        let (mut exploratory, exploratory_handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 2,
+            num_outbound: 2,
+            ..Default::default()
+        })
+        .await;
+
+        client_handle.set_quantity_target(1, 1).unwrap();
+        assert!(client.sync_quantity_target());
+        // Exploratory pool never observes the client update.
+        assert!(!exploratory.sync_quantity_target());
+        assert_eq!(exploratory.desired_quantity_target(), (2, 2));
+        assert_eq!(exploratory_handle.desired_quantity_target(), (2, 2));
+        assert_eq!(client.desired_quantity_target(), (1, 1));
+    }
+
+    // M135 §8.18: closed control is rejected and leaves the last target.
+    #[tokio::test(start_paused = true)]
+    async fn m135_closed_control_is_rejected() {
+        let (mut pool, mut handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 2,
+            num_outbound: 2,
+            ..Default::default()
+        })
+        .await;
+
+        handle.set_quantity_target(1, 1).unwrap();
+        assert!(pool.sync_quantity_target());
+        assert_eq!(pool.desired_quantity_target(), (1, 1));
+
+        handle.shutdown();
+        assert_eq!(
+            handle.set_quantity_target(2, 2),
+            Err(QuantityTargetError::PoolShutDown)
+        );
+        // Closed cell leaves the last synchronized target in place.
+        assert!(!pool.sync_quantity_target());
+        assert_eq!(pool.desired_quantity_target(), (1, 1));
+    }
+
+    // M135 §8.19: coalescing preserves the latest restore target.
+    #[tokio::test(start_paused = true)]
+    async fn m135_coalescing_preserves_latest_restore() {
+        let (mut pool, handle) = m135_pool_with_config(TunnelPoolConfig {
+            num_inbound: 3,
+            num_outbound: 3,
+            ..Default::default()
+        })
+        .await;
+
+        // Burst of updates before the pool polls: only the newest matters.
+        // The final restore equals the initial base, so synchronization is a
+        // no-op that still leaves the restore value (not an intermediate).
+        handle.set_quantity_target(1, 1).unwrap();
+        handle.set_quantity_target(2, 1).unwrap();
+        handle.restore_quantity_target().unwrap();
+        let _ = pool.sync_quantity_target();
+        assert_eq!(pool.desired_quantity_target(), (3, 3));
+        // A distinct burst proves the newest pair wins when it differs.
+        handle.set_quantity_target(1, 2).unwrap();
+        handle.set_quantity_target(2, 1).unwrap();
+        assert!(pool.sync_quantity_target());
+        assert_eq!(pool.desired_quantity_target(), (2, 1));
+        // No further change without a new update.
+        assert!(!pool.sync_quantity_target());
     }
 }

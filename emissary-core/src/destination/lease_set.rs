@@ -193,8 +193,19 @@ pub struct LeaseSetManager<R: Runtime> {
 
     /// How many inbound tunnels is the [`Destination`] configured to have.
     ///
-    /// Used to gauge when to publish new lease set to `NetDb`.
-    num_inbound: usize,
+    /// Immutable base authority. Publication readiness uses the dynamic
+    /// desired count below.
+    #[allow(dead_code)]
+    base_inbound: usize,
+
+    /// Current desired inbound tunnel count.
+    ///
+    /// Initialized from the base value and updated through the narrow
+    /// destination coordination bridge. Existing lease records are never
+    /// fabricated or synchronously deleted merely because the target
+    /// decreased; normal inbound lifecycle events rebuild using the current
+    /// real leases and this count.
+    desired_inbound: usize,
 
     /// Pending floodfills.
     ///
@@ -269,7 +280,8 @@ impl<R: Runtime> LeaseSetManager<R> {
             lease_set,
             netdb_handle,
             noise_ctx,
-            num_inbound,
+            base_inbound: num_inbound,
+            desired_inbound: num_inbound,
             pending_floodfills: HashSet::new(),
             profile_storage,
             queried_floodfills: HashSet::new(),
@@ -406,6 +418,83 @@ impl<R: Runtime> LeaseSetManager<R> {
         }
     }
 
+    /// Configured/base inbound tunnel count (immutable).
+    #[allow(dead_code)]
+    pub fn base_inbound_count(&self) -> usize {
+        self.base_inbound
+    }
+
+    /// Current desired inbound tunnel count.
+    #[allow(dead_code)]
+    pub fn desired_inbound_count(&self) -> usize {
+        self.desired_inbound
+    }
+
+    /// Update the desired inbound tunnel count without reconstructing the manager.
+    ///
+    /// The update is generic: it carries no session or administrative policy.
+    /// Existing lease records are preserved; a decrease never fabricates
+    /// removal and never publishes leases for tunnels that do not exist. An
+    /// increase moves the manager into the existing await-tunnels state so a
+    /// full-count lease set is only created after real tunnels exist.
+    /// Unpublished destinations keep their desired value but remain
+    /// unpublished with no state transition.
+    #[allow(dead_code)]
+    pub fn set_desired_inbound_count(
+        &mut self,
+        count: usize,
+    ) -> Result<(), crate::tunnel::QuantityTargetError> {
+        if count > crate::tunnel::MAX_DESIRED_TUNNEL_QUANTITY {
+            return Err(crate::tunnel::QuantityTargetError::InvalidQuantity);
+        }
+
+        if count == self.desired_inbound {
+            return Ok(());
+        }
+
+        self.desired_inbound = count;
+
+        if self.unpublished {
+            return Ok(());
+        }
+
+        // Reconcile with the existing owner states only. Awaiting additional
+        // tunnels when below target; awaiting the upper-layer lease set once
+        // the real tunnel count satisfies the new target. Never publish
+        // prematurely and never delete real leases on decrease.
+        if self.tunnels.len() < self.desired_inbound {
+            tracing::trace!(
+                target: LOG_TARGET,
+                local = %self.destination_id,
+                num_tunnels = %self.tunnels.len(),
+                num_needed = %self.desired_inbound,
+                "desired inbound count increased, awaiting tunnels",
+            );
+            self.state = PublishState::AwaitingTunnels {
+                timer: R::timer(TUNNEL_BUILD_WAIT_TIMEOUT),
+            };
+            if let Some(waker) = self.waker.take() {
+                waker.wake_by_ref();
+            }
+        } else if matches!(self.state, PublishState::AwaitingTunnels { .. })
+            && self.tunnels.len() >= self.desired_inbound
+        {
+            tracing::trace!(
+                target: LOG_TARGET,
+                local = %self.destination_id,
+                num_tunnels = %self.tunnels.len(),
+                num_needed = %self.desired_inbound,
+                "desired inbound count decreased to available tunnels, awaiting lease set",
+            );
+            self.state = PublishState::AwaitingLeaseSet;
+            if let Some(waker) = self.waker.take() {
+                waker.wake_by_ref();
+            }
+        }
+
+        Ok(())
+    }
+
     /// Register [`Lease`] for a newly built inbound tunnel.
     pub fn register_inbound_tunnel(&mut self, lease: Lease) -> Vec<Lease> {
         self.tunnels.insert(lease.tunnel_id, lease.clone());
@@ -414,34 +503,55 @@ impl<R: Runtime> LeaseSetManager<R> {
             return self.tunnels.values().cloned().collect();
         }
 
-        match self.tunnels.len() == self.num_inbound {
-            true => {
-                tracing::trace!(
-                    target: LOG_TARGET,
-                    local = %self.destination_id,
-                    num_tunnels = %self.num_inbound,
-                    "all inbound tunnels have been built, awaiting new lease set",
-                );
+        // Readiness follows the current desired count. Excess tunnels above a
+        // lowered target do not trigger extra work; the manager simply holds
+        // the real leases until normal lifecycle removal converges.
+        // A pending increase keeps awaiting tunnels until real capacity
+        // arrives, so a full-count lease set is never created early.
+        let ready = self.tunnels.len() >= self.desired_inbound && self.desired_inbound > 0
+            || (self.desired_inbound == 0 && !self.tunnels.is_empty());
+        // Exact-full readiness (len == desired, or any non-empty set when the
+        // desired count is zero) awaits the upper-layer lease set; otherwise
+        // keep awaiting tunnels with the existing bounded timer.
+        let awaiting_full = self.tunnels.len() == self.desired_inbound
+            || (self.desired_inbound == 0 && !self.tunnels.is_empty());
 
-                self.state = PublishState::AwaitingLeaseSet;
+        if ready && awaiting_full {
+            tracing::trace!(
+                target: LOG_TARGET,
+                local = %self.destination_id,
+                num_tunnels = %self.desired_inbound,
+                "all inbound tunnels have been built, awaiting new lease set",
+            );
+
+            self.state = PublishState::AwaitingLeaseSet;
+        } else if !ready {
+            tracing::trace!(
+                target: LOG_TARGET,
+                local = %self.destination_id,
+                num_tunnels = %self.tunnels.len(),
+                num_needed = %self.desired_inbound,
+                "waiting for inbound tunnels to be built",
+            );
+
+            self.state = PublishState::AwaitingTunnels {
+                timer: R::timer(TUNNEL_BUILD_WAIT_TIMEOUT),
+            };
+
+            if let Some(waker) = self.waker.take() {
+                waker.wake_by_ref();
             }
-            false => {
-                tracing::trace!(
-                    target: LOG_TARGET,
-                    local = %self.destination_id,
-                    num_tunnels = %self.tunnels.len(),
-                    num_needed = %self.num_inbound,
-                    "waiting for inbound tunnels to be built",
-                );
-
-                self.state = PublishState::AwaitingTunnels {
-                    timer: R::timer(TUNNEL_BUILD_WAIT_TIMEOUT),
-                };
-
-                if let Some(waker) = self.waker.take() {
-                    waker.wake_by_ref();
-                }
-            }
+        } else {
+            // Excess above a lowered target: keep the current state (usually
+            // `Inactive` after publication) and hold the real leases without
+            // fabricating removal or a new publish.
+            tracing::trace!(
+                target: LOG_TARGET,
+                local = %self.destination_id,
+                num_tunnels = %self.tunnels.len(),
+                num_needed = %self.desired_inbound,
+                "excess inbound tunnels above desired count, holding real leases",
+            );
         }
 
         self.tunnels.values().cloned().collect()
@@ -3085,5 +3195,164 @@ mod tests {
         }
 
         assert!(std::matches!(manager.state, PublishState::Inactive));
+    }
+
+    fn m135_test_lease(expires_secs: u64) -> Lease {
+        Lease {
+            router_id: RouterId::random(),
+            tunnel_id: TunnelId::from(MockRuntime::rng().next_u32()),
+            expires: MockRuntime::time_since_epoch() + Duration::from_secs(expires_secs),
+        }
+    }
+
+    fn m135_test_manager(
+        base: usize,
+        existing: Vec<Lease>,
+        unpublished: bool,
+    ) -> LeaseSetManager<MockRuntime> {
+        let (tp_handle, _tm_rx, _tp_tx, _srx) = TunnelPoolHandle::create();
+        let (netdb_handle, _netdb_rx) = NetDbHandle::create();
+        let destination_id = DestinationId::random();
+        let noise_ctx = NoiseContext::new(
+            StaticPrivateKey::random(MockRuntime::rng()),
+            Bytes::from(destination_id.to_vec()),
+        );
+        LeaseSetManager::<MockRuntime>::new(
+            existing,
+            destination_id,
+            tp_handle.sender(),
+            base,
+            netdb_handle,
+            noise_ctx,
+            ProfileStorage::new(&[], &[], None),
+            unpublished,
+            Bytes::new(),
+        )
+    }
+
+    // M135 §8.13: desired count follows target decrease; base stays fixed.
+    #[tokio::test(start_paused = true)]
+    async fn m135_desired_follows_decrease() {
+        let mut manager = m135_test_manager(3, Vec::new(), false);
+        assert_eq!(manager.base_inbound_count(), 3);
+        assert_eq!(manager.desired_inbound_count(), 3);
+
+        manager.set_desired_inbound_count(1).expect("valid count");
+        assert_eq!(manager.desired_inbound_count(), 1);
+        assert_eq!(manager.base_inbound_count(), 3);
+    }
+
+    // M135 §8.14: desired count follows restore to base.
+    #[tokio::test(start_paused = true)]
+    async fn m135_desired_follows_restore() {
+        let mut manager = m135_test_manager(3, Vec::new(), false);
+        manager.set_desired_inbound_count(1).unwrap();
+        assert_eq!(manager.desired_inbound_count(), 1);
+        manager.set_desired_inbound_count(3).unwrap();
+        assert_eq!(manager.desired_inbound_count(), 3);
+        assert_eq!(manager.base_inbound_count(), 3);
+    }
+
+    // M135 §8.15: increase waits for real tunnels before full-count creation.
+    #[tokio::test(start_paused = true)]
+    async fn m135_increase_waits_for_real_tunnels() {
+        let mut manager = m135_test_manager(2, Vec::new(), false);
+
+        manager.register_inbound_tunnel(m135_test_lease(600));
+        assert!(std::matches!(
+            manager.state,
+            PublishState::AwaitingTunnels { .. }
+        ));
+
+        manager.set_desired_inbound_count(3).unwrap();
+        assert!(std::matches!(
+            manager.state,
+            PublishState::AwaitingTunnels { .. }
+        ));
+        assert_eq!(manager.tunnels.len(), 1);
+
+        manager.register_inbound_tunnel(m135_test_lease(600));
+        assert!(std::matches!(
+            manager.state,
+            PublishState::AwaitingTunnels { .. }
+        ));
+        manager.register_inbound_tunnel(m135_test_lease(600));
+        assert!(std::matches!(
+            manager.state,
+            PublishState::AwaitingLeaseSet
+        ));
+        assert_eq!(manager.tunnels.len(), 3);
+    }
+
+    // M135 §8.16: decrease neither fabricates removal nor new leases.
+    #[tokio::test(start_paused = true)]
+    async fn m135_decrease_preserves_real_leases() {
+        let mut manager = m135_test_manager(3, Vec::new(), false);
+
+        for _ in 0..3 {
+            manager.register_inbound_tunnel(m135_test_lease(600));
+        }
+        assert!(std::matches!(
+            manager.state,
+            PublishState::AwaitingLeaseSet
+        ));
+        let before: Vec<TunnelId> = manager.tunnels.keys().copied().collect();
+
+        manager.set_desired_inbound_count(1).unwrap();
+        assert_eq!(manager.tunnels.len(), 3);
+        for tunnel_id in &before {
+            assert!(manager.tunnels.contains_key(tunnel_id));
+        }
+        // Still awaiting the upper-layer lease set for the real tunnels;
+        // no synthetic publish and no deletion occurred.
+        assert!(std::matches!(
+            manager.state,
+            PublishState::AwaitingLeaseSet
+        ));
+    }
+
+    // M135 §8.17: unpublished destinations remain unpublished across target
+    // changes while retaining the desired value.
+    #[tokio::test(start_paused = true)]
+    async fn m135_unpublished_behavior_unchanged() {
+        let mut manager = m135_test_manager(2, Vec::new(), true);
+        assert!(std::matches!(manager.state, PublishState::Inactive));
+
+        manager.set_desired_inbound_count(1).unwrap();
+        assert_eq!(manager.desired_inbound_count(), 1);
+        assert!(std::matches!(manager.state, PublishState::Inactive));
+
+        // Inbound records are still tracked locally but never drive
+        // publication while unpublished.
+        manager.register_inbound_tunnel(m135_test_lease(600));
+        assert_eq!(manager.tunnels.len(), 1);
+        assert!(std::matches!(manager.state, PublishState::Inactive));
+
+        manager.set_desired_inbound_count(2).unwrap();
+        assert!(std::matches!(manager.state, PublishState::Inactive));
+    }
+
+    // M135 §8.20: lease-set surface carries no administrative vocabulary.
+    #[tokio::test(start_paused = true)]
+    async fn m135_leaseset_api_carries_no_policy_vocabulary() {
+        let manager = m135_test_manager(2, Vec::new(), false);
+        let text = format!(
+            "{:?} {} {}",
+            manager.state,
+            manager.base_inbound_count(),
+            manager.desired_inbound_count()
+        );
+        for forbidden in [
+            "Proposal",
+            "I2PControl",
+            "TunnelManager",
+            "JsonRpc",
+            "jsonrpc",
+        ] {
+            assert!(
+                !text.contains(forbidden),
+                "lease-set state contains {forbidden}"
+            );
+        }
     }
 }

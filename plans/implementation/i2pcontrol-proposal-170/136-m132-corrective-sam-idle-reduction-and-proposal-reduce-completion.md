@@ -1,6 +1,13 @@
 # M136 — M132 Corrective: SAM Idle Reduction and Proposal Reduce Completion
 
-Status: **deferred / unregistered; hard-depends on successful M135 closure**
+Status: **dependency-ready / unregistered; M135 gate satisfied, registers on its own step**
+
+M135 closure `plans/closure/i2pcontrol-proposal-170/135-closure.md` proves all
+§2 gate items (destination-scoped update/restore, immutable base,
+desired-driven deficit/standby, excess convergence, dynamic LeaseSet count,
+bounded generation-local control, green containment, unchanged `284/88/468`
+matrix, no high/medium defect). No production work is authorized until the
+registration step flips this status.
 
 Class: corrective implementation / neutral SAM policy + I2PControl consumer
 

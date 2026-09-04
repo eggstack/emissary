@@ -1,10 +1,14 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M135 ready/registered**
+Status: **active / partial; M135 closed as complete, M136 dependency-ready**
 
-Current registered handoff:
+Current handoff:
 
-- `plans/implementation/i2pcontrol-proposal-170/135-neutral-live-tunnel-quantity-and-leaseset-reconfiguration-primitive.md` — **ready / registered**.
+- M136 `plans/implementation/i2pcontrol-proposal-170/136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md` — **dependency-ready / unregistered** (M135 gate satisfied; registers on its own step).
+
+Closed corrective primitive:
+
+- M135 closed as complete (`plans/closure/i2pcontrol-proposal-170/135-closure.md`), zero promotions.
 
 Focused lifecycle roadmap:
 
@@ -163,10 +167,10 @@ M131 residual primitive re-freeze                         [CLOSED AS BLOCKED —
   +--> M133 combined close attempt                        [CLOSED AS BLOCKED]
   |
   v
-M135 neutral live quantity + LeaseSet desired count       [READY / REGISTERED]
+M135 neutral live quantity + LeaseSet desired count       [CLOSED AS COMPLETE]
   |
   v
-M136 M132 corrective: session activity + Reduce*          [DEFERRED / UNREGISTERED]
+M136 M132 corrective: session activity + Reduce*          [DEPENDENCY-READY / UNREGISTERED]
   |
   v
 M137 M133 corrective: Close* + reasoned termination       [DEFERRED / UNREGISTERED]
@@ -175,13 +179,13 @@ M137 M133 corrective: Close* + reasoned termination       [DEFERRED / UNREGISTER
 M134 rebased/amended OR future M138 NewDest corrective    [FUTURE / UNREGISTERED]
 ```
 
-Only M135 is executable now.
+Only M136 may register next, on its own registration step.
 
 ### M135
 
-M135 is infrastructure-only and must close with the matrix unchanged at `284/88/468`.
+M135 closed as complete (`plans/closure/i2pcontrol-proposal-170/135-closure.md`) with the matrix unchanged at `284/88/468`.
 
-It establishes:
+It established:
 
 - a generic current desired inbound/outbound quantity distinct from immutable base config;
 - reference-compatible no-immediate-purge convergence;
@@ -193,7 +197,8 @@ No SAM or I2PControl production source is authorized under M135.
 
 ### M136
 
-M136 stays unregistered until M135 closure proves its primitive. It then corrects M132 by adding one generation-local SAM session activity/timer owner and Proposal `Reduce`, `ReduceTime`, `ReduceCount` translation through standard I2CP options.
+M136 is dependency-ready: M135 closure proves the primitive. On its own
+registration step it corrects M132 by adding one generation-local SAM session activity/timer owner and Proposal `Reduce`, `ReduceTime`, `ReduceCount` translation through standard I2CP options.
 
 Direct reference supports all seven client families, including Streamr, but at most 21 cells may be promoted and only with end-to-end evidence.
 
@@ -271,8 +276,9 @@ No new hosted CI/fuzz/release orchestration is required by this roadmap.
 
 Per `plans/003-planning-process.md`:
 
-- **M135 is the sole active/registered Proposal-170 implementation handoff**;
-- M136 remains unregistered until M135 closure explicitly declares dependency readiness;
+- **M136 is dependency-ready and becomes the sole active handoff on its own
+  registration step (status flip + gate citation)**;
+- M137 remains unregistered until M136 closure explicitly declares dependency readiness;
 - M137 remains unregistered until M136 closure explicitly declares dependency readiness;
 - M134 remains unregistered/stale until rebased after M137 or superseded;
 - all other residual clusters remain unregistered;

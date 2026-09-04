@@ -35,6 +35,8 @@ core_inspection = [
 ]
 core_owner_hooks = [
   "emissary-core/src/config.rs",
+  "emissary-core/src/destination/lease_set.rs",
+  "emissary-core/src/destination/mod.rs",
   "emissary-core/src/sam/mod.rs",
   "emissary-core/src/sam/parser.rs",
   "emissary-core/src/transport/ntcp2/mod.rs",
@@ -44,6 +46,7 @@ core_owner_hooks = [
   "emissary-core/src/transport/ssu2/peer_test/mod.rs",
   "emissary-core/src/transport/ssu2/session/active/mod.rs",
   "emissary-core/src/transport/ssu2/socket.rs",
+  "emissary-core/src/tunnel/pool/handle.rs",
   "emissary-core/src/tunnel/pool/mod.rs",
   "emissary-core/src/tunnel/transit/mod.rs",
 ]
@@ -401,6 +404,36 @@ why_upstream_insufficient = "TunnelPool owns exact build/expiry transitions and 
 sensitivity = "bounded tunnel snapshot"
 seam = "passive lifecycle hook"
 reference = "M060 closure retained-owner seam"
+
+[[evidence]]
+path = "emissary-core/src/tunnel/pool/handle.rs"
+owner = "TunnelPoolHandle"
+purpose = "Carries the generation-local latest-state desired inbound/outbound quantity cell between one destination and its pool."
+consumer = "Destination coordination bridge; future session policy owner."
+why_upstream_insufficient = "Only the handle/pool pair owns the bounded coalescing target without exposing pool maps or adding a queue."
+sensitivity = "bounded owner-local control"
+seam = "latest-state control cell"
+reference = "M135 neutral live-quantity primitive; zero administrative vocabulary"
+
+[[evidence]]
+path = "emissary-core/src/destination/mod.rs"
+owner = "Destination"
+purpose = "Coordinates pool desired target and lease-set desired count as one destination-scoped operation."
+consumer = "Destination owner; future session policy owner."
+why_upstream_insufficient = "Destination alone joins its pool handle and lease-set manager without exposing either mutably."
+sensitivity = "owner-local coordination"
+seam = "narrow bridge method"
+reference = "M135 neutral live-quantity primitive; zero administrative vocabulary"
+
+[[evidence]]
+path = "emissary-core/src/destination/lease_set.rs"
+owner = "LeaseSetManager"
+purpose = "Tracks dynamic desired inbound count and reconciles publication readiness with real leases only."
+consumer = "Destination coordination bridge."
+why_upstream_insufficient = "LeaseSetManager owns publication readiness and must await real tunnels without fabricating leases."
+sensitivity = "bounded owner-local state"
+seam = "desired-count reconciliation"
+reference = "M135 neutral live-quantity primitive; zero administrative vocabulary"
 
 [[evidence]]
 path = "emissary-core/src/tunnel/transit/mod.rs"

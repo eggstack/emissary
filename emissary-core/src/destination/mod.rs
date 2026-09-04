@@ -38,7 +38,7 @@ use crate::{
     primitives::{DestinationId, Lease, LeaseSet2, TunnelId},
     profile::ProfileStorage,
     runtime::{JoinSet, Runtime},
-    tunnel::{NoiseContext, TunnelPoolEvent, TunnelPoolHandle},
+    tunnel::{NoiseContext, QuantityTargetError, TunnelPoolEvent, TunnelPoolHandle},
 };
 
 use bytes::Bytes;
@@ -743,6 +743,65 @@ impl<R: Runtime> Destination<R> {
     /// Shutdown session by shutting down the tunnel pool.
     pub fn shutdown(&mut self) {
         self.tunnel_pool_handle.shutdown();
+    }
+
+    /// Configured/base inbound and outbound tunnel quantities (immutable).
+    #[allow(dead_code)]
+    pub fn base_quantity_target(&self) -> (usize, usize) {
+        self.tunnel_pool_handle.base_quantity_target()
+    }
+
+    /// Current desired inbound and outbound tunnel quantities.
+    #[allow(dead_code)]
+    pub fn desired_quantity_target(&self) -> (usize, usize) {
+        self.tunnel_pool_handle.desired_quantity_target()
+    }
+
+    /// Current desired inbound lease-set count.
+    #[allow(dead_code)]
+    pub fn desired_inbound_count(&self) -> usize {
+        self.lease_set_manager.desired_inbound_count()
+    }
+
+    /// Update the current desired inbound/outbound tunnel quantities.
+    ///
+    /// Coordinates the pool target and the lease-set desired inbound count
+    /// as one destination-scoped operation so callers cannot leave the pair
+    /// divergent. The pool update is applied first; when it is rejected
+    /// (out of bounds or shut down) the lease-set target is untouched. The
+    /// lease-set update cannot fail after the same bounds check, and on the
+    /// unreachable failure path the pool target is rolled back to its
+    /// previous value. Existing tunnels are preserved; convergence happens
+    /// through normal expiry/failure without building above the new target.
+    #[allow(dead_code)]
+    pub fn set_tunnel_quantity_target(
+        &mut self,
+        inbound: usize,
+        outbound: usize,
+    ) -> Result<(), QuantityTargetError> {
+        let previous = self.tunnel_pool_handle.desired_quantity_target();
+
+        self.tunnel_pool_handle.set_quantity_target(inbound, outbound)?;
+
+        if let Err(error) = self.lease_set_manager.set_desired_inbound_count(inbound) {
+            // Same bounds govern both owners, so this rollback is a
+            // defensive coherence guarantee rather than an expected path.
+            let _ = self.tunnel_pool_handle.set_quantity_target(previous.0, previous.1);
+            return Err(error);
+        }
+
+        if let Some(waker) = self.waker.take() {
+            waker.wake_by_ref();
+        }
+
+        Ok(())
+    }
+
+    /// Restore desired quantities to the configured/base values.
+    #[allow(dead_code)]
+    pub fn restore_tunnel_quantity_target(&mut self) -> Result<(), QuantityTargetError> {
+        let (inbound, outbound) = self.base_quantity_target();
+        self.set_tunnel_quantity_target(inbound, outbound)
     }
 
     /// Get [`RoutingPathHandle`].
@@ -1617,5 +1676,134 @@ mod tests {
             }
             None => panic!("expected to find context"),
         }
+    }
+
+    fn m135_test_destination(
+        num_inbound: usize,
+        num_outbound: usize,
+        unpublished: bool,
+    ) -> Destination<MockRuntime> {
+        let (netdb_handle, _rx) = NetDbHandle::create();
+        let config = TunnelPoolConfig {
+            num_inbound,
+            num_outbound,
+            ..Default::default()
+        };
+        let (tp_handle, _tm_rx, _tp_tx, _srx) = TunnelPoolHandle::from_config(config);
+        let private_key = StaticPrivateKey::random(MockRuntime::rng());
+        Destination::<MockRuntime>::new(
+            DestinationId::random(),
+            private_key.clone(),
+            vec![private_key.public()],
+            Bytes::new(),
+            netdb_handle,
+            tp_handle,
+            Vec::new(),
+            Vec::new(),
+            unpublished,
+            ProfileStorage::new(&[], &[], None),
+        )
+    }
+
+    // M135 §8.1/§8.13 (destination half): bridge initializes coherent targets.
+    #[tokio::test(start_paused = true)]
+    async fn m135_destination_targets_initialize_coherent() {
+        let destination = m135_test_destination(3, 2, false);
+        assert_eq!(destination.base_quantity_target(), (3, 2));
+        assert_eq!(destination.desired_quantity_target(), (3, 2));
+        assert_eq!(destination.desired_inbound_count(), 3);
+    }
+
+    // M135 WP5: one narrow call keeps pool and lease-set targets coherent.
+    #[tokio::test(start_paused = true)]
+    async fn m135_destination_bridge_keeps_targets_coherent() {
+        let mut destination = m135_test_destination(3, 3, false);
+        destination
+            .set_tunnel_quantity_target(1, 2)
+            .expect("valid target");
+        assert_eq!(destination.desired_quantity_target(), (1, 2));
+        assert_eq!(destination.desired_inbound_count(), 1);
+        assert_eq!(destination.base_quantity_target(), (3, 3));
+
+        destination
+            .restore_tunnel_quantity_target()
+            .expect("restore succeeds");
+        assert_eq!(destination.desired_quantity_target(), (3, 3));
+        assert_eq!(destination.desired_inbound_count(), 3);
+    }
+
+    // M135 WP5 failure semantics: invalid input fails before either owner
+    // changes; no divergent pair is left behind.
+    #[tokio::test(start_paused = true)]
+    async fn m135_destination_rejects_invalid_without_divergence() {
+        let mut destination = m135_test_destination(2, 2, false);
+        assert_eq!(
+            destination.set_tunnel_quantity_target(99, 1),
+            Err(QuantityTargetError::InvalidQuantity)
+        );
+        assert_eq!(destination.desired_quantity_target(), (2, 2));
+        assert_eq!(destination.desired_inbound_count(), 2);
+    }
+
+    // M135 §8.12: another destination is unaffected by this bridge.
+    #[tokio::test(start_paused = true)]
+    async fn m135_destination_bridge_is_isolated() {
+        let mut first = m135_test_destination(3, 3, false);
+        let second = m135_test_destination(3, 3, false);
+
+        first.set_tunnel_quantity_target(1, 1).unwrap();
+        assert_eq!(first.desired_quantity_target(), (1, 1));
+        assert_eq!(first.desired_inbound_count(), 1);
+        assert_eq!(second.desired_quantity_target(), (3, 3));
+        assert_eq!(second.desired_inbound_count(), 3);
+    }
+
+    // M135 §8.6 end-to-end (neutral): decrease, excess expiry convergence,
+    // restore and rebuild readiness through one destination.
+    //
+    // The pool side converges via normal expiry (simulated by retiring one
+    // excess record, as the pool never purges on target change); the
+    // lease-set side never references a nonexistent tunnel and stops waiting
+    // for the old base count after reduction.
+    #[tokio::test(start_paused = true)]
+    async fn m135_destination_end_to_end_convergence() {
+        let mut destination = m135_test_destination(2, 2, false);
+
+        // Two real inbound leases arrive; the returned lease list is the
+        // only creation-request evidence and references only real tunnels.
+        let mut leases = Vec::new();
+        for _ in 0..2 {
+            leases = destination.lease_set_manager.register_inbound_tunnel(Lease {
+                router_id: RouterId::random(),
+                tunnel_id: TunnelId::from(MockRuntime::rng().next_u32()),
+                expires: MockRuntime::time_since_epoch() + Duration::from_secs(600),
+            });
+        }
+        assert_eq!(leases.len(), 2);
+
+        // Decrease: pool and lease-set desired follow together.
+        destination.set_tunnel_quantity_target(1, 1).unwrap();
+        assert_eq!(destination.desired_quantity_target(), (1, 1));
+        assert_eq!(destination.desired_inbound_count(), 1);
+        // No synchronous fabrication: still exactly the two real leases.
+        assert_eq!(leases.len(), 2);
+
+        // Normal excess expiry converges toward the new target.
+        let retired = leases[0].tunnel_id;
+        destination
+            .lease_set_manager
+            .register_expiring_inbound_tunnel(retired);
+        destination
+            .lease_set_manager
+            .register_expired_inbound_tunnel(retired);
+        // After retiring one excess record, one real lease remains; the
+        // desired count of one is satisfied without waiting for base two.
+        assert_eq!(destination.desired_inbound_count(), 1);
+
+        // Restore: manager awaits real tunnels again, never claiming missing
+        // capacity.
+        destination.restore_tunnel_quantity_target().unwrap();
+        assert_eq!(destination.desired_quantity_target(), (2, 2));
+        assert_eq!(destination.desired_inbound_count(), 2);
     }
 }

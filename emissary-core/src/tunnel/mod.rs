@@ -65,7 +65,10 @@ pub use pool::{TunnelMessage, TunnelMessageRecycle};
 pub use garlic::DeliveryInstructions;
 pub use handle::TunnelManagerHandle;
 pub use noise::NoiseContext;
-pub use pool::{TunnelMessageSender, TunnelPoolConfig, TunnelPoolEvent, TunnelPoolHandle};
+pub use pool::{
+    QuantityTargetError, TunnelMessageSender, TunnelPoolConfig, TunnelPoolEvent, TunnelPoolHandle,
+    MAX_DESIRED_TUNNEL_QUANTITY,
+};
 
 /// Logging target for the file.
 const LOG_TARGET: &str = "emissary::tunnel";

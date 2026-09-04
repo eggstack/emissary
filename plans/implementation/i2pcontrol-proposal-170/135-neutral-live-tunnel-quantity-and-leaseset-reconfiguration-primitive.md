@@ -1,6 +1,8 @@
 # M135 — Neutral Live Tunnel Quantity and LeaseSet Reconfiguration Primitive
 
-Status: **ready / registered**
+Status: **closed as complete**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/135-closure.md`
 
 Class: corrective prerequisite / neutral lower-layer capability / zero-P170-promotion primitive
 

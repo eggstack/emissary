@@ -1,6 +1,6 @@
 # Proposal 170 Session-Lifecycle Completion Roadmap
 
-Status: **active / partial; M135 ready/registered**
+Status: **active / partial; M135 closed as complete, M136 dependency-ready**
 
 Parent roadmap:
 
@@ -8,11 +8,15 @@ Parent roadmap:
 
 Current handoff:
 
-- M135 `plans/implementation/i2pcontrol-proposal-170/135-neutral-live-tunnel-quantity-and-leaseset-reconfiguration-primitive.md` — **ready / registered**.
+- M136 `plans/implementation/i2pcontrol-proposal-170/136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md` — **dependency-ready / unregistered** (M135 gate satisfied; registers on its own step).
+
+Closed corrective primitive:
+
+- M135 `plans/implementation/i2pcontrol-proposal-170/135-neutral-live-tunnel-quantity-and-leaseset-reconfiguration-primitive.md` — **closed as complete** (`plans/closure/i2pcontrol-proposal-170/135-closure.md`), zero promotions, matrix `284/88/468` unchanged.
 
 Deferred corrective successors:
 
-- M136 `136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md` — deferred/unregistered; hard-depends on successful M135 closure;
+- M136 — dependency-ready/unregistered; M135 closure satisfies its gate;
 - M137 `137-m133-corrective-sam-idle-close-and-reasoned-termination.md` — deferred/unregistered; hard-depends on successful M136 closure;
 - M134 `134-newdest-on-proven-idle-resume.md` — historical deferred plan; must be explicitly rebased/amended after M137 or superseded by a corrective M138.
 
@@ -124,10 +128,10 @@ M131 residual primitive re-freeze                         [CLOSED AS BLOCKED —
   |    M133 combined close vertical slice                 [CLOSED AS BLOCKED]
   |
   v
-M135 neutral live quantity + LeaseSet desired-count       [READY / REGISTERED — ZERO PROMOTIONS]
+M135 neutral live quantity + LeaseSet desired-count       [CLOSED AS COMPLETE — ZERO PROMOTIONS]
   |
   v
-M136 M132 corrective: activity + Reduce*                  [DEFERRED / UNREGISTERED]
+M136 M132 corrective: activity + Reduce*                  [DEPENDENCY-READY / UNREGISTERED]
   |
   v
 M137 M133 corrective: Close* + reasoned termination       [DEFERRED / UNREGISTERED]
@@ -136,7 +140,7 @@ M137 M133 corrective: Close* + reasoned termination       [DEFERRED / UNREGISTER
 M134 amended/rebased OR M138 corrective NewDest           [FUTURE — NOT REGISTERED]
 ```
 
-Only M135 is executable now.
+Only M136 may register next, on its own registration step.
 
 ## 5. M135 — lower-layer primitive only
 

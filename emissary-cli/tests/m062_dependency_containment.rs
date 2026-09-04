@@ -601,6 +601,7 @@ fn allowed_production_paths_match_the_m062_budget() {
             || is_authorized_m129_path(path)
             || is_authorized_m130_path(path);
         let authorized_m111 = is_authorized_m111_path(path);
+        let authorized_m135 = is_authorized_m135_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -628,6 +629,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m126
                 || authorized_m127
                 || authorized_m111
+                || authorized_m135
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -644,7 +646,6 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m102
                     || authorized_m099
                     || authorized_m107
-                    || authorized_m109
                     || authorized_m115
                     || authorized_m110
                     || authorized_m116
@@ -658,6 +659,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m125
                     || authorized_m126
                     || authorized_m127
+                    || authorized_m135
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -863,6 +865,25 @@ fn is_authorized_tunnel_runtime_path(path: &str) -> bool {
             | "emissary-cli/src/i2pcontrol/backends/socks_irc.rs"
             | "emissary-cli/src/i2pcontrol/backends/http_bidir.rs"
             | "emissary-cli/src/proxy/socks.rs"
+    )
+}
+
+fn is_authorized_m135_path(path: &str) -> bool {
+    matches!(
+        path,
+        "emissary-core/src/tunnel/pool/handle.rs"
+            | "emissary-core/src/tunnel/pool/mod.rs"
+            | "emissary-core/src/tunnel/mod.rs"
+            | "emissary-core/src/destination/mod.rs"
+            | "emissary-core/src/destination/lease_set.rs"
+            | "plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/135-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/135-neutral-live-tunnel-quantity-and-leaseset-reconfiguration-primitive.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
     )
 }
 

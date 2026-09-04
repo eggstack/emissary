@@ -1,6 +1,6 @@
 # I2PControl for Emissary
 
-Status: partial Proposal 170 support; M095-M096, M098-M103, and M107 closed; M097 and M104 closed as blocked; M126 historical requalification closed; M127 token-lifetime corrective closed; M128 bounded batch conformance closed; M129 non-loopback managed-TLS fail-closed corrective closed; residual option blocker remains
+Status: partial Proposal 170 support; M095-M096, M098-M103, and M107 closed; M097 and M104 closed as blocked; M126 historical requalification closed; M127 token-lifetime corrective closed; M128 bounded batch conformance closed; M129 non-loopback managed-TLS fail-closed corrective closed; M130 post-corrective requalification closed as current-head authority; residual option blocker remains
 
 Proposal 170 remains **Open**. This documentation is pinned to the revision
 created and last updated on `2026-05-20`.

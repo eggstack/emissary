@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; post-M126 corrective line reopened**. M127-M129 closed; M130 is the current registered handoff. The authoritative M095 matrix remains `284 apply / 96 blocked_primitive / 460 not_applicable`.
+Status: **partial Proposal 170 support; post-M126 corrective line closed**. M127-M130 closed; M130 is the current-head requalification authority. The authoritative M095 matrix remains `284 apply / 96 blocked_primitive / 460 not_applicable`.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -36,7 +36,7 @@ Containment/support evidence:
 - M121 truthfully demoted unsupported `SigType` and `Close`/`CloseTime`/`NewDest` semantics instead of retaining approximate support.
 - M124 exact-pins Yosemite Y005 `59140a2277bf296928d2e8ce39a148182eeff044` only through the optional I2PControl alias; ordinary Yosemite remains registry 0.7.0.
 - M125 corrected two server-role `AllowInternalSSL` applicability cells and left 96 blocked cells with no dependency-ready owner.
-- M126 is historical current-head evidence, but subsequent review found three shared-control-plane defects/gaps; its clean auth/TLS/JSON-RPC qualification is superseded pending M130 (C10 resolved by closed M127, C11 resolved by closed M128, C12 resolved by closed M129).
+- M126 is historical current-head evidence, but subsequent review found three shared-control-plane defects/gaps; its clean auth/TLS/JSON-RPC qualification is superseded by M130 for current authority (C10 resolved by closed M127, C11 resolved by closed M128, C12 resolved by closed M129).
 
 Full Proposal 170 support is not claimed.
 
@@ -47,13 +47,13 @@ Full Proposal 170 support is not claimed.
 | M127 | **closed** | finite API-1 token lifetime; expired-vs-unknown behavior; auth bounds |
 | M128 | **closed** | bounded JSON-RPC batch conformance and per-element auth/resource rules |
 | M129 | **closed** | non-loopback bind requires explicit TLS certificate/key; managed TLS loopback-only |
-| M130 | **ready / registered** | integrated post-M127-M129 current-head requalification |
+| M130 | **closed** | integrated post-M127-M129 current-head requalification |
 
 Source roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md`
 
-Only M130 is registered now, consistent with `plans/003-planning-process.md`. Later plan files are written to make the full corrective line explicit, but their implementation status remains gated until predecessor closure.
+No Proposal 170 implementation handoff is currently registered, consistent with `plans/003-planning-process.md`. M130 is the current-head requalification authority; any new concrete defect becomes a separately numbered M131+ focused corrective.
 
 ## M127 — closed corrective
 
@@ -125,15 +125,26 @@ identity explicitly loopback-only:
 M129 supersedes only M126/M108's affected managed-TLS qualification
 claim. Historical M126/M127/M128 closures remain unchanged.
 
-## M130 — current registered handoff
+## M130 — closed requalification authority
 
 Plan:
 
 - `130-post-m127-m129-corrective-requalification.md`
 
-Status: **ready / registered** (promoted on M129 closure).
+Closure:
 
-## M130 — integrated requalification
+- `plans/closure/i2pcontrol-proposal-170/130-closure.md` (implementation `fe1a981`).
+
+M130 froze the post-M129 head, mechanically recomputed matrix authority
+(`284 apply / 96 blocked_primitive / 460 not_applicable`), black-box
+requalified the corrected auth/JSON-RPC/TLS boundary, reran representative
+AddressBook/TunnelManager/RouterInfo/ClientServicesInfo production evidence,
+and re-audited M061/M062 containment and Yosemite isolation. It is the
+current-head “implemented subset operationally/security qualified”
+authority and supersedes the affected M126 shared-control-plane claim.
+Historical M126–M129 closures remain unchanged.
+
+## M130 — integrated requalification (historical plan detail)
 
 Plan:
 
@@ -164,6 +175,7 @@ The reopened line therefore fixes only shared base behavior required by the exte
 | M127 | closed — finite token lifetime, expired/unknown mapping, bounds; matrix unchanged |
 | M128 | closed — bounded batch conformance (`MAX_BATCH_ELEMENTS = 32`), per-element auth, notification/no-content rules; matrix unchanged |
 | M129 | closed — non-loopback managed-TLS fail-closed; managed loopback-only; explicit remote only; matrix unchanged |
+| M130 | closed — post-M127–M129 requalification; current-head implemented-subset qualification restored; matrix unchanged |
 
 Historical closure records are retained unchanged.
 

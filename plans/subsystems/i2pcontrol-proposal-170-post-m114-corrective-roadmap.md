@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 — Post-M114 Corrective Roadmap
 
-Status: **active corrective workstream; M127-M129 closed; M130 ready; requalification pending**
+Status: **corrective workstream closed; M127-M130 closed; M130 is the current-head requalification authority**
 
 Original corrective baseline: `feafc6a1d9650887015a01f87bf21b57a4e92085`
 
@@ -171,11 +171,11 @@ M128 JSON-RPC batch corrective                 [CLOSED]
 M129 non-loopback TLS fail-closed corrective   [CLOSED]
   |
   v
-M130 post-corrective requalification           [READY / REGISTERED; HARD DEPENDS M127-M129 SATISFIED]
+M130 post-corrective requalification           [CLOSED as current-head authority]
   |
-  +--> no defect/new residual owner: retain partial 284/96/460
+  +--> closed clean: partial 284/96/460 retained with current-head qualification
   |
-  +--> concrete defect: register M131+ focused corrective
+  +--> concrete defect found later: register M131+ focused corrective
 ```
 
 Dependency classes:
@@ -183,9 +183,9 @@ Dependency classes:
 - M127 has no open hard dependency and is dependency-ready.
 - M128 is technically local/independent but intentionally sequencing-gated on M127 closure because it shares parser/auth dispatch paths and must consume the corrected token semantics.
 - M129 is technically independent but intentionally sequencing-gated after M128 to keep one active implementation handoff and one closure authority at a time.
-- M130 has hard dependencies on closed M127, M128, and M129 implementations/closures.
+- M130 hard dependencies on closed M127, M128, and M129 implementations/closures are satisfied; M130 is closed.
 
-Only M130 is registered as the current handoff under `plans/003-planning-process.md`.
+No Proposal 170 implementation handoff is currently registered under `plans/003-planning-process.md`.
 
 ## 8. M127 — finite authentication token lifetime
 
@@ -247,9 +247,9 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/130-post-m127-m129-corrective-requalification.md`
 
-Status: **ready / registered** (promoted on M129 closure).
+Status: **closed**; closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`, implementation `fe1a981`.
 
-M130 freezes the actual merged post-M129 head and requalifies:
+M130 froze the post-M129 head and requalified:
 
 - M127 token lifetime/error behavior;
 - M128 single/batch/notification/auth/resource behavior;
@@ -258,7 +258,7 @@ M130 freezes the actual merged post-M129 head and requalifies:
 - M061/M062 containment and Yosemite isolation;
 - active matrix/support documentation.
 
-M130 is the only milestone in this reopened sequence that may restore a clean “current implemented subset operationally/security qualified” statement.
+M130 was the only milestone in this reopened sequence allowed to restore a clean “current implemented subset operationally/security qualified” statement, and it closed cleanly. Historical M126–M129 closures remain unchanged.
 
 ## 12. Residual capability work remains deferred
 
@@ -322,7 +322,8 @@ Mitigation is the milestone decomposition above plus a new M130 integrated requa
 
 M127 closed on the `098c9d1` head with no matrix change; M128 closed on
 the `0ed60eb` head with no matrix change; M129 closed on the `39ccdd7`
-head with no matrix change; M130 is now the registered handoff. Every
+head with no matrix change; M130 closed on the `fe1a981` head with no
+matrix change and no production change. Every
 milestone gets a separate closure record with:
 
 - exact implementation commit(s);
@@ -335,9 +336,9 @@ milestone gets a separate closure record with:
 - next-readiness disposition;
 - internal-only external-interaction attestation.
 
-M127 closure promotes M128; M128 closure promotes M129; M129 closure promotes M130 (done: M130 ready/registered). Registry updates should occur only when the predecessor closes.
+M127 closure promotes M128; M128 closure promotes M129; M129 closure promotes M130 (done: M130 closed). Registry updates should occur only when the predecessor closes.
 
-M130 clean closure restores current-head qualification but does not equal full Proposal 170 completion while applicable residuals remain blocked.
+M130 clean closure restores current-head qualification but does not equal full Proposal 170 completion while applicable residuals remain blocked. No successor is registered; any new concrete defect becomes a separately numbered M131+ focused corrective.
 
 Any new concrete defect found by these milestones becomes an M131+ focused corrective. Do not opportunistically broaden an active milestone.
 

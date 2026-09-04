@@ -32,13 +32,14 @@ baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its
-# named production-path helpers. The M109-M124 entries and the post-M114
-# corrective roadmap below are planning documents only; their presence here
+# named production-path helpers. The M109-M134 entries and focused corrective /
+# completion roadmaps below are planning documents only; their presence here
 # does not authorize any production path, dependency, or lockfile change.
 # Future execution still requires registry readiness and the exact production
 # authority stated by each plan. ADR-0005 authorizes only the I2PControl-owned
 # exact-revision Yosemite fork alias. M122 landed Y004 (c2db73d); M124 adopted
-# reviewed Y005 (59140a2) after Y005 and M123 closed.
+# reviewed Y005 (59140a2) after Y005 and M123 closed. M132 is the sole active
+# implementation handoff; M133-M134 remain dependency-blocked and unregistered.
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",
@@ -59,7 +60,11 @@ root_manifests = [
   "plans/implementation/i2pcontrol-proposal-170/122-corrected-yosemite-leaseset-pin-adoption.md",
   "plans/implementation/i2pcontrol-proposal-170/123-m120-commit-phase-cancellation-atomicity-corrective.md",
   "plans/implementation/i2pcontrol-proposal-170/124-y005-auth-consistency-pin-adoption.md",
+  "plans/implementation/i2pcontrol-proposal-170/132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/133-neutral-sam-idle-close-and-reasoned-termination.md",
+  "plans/implementation/i2pcontrol-proposal-170/134-newdest-on-proven-idle-resume.md",
   "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md",
+  "plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md",
 ]
 
 [prohibited_production_paths]

@@ -1,22 +1,17 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M131 closed as blocked**.
+Status: **partial Proposal 170 support; M132 ready / registered**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
-Current runtime/security qualification authority:
+Current authorities:
 
-- M130 closure: `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
-- M130 implementation `fe1a981`;
-- M130 closure / M131 production-behavior baseline `a68094e128d2b92f0fd5b350e38512ef6b65cb6b`.
+- runtime/security: M130 closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
+- residual applicability/primitive map: M131 closure `plans/closure/i2pcontrol-proposal-170/131-closure.md` and `131-residual-primitive-map.toml`;
+- current matrix: `284 apply / 88 blocked_primitive / 468 not_applicable`;
+- current implementation handoff: M132.
 
-Current registered handoff: **none**. M131 found no dependency-ready successor.
-
-The M131-reconciled M095 matrix is `284 apply / 88 blocked_primitive / 468 not_applicable`.
-
-## Authority
-
-Read in this order:
+## Authority order
 
 1. `plans/000-long-term-specification.md`;
 2. `plans/001-terminology-and-domain-model.md`;
@@ -27,7 +22,7 @@ Read in this order:
 7. `plans/registry.md`;
 8. the specific registered plan.
 
-Containment/support evidence:
+Containment/support evidence remains centered on:
 
 - `061-containment-boundary.toml`;
 - `062-dependency-containment.toml`;
@@ -35,134 +30,116 @@ Containment/support evidence:
 - `105-residual-option-audit.toml`;
 - `110-completion-ledger.toml`.
 
-## Current production/support state
-
-According to M130 and preceding closures:
-
-- RouterInfo: 43 Proposal additions / 42 available / 1 neutral / 0 unavailable;
-- AddressBook CRUD, subscriptions, all 13 SetConfig keys and cross-book precedence operational;
-- all 12 TunnelManager data planes and seven actions exist for the currently claimed subset;
-- all six ClientServicesInfo selectors operational;
-- M121 truthfully demoted unsupported `SigType` and `Close`/`CloseTime`/`NewDest` approximations;
-- Yosemite Y005 `59140a2277bf296928d2e8ce39a148182eeff044` is exact-pinned only through the optional I2PControl alias;
-- M127 finite token lifetime, M128 bounded JSON-RPC batches and M129 fail-closed non-loopback TLS are closed;
-- M130 requalified the corrected shared control plane and representative Proposal production.
-
-Full Proposal 170 support is not claimed.
-
-## M131 — closed residual re-freeze
+## Current registered handoff — M132
 
 Plan:
 
-- `131-residual-applicability-and-primitive-architecture-refreeze.md`
+- `132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md`.
 
-Status: **closed as blocked**.
+Source roadmap:
 
-Outcome:
+- `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md`.
 
-Re-froze all 96 starting blocked TunnelManager cells. Eight cells were reclassified to `not_applicable` from affirmative reference applicability evidence; 88 remain `blocked_primitive`. M131 made no runtime production change and promoted zero cells to `apply`.
+Status: **ready / registered**.
 
-Evidence artifact: `131-residual-primitive-map.toml`; closure: `plans/closure/i2pcontrol-proposal-170/131-closure.md`.
+M132 implements one vertical contract slice:
 
-M131 delivered:
+- actual SAM/I2CP session activity at the streaming/datagram payload boundary;
+- a neutral bounded live active inbound/outbound tunnel-pool target separate from configured/base quantity;
+- exact idle reduction and restoration semantics;
+- Proposal `Reduce`, `ReduceCount`, `ReduceTime` validation and mapping through the existing Yosemite session-option boundary;
+- shared-session compatibility/activity aggregation;
+- truthful LeaseSet/pool behavior and generation-local cancellation/restart semantics.
 
-- exact mechanical enumeration of all 96 starting blocked cells;
-- cell-level applicability and semantic evidence;
-- evidence-backed blocker-owner corrections;
-- `not_applicable` corrections only with affirmative pinned/reference evidence;
-- **zero `apply` promotions**;
-- a machine-readable residual primitive map;
-- canonical owners and minimal future path budgets;
-- dependency/security/failure/restart analysis for each future primitive cluster;
-- one next dependency-ready M132+ handoff at closure, or an explicit no-handoff result.
+M132 is an explicit neutral lower-layer exception. Its production path budget is limited to existing canonical SAM/destination/tunnel-pool owners plus the I2PControl session adapter. No Cargo/dependency/Yosemite/frontend/startup/NetDb/crypto expansion is authorized.
 
-Required semantic review includes:
+Starting matrix is `284 / 88 / 468`. M132 may promote up to 21 `Reduce*` cells only where direct reference and end-to-end evidence prove applicability; Streamr cells remain blocked if ambiguity remains.
 
-- `UseOutproxyPlugin`, `SSLProxies`, `JumpList` applicability;
-- every Streamr residual;
-- `Profile` streaming-window/runtime semantics;
-- session application-activity, idle reduction, close and resume semantics for `Reduce*`, `Close*`, `NewDest`;
-- `UniqueLocalAddressPerClient` source-bind behavior and loopback confinement;
-- `MultiHoming` versus `shouldBundleReplyInfo`;
-- exact `UseSSL` type/direction/identity/trust semantics;
-- `SigType` crypto/destination requirements;
-- encrypted/authenticated LeaseSet runtime ownership below Yosemite Y005.
+## Deferred successor — M133
 
-M131 explicitly authorizes no production Rust changes, no Cargo/dependency changes and no Yosemite writes.
+Plan:
 
-## Current residual starting state
+- `133-neutral-sam-idle-close-and-reasoned-termination.md`.
 
-The M131 starting 96 blocked cells were reconciled to:
+Status: **deferred / unregistered**; hard-depends on M132 closure.
 
-- 4 `UseSSL` cells;
-- 10 `SigType` cells;
-- 63 client proxy/profile/reduction/lifecycle cells;
-- 19 server presentation/routing/LeaseSet cells.
+M133 extends the same neutral activity/timer state machine for `Close`/`CloseTime`, performs real idle session teardown and exposes a neutral authoritative in-process idle-close reason. It does not implement `NewDest` and may not invent a SAM wire extension.
 
-Current matrix: `284 apply / 88 blocked_primitive / 468 not_applicable`.
+## Deferred successor — M134
 
-M131 must derive the exact set mechanically from M095. Counts are evidence, not targets.
+Plan:
 
-## Candidate future primitive clusters
+- `134-newdest-on-proven-idle-resume.md`.
 
-M131 must test rather than assume these clusters:
+Status: **deferred / unregistered**; hard-depends on M133 closure.
 
-- HTTP address-helper / SSL-outproxy behavior;
-- local presentation TLS;
-- streaming profile/window configuration;
-- I2P-session activity + idle reduction/close/resume;
-- per-client local source addressing;
-- `shouldBundleReplyInfo` / sender LeaseSet bundling;
-- outproxy-provider/plugin integration;
-- destination signing-type generation;
+M134 keeps destination/key rotation under existing I2PControl secret/session owners. It rotates exactly once on successful resume after a proven idle close, with staged-secret rollback on failure/cancellation. Manual stop/start, restart, process restart and unrelated failure do not rotate. Streamr `NewDest` remains not applicable under M131 authority.
+
+## Current support state
+
+According to current closure authority:
+
+- RouterInfo: 43 additions / 42 available / 1 neutral / 0 unavailable;
+- AddressBook CRUD, subscriptions, all 13 SetConfig keys and cross-book precedence operational;
+- all 12 canonical TunnelManager data planes and seven actions exist for the claimed subset;
+- all six ClientServicesInfo selectors operational;
+- M127 finite token lifetime, M128 bounded batch conformance and M129 fail-closed non-loopback TLS are requalified by M130;
+- M131 corrected eight false applicability blockers and retained 88 genuine primitive blockers.
+
+Full Proposal 170 support is not claimed.
+
+## Active dependency graph
+
+```text
+M130 current runtime/security authority         [CLOSED]
+  |
+  v
+M131 residual primitive re-freeze               [CLOSED AS BLOCKED — 284/88/468]
+  |
+  v
+M132 idle reduction + live pool target          [READY / REGISTERED]
+  |
+  v
+M133 idle close + reasoned termination          [DEFERRED / UNREGISTERED]
+  |
+  v
+M134 NewDest on proven idle resume              [DEFERRED / UNREGISTERED]
+```
+
+Only M132 is executable under the current registry.
+
+## Other residual clusters
+
+Remain unregistered under M131 authority:
+
+- presentation `UseSSL`;
+- destination `SigType`;
+- outproxy provider/plugin integration;
+- HTTP `SSLProxies` and `JumpList`;
+- streaming `Profile`;
+- retained Streamr lifecycle ambiguity such as `ConnectDelay`;
+- `UniqueLocalAddressPerClient`;
+- `MultiHoming`/`shouldBundleReplyInfo`;
 - encrypted/authenticated LeaseSets.
 
-No M132+ plan is registered: no retained primitive cluster has a complete owner, security/interoperability contract, path budget and dependency authorization.
-
-## Recent closed sequence
-
-| Handoff | Status | Scope |
-|---|---|---|
-| M121 | closed | semantic truthfulness; `SigType` and idle lifecycle demotions |
-| M122 | closed | exact Y004 dependency adoption |
-| M123 | closed | cancellation/commit atomicity |
-| M124 | closed | exact Y005 dependency adoption |
-| M125 | closed | residual capability audit; two `AllowInternalSSL` applicability corrections |
-| M126 | historical | pre-corrective shared-control-plane requalification |
-| M127 | closed | finite API token lifetime |
-| M128 | closed | bounded JSON-RPC batch conformance |
-| M129 | closed | non-loopback explicit-TLS requirement; managed loopback-only |
-| M130 | closed | integrated current-head runtime/security requalification |
-| M131 | **closed as blocked** | residual applicability and primitive-architecture re-freeze; 8 applicability corrections, 88 residual primitive blockers |
-
-Historical closure records remain unchanged.
-
-## Canonical base-I2PControl scope
-
-`plans/000-long-term-specification.md` excludes unrelated base-method parity from Proposal-170 completion. `GetKeys`, `GetRate`, `RouterManager`, `NetworkSetting`, `AdvancedSettings` and similar methods remain outside this workstream.
-
-Shared base behavior is in scope only where needed for the implemented extension surface: authentication/version/token semantics, HTTPS, JSON-RPC envelopes/IDs/notifications/batches and protected dispatch.
+No active lifecycle plan authorizes these areas.
 
 ## Containment
 
 Preferred production ownership remains `emissary-cli/src/i2pcontrol/**`.
 
-Any future path outside that boundary requires a neutral canonical owner, exact path budget, containment amendment and separately registered plan. No Proposal-shaped core API, global Yosemite patch, path dependency, vendoring, floating fork, frontend coupling or broad router refactor is authorized.
+M132 is the narrowly registered exception for generic lower-layer session/pool behavior and must amend M062 to the exact production diff. Core APIs must remain neutral and contain no Proposal/I2PControl business concepts.
 
-All external I2P/upstream Emissary/upstream Yosemite sources are read-only evidence.
+Yosemite remains exact-pinned through the optional `yosemite-i2pcontrol` alias; no global patch, vendoring, path dependency, floating ref or parallel raw SAM stack is permitted.
 
 ## Verification baseline
 
-M131 is planning/evidence-only. If it changes M095/M105/M110 or their focused guards, run at minimum:
+Individual plans refine focused tests. Broad implementation verification includes relevant core/CLI checks and tests, M061/M062 containment, M095/M105 matrix guards, live runtime where applicable, clippy, `cargo fmt --all -- --check`, and `git diff --check`.
 
-```text
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m095_full_support_matrix --test m105_residual_option_audit --no-fail-fast
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m061_containment --test m062_dependency_containment --no-fail-fast
-cargo check -p emissary-cli --no-default-features --features i2pcontrol
-cargo check -p emissary-cli --no-default-features
-cargo check
-cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
-git diff --check
-```
+Known repository-wide stable/nightly rustfmt drift is recorded rather than normalized through unrelated churn.
 
-Existing stable/nightly rustfmt drift must be recorded rather than normalized through unrelated churn.
+## Internal-only rule
+
+All writes remain internal to `eggstack/emissary` unless a separate explicit maintainer directive authorizes another internal target. External I2P/upstream Emissary/upstream Yosemite sources are read-only evidence.
+
+No plan authorizes upstream issue/PR/review/contact/submission/release/merge/adoption activity.

@@ -81,6 +81,40 @@ const LOG_TARGET: &str = "emissary::sam";
 /// SAMv3 command channel size.
 const COMMAND_CHANNEL_SIZE: usize = 256;
 
+/// Neutral authoritative termination cause for one SAM session generation.
+///
+/// Recorded at the winning lifecycle transition, not inferred after the
+/// session disappears. Generation-local, never persisted, and available
+/// in-process for a future identity-resume consumer. Contains no secrets,
+/// addresses, or administrative policy names.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SamTerminationReason {
+    /// Idle policy closed the session after the close threshold.
+    IdlePolicy,
+    /// Explicit/manual/requested close (client quit, socket close, final
+    /// member release, restart).
+    Requested,
+    /// Failure/transport shutdown where authoritative.
+    Failure,
+    /// The winning cause cannot be proven; never fabricate idle.
+    Unknown,
+}
+
+/// Authoritative result of one SAM session generation.
+///
+/// Carries the stable session identifier and the neutral termination
+/// cause recorded by the winning transition. The generation identifier
+/// for stale-generation protection is owned by the session future
+/// (`idle_generation`); a replacement generation starts without
+/// inherited idle/reduced/closing state and never replays this fact.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SamSessionResult {
+    /// Stable SAM session identifier.
+    pub session_id: Arc<str>,
+    /// Neutral authoritative termination cause.
+    pub reason: SamTerminationReason,
+}
+
 /// A sanitized lifecycle fact emitted by the authoritative SAM owner.
 ///
 /// The event contains no socket, session, destination, key, or command-channel handle. The
@@ -124,6 +158,8 @@ pub enum SamObservationEvent {
     SessionRemoved {
         /// SAM session identifier.
         session_id: Arc<str>,
+        /// Neutral authoritative termination cause.
+        reason: SamTerminationReason,
     },
 }
 
@@ -231,7 +267,7 @@ impl<R: Runtime, T: 'static + Send + Unpin> SessionContext<R, T> {
     }
 }
 
-impl<R: Runtime> SessionContext<R, Arc<str>> {
+impl<R: Runtime, T: 'static + Send + Unpin> SessionContext<R, T> {
     /// Send `command` to an active session identified by `session_id`.
     fn send_command(
         &self,
@@ -307,7 +343,7 @@ pub struct SamServer<R: Runtime> {
     active_destinations: HashSet<DestinationId>,
 
     /// Active SAMV3 sessions.
-    active_sessions: SessionContext<R, Arc<str>>,
+    active_sessions: SessionContext<R, SamSessionResult>,
 
     /// Address book.
     address_book: Option<Arc<dyn AddressBook>>,
@@ -962,6 +998,7 @@ impl<R: Runtime> Future for SamServer<R> {
                                 this.observation_hook.as_ref(),
                                 SamObservationEvent::SessionRemoved {
                                     session_id: sanitized_text(&context.session_id, 256),
+                                    reason: SamTerminationReason::Failure,
                                 },
                             );
 
@@ -985,10 +1022,12 @@ impl<R: Runtime> Future for SamServer<R> {
             match this.active_sessions.poll_next_unpin(cx) {
                 Poll::Pending => break,
                 Poll::Ready(None) => return Poll::Ready(()),
-                Poll::Ready(Some(session_id)) => {
+                Poll::Ready(Some(result)) => {
+                    let SamSessionResult { session_id, reason } = result;
                     tracing::info!(
                         target: LOG_TARGET,
                         %session_id,
+                        ?reason,
                         "session terminated",
                     );
                     this.active_sessions.remove(&session_id);
@@ -996,6 +1035,7 @@ impl<R: Runtime> Future for SamServer<R> {
                         this.observation_hook.as_ref(),
                         SamObservationEvent::SessionRemoved {
                             session_id: sanitized_text(&session_id, 256),
+                            reason,
                         },
                     );
 

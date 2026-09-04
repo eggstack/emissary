@@ -312,7 +312,27 @@ fn audit_covers_the_exact_m104_residual_inventory() {
     assert_eq!(m136_completed.len(), 21);
     let expected_post_m136 =
         expected_post_m131.difference(&m136_completed).cloned().collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m136);
+    // M137 promotes the 14 Close/CloseTime client cells to apply.
+    let m137_completed: BTreeSet<(String, String)> = ["Close", "CloseTime"]
+        .into_iter()
+        .flat_map(|option| {
+            [
+                "client",
+                "httpclient",
+                "ircclient",
+                "socks",
+                "socksirc",
+                "connectclient",
+                "streamrclient",
+            ]
+            .into_iter()
+            .map(move |tunnel_type| (option.to_owned(), tunnel_type.to_owned()))
+        })
+        .collect();
+    assert_eq!(m137_completed.len(), 14);
+    let expected_post_m137 =
+        expected_post_m136.difference(&m137_completed).cloned().collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m137);
     assert_eq!(
         audit["summary"]["post_m116_reclassified_cells"].as_integer(),
         Some(7)

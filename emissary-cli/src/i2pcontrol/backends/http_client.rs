@@ -713,12 +713,14 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "Reduce",
         "ReduceCount",
         "ReduceTime",
+        "Close",
+        "CloseTime",
         "Shared",
         "PersistentClientKey",
         "PrivKeyFile",
     ];
-    // M121: "Close", "CloseTime", and "NewDest" demoted to blocked_primitive.
-    // M136: Reduce family supported.
+    // M121: "NewDest" remains demoted to blocked_primitive.
+    // M136: Reduce family supported. M137: Close family supported.
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
             continue;

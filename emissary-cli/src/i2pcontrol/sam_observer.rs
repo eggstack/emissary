@@ -265,7 +265,7 @@ impl SamObservationHook for SamObservationSource {
                 }
                 state.is_representable()
             }
-            SamObservationEvent::SessionRemoved { session_id } => {
+            SamObservationEvent::SessionRemoved { session_id, .. } => {
                 let removed = state.sessions.remove(&session_id).is_some();
                 state.unknown_sockets.retain(|(id, _), _| id.as_ref() != session_id.as_ref());
                 if removed {

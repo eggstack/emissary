@@ -426,16 +426,19 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "Reduce",
         "ReduceCount",
         "ReduceTime",
+        "Close",
+        "CloseTime",
         "Shared",
         "PersistentClientKey",
         "PrivKeyFile",
     ];
-    // M121: "Close", "CloseTime", and "NewDest" are demoted to
-    // blocked_primitive (reference I2P-session idle semantics have no local
-    // observation primitive). Any supplied value fails in
-    // client_lifecycle_config / validate_common_options before allocation.
+    // M121: "NewDest" remains demoted to blocked_primitive. Any supplied
+    // value fails in client_lifecycle_config / validate_common_options
+    // before allocation.
     // M136: "Reduce"/"ReduceCount"/"ReduceTime" are supported via the
     // canonical SAM idle owner and Yosemite generic session options.
+    // M137: "Close"/"CloseTime" are supported via the same canonical owner
+    // (close-before-reduce, canonical teardown, neutral reason).
     const METADATA: &[&str] = &[
         "name",
         "type",

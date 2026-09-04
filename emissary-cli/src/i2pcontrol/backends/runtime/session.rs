@@ -31,13 +31,22 @@ const REDUCE_DEFAULT_QUANTITY: u64 = 1;
 /// Proposal-valid reduced quantity range, matching `TunnelQuantity` 1..6.
 const REDUCE_MAX_QUANTITY: u64 = 6;
 
+/// Reference idle-close defaults frozen from I2CP/Java evidence.
+///
+/// - default close delay 30 minutes (1800000 ms);
+/// - minimum close delay 5 minutes (300000 ms).
+const CLOSE_DEFAULT_IDLE_TIME_MS: u64 = 1_800_000;
+const CLOSE_MIN_IDLE_TIME_MS: u64 = 300_000;
+
 /// Generation-local lifecycle controls for streaming client listeners.
 ///
-/// Only `ConnectDelay` remains an applied Proposal lifecycle effect. `Close`,
-/// `CloseTime`, and `NewDest` are M121-demoted to `blocked_primitive`: the
-/// reference idle policy observes I2P-session activity while the local owner
-/// can only count accepted TCP handler tasks, and Yosemite exposes no
-/// session-activity observation primitive. Any supplied close/new-dest value
+/// `ConnectDelay` remains an applied Proposal lifecycle effect via the
+/// generation-local outbound connector. Proposal `Close`/`CloseTime` are
+/// M137-applied via the router-side SAM idle owner (standard
+/// `i2cp.close*` through Yosemite generic session options), not via the
+/// local TCP-handler-count heuristic: the local `close_on_idle` switch
+/// stays disabled and `run_idle_closer` is never armed by Proposal
+/// values. `NewDest` remains `blocked_primitive` and any supplied value
 /// fails before allocation (see `client_lifecycle_config`).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ClientLifecycleConfig {
@@ -684,6 +693,77 @@ fn parse_reduce_policy(definition: &TunnelDefinition) -> BackendResult<Option<Re
     }))
 }
 
+/// Validated Proposal idle-close policy for one definition.
+///
+/// `None` means close disabled (no close timer/work). `Some` carries the
+/// exact standard `i2cp.closeIdleTime` value to serialize via Yosemite's
+/// validated generic additional-session-option path.
+///
+/// Frozen semantics (M095/M105 + pinned Proposal + Java/I2CP reference):
+/// - `Close` boolean is the master switch; absent or `false` disables;
+/// - `CloseTime` duration in milliseconds, minimum 300000, default
+///   1800000 when `Close` is true and the field is absent;
+/// - `CloseTime` without `Close=true` fails before allocation (no silent
+///   enable, no accept-inert ignore);
+/// - server families reject any `Close*` presence (not applicable);
+/// - malformed types fail before allocation.
+///
+/// Core remains fail-safe for non-I2PControl SAM input, but I2PControl
+/// enforces Proposal-valid values here before listener/session allocation.
+fn parse_close_policy(definition: &TunnelDefinition) -> BackendResult<Option<u64>> {
+    let tunnel_type = definition.tunnel_type;
+    let has_close = definition.raw_config.contains_key("Close");
+    let has_time = definition.raw_config.contains_key("CloseTime");
+
+    if !tunnel_type.is_client() {
+        if has_close || has_time {
+            let option = if has_close { "Close" } else { "CloseTime" };
+            return Err(BackendError::UnsupportedOption {
+                tunnel_type,
+                option: option.to_owned(),
+            });
+        }
+        return Ok(None);
+    }
+
+    let enabled = match definition.raw_config.get("Close") {
+        None => false,
+        Some(value) => value.as_bool().ok_or_else(|| BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "Close".to_owned(),
+        })?,
+    };
+
+    if !enabled {
+        if has_time {
+            return Err(BackendError::UnsupportedOption {
+                tunnel_type,
+                option: "CloseTime".to_owned(),
+            });
+        }
+        return Ok(None);
+    }
+
+    let idle_time_ms = match definition.raw_config.get("CloseTime") {
+        None => CLOSE_DEFAULT_IDLE_TIME_MS,
+        Some(value) => {
+            let parsed = value.as_u64().ok_or_else(|| BackendError::UnsupportedOption {
+                tunnel_type,
+                option: "CloseTime".to_owned(),
+            })?;
+            if parsed < CLOSE_MIN_IDLE_TIME_MS {
+                return Err(BackendError::UnsupportedOption {
+                    tunnel_type,
+                    option: "CloseTime".to_owned(),
+                });
+            }
+            parsed
+        }
+    };
+
+    Ok(Some(idle_time_ms))
+}
+
 /// Build the Yosemite session settings for one validated definition.
 ///
 /// The returned settings are safe to move into a runtime task. Persistent
@@ -697,21 +777,9 @@ pub fn build_session_options(
 ) -> BackendResult<SessionOptions> {
     validate_common_options(definition.tunnel_type, &definition.options).map_err(option_error)?;
 
-    // M121 §5.2 remains authoritative: `Close`/`CloseTime` are blocked for
-    // every family, including Streamr which bypasses `client_lifecycle_config`.
-    // M136 must not close a session; M137 owns close semantics.
-    if definition.raw_config.contains_key("Close") {
-        return Err(BackendError::UnsupportedOption {
-            tunnel_type: definition.tunnel_type,
-            option: "Close".to_owned(),
-        });
-    }
-    if definition.raw_config.contains_key("CloseTime") {
-        return Err(BackendError::UnsupportedOption {
-            tunnel_type: definition.tunnel_type,
-            option: "CloseTime".to_owned(),
-        });
-    }
+    // M137: `Close`/`CloseTime` are validated by `parse_close_policy`
+    // below (including Streamr which bypasses `client_lifecycle_config`).
+    // No Yosemite change, no raw SAM command construction.
 
     if definition.options.tunnel_length.is_some_and(|value| value > 3) {
         return Err(BackendError::UnsupportedOption {
@@ -782,6 +850,25 @@ pub fn build_session_options(
             .map_err(|_| BackendError::UnsupportedOption {
                 tunnel_type: definition.tunnel_type,
                 option: "ReduceCount".to_owned(),
+            })?;
+    }
+
+    // M137: map validated Proposal `Close`/`CloseTime` through the same
+    // validated generic path. Close-before-reduce ordering and
+    // close<=reduce suppression are enforced router-side by the same
+    // canonical SAM idle owner.
+    if let Some(idle_time_ms) = parse_close_policy(definition)? {
+        options
+            .add_session_option("i2cp.closeOnIdle".to_owned(), "true".to_owned())
+            .map_err(|_| BackendError::UnsupportedOption {
+                tunnel_type: definition.tunnel_type,
+                option: "Close".to_owned(),
+            })?;
+        options
+            .add_session_option("i2cp.closeIdleTime".to_owned(), idle_time_ms.to_string())
+            .map_err(|_| BackendError::UnsupportedOption {
+                tunnel_type: definition.tunnel_type,
+                option: "CloseTime".to_owned(),
             })?;
     }
 
@@ -864,10 +951,13 @@ fn option_error(error: super::super::options::OptionValidationError) -> BackendE
 }
 
 /// Parse the residual client lifecycle fields before any runtime allocation.
-/// `ConnectDelay` remains applied; `Close`, `CloseTime`, and `NewDest` are
-/// M121-demoted to `blocked_primitive` and any supplied value fails here,
-/// before listener/session allocation. Values remain in canonical raw config
-/// for lossless round-trip, but no close/new-dest runtime effect is claimed.
+/// `ConnectDelay` remains applied via the local connector. Proposal
+/// `Close`/`CloseTime` are M137-applied router-side via `build_session_options`
+/// (standard `i2cp.close*`); they are validated here fail-before-allocation
+/// but never arm the local TCP-handler-count `run_idle_closer`, which stays
+/// disabled. `NewDest` remains `blocked_primitive` and any supplied value
+/// fails here, before listener/session allocation. Values remain in canonical
+/// raw config for lossless round-trip.
 pub(crate) fn client_lifecycle_config(
     definition: &TunnelDefinition,
 ) -> BackendResult<ClientLifecycleConfig> {
@@ -885,21 +975,10 @@ pub(crate) fn client_lifecycle_config(
     }
 
     let connect_delay = raw_duration(definition, "ConnectDelay", 0, MAX_CONNECT_DELAY)?;
-    // M121 §5.2 demotion: reference closeOnIdle observes I2P-session activity
-    // (bytes/messages), not accepted local TCP handler count, and Yosemite
-    // exposes no session-activity observation primitive. Fail closed.
-    if definition.raw_config.contains_key("Close") {
-        return Err(BackendError::UnsupportedOption {
-            tunnel_type,
-            option: "Close".to_owned(),
-        });
-    }
-    if definition.raw_config.contains_key("CloseTime") {
-        return Err(BackendError::UnsupportedOption {
-            tunnel_type,
-            option: "CloseTime".to_owned(),
-        });
-    }
+    // M137: validate Proposal close values fail-before-allocation; the
+    // runtime effect is router-side via Yosemite generic options, never via
+    // the local handler-count heuristic.
+    let _ = parse_close_policy(definition)?;
     if definition.options.new_dest.is_some() {
         return Err(BackendError::UnsupportedOption {
             tunnel_type,
@@ -1012,6 +1091,10 @@ mod tests {
 
     #[test]
     fn m121_close_closetime_newdest_fail_before_allocation_for_all_clients() {
+        // M137 update: `Close`/`CloseTime` are now applied router-side via
+        // the canonical SAM idle owner (validated here and mapped through
+        // Yosemite generic options); the local handler-count heuristic stays
+        // disabled. `NewDest` remains blocked.
         use crate::i2pcontrol::domain::tunnel::TunnelType::*;
         for tunnel_type in [
             Client,
@@ -1024,11 +1107,15 @@ mod tests {
             let mut close_def = definition();
             close_def.tunnel_type = tunnel_type;
             close_def.raw_config.insert("Close".to_owned(), serde_json::json!(true));
-            assert!(matches!(
-                client_lifecycle_config(&close_def),
-                Err(BackendError::UnsupportedOption { option, .. }) if option == "Close"
-            ));
+            // Valid close passes lifecycle (local closer stays disabled) and
+            // maps through session options.
+            let lifecycle = client_lifecycle_config(&close_def).unwrap();
+            assert!(!lifecycle.close_on_idle);
+            assert!(
+                build_session_options(&close_def, 7656, false, DestinationKind::Transient).is_ok()
+            );
 
+            // Below-minimum close time still fails before allocation.
             let mut close_time_def = definition();
             close_time_def.tunnel_type = tunnel_type;
             close_time_def
@@ -1080,8 +1167,9 @@ mod tests {
 
     #[test]
     fn client_lifecycle_controls_are_bounded_and_fail_before_allocation() {
-        // ConnectDelay remains applied; Close/CloseTime/NewDest are M121
-        // demoted: any supplied value fails before allocation.
+        // ConnectDelay remains applied; Close/CloseTime are M137-applied
+        // router-side (validated here, local closer stays disabled);
+        // NewDest remains M121-demoted and any supplied value fails.
         let mut valid = definition();
         valid.raw_config.insert("ConnectDelay".to_owned(), serde_json::json!(60_000));
         let lifecycle = client_lifecycle_config(&valid).unwrap();
@@ -1089,11 +1177,21 @@ mod tests {
         assert!(!lifecycle.close_on_idle);
         assert!(!lifecycle.new_dest_on_resume);
 
+        // Valid close passes lifecycle with the local heuristic disabled.
+        let mut valid_close = definition();
+        valid_close.raw_config.insert("Close".to_owned(), serde_json::json!(true));
+        let lifecycle = client_lifecycle_config(&valid_close).unwrap();
+        assert!(!lifecycle.close_on_idle);
+        let mut valid_close_time = definition();
+        valid_close_time.raw_config.insert("Close".to_owned(), serde_json::json!(true));
+        valid_close_time
+            .raw_config
+            .insert("CloseTime".to_owned(), serde_json::json!(600_000));
+        assert!(client_lifecycle_config(&valid_close_time).is_ok());
+
         for (key, value) in [
             ("ConnectDelay", serde_json::json!(60_001)),
             ("ConnectDelay", serde_json::json!(-1)),
-            ("Close", serde_json::json!(true)),
-            ("Close", serde_json::json!(false)),
             ("Close", serde_json::json!("true")),
             ("CloseTime", serde_json::json!(0)),
             ("CloseTime", serde_json::json!(1)),
@@ -1105,11 +1203,15 @@ mod tests {
                 Err(BackendError::UnsupportedOption { option, .. }) if option == key
             ));
         }
+        // `Close=false` is valid (disabled, no wire effect).
+        let mut disabled = definition();
+        disabled.raw_config.insert("Close".to_owned(), serde_json::json!(false));
+        assert!(client_lifecycle_config(&disabled).is_ok());
 
         let mut close_time_without_close = definition();
         close_time_without_close
             .raw_config
-            .insert("CloseTime".to_owned(), serde_json::json!(1));
+            .insert("CloseTime".to_owned(), serde_json::json!(600_000));
         assert!(matches!(
             client_lifecycle_config(&close_time_without_close),
             Err(BackendError::UnsupportedOption { option, .. }) if option == "CloseTime"
@@ -1122,8 +1224,9 @@ mod tests {
             Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
         ));
 
-        // M121: NewDest=false is also blocked (no accept-inert). Close is
-        // blocked even with Shared (fail on Close first).
+        // M121: NewDest=false is also blocked (no accept-inert). Close=true
+        // with Shared passes lifecycle (sharing compatibility is enforced
+        // via the session-options identity, not by rejecting close).
         let mut new_dest_false = definition();
         new_dest_false.options.new_dest = Some(false);
         assert!(matches!(
@@ -1134,10 +1237,8 @@ mod tests {
         let mut shared_close = definition();
         shared_close.raw_config.insert("Close".to_owned(), serde_json::json!(true));
         shared_close.options.shared = Some(true);
-        assert!(matches!(
-            client_lifecycle_config(&shared_close),
-            Err(BackendError::UnsupportedOption { option, .. }) if option == "Close"
-        ));
+        let lifecycle = client_lifecycle_config(&shared_close).unwrap();
+        assert!(!lifecycle.close_on_idle);
 
         let mut persistent_new_dest = definition();
         persistent_new_dest.options.new_dest = Some(true);
@@ -1862,7 +1963,71 @@ mod tests {
     }
 
     #[test]
-    fn m136_close_remains_blocked_for_all_clients_including_streamr() {
+    fn m137_close_absent_or_false_is_disabled_without_wire() {
+        for tunnel_type in [
+            TunnelType::Client,
+            TunnelType::HttpClient,
+            TunnelType::IrcClient,
+            TunnelType::Socks,
+            TunnelType::SocksIrc,
+            TunnelType::ConnectClient,
+            TunnelType::StreamrClient,
+        ] {
+            let absent = reduce_definition(tunnel_type, &[]);
+            // Absent close alone is disabled; reduce-absent definitions carry
+            // no close wire either (reduce tests cover reduce-absent).
+            assert!(parse_close_policy(&absent).unwrap().is_none());
+
+            let disabled = reduce_definition(tunnel_type, &[("Close", serde_json::json!(false))]);
+            assert!(parse_close_policy(&disabled).unwrap().is_none());
+        }
+    }
+
+    #[test]
+    fn m137_close_true_maps_defaults_through_generic_path() {
+        let def = reduce_definition(TunnelType::Client, &[("Close", serde_json::json!(true))]);
+        let idle_ms = parse_close_policy(&def).unwrap().expect("enabled");
+        assert_eq!(idle_ms, CLOSE_DEFAULT_IDLE_TIME_MS);
+
+        let options = build_session_options(&def, 7656, false, DestinationKind::Transient).unwrap();
+        let keys: Vec<_> = options
+            .additional_options
+            .iter()
+            .map(|o| (o.key().to_owned(), o.value().to_owned()))
+            .collect();
+        assert!(keys.contains(&("i2cp.closeOnIdle".to_owned(), "true".to_owned())));
+        assert!(keys.contains(&(
+            "i2cp.closeIdleTime".to_owned(),
+            CLOSE_DEFAULT_IDLE_TIME_MS.to_string()
+        )));
+    }
+
+    #[test]
+    fn m137_close_true_with_custom_valid_time() {
+        let def = reduce_definition(
+            TunnelType::Client,
+            &[
+                ("Close", serde_json::json!(true)),
+                ("CloseTime", serde_json::json!(600_000)),
+            ],
+        );
+        let idle_ms = parse_close_policy(&def).unwrap().expect("enabled");
+        assert_eq!(idle_ms, 600_000);
+
+        let options = build_session_options(&def, 7656, false, DestinationKind::Transient).unwrap();
+        let map: std::collections::BTreeMap<_, _> = options
+            .additional_options
+            .iter()
+            .map(|o| (o.key().to_owned(), o.value().to_owned()))
+            .collect();
+        assert_eq!(
+            map.get("i2cp.closeIdleTime").map(String::as_str),
+            Some("600000")
+        );
+    }
+
+    #[test]
+    fn m137_close_time_without_close_fails_before_allocation() {
         use TunnelType::*;
         for tunnel_type in [
             Client,
@@ -1873,17 +2038,167 @@ mod tests {
             ConnectClient,
             StreamrClient,
         ] {
-            let close = reduce_definition(tunnel_type, &[("Close", serde_json::json!(true))]);
+            let def = reduce_definition(tunnel_type, &[("CloseTime", serde_json::json!(600_000))]);
+            let err = parse_close_policy(&def).unwrap_err();
+            assert!(
+                matches!(err, BackendError::UnsupportedOption { ref option, .. } if option == "CloseTime"),
+                "{tunnel_type} CloseTime without Close must fail"
+            );
             assert!(matches!(
-                build_session_options(&close, 7656, false, DestinationKind::Transient),
-                Err(BackendError::UnsupportedOption { option, .. }) if option == "Close"
+                build_session_options(&def, 7656, false, DestinationKind::Transient),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "CloseTime"
             ));
-            let close_time =
-                reduce_definition(tunnel_type, &[("CloseTime", serde_json::json!(600_000))]);
             assert!(matches!(
-                build_session_options(&close_time, 7656, false, DestinationKind::Transient),
+                client_lifecycle_config(&def),
                 Err(BackendError::UnsupportedOption { option, .. }) if option == "CloseTime"
             ));
         }
+    }
+
+    #[test]
+    fn m137_malformed_close_values_fail_before_allocation() {
+        for value in [
+            serde_json::json!("true"),
+            serde_json::json!(1),
+            serde_json::json!(null),
+        ] {
+            let def = reduce_definition(TunnelType::Client, &[("Close", value)]);
+            assert!(matches!(
+                parse_close_policy(&def),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "Close"
+            ));
+        }
+        for value in [
+            serde_json::json!(0),
+            serde_json::json!(299_999),
+            serde_json::json!(-1),
+            serde_json::json!("600000"),
+            serde_json::json!(600_000.5),
+        ] {
+            let def = reduce_definition(
+                TunnelType::Client,
+                &[("Close", serde_json::json!(true)), ("CloseTime", value)],
+            );
+            assert!(matches!(
+                parse_close_policy(&def),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "CloseTime"
+            ));
+        }
+    }
+
+    #[test]
+    fn m137_server_families_reject_close_as_not_applicable() {
+        use TunnelType::*;
+        for tunnel_type in [
+            Server,
+            HttpServer,
+            HttpBidirServer,
+            IrcServer,
+            StreamrServer,
+        ] {
+            for (key, value) in [
+                ("Close", serde_json::json!(true)),
+                ("Close", serde_json::json!(false)),
+                ("CloseTime", serde_json::json!(600_000)),
+            ] {
+                let def = reduce_definition(tunnel_type, &[(key, value)]);
+                assert!(parse_close_policy(&def).is_err());
+                assert!(
+                    build_session_options(&def, 7656, false, DestinationKind::Transient).is_err()
+                );
+            }
+            let absent = reduce_definition(tunnel_type, &[]);
+            assert!(parse_close_policy(&absent).unwrap().is_none());
+        }
+    }
+
+    #[test]
+    fn m137_all_seven_client_families_translate_close_end_to_end() {
+        use TunnelType::*;
+        for tunnel_type in [
+            Client,
+            HttpClient,
+            IrcClient,
+            Socks,
+            SocksIrc,
+            ConnectClient,
+            StreamrClient,
+        ] {
+            let def = reduce_definition(
+                tunnel_type,
+                &[
+                    ("Close", serde_json::json!(true)),
+                    ("CloseTime", serde_json::json!(600_000)),
+                ],
+            );
+            let options =
+                build_session_options(&def, 7656, false, DestinationKind::Transient).unwrap();
+            let map: std::collections::BTreeMap<_, _> = options
+                .additional_options
+                .iter()
+                .map(|o| (o.key().to_owned(), o.value().to_owned()))
+                .collect();
+            assert_eq!(
+                map.get("i2cp.closeOnIdle").map(String::as_str),
+                Some("true")
+            );
+            assert_eq!(
+                map.get("i2cp.closeIdleTime").map(String::as_str),
+                Some("600000")
+            );
+            // Lifecycle validates but never arms the local heuristic.
+            let lifecycle = client_lifecycle_config(&def).unwrap();
+            assert!(!lifecycle.close_on_idle);
+        }
+    }
+
+    #[test]
+    fn m137_differing_close_policies_do_not_share() {
+        let base = reduce_definition(TunnelType::Client, &[("Close", serde_json::json!(true))]);
+        let base_options =
+            build_session_options(&base, 7656, false, DestinationKind::Transient).unwrap();
+        let different_time = reduce_definition(
+            TunnelType::Client,
+            &[
+                ("Close", serde_json::json!(true)),
+                ("CloseTime", serde_json::json!(900_000)),
+            ],
+        );
+        let different_time_options =
+            build_session_options(&different_time, 7656, false, DestinationKind::Transient)
+                .unwrap();
+        let disabled = reduce_definition(TunnelType::Client, &[]);
+        let disabled_options =
+            build_session_options(&disabled, 7656, false, DestinationKind::Transient).unwrap();
+
+        let base_key = compatibility_key(&base_options, "stream");
+        assert_ne!(
+            base_key,
+            compatibility_key(&different_time_options, "stream")
+        );
+        assert_ne!(base_key, compatibility_key(&disabled_options, "stream"));
+        let same = reduce_definition(TunnelType::Client, &[("Close", serde_json::json!(true))]);
+        let same_options =
+            build_session_options(&same, 7656, false, DestinationKind::Transient).unwrap();
+        assert_eq!(base_key, compatibility_key(&same_options, "stream"));
+    }
+
+    #[tokio::test]
+    async fn m137_close_wire_uses_exact_standard_keys_without_injection() {
+        let def = reduce_definition(
+            TunnelType::Client,
+            &[
+                ("Close", serde_json::json!(true)),
+                ("CloseTime", serde_json::json!(600_000)),
+            ],
+        );
+        let mut options =
+            build_session_options(&def, 7656, false, DestinationKind::Transient).unwrap();
+        options.nickname = "m137-close-wire".to_owned();
+        let command = fake_sam_session_create_command(options).await;
+        assert!(command.contains("i2cp.closeOnIdle=true"));
+        assert!(command.contains("i2cp.closeIdleTime=600000"));
+        assert!(!command.contains(" Close="));
+        assert!(!command.contains(" CloseTime="));
     }
 }

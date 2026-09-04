@@ -1129,13 +1129,16 @@ fn validate_raw_options(
         "Reduce",
         "ReduceCount",
         "ReduceTime",
+        "Close",
+        "CloseTime",
         "Shared",
         "PersistentClientKey",
         "PrivKeyFile",
     ];
-    // M121: "Close", "CloseTime", and "NewDest" demoted to blocked_primitive;
+    // M121: "NewDest" remains demoted to blocked_primitive;
     // "ConnectDelay" remains applied via the shared lifecycle connector.
     // M136: Reduce family supported via the canonical idle owner.
+    // M137: Close family supported via the same owner.
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
             continue;

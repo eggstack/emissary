@@ -42,7 +42,10 @@ pub use config::{
 };
 pub use error::Error;
 pub use profile::Profile;
-pub use sam::{SamObservationEvent, SamObservationHook, SamObservationHookError};
+pub use sam::{
+    SamObservationEvent, SamObservationHook, SamObservationHookError, SamSessionResult,
+    SamTerminationReason,
+};
 
 #[cfg(feature = "fuzz")]
 pub use {

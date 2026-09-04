@@ -362,10 +362,15 @@ M112 added bounded `ConnectDelay` behavior
 to the six streaming client listeners; M121 demotes M112's `Close`, `CloseTime`,
 and `NewDest` cells to blocked (§5.2) because reference closeOnIdle observes
 I2P-session activity while the local owner can only count accepted TCP handler
-tasks and Yosemite exposes no session-activity observation primitive. Any supplied
-`Close`/`CloseTime`/`NewDest` value fails before allocation. `ConnectDelay`
+tasks and Yosemite exposes no session-activity observation primitive. M137
+closes that gap router-side: `Close`/`CloseTime` are applied through the
+canonical SAM idle owner (standard `i2cp.close*`, close-before-reduce,
+canonical teardown, neutral reason); `NewDest` remains blocked and any supplied
+value fails before allocation. `ConnectDelay`
 (0–60,000 ms) remains applied via the generation-local outbound connector.
-`Shared=true` cannot be combined with `Close=true`, because one member must not close a session owned by another member.
+Shared definitions must carry compatible close/reduce policy to share one
+underlying session; activity from any member resets the common idle clock and
+idle close tears down the shared generation once.
 M113 re-validated the remaining server presentation/routing and LeaseSet cells and
 closed them as blocked. M125 corrected the two server-role `AllowInternalSSL`
 cells to `not_applicable`, because Proposal 170 places that option under HTTP
@@ -390,7 +395,8 @@ allocation. M131 closes the residual ledger at `284 apply / 88 blocked /
 | Applied by accepted client proxy/filter runtimes | `ProxyList`, `ProxyAuth`, `ProxyUsername`, `ProxyPassword`, `OutproxyAuth`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `AllowUserAgent`, `AllowReferer`, `AllowAccept` |
 | Applied by six streaming client lifecycle owners | `ConnectDelay` (0–60,000 ms) |
 | Applied by seven client idle owners (M136) | `Reduce` (boolean master switch), `ReduceCount` (1–6, default 1), `ReduceTime` (ms, minimum 300000, default 1200000) via standard `i2cp.reduce*` and the live-quantity primitive; `ReduceTime`/`ReduceCount` without `Reduce=true` fail before allocation |
-| Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, `Profile`, `Close`, `CloseTime`, `NewDest`, Streamr `ConnectDelay` and other retained Streamr lifecycle cells; `SigType` for all applicable families |
+| Applied by seven client idle owners (M137) | `Close` (boolean master switch), `CloseTime` (ms, minimum 300000, default 1800000) via standard `i2cp.close*` with close-before-reduce ordering and canonical teardown; `CloseTime` without `Close=true` fails before allocation |
+| Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, `Profile`, `NewDest`, Streamr `ConnectDelay` and other retained Streamr lifecycle cells; `SigType` for all applicable families |
 | Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime` |
 | Rejected before allocation as residual server blockers | `UniqueLocalAddressPerClient`, `MultiHoming`, `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
 | Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
@@ -401,16 +407,19 @@ handoff into an I2PControl-owned key store exist. New `OutproxyPassword` values
 are held in the same typed redacted boundary as `ProxyPassword`; legacy raw
 compatibility values remain response-redacted. Proxy credentials are bounded, separated between the local
 listener and the configured I2P outproxy, and never serialized in canonical
-`get` output. `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, `Profile`, and
-the Close family fail before listener/session allocation because no exact
-Emissary-owned primitive currently exists for them (Close needs M137).
-The Reduce family is applied by M136: idle SAM sessions decrease to the
-configured quantity through the live-quantity primitive and restore on
-activity; malformed or server-family values fail before allocation.
+`get` output. `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, and `Profile`
+fail before listener/session allocation because no exact Emissary-owned
+primitive exists for them. The Reduce family is applied by M136: idle SAM
+sessions decrease to the configured quantity through the live-quantity
+primitive and restore on activity; malformed or server-family values fail
+before allocation. The Close family is applied by M137: idle SAM sessions
+tear down through the canonical session/pool path with a neutral
+`IdlePolicy`/`Requested`/`Failure`/`Unknown` reason; malformed or
+server-family values fail before allocation.
 Streamr `DelayOpen` and `NewDest` are not applicable by affirmative reference gates; its other retained
 lifecycle cells remain explicit blocked responses because generic reference
-setters do not establish a datagram runtime owner, except Reduce which now
-uses the shared datagram session owner. `AllowInternalSSL` is not
+setters do not establish a datagram runtime owner, except Reduce and Close
+which now use the shared datagram session owner. `AllowInternalSSL` is not
 applicable to the accepted HTTP-only outbound client; server-role cells belong
 to M099.
 

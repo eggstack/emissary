@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M135/M136 closed as complete, M137 dependency-ready**.
+Status: **partial Proposal 170 support; M135/M136/M137 closed as complete, NewDest future**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -10,8 +10,9 @@ Current authorities:
 - residual applicability/primitive map: M131 closure `plans/closure/i2pcontrol-proposal-170/131-closure.md` and `131-residual-primitive-map.toml`;
 - neutral live-quantity primitive: M135 closure `plans/closure/i2pcontrol-proposal-170/135-closure.md`;
 - idle reduction: M136 closure `plans/closure/i2pcontrol-proposal-170/136-closure.md`;
-- current matrix: `305 apply / 67 blocked_primitive / 468 not_applicable`;
-- next handoff: M137 (dependency-ready, registers on its own step).
+- idle close: M137 closure `plans/closure/i2pcontrol-proposal-170/137-closure.md`;
+- current matrix: `319 apply / 53 blocked_primitive / 468 not_applicable`;
+- next handoff: NewDest future (M134 rebase or M138, gated on M137 §12).
 
 ## Authority order
 
@@ -64,16 +65,22 @@ Status: **closed as complete** (`plans/closure/i2pcontrol-proposal-170/136-closu
 
 M136 corrects the failed combined M132 vertical slice. After M135 proves the lower primitive, M136 adds one generation-local SAM session activity/timer owner, consumes standard `i2cp.reduceOnIdle`, `i2cp.reduceIdleTime`, `i2cp.reduceQuantity`, then maps Proposal `Reduce`, `ReduceTime`, `ReduceCount` through Yosemite's validated generic additional-session-option path. All 21 client cells (six TCP families plus Streamr) promote to `apply` with end-to-end evidence; servers remain `not_applicable`. Closing matrix `305/67/468`.
 
-## Dependency-ready successor — M137
+## Closed corrective — M137
 
 Plan:
 
 - `137-m133-corrective-sam-idle-close-and-reasoned-termination.md`.
 
-Status: **dependency-ready / unregistered**; M136 closure satisfies its
-hard-dependency gate. It registers on its own registration step.
+Status: **closed as complete** (`plans/closure/i2pcontrol-proposal-170/137-closure.md`).
 
-M137 extends the same M136 activity/timer owner with standard `i2cp.closeOnIdle` / `i2cp.closeIdleTime`, exact close-before-reduce ordering, canonical real session teardown, and one neutral authoritative generation-local termination cause. It then maps Proposal `Close`/`CloseTime`.
+M137 corrects the failed combined M133 vertical slice. It extends the same
+M136 activity/timer owner with standard `i2cp.closeOnIdle` /
+`i2cp.closeIdleTime`, exact close-before-reduce ordering, canonical real
+session teardown, and one neutral authoritative generation-local termination
+cause (`IdlePolicy`/`Requested`/`Failure`/`Unknown`). It then maps Proposal
+`Close`/`CloseTime` through Yosemite's validated generic path. All 14 client
+cells (six TCP families plus Streamr) promote to `apply`; servers remain
+`not_applicable`. Closing matrix `319/53/468`.
 
 M137 does not implement `NewDest`.
 

@@ -1,15 +1,16 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M135/M136 closed as complete, M137 dependency-ready**
+Status: **active / partial; M135/M136/M137 closed as complete, NewDest future**
 
 Current handoff:
 
-- M137 `plans/implementation/i2pcontrol-proposal-170/137-m133-corrective-sam-idle-close-and-reasoned-termination.md` — **dependency-ready / unregistered** (M136 gate satisfied; registers on its own step).
+- NewDest successor (historical M134 rebase or corrective M138), gated on the M137 §12 consumer contract. No NewDest execution is authorized now.
 
 Closed correctives:
 
 - M135 closed as complete (`plans/closure/i2pcontrol-proposal-170/135-closure.md`), zero promotions;
-- M136 closed as complete (`plans/closure/i2pcontrol-proposal-170/136-closure.md`), 21 `Reduce*` promotions.
+- M136 closed as complete (`plans/closure/i2pcontrol-proposal-170/136-closure.md`), 21 `Reduce*` promotions;
+- M137 closed as complete (`plans/closure/i2pcontrol-proposal-170/137-closure.md`), 14 `Close`/`CloseTime` promotions.
 
 Focused lifecycle roadmap:
 
@@ -17,20 +18,21 @@ Focused lifecycle roadmap:
 
 Corrective successors already planned but unregistered:
 
-- M137 `137-m133-corrective-sam-idle-close-and-reasoned-termination.md` — dependency-ready; hard-depended on M136 (now satisfied).
+- NewDest successor only (M134 rebase or M138).
 
 Historical lifecycle attempts:
 
 - M132 closed as blocked;
 - M133 closed as blocked;
-- M134 remains deferred and must be rebased after M137 or superseded.
+- M134 remains deferred and must be rebased against the M137 contract or superseded.
 
 Current authorities:
 
 - runtime/security qualification: M130 closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
 - residual applicability/primitive authority: M131 closure `plans/closure/i2pcontrol-proposal-170/131-closure.md` and `131-residual-primitive-map.toml`;
-- current matrix: `305 apply / 67 blocked_primitive / 468 not_applicable`;
-- M136 closure: `plans/closure/i2pcontrol-proposal-170/136-closure.md`.
+- current matrix: `319 apply / 53 blocked_primitive / 468 not_applicable`;
+- M136 closure: `plans/closure/i2pcontrol-proposal-170/136-closure.md`;
+- M137 closure: `plans/closure/i2pcontrol-proposal-170/137-closure.md`.
 
 Pinned external authority:
 
@@ -170,16 +172,16 @@ M131 residual primitive re-freeze                         [CLOSED AS BLOCKED —
 M135 neutral live quantity + LeaseSet desired count       [CLOSED AS COMPLETE]
   |
   v
-M136 M132 corrective: session activity + Reduce*          [DEPENDENCY-READY / UNREGISTERED]
+M136 M132 corrective: session activity + Reduce*          [CLOSED AS COMPLETE — 305/67/468]
   |
   v
-M137 M133 corrective: Close* + reasoned termination       [DEFERRED / UNREGISTERED]
+M137 M133 corrective: Close* + reasoned termination       [CLOSED AS COMPLETE — 319/53/468]
   |
   v
 M134 rebased/amended OR future M138 NewDest corrective    [FUTURE / UNREGISTERED]
 ```
 
-Only M136 may register next, on its own registration step.
+No active implementation handoff; NewDest registers only against the M137 §12 contract.
 
 ### M135
 
@@ -197,16 +199,13 @@ No SAM or I2PControl production source is authorized under M135.
 
 ### M136
 
-M136 is dependency-ready: M135 closure proves the primitive. On its own
-registration step it corrects M132 by adding one generation-local SAM session activity/timer owner and Proposal `Reduce`, `ReduceTime`, `ReduceCount` translation through standard I2CP options.
-
-Direct reference supports all seven client families, including Streamr, but at most 21 cells may be promoted and only with end-to-end evidence.
+M136 closed as complete (`plans/closure/i2pcontrol-proposal-170/136-closure.md`, 21 promotions, `305/67/468`). It corrected M132 with one generation-local SAM session activity/timer owner and Proposal `Reduce`, `ReduceTime`, `ReduceCount` translation through standard I2CP options.
 
 ### M137
 
-M137 stays unregistered until M136 closure explicitly proves readiness. It extends the same activity/timer owner with standard close-on-idle semantics, canonical session teardown and a neutral authoritative termination cause, then maps Proposal `Close`/`CloseTime`.
+M137 closed as complete (`plans/closure/i2pcontrol-proposal-170/137-closure.md`, 14 promotions, `319/53/468`). It extended the same owner with standard close-on-idle semantics, canonical session teardown and a neutral authoritative termination cause, then mapped Proposal `Close`/`CloseTime`.
 
-It may promote at most 14 client cells and does not implement `NewDest`.
+It did not implement `NewDest`.
 
 ### NewDest
 

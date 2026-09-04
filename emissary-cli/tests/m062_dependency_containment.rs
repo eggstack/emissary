@@ -603,6 +603,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m111 = is_authorized_m111_path(path);
         let authorized_m135 = is_authorized_m135_path(path);
         let authorized_m136 = is_authorized_m136_path(path);
+        let authorized_m137 = is_authorized_m137_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -632,6 +633,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m111
                 || authorized_m135
                 || authorized_m136
+                || authorized_m137
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -663,6 +665,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m127
                     || authorized_m135
                     || authorized_m136
+                    || authorized_m137
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -913,6 +916,36 @@ fn is_authorized_m136_path(path: &str) -> bool {
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+    )
+}
+
+fn is_authorized_m137_path(path: &str) -> bool {
+    matches!(
+        path,
+        "emissary-core/src/sam/session.rs"
+            | "emissary-core/src/sam/mod.rs"
+            | "emissary-core/src/lib.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/session.rs"
+            | "emissary-cli/src/i2pcontrol/backends/client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/connect_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_client.rs"
+            | "emissary-cli/src/i2pcontrol/backends/socks.rs"
+            | "emissary-cli/src/i2pcontrol/sam_observer.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "emissary-cli/tests/m095_full_support_matrix.rs"
+            | "emissary-cli/tests/m105_residual_option_audit.rs"
+            | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/110-completion-ledger.toml"
+            | "docs/i2pcontrol/tunnel-manager.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "plans/closure/i2pcontrol-proposal-170/137-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/137-m133-corrective-sam-idle-close-and-reasoned-termination.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "AGENTS.md"
+            | "README.md"
     )
 }
 

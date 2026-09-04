@@ -1,6 +1,8 @@
 # M137 — M133 Corrective: SAM Idle Close and Reasoned Termination
 
-Status: **dependency-ready / unregistered; M136 gate satisfied, registers on its own step**
+Status: **closed as complete**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/137-closure.md`
 
 Class: corrective implementation / neutral lifecycle close + I2PControl consumer
 

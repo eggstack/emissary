@@ -188,6 +188,26 @@ reclassified_cells = [
 reclassification_reason = "M136 proves one generation-local SAM idle owner with standard i2cp.reduce* consumption through the M135 live-quantity bridge, plus I2PControl fail-before-allocation validation and Yosemite generic additional-option mapping for all seven client families including Streamr with runtime traces."
 closure = "plans/closure/i2pcontrol-proposal-170/136-closure.md"
 
+[post_m137]
+status = "closed as complete"
+matrix_before_apply = 305
+matrix_before_blocked_primitive = 67
+matrix_before_not_applicable = 468
+matrix_after_apply = 319
+matrix_after_blocked_primitive = 53
+matrix_after_not_applicable = 468
+completed_cell_count = 14
+completed_options = ["Close", "CloseTime"]
+completed_tunnel_types = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient", "streamrclient"]
+reclassified_cells = [
+    "Close:client", "Close:httpclient", "Close:ircclient",
+    "Close:socks", "Close:socksirc", "Close:connectclient", "Close:streamrclient",
+    "CloseTime:client", "CloseTime:httpclient", "CloseTime:ircclient",
+    "CloseTime:socks", "CloseTime:socksirc", "CloseTime:connectclient", "CloseTime:streamrclient",
+]
+reclassification_reason = "M137 extends the same M136 activity/timer owner with standard i2cp.close* close-before-reduce ordering, canonical session/pool teardown, and neutral IdlePolicy/Requested/Failure/Unknown reason, plus I2PControl fail-before-allocation validation and Yosemite generic mapping for all seven client families including Streamr with runtime traces."
+closure = "plans/closure/i2pcontrol-proposal-170/137-closure.md"
+
 [ownership]
 session_registry = "emissary-cli/src/i2pcontrol/backends/runtime/session.rs::SharedClientSessionRegistry"
 stream_listener_owner = "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"

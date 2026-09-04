@@ -37,7 +37,8 @@ use crate::{
             PendingSession, PendingSessionState, PublicKeyContext, SamSessionCommand,
             SamSessionCommandRecycle, SamSessionKind,
         },
-        SamObservationEvent, SamObservationHook, SubSessionCommand,
+        SamObservationEvent, SamObservationHook, SamSessionResult, SamTerminationReason,
+        SubSessionCommand,
     },
 };
 
@@ -73,10 +74,18 @@ const IDLE_MIN_MS: u64 = 300_000;
 /// Default decreased inbound/outbound quantity (reference).
 const IDLE_DEFAULT_QUANTITY: usize = 1;
 
+/// Default idle time before session close (30 minutes, reference).
+const CLOSE_DEFAULT_MS: u64 = 1_800_000;
+
+/// Minimum idle time before close can fire (5 minutes, reference).
+const CLOSE_MIN_MS: u64 = 300_000;
+
 /// Generation-local SAM session idle policy.
 ///
-/// Neutral core vocabulary only. Extensible for future idle-close handling
-/// using the same activity clock (close evaluated before decrease).
+/// Neutral core vocabulary only. One activity clock drives both decrease
+/// and close; close is evaluated before decrease. When both are enabled
+/// and the close threshold is less than or equal to the decrease
+/// threshold, decrease is suppressed from the frozen policy state.
 #[derive(Debug, Clone, Copy)]
 struct IdlePolicy {
     /// Decrease enabled via standard `i2cp.reduceOnIdle`.
@@ -85,46 +94,140 @@ struct IdlePolicy {
     idle_time: Duration,
     /// Decreased inbound/outbound quantity (coerced to at least 1, bounded).
     target_quantity: usize,
+    /// Close enabled via standard `i2cp.closeOnIdle`.
+    close_enabled: bool,
+    /// Idle duration before close (clamped to minimum).
+    close_idle_time: Duration,
 }
 
 impl IdlePolicy {
-    /// Parse standard `i2cp.reduce*` options fail-safe.
+    /// Parse standard `i2cp.reduce*` and `i2cp.close*` options fail-safe.
     ///
-    /// Malformed external input disables the policy rather than
+    /// Malformed external input disables the affected policy rather than
     /// disrupting the session. Reference-compatible rules:
-    /// - enabled only when `reduceOnIdle` equals `true` (case-insensitive);
-    /// - default idle 1200000 ms, minimum 300000 ms;
+    /// - decrease enabled only when `reduceOnIdle` equals `true`
+    ///   (case-insensitive);
+    /// - default decrease idle 1200000 ms, minimum 300000 ms;
     /// - default quantity 1, values below 1 coerce to 1 (reference),
-    ///   values above the live-quantity bound clamp to that bound.
+    ///   values above the live-quantity bound clamp to that bound;
+    /// - close enabled only when `closeOnIdle` equals `true`
+    ///   (case-insensitive);
+    /// - default close idle 1800000 ms, minimum 300000 ms.
     fn parse(options: &HashMap<String, String>) -> Self {
         let enabled = options
             .get("i2cp.reduceOnIdle")
             .is_some_and(|value| value.eq_ignore_ascii_case("true"));
 
-        if !enabled {
-            return Self {
-                enabled: false,
-                idle_time: Duration::from_millis(IDLE_DEFAULT_MS),
-                target_quantity: IDLE_DEFAULT_QUANTITY,
-            };
-        }
+        let (idle_time, target_quantity) = if !enabled {
+            (
+                Duration::from_millis(IDLE_DEFAULT_MS),
+                IDLE_DEFAULT_QUANTITY,
+            )
+        } else {
+            let idle_ms = options
+                .get("i2cp.reduceIdleTime")
+                .and_then(|value| value.trim().parse::<u64>().ok())
+                .unwrap_or(IDLE_DEFAULT_MS);
+            let idle_ms = idle_ms.max(IDLE_MIN_MS);
 
-        let idle_ms = options
-            .get("i2cp.reduceIdleTime")
-            .and_then(|value| value.trim().parse::<u64>().ok())
-            .unwrap_or(IDLE_DEFAULT_MS);
-        let idle_ms = idle_ms.max(IDLE_MIN_MS);
+            let target_quantity = options
+                .get("i2cp.reduceQuantity")
+                .and_then(|value| value.trim().parse::<usize>().ok())
+                .unwrap_or(IDLE_DEFAULT_QUANTITY)
+                .clamp(1, crate::tunnel::MAX_DESIRED_TUNNEL_QUANTITY);
 
-        let target_quantity = options
-            .get("i2cp.reduceQuantity")
-            .and_then(|value| value.trim().parse::<usize>().ok())
-            .unwrap_or(IDLE_DEFAULT_QUANTITY)
-            .clamp(1, crate::tunnel::MAX_DESIRED_TUNNEL_QUANTITY);
+            (Duration::from_millis(idle_ms), target_quantity)
+        };
+
+        let close_enabled = options
+            .get("i2cp.closeOnIdle")
+            .is_some_and(|value| value.eq_ignore_ascii_case("true"));
+
+        let close_idle_time = if !close_enabled {
+            Duration::from_millis(CLOSE_DEFAULT_MS)
+        } else {
+            let close_ms = options
+                .get("i2cp.closeIdleTime")
+                .and_then(|value| value.trim().parse::<u64>().ok())
+                .unwrap_or(CLOSE_DEFAULT_MS);
+            Duration::from_millis(close_ms.max(CLOSE_MIN_MS))
+        };
 
         Self {
-            enabled: true,
-            idle_time: Duration::from_millis(idle_ms),
+            enabled,
+            idle_time,
             target_quantity,
+            close_enabled,
+            close_idle_time,
+        }
+    }
+
+    /// Whether decrease is effectively active after close suppression.
+    ///
+    /// When both policies are enabled and the close threshold is less
+    /// than or equal to the decrease threshold, Java disables reduction
+    /// for that session timer; close remains enabled. The suppression is
+    /// derived from the frozen policy state rather than momentarily
+    /// reducing immediately before close.
+    fn reduce_effective(&self) -> bool {
+        self.enabled && !(self.close_enabled && self.close_idle_time <= self.idle_time)
+    }
+
+    /// Whether any idle timer/work is needed.
+    fn any_timer_needed(&self) -> bool {
+        self.close_enabled || self.reduce_effective()
+    }
+
+    /// Initial timer delay from activation (minimum of enabled thresholds).
+    fn initial_delay(&self) -> Option<Duration> {
+        match (self.reduce_effective(), self.close_enabled) {
+            (false, false) => None,
+            (true, false) => Some(self.idle_time),
+            (false, true) => Some(self.close_idle_time),
+            (true, true) => Some(self.idle_time.min(self.close_idle_time)),
+        }
+    }
+
+    /// Remaining delay until the next relevant deadline given elapsed idle age.
+    ///
+    /// When reduced, only close can still fire. When active, the next
+    /// deadline is the minimum of the effectively enabled thresholds.
+    /// Returns `None` when no timer is needed.
+    fn remaining_delay(&self, elapsed: Duration, reduced: bool) -> Option<Duration> {
+        if reduced {
+            if !self.close_enabled {
+                return None;
+            }
+            if elapsed >= self.close_idle_time {
+                return Some(Duration::from_millis(0));
+            }
+            return Some(self.close_idle_time - elapsed);
+        }
+
+        match (self.reduce_effective(), self.close_enabled) {
+            (false, false) => None,
+            (true, false) => {
+                if elapsed >= self.idle_time {
+                    Some(Duration::from_millis(0))
+                } else {
+                    Some(self.idle_time - elapsed)
+                }
+            }
+            (false, true) => {
+                if elapsed >= self.close_idle_time {
+                    Some(Duration::from_millis(0))
+                } else {
+                    Some(self.close_idle_time - elapsed)
+                }
+            }
+            (true, true) => {
+                let next = self.idle_time.min(self.close_idle_time);
+                if elapsed >= next {
+                    Some(Duration::from_millis(0))
+                } else {
+                    Some(next - elapsed)
+                }
+            }
         }
     }
 }
@@ -141,11 +244,13 @@ fn next_idle_generation() -> u64 {
     NEXT_IDLE_GENERATION.fetch_add(1, core::sync::atomic::Ordering::Relaxed)
 }
 
-/// Create the initial actor-local idle timer when the policy is enabled.
+/// Create the initial actor-local idle timer when any policy is enabled.
 ///
-/// Returns `None` when disabled so no timer/work exists.
+/// Returns `None` when both decrease and close are disabled so no
+/// timer/work exists. When both are enabled the delay is the minimum of
+/// the two thresholds; the firing path evaluates close before decrease.
 fn enabled_idle_timer<R: Runtime>(config: &IdlePolicy) -> Option<R::Timer> {
-    config.enabled.then(|| R::timer(config.idle_time))
+    config.initial_delay().map(R::timer)
 }
 
 /// Active SAMv3 session.
@@ -230,7 +335,7 @@ pub struct SamSession<R: Runtime> {
     /// Optional passive lifecycle observer.
     observation_hook: Option<Arc<dyn SamObservationHook>>,
 
-    /// Generation-local idle policy (standard `i2cp.reduce*`).
+    /// Generation-local idle policy (standard `i2cp.reduce*`/`i2cp.close*`).
     idle_policy: IdlePolicy,
 
     /// Last qualifying I2P application-message activity (monotonic).
@@ -239,11 +344,25 @@ pub struct SamSession<R: Runtime> {
     /// Whether the live desired target is currently at the low quantity.
     idle_reduced: bool,
 
-    /// Actor-local idle timer; `None` when disabled, reduced, or shut down.
+    /// Actor-local idle timer; `None` when disabled, reduced (without close),
+    /// closing, or shut down.
     idle_timer: Option<R::Timer>,
 
     /// Generation identifier for this session's idle owner.
     idle_generation: u64,
+
+    /// Whether idle close has won and canonical teardown was requested.
+    ///
+    /// Once set, no further reduction, restore, or timer rescheduling
+    /// occurs for this generation.
+    idle_closing: bool,
+
+    /// Neutral authoritative termination cause for this generation.
+    ///
+    /// First winner wins: idle close records `IdlePolicy` only if no
+    /// prior reason exists; manual/failure paths record their cause only
+    /// if idle has not already won. `None` until the winning transition.
+    termination_reason: Option<SamTerminationReason>,
 }
 
 impl<R: Runtime> SamSession<R> {
@@ -422,6 +541,8 @@ impl<R: Runtime> SamSession<R> {
             idle_timer,
             idle_generation: next_idle_generation(),
             idle_policy,
+            idle_closing: false,
+            termination_reason: None,
         }
     }
 
@@ -466,6 +587,59 @@ impl<R: Runtime> SamSession<R> {
         }
     }
 
+    /// Record the winning termination cause (first wins, never overwrites).
+    ///
+    /// The authoritative transition owns the reason. Simultaneous causes
+    /// resolve deterministically by poll order; when the implementation
+    /// genuinely cannot prove precedence the caller passes `Unknown`
+    /// rather than fabricating `IdlePolicy`.
+    fn record_termination_reason(&mut self, reason: SamTerminationReason) {
+        if self.termination_reason.is_none() {
+            self.termination_reason = Some(reason);
+        }
+    }
+
+    /// Authoritative reason for this generation, defaulting to `Unknown`.
+    ///
+    /// Used when the session future completes without an explicit winning
+    /// transition having been recorded. Never infers idle after the fact.
+    fn termination_result(&self) -> SamTerminationReason {
+        self.termination_reason.unwrap_or(SamTerminationReason::Unknown)
+    }
+
+    /// Request canonical teardown for idle-policy close.
+    ///
+    /// Records `IdlePolicy` only if no prior reason won the race, then
+    /// triggers the existing authoritative teardown path in order: stop
+    /// accepting socket commands, shut down the stream manager and the
+    /// destination/tunnel pool through their existing owners, drop the
+    /// idle timer without rescheduling. Returns `true` when this call
+    /// won the race. Observation publication failure never blocks
+    /// teardown; the `SamServer` publishes the recorded reason passively
+    /// after this future completes.
+    fn request_idle_close(&mut self) -> bool {
+        if self.idle_closing || self.termination_reason.is_some() {
+            return false;
+        }
+
+        self.termination_reason = Some(SamTerminationReason::IdlePolicy);
+        self.idle_closing = true;
+        self.idle_timer = None;
+        self.idle_reduced = false;
+
+        tracing::info!(
+            target: LOG_TARGET,
+            session_id = %self.session_id,
+            generation = %self.idle_generation,
+            "session idle close threshold reached, tearing down session",
+        );
+
+        self.stream_manager.shutdown();
+        self.destination.shutdown();
+        self.socket = None;
+        true
+    }
+
     /// Record qualifying I2P application-message activity.
     ///
     /// Qualifying activity (reference boundary):
@@ -483,14 +657,20 @@ impl<R: Runtime> SamSession<R> {
     /// naming/address lookup, tunnel build/maintenance, NetDb, control
     /// RPC. Those paths must not call this method.
     ///
-    /// When at the low target, the first qualifying activity requests
-    /// restore to the base target. A failed restore keeps `idle_reduced`
-    /// set so a later activity retries; it never falsely marks restored.
-    /// When active, activity resets the monotonic idle age by recreating
-    /// the single actor-local timer. No lock spans network I/O; the
-    /// destination bridge is synchronous and bounded.
+    /// Once closing, activity is ignored: it neither resets the close
+    /// deadline nor restores targets. When at the low target, the first
+    /// qualifying activity requests restore to the base target. A failed
+    /// restore keeps `idle_reduced` set so a later activity retries; it
+    /// never falsely marks restored. When active, activity resets the
+    /// monotonic idle age by recreating the single actor-local timer for
+    /// the next relevant deadline (minimum of effectively enabled
+    /// thresholds). No lock spans network I/O; the destination bridge is
+    /// synchronous and bounded.
     fn note_qualifying_activity(&mut self) {
-        if !self.idle_policy.enabled {
+        if self.idle_closing {
+            return;
+        }
+        if !self.idle_policy.any_timer_needed() {
             return;
         }
 
@@ -500,7 +680,13 @@ impl<R: Runtime> SamSession<R> {
             match self.destination.restore_tunnel_quantity_target() {
                 Ok(()) => {
                     self.idle_reduced = false;
-                    self.idle_timer = Some(R::timer(self.idle_policy.idle_time));
+                    if let Some(delay) =
+                        self.idle_policy.remaining_delay(self.idle_last_activity.elapsed(), false)
+                    {
+                        self.idle_timer = Some(R::timer(delay));
+                    } else {
+                        self.idle_timer = None;
+                    }
                 }
                 Err(error) => {
                     tracing::warn!(
@@ -511,22 +697,40 @@ impl<R: Runtime> SamSession<R> {
                     );
                 }
             }
+        } else if let Some(delay) =
+            self.idle_policy.remaining_delay(self.idle_last_activity.elapsed(), false)
+        {
+            self.idle_timer = Some(R::timer(delay));
         } else {
-            self.idle_timer = Some(R::timer(self.idle_policy.idle_time));
+            self.idle_timer = None;
         }
     }
 
-    /// Poll the single actor-local idle timer and drive target decrease.
+    /// Poll the single actor-local idle timer and drive decrease/close.
     ///
-    /// At the deadline the desired inbound/outbound target becomes the
-    /// configured low quantity via the live-quantity primitive. Only
-    /// authoritative success marks the session at the low target. While
-    /// there no further controls are enqueued. Failures leave
-    /// `idle_reduced` unset without spinning; shutdown wins by dropping
-    /// the timer. The state machine keeps one activity clock so a future
-    /// close policy can evaluate close before decrease.
+    /// Ordering per evaluation (same activity clock):
+    /// 1. if closing, stop (no reschedule);
+    /// 2. compute idle age from the M136 last-activity value;
+    /// 3. if close enabled and age >= close threshold, win/record
+    ///    idle-policy close and enter canonical teardown;
+    /// 4. otherwise evaluate reduction if effectively enabled;
+    /// 5. reschedule only while active/reduced without close pending.
+    ///
+    /// At the decrease deadline the desired target becomes the low
+    /// quantity via the live-quantity primitive. Only authoritative
+    /// success marks reduced. While reduced with close disabled no
+    /// further controls are enqueued; with close enabled a timer remains
+    /// for the close deadline. Failures leave state explicit without
+    /// spinning; shutdown wins by dropping the timer.
     fn poll_idle_timer(&mut self, cx: &mut Context<'_>) {
-        if !self.idle_policy.enabled || self.idle_reduced {
+        if self.idle_closing {
+            return;
+        }
+        if !self.idle_policy.any_timer_needed() {
+            return;
+        }
+        // While reduced without close, M136 behavior holds: no timer/work.
+        if self.idle_reduced && !self.idle_policy.close_enabled {
             return;
         }
 
@@ -537,9 +741,46 @@ impl<R: Runtime> SamSession<R> {
         match Pin::new(timer).poll(cx) {
             Poll::Pending => {}
             Poll::Ready(()) => {
-                if self.idle_last_activity.elapsed() < self.idle_policy.idle_time {
-                    let remaining = self.idle_policy.idle_time - self.idle_last_activity.elapsed();
-                    self.idle_timer = Some(R::timer(remaining));
+                let elapsed = self.idle_last_activity.elapsed();
+
+                // Close evaluated before reduction on the same clock.
+                if self.idle_policy.close_enabled && elapsed >= self.idle_policy.close_idle_time {
+                    self.request_idle_close();
+                    return;
+                }
+
+                if self.idle_reduced {
+                    // Still reduced, close pending in the future: reschedule
+                    // for the remaining close delay.
+                    if self.idle_policy.close_enabled {
+                        let remaining = self.idle_policy.close_idle_time - elapsed;
+                        self.idle_timer = Some(R::timer(remaining));
+                    } else {
+                        self.idle_timer = None;
+                    }
+                    return;
+                }
+
+                if !self.idle_policy.reduce_effective() {
+                    // Reduction suppressed (close <= reduce) or disabled:
+                    // reschedule for close if enabled.
+                    if self.idle_policy.close_enabled {
+                        let remaining = self.idle_policy.close_idle_time - elapsed;
+                        // Elapsed < close here (close checked above), so
+                        // remaining is positive.
+                        self.idle_timer = Some(R::timer(remaining));
+                    } else {
+                        self.idle_timer = None;
+                    }
+                    return;
+                }
+
+                if elapsed < self.idle_policy.idle_time {
+                    if let Some(delay) = self.idle_policy.remaining_delay(elapsed, false) {
+                        self.idle_timer = Some(R::timer(delay));
+                    } else {
+                        self.idle_timer = None;
+                    }
                     return;
                 }
 
@@ -554,7 +795,18 @@ impl<R: Runtime> SamSession<R> {
                             "session idle threshold reached, using low tunnel target",
                         );
                         self.idle_reduced = true;
-                        self.idle_timer = None;
+                        // After reduction, keep a timer only for close.
+                        if self.idle_policy.close_enabled {
+                            let elapsed = self.idle_last_activity.elapsed();
+                            if elapsed >= self.idle_policy.close_idle_time {
+                                self.request_idle_close();
+                            } else {
+                                let remaining = self.idle_policy.close_idle_time - elapsed;
+                                self.idle_timer = Some(R::timer(remaining));
+                            }
+                        } else {
+                            self.idle_timer = None;
+                        }
                     }
                     Err(error) => {
                         tracing::warn!(
@@ -573,7 +825,8 @@ impl<R: Runtime> SamSession<R> {
     /// Cancel idle state on authoritative session teardown.
     ///
     /// Timer state is generation-local and never persisted; replacement
-    /// generations start fresh active state.
+    /// generations start fresh active state. Does not overwrite an
+    /// already-recorded winning reason.
     fn cancel_idle_state(&mut self) {
         self.idle_timer = None;
     }
@@ -1447,9 +1700,14 @@ impl<R: Runtime> SamSession<R> {
 }
 
 impl<R: Runtime> Future for SamSession<R> {
-    type Output = Arc<str>;
+    type Output = SamSessionResult;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let result = |this: &Self| SamSessionResult {
+            session_id: Arc::clone(&this.session_id),
+            reason: this.termination_result(),
+        };
+
         loop {
             let command = match &mut self.socket {
                 None => break,
@@ -1462,6 +1720,8 @@ impl<R: Runtime> Future for SamSession<R> {
                             "session socket closed, destroy session",
                         );
 
+                        // Manual/requested close wins unless idle already won.
+                        self.record_termination_reason(SamTerminationReason::Requested);
                         self.stream_manager.shutdown();
                         self.socket = None;
                         break;
@@ -1494,7 +1754,9 @@ impl<R: Runtime> Future for SamSession<R> {
                         session_id = %self.session_id,
                         "shutting down session",
                     );
-                    return Poll::Ready(Arc::clone(&self.session_id));
+                    self.record_termination_reason(SamTerminationReason::Requested);
+                    let output = result(&self);
+                    return Poll::Ready(output);
                 }
                 SamCommand::Ping(text) => {
                     let Some(ref mut socket) = self.socket else {
@@ -1518,41 +1780,53 @@ impl<R: Runtime> Future for SamSession<R> {
             }
         }
 
-        loop {
-            match self.receiver.poll_recv(cx) {
-                Poll::Pending => break,
-                Poll::Ready(None) => return Poll::Ready(Arc::clone(&self.session_id)),
-                Poll::Ready(Some(SamSessionCommand::Connect {
-                    socket,
-                    destination_id,
-                    options,
-                    session_id,
-                })) => self.on_stream_connect(socket, destination_id, options, session_id),
-                Poll::Ready(Some(SamSessionCommand::Accept {
-                    socket,
-                    options,
-                    session_id,
-                })) => self.on_stream_accept(socket, options, session_id),
-                Poll::Ready(Some(SamSessionCommand::Forward {
-                    socket,
-                    port,
-                    options,
-                    session_id,
-                })) => self.on_stream_forward(socket, port, options, session_id),
-                Poll::Ready(Some(SamSessionCommand::SendDatagram {
-                    destination,
-                    datagram,
-                    session_id,
-                    options,
-                })) => self.on_send_datagram(*destination, datagram, session_id, options),
-                Poll::Ready(Some(SamSessionCommand::Dummy)) => unreachable!(),
+        // Once idle close has won, stop accepting new SAM commands for
+        // the generation; the existing shutdown chain drives to `Ready`.
+        if !self.idle_closing {
+            loop {
+                match self.receiver.poll_recv(cx) {
+                    Poll::Pending => break,
+                    Poll::Ready(None) => {
+                        self.record_termination_reason(SamTerminationReason::Unknown);
+                        let output = result(&self);
+                        return Poll::Ready(output);
+                    }
+                    Poll::Ready(Some(SamSessionCommand::Connect {
+                        socket,
+                        destination_id,
+                        options,
+                        session_id,
+                    })) => self.on_stream_connect(socket, destination_id, options, session_id),
+                    Poll::Ready(Some(SamSessionCommand::Accept {
+                        socket,
+                        options,
+                        session_id,
+                    })) => self.on_stream_accept(socket, options, session_id),
+                    Poll::Ready(Some(SamSessionCommand::Forward {
+                        socket,
+                        port,
+                        options,
+                        session_id,
+                    })) => self.on_stream_forward(socket, port, options, session_id),
+                    Poll::Ready(Some(SamSessionCommand::SendDatagram {
+                        destination,
+                        datagram,
+                        session_id,
+                        options,
+                    })) => self.on_send_datagram(*destination, datagram, session_id, options),
+                    Poll::Ready(Some(SamSessionCommand::Dummy)) => unreachable!(),
+                }
             }
         }
 
         loop {
             match self.stream_manager.poll_next_unpin(cx) {
                 Poll::Pending => break,
-                Poll::Ready(None) => return Poll::Ready(Arc::clone(&self.session_id)),
+                Poll::Ready(None) => {
+                    self.record_termination_reason(SamTerminationReason::Unknown);
+                    let output = result(&self);
+                    return Poll::Ready(output);
+                }
                 Poll::Ready(Some(StreamManagerEvent::SendPacket {
                     delivery_style,
                     dst_port,
@@ -1630,7 +1904,11 @@ impl<R: Runtime> Future for SamSession<R> {
         loop {
             match self.destination.poll_next_unpin(cx) {
                 Poll::Pending => break,
-                Poll::Ready(None) => return Poll::Ready(Arc::clone(&self.session_id)),
+                Poll::Ready(None) => {
+                    self.record_termination_reason(SamTerminationReason::Unknown);
+                    let output = result(&self);
+                    return Poll::Ready(output);
+                }
                 Poll::Ready(Some(DestinationEvent::Messages { messages })) => {
                     self.on_inbound_message(messages)
                 }
@@ -1645,10 +1923,15 @@ impl<R: Runtime> Future for SamSession<R> {
                     tracing::info!(
                         target: LOG_TARGET,
                         session_id = ?self.session_id,
+                        reason = ?self.termination_result(),
                         "tunnel pool shut down, shutting down session",
                     );
 
-                    return Poll::Ready(Arc::clone(&self.session_id));
+                    // Transport shutdown is authoritative failure unless a
+                    // winning reason (idle or requested) already exists.
+                    self.record_termination_reason(SamTerminationReason::Failure);
+                    let output = result(&self);
+                    return Poll::Ready(output);
                 }
                 Poll::Ready(Some(DestinationEvent::CreateLeaseSet { leases })) => {
                     tracing::trace!(
@@ -1693,7 +1976,11 @@ impl<R: Runtime> Future for SamSession<R> {
         loop {
             match self.lookup_futures.poll_next_unpin(cx) {
                 Poll::Pending => break,
-                Poll::Ready(None) => return Poll::Ready(Arc::clone(&self.session_id)),
+                Poll::Ready(None) => {
+                    self.record_termination_reason(SamTerminationReason::Unknown);
+                    let output = result(&self);
+                    return Poll::Ready(output);
+                }
                 Poll::Ready(Some((name, result))) => {
                     let message = match result {
                         Some(destination) => {
@@ -1736,10 +2023,14 @@ impl<R: Runtime> Future for SamSession<R> {
         // Drive the single generation-local idle timer after all qualifying
         // activity in this turn has been recorded, so activity in the same
         // turn wins over the deadline. The timer wakes this future at the
-        // reduction deadline even when no other event arrives. Shutdown
-        // paths above return early; teardown drops the timer via
-        // `cancel_idle_state` on socket close below.
-        if self.socket.is_none() {
+        // next relevant deadline even when no other event arrives. Shutdown
+        // paths above return early. Manual socket close cancels idle work
+        // without overwriting the recorded requested reason; idle close
+        // never reschedules after teardown.
+        if self.idle_closing {
+            // Canonical teardown already requested; the existing
+            // stream/destination shutdown chain drives to `Ready`.
+        } else if self.socket.is_none() {
             self.cancel_idle_state();
         } else {
             self.poll_idle_timer(cx);
@@ -2924,5 +3215,418 @@ mod tests {
         session.note_qualifying_activity();
         assert!(!session.idle_reduced);
         assert!(session.idle_timer.is_some());
+    }
+
+    #[test]
+    fn m137_close_policy_parsing_is_deterministic_and_bounded() {
+        // Disabled unless exactly true (case-insensitive).
+        assert!(!IdlePolicy::parse(&HashMap::new()).close_enabled);
+        assert!(!IdlePolicy::parse(&idle_options(&[("i2cp.closeOnIdle", "false")])).close_enabled);
+        assert!(!IdlePolicy::parse(&idle_options(&[("i2cp.closeOnIdle", "1")])).close_enabled);
+        assert!(!IdlePolicy::parse(&idle_options(&[("i2cp.closeOnIdle", "")])).close_enabled);
+        assert!(IdlePolicy::parse(&idle_options(&[("i2cp.closeOnIdle", "true")])).close_enabled);
+        assert!(IdlePolicy::parse(&idle_options(&[("i2cp.closeOnIdle", "TRUE")])).close_enabled);
+
+        // Defaults: 1800000 ms, minimum 300000 ms.
+        let cfg = IdlePolicy::parse(&idle_options(&[("i2cp.closeOnIdle", "true")]));
+        assert_eq!(cfg.close_idle_time, Duration::from_millis(1_800_000));
+
+        let cfg = IdlePolicy::parse(&idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "1000"),
+        ]));
+        assert_eq!(cfg.close_idle_time, Duration::from_millis(300_000));
+
+        // Malformed time falls back to default (fail-safe, no disruption).
+        let cfg = IdlePolicy::parse(&idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "not-a-number"),
+        ]));
+        assert_eq!(cfg.close_idle_time, Duration::from_millis(1_800_000));
+
+        // Close disabled carries default time but no timer/work.
+        let cfg = IdlePolicy::parse(&HashMap::new());
+        assert!(!cfg.close_enabled);
+        assert!(cfg.initial_delay().is_none());
+    }
+
+    #[test]
+    fn m137_close_policy_carries_no_admin_vocabulary_in_diagnostics() {
+        let cfg = IdlePolicy::parse(&idle_options(&[("i2cp.closeOnIdle", "true")]));
+        let debug = format!("{cfg:?}");
+        for forbidden in [
+            "Proposal",
+            "I2PControl",
+            "TunnelManager",
+            "JsonRpc",
+            "jsonrpc",
+        ] {
+            assert!(
+                !debug.contains(forbidden),
+                "diagnostic contains forbidden term {forbidden}: {debug}"
+            );
+        }
+        let reason = SamTerminationReason::IdlePolicy;
+        let debug = format!("{reason:?}");
+        for forbidden in [
+            "Proposal",
+            "I2PControl",
+            "TunnelManager",
+            "CloseTime",
+            "NewDest",
+        ] {
+            // `IdlePolicy` itself is neutral (no Proposal prefix); ensure no
+            // administrative scoping leaks through the reason type.
+            assert!(
+                !debug.contains(forbidden),
+                "reason diagnostic contains forbidden term {forbidden}: {debug}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn m137_no_close_option_preserves_m136_behavior() {
+        let (session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+        ]))
+        .await;
+        assert!(!session.idle_policy.close_enabled);
+        assert!(session.idle_policy.reduce_effective());
+        assert!(!session.idle_closing);
+        assert!(session.termination_reason.is_none());
+        assert!(session.idle_timer.is_some());
+
+        let (plain, _ctx2) = create_idle_session(HashMap::new()).await;
+        assert!(!plain.idle_policy.close_enabled);
+        assert!(!plain.idle_policy.reduce_effective());
+        assert!(plain.idle_timer.is_none());
+        assert!(!plain.idle_closing);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m137_close_enabled_no_teardown_before_threshold() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        session.idle_policy.close_idle_time = Duration::from_millis(200);
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(200)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+        assert!(!session.idle_closing);
+        assert!(session.termination_reason.is_none());
+        assert!(session.socket.is_some());
+        assert!(session.idle_timer.is_some());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m137_exact_threshold_triggers_canonical_teardown() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        session.idle_policy.close_idle_time = Duration::from_millis(100);
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(100)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+
+        assert!(session.idle_closing);
+        assert_eq!(
+            session.termination_reason,
+            Some(SamTerminationReason::IdlePolicy)
+        );
+        assert!(session.idle_timer.is_none());
+        // Canonical teardown stops accepting socket commands.
+        assert!(session.socket.is_none());
+        // Timer does not reschedule after teardown.
+        session.poll_idle_timer(&mut cx);
+        assert!(session.idle_timer.is_none());
+        assert!(session.idle_closing);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m137_activity_resets_both_close_and_reduce_clocks() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        // Close (300s) > reduce (200ms test override): both effectively
+        // enabled, single shared clock.
+        session.idle_policy.idle_time = Duration::from_millis(200);
+        session.idle_policy.close_idle_time = Duration::from_millis(400);
+        assert!(session.idle_policy.reduce_effective());
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(200)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        session.note_qualifying_activity();
+
+        tokio::time::advance(Duration::from_millis(150)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+        // Only 150ms since last activity: neither reduce nor close.
+        assert!(!session.idle_reduced);
+        assert!(!session.idle_closing);
+        assert_eq!(session.destination.desired_quantity_target(), (3, 3));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m137_close_not_greater_than_reduce_suppresses_reduction() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        // Close (100ms) <= reduce (200ms): reduction suppressed from the
+        // frozen policy state, never momentarily reducing before close.
+        session.idle_policy.idle_time = Duration::from_millis(200);
+        session.idle_policy.close_idle_time = Duration::from_millis(100);
+        assert!(!session.idle_policy.reduce_effective());
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(100)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+
+        assert!(!session.idle_reduced);
+        assert!(session.idle_closing);
+        assert_eq!(
+            session.termination_reason,
+            Some(SamTerminationReason::IdlePolicy)
+        );
+        // No reduction occurred: desired target never went low.
+        assert_eq!(session.destination.desired_quantity_target(), (3, 3));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m137_close_after_reduce_allows_reduce_then_later_close() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        session.idle_policy.idle_time = Duration::from_millis(100);
+        session.idle_policy.close_idle_time = Duration::from_millis(300);
+        assert!(session.idle_policy.reduce_effective());
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(100)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+        assert!(session.idle_reduced);
+        assert!(!session.idle_closing);
+        assert_eq!(session.destination.desired_quantity_target(), (1, 1));
+        // Close timer remains after reduction.
+        assert!(session.idle_timer.is_some());
+
+        tokio::time::advance(Duration::from_millis(200)).await;
+        session.poll_idle_timer(&mut cx);
+        assert!(session.idle_closing);
+        assert_eq!(
+            session.termination_reason,
+            Some(SamTerminationReason::IdlePolicy)
+        );
+        assert!(session.idle_timer.is_none());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m137_reduced_activity_restores_and_postpones_close() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.reduceOnIdle", "true"),
+            ("i2cp.reduceIdleTime", "300000"),
+            ("i2cp.reduceQuantity", "1"),
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        session.idle_policy.idle_time = Duration::from_millis(100);
+        session.idle_policy.close_idle_time = Duration::from_millis(500);
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(100)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        {
+            let waker = futures::task::noop_waker();
+            let mut cx = Context::from_waker(&waker);
+            session.poll_idle_timer(&mut cx);
+        }
+        assert!(session.idle_reduced);
+
+        // First qualifying activity while reduced restores base and
+        // postpones close.
+        session.note_qualifying_activity();
+        assert!(!session.idle_reduced);
+        assert!(!session.idle_closing);
+        assert_eq!(session.destination.desired_quantity_target(), (3, 3));
+        assert!(session.idle_timer.is_some());
+    }
+
+    #[tokio::test]
+    async fn m137_idle_cause_recorded_only_when_idle_wins() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        // Manual stop wins first: idle close must not overwrite.
+        session.record_termination_reason(SamTerminationReason::Requested);
+        assert!(!session.request_idle_close());
+        assert_eq!(
+            session.termination_reason,
+            Some(SamTerminationReason::Requested)
+        );
+
+        // Fresh session: idle wins when no prior reason.
+        let (mut fresh, _ctx2) = create_idle_session(idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        assert!(fresh.request_idle_close());
+        assert_eq!(
+            fresh.termination_reason,
+            Some(SamTerminationReason::IdlePolicy)
+        );
+        // Second winner cannot overwrite idle.
+        fresh.record_termination_reason(SamTerminationReason::Requested);
+        assert_eq!(
+            fresh.termination_reason,
+            Some(SamTerminationReason::IdlePolicy)
+        );
+        // Activity after closing is ignored.
+        fresh.note_qualifying_activity();
+        assert!(fresh.idle_timer.is_none());
+    }
+
+    #[tokio::test]
+    async fn m137_manual_stop_and_failure_reasons_are_not_idle() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        // Explicit restart/manual path.
+        session.record_termination_reason(SamTerminationReason::Requested);
+        assert_ne!(
+            session.termination_result(),
+            SamTerminationReason::IdlePolicy
+        );
+
+        // Transport failure path.
+        let (mut failed, _ctx2) = create_idle_session(idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        failed.record_termination_reason(SamTerminationReason::Failure);
+        assert_ne!(
+            failed.termination_result(),
+            SamTerminationReason::IdlePolicy
+        );
+
+        // Unrecorded spontaneous end defaults to Unknown, never idle.
+        let (plain, _ctx3) = create_idle_session(idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        assert_eq!(plain.termination_result(), SamTerminationReason::Unknown);
+    }
+
+    #[tokio::test]
+    async fn m137_stale_generation_cannot_close_replacement() {
+        let (mut first, _c1) = create_idle_session(idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        let (second, _c2) = create_idle_session(idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        assert_ne!(first.idle_generation, second.idle_generation);
+
+        // Old generation closes itself only.
+        assert!(first.request_idle_close());
+        assert!(first.idle_closing);
+        // Replacement starts fresh: active, no closing, no reason.
+        assert!(!second.idle_closing);
+        assert!(second.termination_reason.is_none());
+        assert!(second.idle_timer.is_some());
+        assert!(second.socket.is_some());
+    }
+
+    #[tokio::test]
+    async fn m137_shared_members_use_one_close_clock() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        session.session_kind = SamSessionKind::Primary {
+            sub_sessions: HashMap::new(),
+        };
+        let _ = session.on_create_sub_session("sub1".into(), SessionKind::Stream, HashMap::new());
+        // Registration itself is not activity and does not close.
+        assert!(!session.idle_closing);
+        assert!(session.idle_timer.is_some());
+
+        // Activity from any member resets the common clock.
+        session.note_qualifying_activity();
+        assert!(!session.idle_closing);
+        assert!(session.idle_timer.is_some());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn m137_datagram_close_uses_same_generic_owner() {
+        let (mut session, _ctx) = create_idle_session(idle_options(&[
+            ("i2cp.closeOnIdle", "true"),
+            ("i2cp.closeIdleTime", "300000"),
+        ]))
+        .await;
+        session.session_kind = SamSessionKind::Datagram {
+            kind: SessionKind::Datagram,
+        };
+        session.idle_policy.close_idle_time = Duration::from_millis(100);
+        session.idle_last_activity = MockRuntime::now();
+        session.idle_timer = Some(MockRuntime::timer(Duration::from_millis(100)));
+
+        tokio::time::advance(Duration::from_millis(100)).await;
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        session.poll_idle_timer(&mut cx);
+        assert!(session.idle_closing);
+        assert_eq!(
+            session.termination_reason,
+            Some(SamTerminationReason::IdlePolicy)
+        );
     }
 }

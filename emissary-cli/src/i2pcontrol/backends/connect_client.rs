@@ -727,12 +727,15 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "Reduce",
         "ReduceCount",
         "ReduceTime",
+        "Close",
+        "CloseTime",
         "Shared",
         "PersistentClientKey",
         "PrivKeyFile",
     ];
-    // M121: "Close", "CloseTime", and "NewDest" demoted to blocked_primitive.
+    // M121: "NewDest" remains demoted to blocked_primitive.
     // M136: "Reduce"/"ReduceCount"/"ReduceTime" supported via idle owner.
+    // M137: "Close"/"CloseTime" supported via the same canonical owner.
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
             continue;

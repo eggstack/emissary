@@ -1,8 +1,11 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M132 ready / registered**
+Status: **active / partial; M132 closed as blocked; no active handoff**
 
-Current registered handoff:
+Current registered handoff: none — M132 is closed as blocked
+(`plans/closure/i2pcontrol-proposal-170/132-closure.md`).
+
+Prior handoff:
 
 - `plans/implementation/i2pcontrol-proposal-170/132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md`.
 
@@ -147,16 +150,16 @@ The line is:
 M131 residual primitive re-freeze                 [CLOSED AS BLOCKED]
   |
   v
-M132 idle reduction + live pool target            [READY / REGISTERED]
+M132 idle reduction + live pool target            [CLOSED AS BLOCKED]
   |
-  v
+  x
 M133 idle close + reasoned termination            [DEFERRED / UNREGISTERED]
   |
-  v
+  x
 M134 NewDest on proven idle resume                [DEFERRED / UNREGISTERED]
 ```
 
-Only M132 is executable now.
+No handoff is executable now. M132 closure unblocks no successor.
 
 ### M132
 

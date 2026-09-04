@@ -1,6 +1,8 @@
 # M132 — Neutral SAM Idle Reduction and Proposal Reduce Completion
 
-Status: **ready / registered**
+Status: **closed as blocked**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/132-closure.md`
 
 Class: capability / neutral lower-layer exception / Proposal-170 vertical slice
 

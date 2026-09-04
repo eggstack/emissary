@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M132 ready / registered**.
+Status: **partial Proposal 170 support; M132 closed as blocked; no active handoff**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -30,7 +30,7 @@ Containment/support evidence remains centered on:
 - `105-residual-option-audit.toml`;
 - `110-completion-ledger.toml`.
 
-## Current registered handoff — M132
+## M132 closure — no active handoff
 
 Plan:
 
@@ -40,20 +40,20 @@ Source roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md`.
 
-Status: **ready / registered**.
+Status: **closed as blocked**.
 
-M132 implements one vertical contract slice:
+Closure:
 
-- actual SAM/I2CP session activity at the streaming/datagram payload boundary;
-- a neutral bounded live active inbound/outbound tunnel-pool target separate from configured/base quantity;
-- exact idle reduction and restoration semantics;
-- Proposal `Reduce`, `ReduceCount`, `ReduceTime` validation and mapping through the existing Yosemite session-option boundary;
-- shared-session compatibility/activity aggregation;
-- truthful LeaseSet/pool behavior and generation-local cancellation/restart semantics.
+- `plans/closure/i2pcontrol-proposal-170/132-closure.md`.
 
-M132 is an explicit neutral lower-layer exception. Its production path budget is limited to existing canonical SAM/destination/tunnel-pool owners plus the I2PControl session adapter. No Cargo/dependency/Yosemite/frontend/startup/NetDb/crypto expansion is authorized.
-
-Starting matrix is `284 / 88 / 468`. M132 may promote up to 21 `Reduce*` cells only where direct reference and end-to-end evidence prove applicability; Streamr cells remain blocked if ambiguity remains.
+M132 targeted one vertical contract slice (SAM/I2CP activity, neutral bounded
+live pool target, idle reduction/restore, Proposal `Reduce`/`ReduceCount`/
+`ReduceTime` via Yosemite, shared-session semantics, truthful LeaseSet/pool
+behavior). It closed as blocked with zero promotions: reference items 9–11
+could not be resolved without guessing, the live target plus LeaseSet sync
+requires a broad redesign, Yosemite typed reduce fields are dormant, and
+Streamr applicability remains ambiguous. The matrix remains
+`284 / 88 / 468`. No active handoff exists after M132 closure.
 
 ## Deferred successor — M133
 
@@ -97,16 +97,16 @@ M130 current runtime/security authority         [CLOSED]
 M131 residual primitive re-freeze               [CLOSED AS BLOCKED — 284/88/468]
   |
   v
-M132 idle reduction + live pool target          [READY / REGISTERED]
+M132 idle reduction + live pool target          [CLOSED AS BLOCKED — 284/88/468]
   |
-  v
+  x
 M133 idle close + reasoned termination          [DEFERRED / UNREGISTERED]
   |
-  v
+  x
 M134 NewDest on proven idle resume              [DEFERRED / UNREGISTERED]
 ```
 
-Only M132 is executable under the current registry.
+No handoff is executable under the current registry after M132 closure.
 
 ## Other residual clusters
 

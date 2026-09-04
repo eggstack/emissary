@@ -1,14 +1,17 @@
 # Proposal 170 Session-Lifecycle Completion Roadmap
 
-Status: **active / partial; M132 ready / registered; M133-M134 dependency-blocked**
+Status: **active / partial; M132 closed as blocked; M133-M134 dependency-blocked**
 
 Parent roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`.
 
-Current handoff:
+Current handoff: none — M132 is closed as blocked
+(`plans/closure/i2pcontrol-proposal-170/132-closure.md`).
 
-- `plans/implementation/i2pcontrol-proposal-170/132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md` — **ready / registered**.
+Prior handoff:
+
+- `plans/implementation/i2pcontrol-proposal-170/132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md` — **closed as blocked**.
 
 Future handoffs:
 
@@ -154,16 +157,18 @@ M134 consumes only a proven M133 idle-close fact. Successor identity staging/com
 M131 residual primitive re-freeze                 [CLOSED AS BLOCKED]
   |
   v
-M132 SAM idle reduction + dynamic pool target     [READY / REGISTERED]
+M132 SAM idle reduction + dynamic pool target     [CLOSED AS BLOCKED]
   |
-  v
-M133 SAM idle close + reasoned termination        [DEFERRED / UNREGISTERED]
+  x
+M133 SAM idle close + reasoned termination        [DEFERRED / UNREGISTERED — M132 provided no stable activity/timer owner]
   |
-  v
-M134 NewDest on proven idle resume                [DEFERRED / UNREGISTERED]
+  x
+M134 NewDest on proven idle resume                [DEFERRED / UNREGISTERED — hard-depends on M133]
 ```
 
-Only M132 is authorized for execution.
+No lifecycle handoff is authorized for execution after M132 closure. M133
+must be amended/re-based against a future proven reduction primitive before
+any registration.
 
 ## 8. M132 exit conditions
 
@@ -275,4 +280,4 @@ Those remain separate M131 primitive clusters.
 
 ## 16. Completion rule
 
-This roadmap closes after M134 closure or a truthful blocked disposition for remaining lifecycle cells. It does not itself establish full Proposal 170 support. Whole-surface completion remains governed by the parent roadmap and future requalification after all applicable residual clusters are resolved.
+This roadmap closes after M134 closure or a truthful blocked disposition for remaining lifecycle cells. M132 closed as blocked (`plans/closure/i2pcontrol-proposal-170/132-closure.md`) with zero `Reduce*` promotions and no successor unblocked. It does not itself establish full Proposal 170 support. Whole-surface completion remains governed by the parent roadmap and future requalification after all applicable residual clusters are resolved.

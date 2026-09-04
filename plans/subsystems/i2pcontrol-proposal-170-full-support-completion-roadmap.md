@@ -1,13 +1,15 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M132 closed as blocked; no active handoff**
+Status: **active / partial; M132/M133 closed as blocked; no active handoff**
 
-Current registered handoff: none — M132 is closed as blocked
-(`plans/closure/i2pcontrol-proposal-170/132-closure.md`).
+Current registered handoff: none — M132/M133 are closed as blocked
+(`plans/closure/i2pcontrol-proposal-170/132-closure.md`,
+`plans/closure/i2pcontrol-proposal-170/133-closure.md`).
 
-Prior handoff:
+Prior handoffs:
 
-- `plans/implementation/i2pcontrol-proposal-170/132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md`.
+- `plans/implementation/i2pcontrol-proposal-170/132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md` — **closed as blocked**;
+- `plans/implementation/i2pcontrol-proposal-170/133-neutral-sam-idle-close-and-reasoned-termination.md` — **closed as blocked**.
 
 Active focused roadmap:
 
@@ -153,13 +155,13 @@ M131 residual primitive re-freeze                 [CLOSED AS BLOCKED]
 M132 idle reduction + live pool target            [CLOSED AS BLOCKED]
   |
   x
-M133 idle close + reasoned termination            [DEFERRED / UNREGISTERED]
+M133 idle close + reasoned termination            [CLOSED AS BLOCKED]
   |
   x
 M134 NewDest on proven idle resume                [DEFERRED / UNREGISTERED]
 ```
 
-No handoff is executable now. M132 closure unblocks no successor.
+No handoff is executable now. M132/M133 closure unblocks no successor.
 
 ### M132
 
@@ -173,15 +175,15 @@ M132 authorizes no Cargo/Yosemite dependency changes and no unrelated core path.
 
 ### M133
 
-Plan exists but is unregistered: `133-neutral-sam-idle-close-and-reasoned-termination.md`.
+Plan: `133-neutral-sam-idle-close-and-reasoned-termination.md` — **closed as blocked** (`plans/closure/i2pcontrol-proposal-170/133-closure.md`).
 
-Hard-depends on M132 closure. It must reuse M132 activity/timer state for `Close`/`CloseTime`, perform bounded idle session teardown, and provide a neutral authoritative in-process idle-close reason without a SAM wire extension.
+Hard-depended on M132 closure. It would have reused the M132 activity/timer state for `Close`/`CloseTime`, performed bounded idle session teardown, and provided a neutral authoritative in-process idle-close reason without a SAM wire extension. Zero `Close`/`CloseTime` cells promoted: M132 provided no owner to extend.
 
 ### M134
 
 Plan exists but is unregistered: `134-newdest-on-proven-idle-resume.md`.
 
-Hard-depends on M133. It keeps `NewDest` entirely I2PControl-owned, stages/commits a fresh destination exactly once on successful resume after a proven idle close, and never rotates on manual stop/start, restart, process restart, network failure or failed/cancelled resume. Streamr NewDest remains not applicable under M131.
+Hard-depends on M133 (not satisfied — M133 closed as blocked without an authoritative reason). It keeps `NewDest` entirely I2PControl-owned, stages/commits a fresh destination exactly once on successful resume after a proven idle close, and never rotates on manual stop/start, restart, process restart, network failure or failed/cancelled resume. Streamr NewDest remains not applicable under M131.
 
 ## 8. Other residual clusters
 
@@ -248,9 +250,7 @@ No new hosted CI/fuzz/release orchestration is required by this roadmap.
 
 Per `plans/003-planning-process.md`:
 
-- M132 is the only active registered implementation plan;
-- M133 stays unregistered until M132 closure explicitly proves its interface/readiness;
-- M134 stays unregistered until M133 closure explicitly proves authoritative idle-close/reopen semantics;
+- M132/M133 are closed as blocked; M134 stays unregistered until a future reduction primitive and a future close primitive explicitly prove the authoritative idle-close/reopen semantics;
 - future residual clusters remain unregistered;
 - material deviations require plan amendment before production code;
 - closure evidence decides support and matrix promotion.

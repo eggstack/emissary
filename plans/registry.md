@@ -28,27 +28,29 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
-| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M132 closed as blocked; no active handoff** |
-| Proposal 170 session-lifecycle completion | **active / blocked** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | **M132 closed as blocked**; M133-M134 deferred |
+| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M132/M133 closed as blocked; no active handoff** |
+| Proposal 170 session-lifecycle completion | **active / blocked** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | **M132/M133 closed as blocked**; M134 deferred |
 | Post-M114 shared-control-plane corrective line | closed | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | M130 closed as current runtime/security authority |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
 
-## M132 closure — no active handoff
+## M132/M133 closure — no active handoff
 
-Plan:
+Plans:
 
 - `plans/implementation/i2pcontrol-proposal-170/132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md`
+- `plans/implementation/i2pcontrol-proposal-170/133-neutral-sam-idle-close-and-reasoned-termination.md`
 
-Status: **closed as blocked**.
+Status: **both closed as blocked**.
 
 Baseline:
 
 - M131 closure head `3a829d7d3d6314ecf09e42dbf0339506f0917c96`;
 - M131 matrix `284 apply / 88 blocked_primitive / 468 not_applicable`.
 
-Closure:
+Closures:
 
-- `plans/closure/i2pcontrol-proposal-170/132-closure.md`.
+- `plans/closure/i2pcontrol-proposal-170/132-closure.md`;
+- `plans/closure/i2pcontrol-proposal-170/133-closure.md`.
 
 M132 was the Proposal-170 implementation handoff for the smallest neutral
 lower-layer session/pool primitive required by Proposal `Reduce`,
@@ -59,20 +61,33 @@ truthful LeaseSet synchronization requires a broad redesign, Yosemite typed
 reduce fields are dormant, and Streamr applicability remains ambiguous. The
 matrix remains `284 apply / 88 blocked_primitive / 468 not_applicable`.
 
-No Proposal-170 implementation handoff is active or registered after M132
-closure. M133/M134 remain deferred/unregistered.
+M133 was the Proposal-170 successor for neutral `Close`/`CloseTime` plus a
+neutral authoritative idle-close reason. It closed as blocked with zero
+promotions: M132 provided no stable activity/timer owner to extend, so no
+same-clock close deadline, authoritative teardown trigger, or `IdlePolicy`
+reason exists. Yosemite typed close fields are dormant and the only
+in-tree idle-closer is the forbidden local-TCP-handler heuristic,
+unreachable via Proposal `Close`. The matrix remains
+`284 apply / 88 blocked_primitive / 468 not_applicable`.
 
-## Deferred session-lifecycle successors
+No Proposal-170 implementation handoff is active or registered after M132/M133
+closure. M134 remains deferred/unregistered.
 
-### M133 — idle close and reasoned termination
+## Deferred session-lifecycle successor
+
+### M133 — idle close and reasoned termination (closed)
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/133-neutral-sam-idle-close-and-reasoned-termination.md`
 
-Status: **deferred / unregistered**; hard dependency on M132 closure (not satisfied — M132 closed as blocked without a stable activity/timer owner).
+Status: **closed as blocked**; hard dependency on M132 closure was not satisfied — M132 closed as blocked without a stable activity/timer owner.
 
-M133 would reuse the M132 activity/timer owner for `Close`/`CloseTime` and add only a neutral authoritative in-process idle-close termination reason. It must not implement `NewDest` or invent a SAM wire extension. Registration requires a future proven reduction primitive first.
+Closure:
+
+- `plans/closure/i2pcontrol-proposal-170/133-closure.md`.
+
+M133 would have reused the M132 activity/timer owner for `Close`/`CloseTime` and added only a neutral authoritative in-process idle-close termination reason. It must not have implemented `NewDest` or invented a SAM wire extension. A future proven reduction primitive is required before any close re-attempt.
 
 ### M134 — NewDest on proven idle resume
 
@@ -80,7 +95,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/134-newdest-on-proven-idle-resume.md`
 
-Status: **deferred / unregistered**; hard dependency on M133 closure.
+Status: **deferred / unregistered**; hard dependency on M133 closure (not satisfied — M133 closed as blocked without an authoritative idle-close reason).
 
 M134 keeps destination/key rotation entirely I2PControl-owned. It may consume one authoritative M133 idle-close fact and rotate exactly once on a successful qualifying resume. Manual stop/start, restart, process restart, network/SAM failure and failed/cancelled resume must not rotate. `NewDest:streamrclient` remains not applicable under M131 authority.
 
@@ -126,13 +141,13 @@ M131 residual primitive re-freeze           [CLOSED AS BLOCKED — 284/88/468]
 M132 idle reduction + live pool target      [CLOSED AS BLOCKED — 284/88/468]
   |
   x
-M133 idle close + reasoned termination      [DEFERRED / UNREGISTERED — M132 did not provide the stable activity/timer owner]
+M133 idle close + reasoned termination      [CLOSED AS BLOCKED — 284/88/468]
   |
   x
 M134 NewDest on proven idle resume          [DEFERRED / UNREGISTERED — hard-depends on M133]
 ```
 
-M114 remains historically closed as blocked. The M132-M134 line resolves only the session-lifecycle cluster and does not authorize unrelated residual clusters. M132 closure unblocks no successor.
+M114 remains historically closed as blocked. The M132-M134 line resolves only the session-lifecycle cluster and does not authorize unrelated residual clusters. M132/M133 closure unblocks no successor.
 
 ## Residual clusters outside the active line
 
@@ -153,7 +168,7 @@ No successor from those clusters may be smuggled into M132-M134.
 ## Canonical containment rules
 
 1. Proposal policy stays under `emissary-cli/src/i2pcontrol/**` wherever possible.
-2. M132 closed with no core changes; any future reduction primitive is permitted only in its exact neutral SAM/destination/tunnel-pool path budget and must be reflected in M062 before implementation closure.
+2. M132/M133 closed with no core changes; any future reduction/close primitive is permitted only in its exact neutral SAM/destination/tunnel-pool path budget and must be reflected in M062 before implementation closure.
 3. No Proposal-shaped `emissary-core` API is accepted merely to improve matrix counts.
 4. Yosemite remains the sole accepted SAM implementation; no parallel raw SAM stack.
 5. Exact Y005 remains isolated behind the optional `yosemite-i2pcontrol` alias.
@@ -165,8 +180,8 @@ No successor from those clusters may be smuggled into M132-M134.
 
 ## Registration rules
 
-1. **No Proposal-170 implementation plan is active/registered after M132 closure.**
-2. M133 is registered only after a future reduction primitive explicitly proves the M132 dependency-ready interface (stable activity/timer owner, generation-local lifecycle contract); M132 closure explicitly did not prove it.
+1. **No Proposal-170 implementation plan is active/registered after M132/M133 closure.**
+2. A future close re-attempt is registered only after a future reduction primitive explicitly proves the M132 dependency-ready interface (stable activity/timer owner, generation-local lifecycle contract); M132/M133 closure explicitly did not prove it.
 3. M134 is registered only after M133 closure explicitly proves an authoritative idle-close reason/reopen contract.
 4. Material path/architecture deviations require plan amendment before code.
 5. Closure evidence, not implementation assertions, determines support/matrix promotion.
@@ -184,6 +199,7 @@ No successor from those clusters may be smuggled into M132-M134.
 | M129 | closed; non-loopback managed-TLS fail-closed |
 | M130 | closed; current implemented-subset runtime/security qualification |
 | M131 | closed as blocked; residual applicability/primitive re-freeze; 8 applicability corrections; matrix 284/88/468 |
-| M132 | **closed as blocked**; idle reduction + live pool target; zero promotions; M133/M134 remain deferred |
+| M132 | **closed as blocked**; idle reduction + live pool target; zero promotions; matrix 284/88/468 |
+| M133 | **closed as blocked**; idle close + reasoned termination; zero promotions; M134 remains deferred |
 
 Historical closure files remain unchanged.

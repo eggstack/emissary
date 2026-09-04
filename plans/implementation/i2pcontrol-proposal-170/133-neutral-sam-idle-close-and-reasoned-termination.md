@@ -1,6 +1,8 @@
 # M133 — Neutral SAM Idle Close and Reasoned Termination
 
-Status: **deferred / unregistered; hard-depends on M132 closure**
+Status: **closed as blocked**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/133-closure.md`
 
 Class: capability / neutral lower-layer exception / Proposal-170 vertical slice
 

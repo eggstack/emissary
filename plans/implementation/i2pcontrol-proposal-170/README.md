@@ -1,223 +1,166 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; post-M126 corrective line closed**. M127-M130 closed; M130 is the current-head requalification authority. The authoritative M095 matrix remains `284 apply / 96 blocked_primitive / 460 not_applicable`.
+Status: **partial Proposal 170 support; M131 ready / registered**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
-This directory contains bounded internal implementation, corrective, audit and dependency handoffs for the I2PControl Proposal 170 workstream.
+Current runtime/security qualification authority:
+
+- M130 closure: `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
+- M130 implementation `fe1a981`;
+- M130 closure / M131 production-behavior baseline `a68094e128d2b92f0fd5b350e38512ef6b65cb6b`.
+
+Current registered handoff:
+
+- `131-residual-applicability-and-primitive-architecture-refreeze.md`.
+
+The authoritative M095 starting matrix remains `284 apply / 96 blocked_primitive / 460 not_applicable` until M131 produces evidence-backed current-authority corrections.
 
 ## Authority
 
 Read in this order:
 
-1. `plans/000-long-term-specification.md`
-2. `plans/001-terminology-and-domain-model.md`
-3. `plans/002-long-term-roadmap.md`
-4. `plans/003-planning-process.md`
-5. ADR-0001 through ADR-0005
-6. subsystem roadmaps
-7. `plans/registry.md`
-8. the specific registered implementation plan
+1. `plans/000-long-term-specification.md`;
+2. `plans/001-terminology-and-domain-model.md`;
+3. `plans/002-long-term-roadmap.md`;
+4. `plans/003-planning-process.md`;
+5. ADR-0001 through ADR-0005;
+6. subsystem roadmaps;
+7. `plans/registry.md`;
+8. the specific registered plan.
 
 Containment/support evidence:
 
-- `061-containment-boundary.toml`
-- `062-dependency-containment.toml`
-- `095-full-support-matrix.toml`
-- `105-residual-option-audit.toml`
-- `110-completion-ledger.toml`
+- `061-containment-boundary.toml`;
+- `062-dependency-containment.toml`;
+- `095-full-support-matrix.toml`;
+- `105-residual-option-audit.toml`;
+- `110-completion-ledger.toml`.
 
 ## Current production/support state
 
-- RouterInfo: 43 Proposal additions / 42 available / 1 protocol-permitted neutral / 0 unavailable according to current closure evidence.
-- AddressBook CRUD, subscriptions, all 13 SetConfig keys and cross-book precedence are operational according to current closure evidence.
-- All 12 canonical TunnelManager data planes and seven actions exist for the currently claimed subset.
-- All six ClientServicesInfo selectors are operational according to current closure evidence.
-- M121 truthfully demoted unsupported `SigType` and `Close`/`CloseTime`/`NewDest` semantics instead of retaining approximate support.
-- M124 exact-pins Yosemite Y005 `59140a2277bf296928d2e8ce39a148182eeff044` only through the optional I2PControl alias; ordinary Yosemite remains registry 0.7.0.
-- M125 corrected two server-role `AllowInternalSSL` applicability cells and left 96 blocked cells with no dependency-ready owner.
-- M126 is historical current-head evidence, but subsequent review found three shared-control-plane defects/gaps; its clean auth/TLS/JSON-RPC qualification is superseded by M130 for current authority (C10 resolved by closed M127, C11 resolved by closed M128, C12 resolved by closed M129).
+According to M130 and preceding closures:
+
+- RouterInfo: 43 Proposal additions / 42 available / 1 neutral / 0 unavailable;
+- AddressBook CRUD, subscriptions, all 13 SetConfig keys and cross-book precedence operational;
+- all 12 TunnelManager data planes and seven actions exist for the currently claimed subset;
+- all six ClientServicesInfo selectors operational;
+- M121 truthfully demoted unsupported `SigType` and `Close`/`CloseTime`/`NewDest` approximations;
+- Yosemite Y005 `59140a2277bf296928d2e8ce39a148182eeff044` is exact-pinned only through the optional I2PControl alias;
+- M127 finite token lifetime, M128 bounded JSON-RPC batches and M129 fail-closed non-loopback TLS are closed;
+- M130 requalified the corrected shared control plane and representative Proposal production.
 
 Full Proposal 170 support is not claimed.
 
-## Reopened corrective sequence
-
-| Handoff | Status | Scope |
-|---|---|---|
-| M127 | **closed** | finite API-1 token lifetime; expired-vs-unknown behavior; auth bounds |
-| M128 | **closed** | bounded JSON-RPC batch conformance and per-element auth/resource rules |
-| M129 | **closed** | non-loopback bind requires explicit TLS certificate/key; managed TLS loopback-only |
-| M130 | **closed** | integrated post-M127-M129 current-head requalification |
-
-Source roadmap:
-
-- `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md`
-
-No Proposal 170 implementation handoff is currently registered, consistent with `plans/003-planning-process.md`. M130 is the current-head requalification authority; any new concrete defect becomes a separately numbered M131+ focused corrective.
-
-## M127 — closed corrective
+## M131 — current registered handoff
 
 Plan:
 
-- `127-base-auth-token-lifetime-corrective.md`
+- `131-residual-applicability-and-primitive-architecture-refreeze.md`
 
-Closure:
+Status: **ready / registered**.
 
-- `plans/closure/i2pcontrol-proposal-170/127-closure.md` (implementation `098c9d1`).
+Purpose:
 
-M127 corrected the concrete authentication-lifetime defect missed by M126:
+Re-freeze all 96 currently blocked TunnelManager cells before implementing additional lower-layer primitives. M131 is planning/evidence-only and may not change runtime production behavior.
 
-- issued opaque tokens gained finite one-day monotonic in-process validity;
-- validation distinguishes valid, expired-and-removed and unknown credentials;
-- expired lookup maps to existing `-32004 TOKEN_EXPIRED`;
-- later use of the removed token maps to existing `-32003 INVALID_TOKEN`;
-- token capacity/input, conflict rejection, throttle, shutdown clearing and secret safety remain bounded;
-- no production change outside `emissary-cli/src/i2pcontrol/**` occurred;
-- no Proposal matrix cell changed.
+M131 must deliver:
 
-M127 does not add unrelated base I2PControl methods.
+- exact mechanical enumeration of all 96 starting blocked cells;
+- cell-level applicability and semantic evidence;
+- evidence-backed blocker-owner corrections;
+- `not_applicable` corrections only with affirmative pinned/reference evidence;
+- **zero `apply` promotions**;
+- a machine-readable residual primitive map;
+- canonical owners and minimal future path budgets;
+- dependency/security/failure/restart analysis for each future primitive cluster;
+- one next dependency-ready M132+ handoff at closure, or an explicit no-handoff result.
 
-## M128 — closed corrective
+Required semantic review includes:
 
-Plan:
+- `UseOutproxyPlugin`, `SSLProxies`, `JumpList` applicability;
+- every Streamr residual;
+- `Profile` streaming-window/runtime semantics;
+- session application-activity, idle reduction, close and resume semantics for `Reduce*`, `Close*`, `NewDest`;
+- `UniqueLocalAddressPerClient` source-bind behavior and loopback confinement;
+- `MultiHoming` versus `shouldBundleReplyInfo`;
+- exact `UseSSL` type/direction/identity/trust semantics;
+- `SigType` crypto/destination requirements;
+- encrypted/authenticated LeaseSet runtime ownership below Yosemite Y005.
 
-- `128-json-rpc-batch-conformance-corrective.md`
+M131 explicitly authorizes no production Rust changes, no Cargo/dependency changes and no Yosemite writes.
 
-Closure:
+## Current residual starting state
 
-- `plans/closure/i2pcontrol-proposal-170/128-closure.md` (implementation `0ed60eb`).
-
-M128 started from the closed-M127 head and inherited the corrected
-token-lifetime semantics. It replaced blanket top-level-array rejection
-with bounded JSON-RPC 2.0 batch behavior:
-
-- non-empty batch support (`MAX_BATCH_ELEMENTS = 32`);
-- per-element authentication and independent result/error handling;
-- exact notification suppression and no-content all-notification behavior;
-- explicit batch cardinality bound and zero execution for over-cap batches;
-- no implicit token propagation or cross-element transaction semantics;
-- no unbounded task fan-out;
-- unchanged single-request method/domain behavior.
-
-M128 supersedes only M126's affected batch-conformance qualification
-claim. Historical M126/M127 closures remain unchanged.
-
-## M129 — closed corrective
-
-Plan:
-
-- `129-nonloopback-managed-tls-fail-closed-corrective.md`
-
-Closure:
-
-- `plans/closure/i2pcontrol-proposal-170/129-closure.md` (implementation `39ccdd7`).
-
-M129 started from the closed-M128 head and inherited the corrected
-token-lifetime and batch semantics. It made the managed self-signed
-identity explicitly loopback-only:
-
-- loopback bind may use managed or explicit TLS material;
-- non-loopback bind requires complete explicit certificate + private key paths;
-- invalid remote/managed configuration fails before listener/task/managed-file side effects;
-- explicit remote TLS remains supported with verified TLS evidence;
-- no automatic SAN discovery, CA/trust management, mTLS or plaintext fallback was added.
-
-M129 supersedes only M126/M108's affected managed-TLS qualification
-claim. Historical M126/M127/M128 closures remain unchanged.
-
-## M130 — closed requalification authority
-
-Plan:
-
-- `130-post-m127-m129-corrective-requalification.md`
-
-Closure:
-
-- `plans/closure/i2pcontrol-proposal-170/130-closure.md` (implementation `fe1a981`).
-
-M130 froze the post-M129 head, mechanically recomputed matrix authority
-(`284 apply / 96 blocked_primitive / 460 not_applicable`), black-box
-requalified the corrected auth/JSON-RPC/TLS boundary, reran representative
-AddressBook/TunnelManager/RouterInfo/ClientServicesInfo production evidence,
-and re-audited M061/M062 containment and Yosemite isolation. It is the
-current-head “implemented subset operationally/security qualified”
-authority and supersedes the affected M126 shared-control-plane claim.
-Historical M126–M129 closures remain unchanged.
-
-## M130 — integrated requalification (historical plan detail)
-
-Plan:
-
-- `130-post-m127-m129-corrective-requalification.md`
-
-M130 hard-depends on M127-M129 closure. It freezes the actual merged post-M129 head, mechanically recomputes matrix authority, black-box requalifies the corrected auth/JSON-RPC/TLS boundary, reruns representative AddressBook/TunnelManager/RouterInfo/ClientServicesInfo production evidence, and re-audits M061/M062 containment and Yosemite isolation.
-
-M130 is the only milestone in this sequence allowed to restore a clean current-head “implemented subset operationally/security qualified” statement.
-
-## Canonical base-I2PControl scope
-
-`plans/000-long-term-specification.md` explicitly excludes implementing unrelated base methods such as `GetKeys`, `GetRate`, `RouterManager`, `NetworkSetting`, or `AdvancedSettings` merely to claim Proposal 170 completion.
-
-The reopened line therefore fixes only shared base behavior required by the extension surface: authentication/version/token semantics, HTTPS serving, JSON-RPC envelopes/IDs/notifications/batches, and protected dispatch. It is not a general I2PControl-parity project.
-
-## Historical corrective sequence
-
-| Handoff | Disposition |
-|---|---|
-| M119 | closed — standby expiry + variance correctness |
-| M120 | historical closed; cancellation claim later superseded by M123 |
-| M121 | closed — semantic truthfulness; historical matrix 284/98/458 |
-| M122 | closed — exact Y004 dependency adoption; transport only |
-| M123 | closed — commit-phase cancellation/lifecycle atomicity |
-| M124 | closed — exact Y005 dependency adoption; no Proposal mapping |
-| M125 | closed — M113 capability/crypto audit; two cells reclassified |
-| M126 | historical closed — later C10-C12 findings supersede its clean shared-control-plane qualification (C10 resolved by M127, C11 resolved by M128, C12 resolved by M129) |
-| M127 | closed — finite token lifetime, expired/unknown mapping, bounds; matrix unchanged |
-| M128 | closed — bounded batch conformance (`MAX_BATCH_ELEMENTS = 32`), per-element auth, notification/no-content rules; matrix unchanged |
-| M129 | closed — non-loopback managed-TLS fail-closed; managed loopback-only; explicit remote only; matrix unchanged |
-| M130 | closed — post-M127–M129 requalification; current-head implemented-subset qualification restored; matrix unchanged |
-
-Historical closure records are retained unchanged.
-
-## Residual Proposal ownership
-
-The 96 blocked cells remain:
+The 96 blocked cells are currently summarized as:
 
 - 4 `UseSSL` cells;
 - 10 `SigType` cells;
-- 63 client proxy/profile/reduction/lifecycle cells, including 18 `Close`/`CloseTime`/`NewDest` cells;
+- 63 client proxy/profile/reduction/lifecycle cells;
 - 19 server presentation/routing/LeaseSet cells.
 
-M127-M130 are correctness/conformance/security work and do not promote these residuals. Parser/serializer reachability is not capability evidence. A future residual implementation requires a genuine canonical owner, exact runtime semantics, no-downgrade proof, path budget and end-to-end evidence before registration.
+M131 must derive the exact set mechanically from M095. Counts are evidence, not targets.
+
+## Candidate future primitive clusters
+
+M131 must test rather than assume these clusters:
+
+- HTTP address-helper / SSL-outproxy behavior;
+- local presentation TLS;
+- streaming profile/window configuration;
+- I2P-session activity + idle reduction/close/resume;
+- per-client local source addressing;
+- `shouldBundleReplyInfo` / sender LeaseSet bundling;
+- outproxy-provider/plugin integration;
+- destination signing-type generation;
+- encrypted/authenticated LeaseSets.
+
+No M132+ plan is currently registered.
+
+## Recent closed sequence
+
+| Handoff | Status | Scope |
+|---|---|---|
+| M121 | closed | semantic truthfulness; `SigType` and idle lifecycle demotions |
+| M122 | closed | exact Y004 dependency adoption |
+| M123 | closed | cancellation/commit atomicity |
+| M124 | closed | exact Y005 dependency adoption |
+| M125 | closed | residual capability audit; two `AllowInternalSSL` applicability corrections |
+| M126 | historical | pre-corrective shared-control-plane requalification |
+| M127 | closed | finite API token lifetime |
+| M128 | closed | bounded JSON-RPC batch conformance |
+| M129 | closed | non-loopback explicit-TLS requirement; managed loopback-only |
+| M130 | closed | integrated current-head runtime/security requalification |
+| M131 | **ready / registered** | residual applicability and primitive-architecture re-freeze |
+
+Historical closure records remain unchanged.
+
+## Canonical base-I2PControl scope
+
+`plans/000-long-term-specification.md` excludes unrelated base-method parity from Proposal-170 completion. `GetKeys`, `GetRate`, `RouterManager`, `NetworkSetting`, `AdvancedSettings` and similar methods remain outside this workstream.
+
+Shared base behavior is in scope only where needed for the implemented extension surface: authentication/version/token semantics, HTTPS, JSON-RPC envelopes/IDs/notifications/batches and protected dispatch.
 
 ## Containment
 
 Preferred production ownership remains `emissary-cli/src/i2pcontrol/**`.
 
-M061/M062 are authoritative. No global `[patch]`, path dependency, vendoring, floating Yosemite ref, frontend coupling or broad router refactor is authorized. M127-M130 specifically authorize no core/router production changes.
+Any future path outside that boundary requires a neutral canonical owner, exact path budget, containment amendment and separately registered plan. No Proposal-shaped core API, global Yosemite patch, path dependency, vendoring, floating fork, frontend coupling or broad router refactor is authorized.
+
+All external I2P/upstream Emissary/upstream Yosemite sources are read-only evidence.
 
 ## Verification baseline
 
-Individual plans refine focused tests, but the broad baseline remains:
+M131 is planning/evidence-only. If it changes M095/M105/M110 or their focused guards, run at minimum:
 
 ```text
+cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m095_full_support_matrix --test m105_residual_option_audit --no-fail-fast
+cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m061_containment --test m062_dependency_containment --no-fail-fast
 cargo check -p emissary-cli --no-default-features --features i2pcontrol
 cargo check -p emissary-cli --no-default-features
 cargo check
-cargo test -p emissary-core
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --lib --no-fail-fast
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --no-fail-fast
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --test i2pcontrol_live_runtime -- --nocapture
-cargo test -p emissary-cli --no-default-features --features i2pcontrol --test m061_containment --test m062_dependency_containment --test m095_full_support_matrix --test m105_residual_option_audit --no-fail-fast
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
-cargo fmt --all -- --check
 git diff --check
 ```
 
-Known stable/nightly rustfmt drift must be recorded rather than normalized through unrelated formatter churn.
-
-## Internal-only rule
-
-All writes remain internal to `eggstack/emissary` and, under its own registry, `eggstack/yosemite`. External I2P/upstream Emissary/upstream Yosemite sources are read-only evidence.
-
-No plan authorizes upstream issue/PR/review/contact/submission/release/merge/adoption activity or contribution preparation.
+Existing stable/nightly rustfmt drift must be recorded rather than normalized through unrelated churn.

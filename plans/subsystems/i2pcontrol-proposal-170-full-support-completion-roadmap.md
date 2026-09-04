@@ -1,10 +1,8 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M131 ready and registered**
+Status: **active / partial; M131 closed as blocked; no successor registered**
 
-Current registered handoff:
-
-- `plans/implementation/i2pcontrol-proposal-170/131-residual-applicability-and-primitive-architecture-refreeze.md`
+Current registered handoff: **none**. M131 found no dependency-ready successor.
 
 Current runtime/security qualification authority:
 
@@ -68,8 +66,8 @@ The authoritative M095 matrix at the M131 starting baseline is:
 
 - 70 option rows × 12 tunnel types = 840 cells;
 - `284 apply`;
-- `96 blocked_primitive`;
-- `460 not_applicable`;
+- `88 blocked_primitive`;
+- `468 not_applicable`;
 - zero planned/unknown/accept-inert cells.
 
 Full Proposal 170 support is **not** claimed.
@@ -163,9 +161,9 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/131-residual-applicability-and-primitive-architecture-refreeze.md`
 
-Status: **ready / registered**.
+Status: **closed as blocked**.
 
-M131 must:
+M131 delivered:
 
 1. enumerate every starting blocked cell;
 2. re-freeze each cell against Proposal/reference/runtime evidence;
@@ -175,9 +173,12 @@ M131 must:
 6. identify canonical owners and minimal future path budgets;
 7. cluster shared primitives;
 8. rank future work by semantic certainty, containment cost, security risk and dependency readiness;
-9. register at most one next dependency-ready M132+ handoff at closure.
+9. assessed future M132+ readiness; no successor was dependency-ready.
 
-M131 is planning/evidence/documentation-only. It authorizes no production Rust, Cargo/dependency or Yosemite changes.
+M131 was planning/evidence/documentation-only. It authorized no production Rust, Cargo/dependency or Yosemite changes.
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/131-closure.md`.
+The reconciled matrix is `284 apply / 88 blocked_primitive / 468 not_applicable`; eight cells have affirmative applicability corrections and no cell was promoted to `apply`.
 
 ## 9. Required M131 semantic lanes
 
@@ -275,9 +276,9 @@ M126 historical requalification             [HISTORICAL]
       M130 integrated requalification       [CLOSED — CURRENT RUNTIME AUTHORITY]
         |
         v
-      M131 residual semantic/primitive map  [READY / REGISTERED]
+      M131 residual semantic/primitive map  [CLOSED AS BLOCKED]
         |
-        +--> exactly one evidence-selected M132+ handoff may be registered at M131 closure
+        +--> no dependency-ready M132+ handoff; retained clusters remain unregistered
 ```
 
 No M132+ capability plan is currently registered.
@@ -331,9 +332,9 @@ A simple happy path with no credible failure model remains blocked.
 
 Per `plans/003-planning-process.md`:
 
-- M131 is the only active Proposal-170 implementation handoff;
-- future M132+ plans may be described by M131 but remain unregistered until dependencies are known;
-- M131 closure may register at most one next dependency-ready handoff;
+- M131 was the final registered Proposal-170 evidence handoff and is now closed;
+- future M132+ plans may be described by the M131 artifact but remain unregistered until dependencies are known;
+- M131 closure registered no next dependency-ready handoff;
 - material deviations require plan/ADR correction before production code;
 - closure evidence, not implementation assertions, decides completion;
 - matrix-count reduction is never itself an acceptance criterion.

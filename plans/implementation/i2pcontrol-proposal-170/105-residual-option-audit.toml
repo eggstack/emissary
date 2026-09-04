@@ -85,6 +85,17 @@ post_m125_reclassified_option = "AllowInternalSSL"
 post_m125_reclassified_tunnel_types = ["httpserver", "httpbidirserver"]
 post_m125_reclassification = "Proposal 170 and Java configuration place AllowInternalSSL under HTTP client filtering; the two server-role cells were incorrectly retained as residual blockers."
 post_m125_closure = "plans/closure/i2pcontrol-proposal-170/125-closure.md"
+post_m131_matrix_apply_cells = 284
+post_m131_matrix_blocked_primitive_cells = 88
+post_m131_matrix_not_applicable_cells = 468
+post_m131_reclassified_cell_count = 8
+post_m131_reclassified_cells = ["SSLProxies:socks", "SSLProxies:socksirc", "SSLProxies:connectclient", "JumpList:socks", "JumpList:socksirc", "JumpList:connectclient", "DelayOpen:streamrclient", "NewDest:streamrclient"]
+post_m131_reclassification = "Pinned Java Proposal-170 applicability gates make SSLProxies HTTP-client-only and JumpList HTTP address-helper-only; the same parser explicitly disables DelayOpen and persistent-key/NewDest resume for Streamr. No blocked cell was promoted to apply."
+post_m131_production_behavior_baseline = "a68094e128d2b92f0fd5b350e38512ef6b65cb6b"
+post_m131_execution_head = "a02e9bbae4d04bce1ca3c892bc6ef4df99c6b894"
+post_m131_matrix_sha256 = "f038521da9cc685bd38dd502f02dcc81f53586c3a8dd83eb3ba5a8827f589f79"
+post_m131_residual_primitive_map = "plans/implementation/i2pcontrol-proposal-170/131-residual-primitive-map.toml"
+post_m131_closure = "plans/closure/i2pcontrol-proposal-170/131-closure.md"
 
 [[cells]]
 canonical_option = "Shared"

@@ -17,6 +17,13 @@ fn matrix() -> Value {
     raw.parse().expect("M095 matrix must be valid TOML")
 }
 
+fn residual_primitive_map() -> Value {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../plans/implementation/i2pcontrol-proposal-170/131-residual-primitive-map.toml");
+    let raw = std::fs::read_to_string(path).expect("M131 residual map must exist");
+    raw.parse().expect("M131 residual map must be valid TOML")
+}
+
 fn rows<'a>(root: &'a Value, section: &str, key: &str) -> &'a [Value] {
     root.get(section)
         .and_then(Value::as_table)
@@ -231,12 +238,10 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
     );
     let new_dest_cells = new_dest["cells"].as_array().unwrap();
     // M121 §5.2 demotes all six TCP NewDest cells to blocked_primitive.
-    assert!(new_dest_cells[..7]
+    assert!(new_dest_cells[..6]
         .iter()
         .all(|cell| cell.as_str() == Some("blocked_primitive")));
-    assert!(new_dest_cells[7..]
-        .iter()
-        .all(|cell| cell.as_str() == Some("not_applicable")));
+    assert!(new_dest_cells[6..].iter().all(|cell| cell.as_str() == Some("not_applicable")));
     assert_eq!(string_field(new_dest, "blocking_milestone"), "M121");
     for tunnel_type in &tunnel_types[..7] {
         assert!(new_dest["cell_notes"].as_table().unwrap().contains_key(*tunnel_type));
@@ -278,7 +283,7 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
         }
         assert_eq!(string_field(row, "completion_owner"), "M098");
     }
-    for key in ["UseOutproxyPlugin", "SSLProxies", "JumpList"] {
+    for key in ["UseOutproxyPlugin"] {
         let row = option(key);
         let cells = row["cells"].as_array().unwrap();
         for index in [1, 3, 4, 5] {
@@ -288,10 +293,26 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
                 "{key} cell {index}"
             );
         }
+        assert_eq!(string_field(row, "completion_owner"), "M112");
+        assert!(!string_field(row, "blocked_primitive").is_empty());
+        assert!(!string_field(row, "blocking_milestone").is_empty());
+    }
+    for key in ["SSLProxies", "JumpList"] {
+        let row = option(key);
+        let cells = row["cells"].as_array().unwrap();
         assert_eq!(
-            string_field(row, "completion_owner"),
-            "M112"
+            cells[1].as_str(),
+            Some("blocked_primitive"),
+            "{key} HTTP cell"
         );
+        for index in [3, 4, 5] {
+            assert_eq!(
+                cells[index].as_str(),
+                Some("not_applicable"),
+                "{key} cell {index}"
+            );
+        }
+        assert_eq!(string_field(row, "completion_owner"), "M112");
         assert!(!string_field(row, "blocked_primitive").is_empty());
         assert!(!string_field(row, "blocking_milestone").is_empty());
     }
@@ -312,7 +333,7 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
                 assert_eq!(cell.as_str(), Some("apply"), "{key} cell {index}");
             }
             assert!(string_field(row, "completion_owner").starts_with("M106"));
-            assert_eq!(cells[6].as_str(), Some("blocked_primitive"));
+            assert_eq!(cells[6].as_str(), Some("not_applicable"));
             continue;
         }
         if matches!(key, "ConnectDelay") {
@@ -339,10 +360,7 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
                 );
             }
         }
-        assert_eq!(
-            string_field(row, "completion_owner"),
-            "M112"
-        );
+        assert_eq!(string_field(row, "completion_owner"), "M112");
         assert!(!string_field(row, "blocked_primitive").is_empty());
         assert!(!string_field(row, "blocking_milestone").is_empty());
     }
@@ -505,10 +523,9 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
 fn current_matrix_counts_are_explicit_and_exact() {
     let root = matrix();
     let options = rows(&root, "tunnel_manager", "options");
-    let counts = options
-        .iter()
-        .flat_map(|row| row["cells"].as_array().unwrap())
-        .fold((0, 0, 0), |mut counts, cell| {
+    let counts = options.iter().flat_map(|row| row["cells"].as_array().unwrap()).fold(
+        (0, 0, 0),
+        |mut counts, cell| {
             match cell.as_str().expect("cell disposition") {
                 "apply" => counts.0 += 1,
                 "blocked_primitive" => counts.1 += 1,
@@ -517,13 +534,92 @@ fn current_matrix_counts_are_explicit_and_exact() {
                 other => panic!("unexpected cell disposition {other}"),
             }
             counts
-        });
-    assert_eq!(counts, (284, 96, 460));
+        },
+    );
+    assert_eq!(counts, (284, 88, 468));
     let declared = root
         .get("current_matrix_counts")
         .and_then(Value::as_table)
         .expect("current matrix counts are declared");
     assert_eq!(declared["apply"].as_integer(), Some(284));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(96));
-    assert_eq!(declared["not_applicable"].as_integer(), Some(460));
+    assert_eq!(declared["blocked_primitive"].as_integer(), Some(88));
+    assert_eq!(declared["not_applicable"].as_integer(), Some(468));
+}
+
+#[test]
+fn m131_residual_map_is_cell_complete_and_closed() {
+    let root = residual_primitive_map();
+    assert_eq!(
+        root["baseline"]["starting_cell_count"].as_integer(),
+        Some(96)
+    );
+    assert_eq!(root["baseline"]["cell_record_count"].as_integer(), Some(96));
+    assert_eq!(root["baseline"]["final_apply"].as_integer(), Some(284));
+    assert_eq!(
+        root["baseline"]["final_blocked_primitive"].as_integer(),
+        Some(88)
+    );
+    assert_eq!(
+        root["baseline"]["final_not_applicable"].as_integer(),
+        Some(468)
+    );
+    assert_eq!(root["baseline"]["apply_promotions"].as_integer(), Some(0));
+
+    let cells = root["cells"].as_array().expect("M131 cell records");
+    let identities = cells
+        .iter()
+        .map(|cell| {
+            (
+                string_field(cell, "canonical_option").to_owned(),
+                string_field(cell, "tunnel_family").to_owned(),
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(cells.len(), 96);
+    assert_eq!(identities.len(), 96);
+    assert!(cells.iter().all(|cell| {
+        string_field(cell, "starting_disposition") == "blocked_primitive"
+            && !string_field(cell, "applicability_evidence").is_empty()
+            && !string_field(cell, "canonical_owner").is_empty()
+            && !string_field(cell, "path_budget").is_empty()
+    }));
+    let final_counts = cells.iter().fold((0, 0), |mut counts, cell| {
+        match string_field(cell, "final_disposition") {
+            "blocked_primitive" => counts.0 += 1,
+            "not_applicable" => counts.1 += 1,
+            other => panic!("unexpected M131 final disposition {other}"),
+        }
+        counts
+    });
+    assert_eq!(final_counts, (88, 8));
+    let reclassified = cells
+        .iter()
+        .filter(|cell| string_field(cell, "final_disposition") == "not_applicable")
+        .map(|cell| {
+            format!(
+                "{}:{}",
+                string_field(cell, "canonical_option"),
+                string_field(cell, "tunnel_family")
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        reclassified,
+        BTreeSet::from([
+            "SSLProxies:socks".to_owned(),
+            "SSLProxies:socksirc".to_owned(),
+            "SSLProxies:connectclient".to_owned(),
+            "JumpList:socks".to_owned(),
+            "JumpList:socksirc".to_owned(),
+            "JumpList:connectclient".to_owned(),
+            "DelayOpen:streamrclient".to_owned(),
+            "NewDest:streamrclient".to_owned(),
+        ])
+    );
+    assert_eq!(root["clusters"].as_array().unwrap().len(), 10);
+    assert!(!root["dependency_graph"]["ordered_edges"].as_array().unwrap().is_empty());
+    assert_eq!(
+        root["future_handoff"]["next_dependency_ready"].as_bool(),
+        Some(false)
+    );
 }

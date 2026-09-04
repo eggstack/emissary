@@ -1,6 +1,6 @@
 # M131 — Residual Applicability and Primitive-Architecture Re-freeze
 
-Status: **ready / registered**
+Status: **closed as blocked**
 
 Source roadmap:
 

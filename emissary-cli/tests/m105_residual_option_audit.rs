@@ -179,10 +179,7 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         .filter(|cell| !m110_completed.contains(&(cell.0.as_str(), cell.1.as_str())))
         .cloned()
         .collect();
-    let expected_with_m116 = expected
-        .union(&m116_reclassified)
-        .cloned()
-        .collect::<BTreeSet<_>>();
+    let expected_with_m116 = expected.union(&m116_reclassified).cloned().collect::<BTreeSet<_>>();
     let m111_completed: BTreeSet<(String, String)> = [
         "TunnelVariance",
         "TunnelBackupQuantity",
@@ -208,28 +205,27 @@ fn audit_covers_the_exact_m104_residual_inventory() {
     })
     .collect();
     assert_eq!(m111_completed.len(), 40);
-    let expected_post_m111 = expected_with_m116
-        .difference(&m111_completed)
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    let m112_applied: BTreeSet<(String, String)> = [
-        "ConnectDelay",
-        "Close",
-        "CloseTime",
-        "NewDest",
-    ]
-    .into_iter()
-    .flat_map(|option| {
-        ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient"]
+    let expected_post_m111 =
+        expected_with_m116.difference(&m111_completed).cloned().collect::<BTreeSet<_>>();
+    let m112_applied: BTreeSet<(String, String)> =
+        ["ConnectDelay", "Close", "CloseTime", "NewDest"]
             .into_iter()
-            .map(move |tunnel_type| (option.to_owned(), tunnel_type.to_owned()))
-    })
-    .collect();
+            .flat_map(|option| {
+                [
+                    "client",
+                    "httpclient",
+                    "ircclient",
+                    "socks",
+                    "socksirc",
+                    "connectclient",
+                ]
+                .into_iter()
+                .map(move |tunnel_type| (option.to_owned(), tunnel_type.to_owned()))
+            })
+            .collect();
     assert_eq!(m112_applied.len(), 24);
-    let expected_post_m112 = expected_post_m111
-        .difference(&m112_applied)
-        .cloned()
-        .collect::<BTreeSet<_>>();
+    let expected_post_m112 =
+        expected_post_m111.difference(&m112_applied).cloned().collect::<BTreeSet<_>>();
     // M121 demotes 10 SigType + 18 Close/CloseTime/NewDest cells back to
     // blocked_primitive. The M105 input inventory is historical (164 rows);
     // the current matrix blocked set must equal the post-M112 blocked set
@@ -255,17 +251,22 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         })
         .chain(
             ["Close", "CloseTime", "NewDest"].into_iter().flat_map(|option| {
-                ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient"]
-                    .into_iter()
-                    .map(move |tunnel_type| (option.to_owned(), tunnel_type.to_owned()))
+                [
+                    "client",
+                    "httpclient",
+                    "ircclient",
+                    "socks",
+                    "socksirc",
+                    "connectclient",
+                ]
+                .into_iter()
+                .map(move |tunnel_type| (option.to_owned(), tunnel_type.to_owned()))
             }),
         )
         .collect();
     assert_eq!(m121_demoted.len(), 28);
-    let expected_post_m121 = expected_post_m112
-        .union(&m121_demoted)
-        .cloned()
-        .collect::<BTreeSet<_>>();
+    let expected_post_m121 =
+        expected_post_m112.union(&m121_demoted).cloned().collect::<BTreeSet<_>>();
     let m125_reclassified = ["httpserver", "httpbidirserver"]
         .into_iter()
         .map(|tunnel_type| ("AllowInternalSSL".to_owned(), tunnel_type.to_owned()))
@@ -274,19 +275,70 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         .difference(&m125_reclassified)
         .cloned()
         .collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m125);
-    assert_eq!(audit["summary"]["post_m116_reclassified_cells"].as_integer(), Some(7));
-    assert_eq!(audit["summary"]["post_m116_blocking_milestone"].as_str(), Some("M112"));
-    assert_eq!(audit["summary"]["post_m112_matrix_apply_cells"].as_integer(), Some(312));
+    let m131_reclassified = [
+        ("SSLProxies", "socks"),
+        ("SSLProxies", "socksirc"),
+        ("SSLProxies", "connectclient"),
+        ("JumpList", "socks"),
+        ("JumpList", "socksirc"),
+        ("JumpList", "connectclient"),
+        ("DelayOpen", "streamrclient"),
+        ("NewDest", "streamrclient"),
+    ]
+    .into_iter()
+    .map(|(option, tunnel_type)| (option.to_owned(), tunnel_type.to_owned()))
+    .collect::<BTreeSet<_>>();
+    let expected_post_m131 = expected_post_m125
+        .difference(&m131_reclassified)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m131);
+    assert_eq!(
+        audit["summary"]["post_m116_reclassified_cells"].as_integer(),
+        Some(7)
+    );
+    assert_eq!(
+        audit["summary"]["post_m116_blocking_milestone"].as_str(),
+        Some("M112")
+    );
+    assert_eq!(
+        audit["summary"]["post_m112_matrix_apply_cells"].as_integer(),
+        Some(312)
+    );
     assert_eq!(
         audit["summary"]["post_m112_matrix_blocked_primitive_cells"].as_integer(),
         Some(70)
     );
-    assert_eq!(audit["summary"]["post_m112_completed_cell_count"].as_integer(), Some(24));
-    assert_eq!(audit["summary"]["post_m121_matrix_apply_cells"].as_integer(), Some(284));
+    assert_eq!(
+        audit["summary"]["post_m112_completed_cell_count"].as_integer(),
+        Some(24)
+    );
+    assert_eq!(
+        audit["summary"]["post_m121_matrix_apply_cells"].as_integer(),
+        Some(284)
+    );
     assert_eq!(
         audit["summary"]["post_m121_matrix_blocked_primitive_cells"].as_integer(),
         Some(98)
     );
-    assert_eq!(audit["summary"]["post_m121_demoted_cell_count"].as_integer(), Some(28));
+    assert_eq!(
+        audit["summary"]["post_m121_demoted_cell_count"].as_integer(),
+        Some(28)
+    );
+    assert_eq!(
+        audit["summary"]["post_m131_matrix_apply_cells"].as_integer(),
+        Some(284)
+    );
+    assert_eq!(
+        audit["summary"]["post_m131_matrix_blocked_primitive_cells"].as_integer(),
+        Some(88)
+    );
+    assert_eq!(
+        audit["summary"]["post_m131_matrix_not_applicable_cells"].as_integer(),
+        Some(468)
+    );
+    assert_eq!(
+        audit["summary"]["post_m131_reclassified_cell_count"].as_integer(),
+        Some(8)
+    );
 }

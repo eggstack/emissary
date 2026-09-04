@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M131 ready / registered**.
+Status: **partial Proposal 170 support; M131 closed as blocked**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -10,11 +10,9 @@ Current runtime/security qualification authority:
 - M130 implementation `fe1a981`;
 - M130 closure / M131 production-behavior baseline `a68094e128d2b92f0fd5b350e38512ef6b65cb6b`.
 
-Current registered handoff:
+Current registered handoff: **none**. M131 found no dependency-ready successor.
 
-- `131-residual-applicability-and-primitive-architecture-refreeze.md`.
-
-The authoritative M095 starting matrix remains `284 apply / 96 blocked_primitive / 460 not_applicable` until M131 produces evidence-backed current-authority corrections.
+The M131-reconciled M095 matrix is `284 apply / 88 blocked_primitive / 468 not_applicable`.
 
 ## Authority
 
@@ -52,19 +50,21 @@ According to M130 and preceding closures:
 
 Full Proposal 170 support is not claimed.
 
-## M131 — current registered handoff
+## M131 — closed residual re-freeze
 
 Plan:
 
 - `131-residual-applicability-and-primitive-architecture-refreeze.md`
 
-Status: **ready / registered**.
+Status: **closed as blocked**.
 
-Purpose:
+Outcome:
 
-Re-freeze all 96 currently blocked TunnelManager cells before implementing additional lower-layer primitives. M131 is planning/evidence-only and may not change runtime production behavior.
+Re-froze all 96 starting blocked TunnelManager cells. Eight cells were reclassified to `not_applicable` from affirmative reference applicability evidence; 88 remain `blocked_primitive`. M131 made no runtime production change and promoted zero cells to `apply`.
 
-M131 must deliver:
+Evidence artifact: `131-residual-primitive-map.toml`; closure: `plans/closure/i2pcontrol-proposal-170/131-closure.md`.
+
+M131 delivered:
 
 - exact mechanical enumeration of all 96 starting blocked cells;
 - cell-level applicability and semantic evidence;
@@ -92,12 +92,14 @@ M131 explicitly authorizes no production Rust changes, no Cargo/dependency chang
 
 ## Current residual starting state
 
-The 96 blocked cells are currently summarized as:
+The M131 starting 96 blocked cells were reconciled to:
 
 - 4 `UseSSL` cells;
 - 10 `SigType` cells;
 - 63 client proxy/profile/reduction/lifecycle cells;
 - 19 server presentation/routing/LeaseSet cells.
+
+Current matrix: `284 apply / 88 blocked_primitive / 468 not_applicable`.
 
 M131 must derive the exact set mechanically from M095. Counts are evidence, not targets.
 
@@ -115,7 +117,7 @@ M131 must test rather than assume these clusters:
 - destination signing-type generation;
 - encrypted/authenticated LeaseSets.
 
-No M132+ plan is currently registered.
+No M132+ plan is registered: no retained primitive cluster has a complete owner, security/interoperability contract, path budget and dependency authorization.
 
 ## Recent closed sequence
 
@@ -131,7 +133,7 @@ No M132+ plan is currently registered.
 | M128 | closed | bounded JSON-RPC batch conformance |
 | M129 | closed | non-loopback explicit-TLS requirement; managed loopback-only |
 | M130 | closed | integrated current-head runtime/security requalification |
-| M131 | **ready / registered** | residual applicability and primitive-architecture re-freeze |
+| M131 | **closed as blocked** | residual applicability and primitive-architecture re-freeze; 8 applicability corrections, 88 residual primitive blockers |
 
 Historical closure records remain unchanged.
 

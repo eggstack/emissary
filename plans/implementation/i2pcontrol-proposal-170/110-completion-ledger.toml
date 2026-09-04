@@ -151,6 +151,21 @@ reclassified_cells = [
 reclassification_reason = "M121 Outcome C (SigType) and §5.2 (Close/CloseTime/NewDest): singleton type-7 domain is inert, not configurable support, and local TCP-handler-count idle is not reference I2P-session idle; no local observation primitive exists without core/Yosemite change."
 closure = "plans/closure/i2pcontrol-proposal-170/121-closure.md"
 
+[post_m131]
+status = "closed as blocked"
+matrix_before_apply = 284
+matrix_before_blocked_primitive = 96
+matrix_before_not_applicable = 460
+matrix_after_apply = 284
+matrix_after_blocked_primitive = 88
+matrix_after_not_applicable = 468
+reclassified_cell_count = 8
+reclassified_cells = ["SSLProxies:socks", "SSLProxies:socksirc", "SSLProxies:connectclient", "JumpList:socks", "JumpList:socksirc", "JumpList:connectclient", "DelayOpen:streamrclient", "NewDest:streamrclient"]
+reclassification_reason = "Pinned Proposal-170 Java applicability gates show SSLProxies is HTTP-client-only and JumpList is HTTP address-helper-only; the parser explicitly disables DelayOpen and persistent-key/NewDest resume for Streamr. All other residual cells remain blocked_primitive; no apply promotion occurred."
+matrix_sha256_after = "f038521da9cc685bd38dd502f02dcc81f53586c3a8dd83eb3ba5a8827f589f79"
+residual_primitive_map = "plans/implementation/i2pcontrol-proposal-170/131-residual-primitive-map.toml"
+closure = "plans/closure/i2pcontrol-proposal-170/131-closure.md"
+
 [ownership]
 session_registry = "emissary-cli/src/i2pcontrol/backends/runtime/session.rs::SharedClientSessionRegistry"
 stream_listener_owner = "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"

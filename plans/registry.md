@@ -28,23 +28,27 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
-| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M131 ready / registered** |
+| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M131 closed as blocked; no successor registered** |
 | Post-M114 shared-control-plane corrective line | closed | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | M130 closed as current runtime/security authority |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
 
-## Current registered handoff — M131
+## M131 closure and future handoff
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/131-residual-applicability-and-primitive-architecture-refreeze.md`
 
-Status: **ready / registered**.
+Status: **closed as blocked**.
 
 Production-behavior baseline:
 
 - M130 closure head `a68094e128d2b92f0fd5b350e38512ef6b65cb6b`.
 
-M131 is a planning/evidence re-freeze of the 96 blocked TunnelManager cells. It does **not** implement a missing runtime capability.
+M131 was a planning/evidence re-freeze of the 96 blocked TunnelManager cells. It did **not** implement a missing runtime capability.
+
+Closure: `plans/closure/i2pcontrol-proposal-170/131-closure.md`.
+Machine-readable authority: `plans/implementation/i2pcontrol-proposal-170/131-residual-primitive-map.toml`.
+The reconciled matrix is `284 apply / 88 blocked_primitive / 468 not_applicable`; zero cells were promoted to `apply`.
 
 Required outputs:
 
@@ -88,11 +92,11 @@ Current supported surface according to closure evidence:
 - bounded JSON-RPC batch semantics with per-element auth and notification suppression;
 - managed I2PControl TLS loopback-only; non-loopback requires complete explicit cert/key.
 
-Current M095 matrix at M131 start:
+Current M095 matrix after M131:
 
 - `284 apply`;
-- `96 blocked_primitive`;
-- `460 not_applicable`.
+- `88 blocked_primitive`;
+- `468 not_applicable`.
 
 Full Proposal 170 status remains **partial**.
 
@@ -107,7 +111,7 @@ The starting blocked count for M131 is 96, currently summarized as:
 
 M131 must derive and audit the exact cells mechanically from M095. The partition above is only a cross-check.
 
-No residual cell implementation is registered while M131 is active.
+No residual cell implementation is registered. No dependency-ready M132+ successor was found; M114 remains historically closed as blocked and no future plan status changes are warranted.
 
 ## Dependency graph
 
@@ -124,9 +128,9 @@ M129 non-loopback TLS fail-closed      [CLOSED]
 M130 integrated requalification        [CLOSED — CURRENT RUNTIME AUTHORITY]
   |
   v
-M131 residual primitive re-freeze      [READY / REGISTERED]
+M131 residual primitive re-freeze      [CLOSED AS BLOCKED]
   |
-  +--> at most one evidence-selected M132+ handoff registered at M131 closure
+  +--> no dependency-ready M132+ handoff; retained clusters remain unregistered
 ```
 
 M114 remains historically closed as blocked; M131 reopens the full-support residual line, not the closed M127-M130 corrective sequence.
@@ -152,7 +156,7 @@ Shared base behavior is in scope only where required by the implemented extensio
 
 ## Registration rules
 
-1. **Only M131 is active/registered.**
+1. **No implementation plan is active/registered after M131 closure.**
 2. M131 may describe future M132+ clusters but may not register more than one successor at closure.
 3. M131 may correct blocked/not-applicable evidence but may not promote a cell to `apply`.
 4. A cell may become `not_applicable` only with affirmative pinned/reference evidence.
@@ -177,6 +181,6 @@ Shared base behavior is in scope only where required by the implemented extensio
 | M128 | closed; bounded JSON-RPC batch conformance |
 | M129 | closed; non-loopback managed-TLS fail-closed |
 | M130 | closed; current implemented-subset requalification authority |
-| M131 | **ready / registered**; residual applicability and primitive-architecture re-freeze |
+| M131 | **closed as blocked**; residual applicability and primitive-architecture re-freeze; 8 applicability corrections |
 
 Historical closure files remain unchanged.

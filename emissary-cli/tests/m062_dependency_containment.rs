@@ -1323,7 +1323,10 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/104-full-proposal-170-live-interoperability-and-reclosure.md"
             | "plans/implementation/i2pcontrol-proposal-170/105-residual-tunnel-option-primitive-audit.md"
             | "plans/implementation/i2pcontrol-proposal-170/105-residual-option-audit.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/110-completion-ledger.toml"
             | "plans/implementation/i2pcontrol-proposal-170/106-delay-open-client-listener.md"
+            | "plans/implementation/i2pcontrol-proposal-170/131-residual-applicability-and-primitive-architecture-refreeze.md"
+            | "plans/implementation/i2pcontrol-proposal-170/131-residual-primitive-map.toml"
             | "plans/implementation/i2pcontrol-proposal-170/108-managed-tls-upgrade-permission-corrective-pass.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
@@ -1373,10 +1376,13 @@ fn is_authorized_planning_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/111-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/112-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/113-closure.md"
+            | "plans/closure/i2pcontrol-proposal-170/131-closure.md"
             | "plans/closure/i2pcontrol-proposal-170/114-closure.md"
             | "emissary-cli/tests/m105_residual_option_audit.rs"
             | "emissary-cli/tests/m095_full_support_matrix.rs"
             | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/tunnel-manager.md"
     )
 }
 

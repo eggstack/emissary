@@ -28,71 +28,83 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
-| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M131 closed as blocked; no successor registered** |
+| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M132 ready / registered** |
+| Proposal 170 session-lifecycle completion | **active** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | **M132 ready / registered**; M133-M134 deferred |
 | Post-M114 shared-control-plane corrective line | closed | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | M130 closed as current runtime/security authority |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
 
-## M131 closure and future handoff
+## Current registered handoff — M132
 
 Plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/131-residual-applicability-and-primitive-architecture-refreeze.md`
+- `plans/implementation/i2pcontrol-proposal-170/132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md`
 
-Status: **closed as blocked**.
+Status: **ready / registered**.
 
-Production-behavior baseline:
+Baseline:
 
-- M130 closure head `a68094e128d2b92f0fd5b350e38512ef6b65cb6b`.
+- M131 closure head `3a829d7d3d6314ecf09e42dbf0339506f0917c96`;
+- M131 matrix `284 apply / 88 blocked_primitive / 468 not_applicable`.
 
-M131 was a planning/evidence re-freeze of the 96 blocked TunnelManager cells. It did **not** implement a missing runtime capability.
+M132 is the only active Proposal-170 implementation handoff. It implements the smallest neutral lower-layer session/pool primitive required by Proposal `Reduce`, `ReduceCount`, and `ReduceTime`:
 
-Closure: `plans/closure/i2pcontrol-proposal-170/131-closure.md`.
-Machine-readable authority: `plans/implementation/i2pcontrol-proposal-170/131-residual-primitive-map.toml`.
-The reconciled matrix is `284 apply / 88 blocked_primitive / 468 not_applicable`; zero cells were promoted to `apply`.
+- activity at the actual SAM/I2CP streaming/datagram payload boundary;
+- one generation-local idle-reduction state machine;
+- a bounded live active inbound/outbound tunnel-quantity target owned by `TunnelPool`;
+- restoration to configured/base quantity on subsequent qualifying session activity;
+- truthful LeaseSet/pool behavior during reduction and restoration;
+- I2PControl validation/translation through the existing Yosemite session-option boundary;
+- shared-session equality/activity aggregation and cancellation safety.
 
-Required outputs:
+M132 is an explicit neutral lower-layer exception. Its named core path budget is limited to existing canonical SAM/destination/tunnel-pool owners. Proposal policy remains under `emissary-cli/src/i2pcontrol/**`. No Cargo/dependency/Yosemite change is authorized.
 
-- exact mechanical inventory of all 96 starting blocked cells;
-- cell-by-cell Proposal/reference applicability review;
-- evidence-backed `blocked_primitive` corrections and, where positively proven, `not_applicable` corrections;
-- zero `apply` promotions;
-- a machine-readable residual primitive/owner/dependency map;
-- exact future lower-layer path budgets and security/failure models;
-- one next dependency-ready M132+ handoff recommendation/registration at closure, or explicit no-handoff disposition.
+M132 starts from 21 mechanically present `Reduce*` cells. Closure may promote up to 21 only if direct reference evidence proves Streamr/datagram applicability; otherwise the three Streamr cells remain blocked. Matrix counts are evidence, not an implementation target.
 
-M131 must specifically re-freeze:
+## Deferred session-lifecycle successors
 
-- `UseOutproxyPlugin`, `SSLProxies`, `JumpList` family applicability;
-- all Streamr residual applicability;
-- `Profile` streaming semantics;
-- I2P-session activity/reduction/close/resume semantics for `Reduce*`, `Close*`, `NewDest`;
-- `UniqueLocalAddressPerClient` source-bind semantics and confinement;
-- `MultiHoming` versus `shouldBundleReplyInfo` semantics;
-- exact `UseSSL` family/direction/identity/trust semantics;
-- `SigType` lower-layer crypto/destination ownership;
-- encrypted/authenticated LeaseSet ownership below Yosemite Y005.
+### M133 — idle close and reasoned termination
 
-No production Rust, Cargo/dependency or Yosemite change is authorized by M131.
+Plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/133-neutral-sam-idle-close-and-reasoned-termination.md`
+
+Status: **deferred / unregistered**; hard dependency on M132 closure.
+
+M133 will reuse the M132 activity/timer owner for `Close`/`CloseTime` and add only a neutral authoritative in-process idle-close termination reason. It must not implement `NewDest` or invent a SAM wire extension.
+
+### M134 — NewDest on proven idle resume
+
+Plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/134-newdest-on-proven-idle-resume.md`
+
+Status: **deferred / unregistered**; hard dependency on M133 closure.
+
+M134 keeps destination/key rotation entirely I2PControl-owned. It may consume one authoritative M133 idle-close fact and rotate exactly once on a successful qualifying resume. Manual stop/start, restart, process restart, network/SAM failure and failed/cancelled resume must not rotate. `NewDest:streamrclient` remains not applicable under M131 authority.
 
 ## Current production/support state
 
-Current implemented-subset runtime/security qualification authority is M130:
+Current implemented-subset runtime/security qualification authority remains M130:
 
-- `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
+- closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
 - implementation head `fe1a981`;
 - closure head `a68094e128d2b92f0fd5b350e38512ef6b65cb6b`.
+
+M131 is the current residual applicability/primitive authority:
+
+- closure `plans/closure/i2pcontrol-proposal-170/131-closure.md`;
+- primitive map `plans/implementation/i2pcontrol-proposal-170/131-residual-primitive-map.toml`;
+- closure head `3a829d7d3d6314ecf09e42dbf0339506f0917c96`.
 
 Current supported surface according to closure evidence:
 
 - RouterInfo: 43 additions / 42 available / 1 protocol-permitted neutral / 0 unavailable;
 - AddressBook CRUD, subscriptions, all 13 SetConfig keys and cross-book precedence operational;
-- all 12 canonical TunnelManager data planes and seven canonical actions exist for the claimed subset;
+- all 12 canonical TunnelManager data planes and seven actions exist for the claimed subset;
 - all six ClientServicesInfo selectors operational;
-- finite one-day API token lifetime with exact expired/unknown distinction;
-- bounded JSON-RPC batch semantics with per-element auth and notification suppression;
-- managed I2PControl TLS loopback-only; non-loopback requires complete explicit cert/key.
+- finite API token lifetime, bounded JSON-RPC batches and fail-closed non-loopback management TLS qualified by M127-M130.
 
-Current M095 matrix after M131:
+Current M095 matrix:
 
 - `284 apply`;
 - `88 blocked_primitive`;
@@ -100,87 +112,76 @@ Current M095 matrix after M131:
 
 Full Proposal 170 status remains **partial**.
 
-## Residual Proposal state
-
-The starting blocked count for M131 is 96, currently summarized as:
-
-- 4 `UseSSL` cells;
-- 10 `SigType` cells;
-- 63 client proxy/profile/reduction/lifecycle cells;
-- 19 server presentation/routing/LeaseSet cells.
-
-M131 must derive and audit the exact cells mechanically from M095. The partition above is only a cross-check.
-
-No residual cell implementation is registered. No dependency-ready M132+ successor was found; M114 remains historically closed as blocked and no future plan status changes are warranted.
-
 ## Dependency graph
 
 ```text
-M127 token lifetime                    [CLOSED]
+M130 integrated requalification             [CLOSED — CURRENT RUNTIME AUTHORITY]
   |
   v
-M128 JSON-RPC batch                    [CLOSED]
+M131 residual primitive re-freeze           [CLOSED AS BLOCKED — 284/88/468]
   |
   v
-M129 non-loopback TLS fail-closed      [CLOSED]
+M132 idle reduction + live pool target      [READY / REGISTERED]
   |
   v
-M130 integrated requalification        [CLOSED — CURRENT RUNTIME AUTHORITY]
+M133 idle close + reasoned termination      [DEFERRED / UNREGISTERED]
   |
   v
-M131 residual primitive re-freeze      [CLOSED AS BLOCKED]
-  |
-  +--> no dependency-ready M132+ handoff; retained clusters remain unregistered
+M134 NewDest on proven idle resume          [DEFERRED / UNREGISTERED]
 ```
 
-M114 remains historically closed as blocked; M131 reopens the full-support residual line, not the closed M127-M130 corrective sequence.
+M114 remains historically closed as blocked. The M132-M134 line resolves only the session-lifecycle cluster and does not authorize unrelated residual clusters.
 
-## Canonical scope
+## Residual clusters outside the active line
 
-This workstream does **not** implement unrelated base I2PControl methods merely for Proposal 170 completion. `GetKeys`, `GetRate`, `RouterManager`, `NetworkSetting`, `AdvancedSettings` and similar unrelated parity remain out of scope.
+Remain unregistered under M131 authority:
 
-Shared base behavior is in scope only where required by the implemented extension surface: API-1 authentication/version/token behavior, HTTPS serving, JSON-RPC envelopes/IDs/notifications/batches and protected dispatch.
+- presentation `UseSSL`;
+- `SigType` destination signing;
+- `UseOutproxyPlugin`;
+- HTTP `SSLProxies` / `JumpList`;
+- streaming `Profile`;
+- Streamr `ConnectDelay` if still ambiguous;
+- `UniqueLocalAddressPerClient`;
+- `MultiHoming` / `shouldBundleReplyInfo`;
+- encrypted/authenticated LeaseSets.
 
-## Containment rules for M131 and successors
+No successor from those clusters may be smuggled into M132-M134.
+
+## Canonical containment rules
 
 1. Proposal policy stays under `emissary-cli/src/i2pcontrol/**` wherever possible.
-2. Any future production path outside I2PControl requires a neutral canonical owner, exact path budget and separately registered authorization.
+2. M132 core changes are permitted only in its exact neutral SAM/destination/tunnel-pool path budget and must be reflected in M062 before implementation closure.
 3. No Proposal-shaped `emissary-core` API is accepted merely to improve matrix counts.
 4. Yosemite remains the sole accepted SAM implementation; no parallel raw SAM stack.
 5. Exact Y005 remains isolated behind the optional `yosemite-i2pcontrol` alias.
 6. No global patch/path/vendor/floating Yosemite dependency.
 7. No direct-clearnet fallback, loopback-confinement weakening, TLS verification bypass or LeaseSet security downgrade.
-8. No secrets in RPC/log/Debug/RawConfig planning evidence.
-9. No frontend/startup/config rewrite unless separately and explicitly authorized.
+8. No secrets in RPC/log/Debug/planning evidence.
+9. No frontend/startup/config rewrite unless separately authorized.
 10. External/upstream activity remains read-only.
 
 ## Registration rules
 
-1. **No implementation plan is active/registered after M131 closure.**
-2. M131 may describe future M132+ clusters but may not register more than one successor at closure.
-3. M131 may correct blocked/not-applicable evidence but may not promote a cell to `apply`.
-4. A cell may become `not_applicable` only with affirmative pinned/reference evidence.
-5. Matrix-count reduction is not an acceptance criterion.
-6. Material scope deviations require a plan/ADR correction before implementation.
-7. Closure evidence, not implementation assertions, determines completion.
-8. Active documentation must retain partial-support wording while applicable blocked cells remain.
+1. **M132 is the only active/registered Proposal-170 implementation plan.**
+2. M133 is registered only after M132 closure explicitly proves its dependency-ready interface.
+3. M134 is registered only after M133 closure explicitly proves an authoritative idle-close reason/reopen contract.
+4. Material path/architecture deviations require plan amendment before code.
+5. Closure evidence, not implementation assertions, determines support/matrix promotion.
+6. Active documentation must retain partial-support wording until all applicable residuals are resolved and requalified.
 
-## Recently closed / superseded claims
+## Recently closed / current authority
 
 | Milestone | Disposition |
 |---|---|
-| M119 | closed |
-| M120 | historical; cancellation claim superseded by M123 |
 | M121 | closed; semantic truthfulness demotion of `SigType` and `Close`/`CloseTime`/`NewDest` |
-| M122 | closed; exact Y004 dependency adoption |
 | M123 | closed; commit-phase cancellation/lifecycle atomicity |
-| M124 | closed; exact Y005 dependency adoption |
 | M125 | closed; two `AllowInternalSSL` cells corrected to not applicable |
-| M126 | historical; shared-control-plane clean claim superseded by M130 |
 | M127 | closed; finite token lifetime |
 | M128 | closed; bounded JSON-RPC batch conformance |
 | M129 | closed; non-loopback managed-TLS fail-closed |
-| M130 | closed; current implemented-subset requalification authority |
-| M131 | **closed as blocked**; residual applicability and primitive-architecture re-freeze; 8 applicability corrections |
+| M130 | closed; current implemented-subset runtime/security qualification |
+| M131 | closed as blocked; residual applicability/primitive re-freeze; 8 applicability corrections; matrix 284/88/468 |
+| M132 | **ready / registered**; idle reduction + live pool target |
 
 Historical closure files remain unchanged.

@@ -1,6 +1,6 @@
 # M128 — JSON-RPC 2.0 Batch Conformance Corrective
 
-Status: **queued / unregistered**
+Status: **ready**
 
 Class: corrective / JSON-RPC conformance / resource hardening
 

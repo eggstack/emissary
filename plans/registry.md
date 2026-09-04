@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | active / partial | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | historical M114 closed as blocked |
-| Post-M114 corrective line | **reopened / active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M127 ready / registered** |
+| Post-M114 corrective line | **reopened / active** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | **M128 ready / registered** |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
 
 ## Current production/support state
@@ -38,23 +38,23 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 - AddressBook CRUD, subscriptions, all 13 SetConfig keys and cross-book precedence are operational according to current closure evidence.
 - All 12 canonical TunnelManager data planes and seven canonical actions exist for the currently claimed subset.
 - All six ClientServicesInfo selectors are operational according to current closure evidence.
-- Current M095 matrix is `284 apply / 96 blocked_primitive / 460 not_applicable` after M125's two `AllowInternalSSL` applicability corrections.
+- Current M095 matrix is `284 apply / 96 blocked_primitive / 460 not_applicable` after M125's two `AllowInternalSSL` applicability corrections; M127 changed no cell.
 - Full Proposal 170 status remains **partial**.
-- M126 remains historical closure evidence, but its clean shared authentication/TLS/JSON-RPC qualification is superseded for current authority by the concrete C10-C12 findings below until M127-M130 close.
+- M126 remains historical closure evidence, but its clean shared authentication/TLS/JSON-RPC qualification is superseded for current authority by the concrete C11-C12 findings below until M128-M130 close. C10 is resolved by closed M127 (`plans/closure/i2pcontrol-proposal-170/127-closure.md`).
 
 ## Reopened post-M126 corrective findings
 
-### C10 — authentication token lifetime
+### C10 — authentication token lifetime (resolved)
 
-Current `TokenService` stores membership only and has no finite expiry state. The RPC layer defines standard `TOKEN_EXPIRED` (`-32004`) behavior, but production validation cannot reach that path. This is an authentication conformance/security-lifetime defect missed by M126.
+M127 is closed. Every issued token has finite one-day monotonic validity; expired lookup removes atomically and returns `-32004` on first use after expiry, then `-32003`.
 
-Owner: **M127** — `plans/implementation/i2pcontrol-proposal-170/127-base-auth-token-lifetime-corrective.md`.
+Resolution: **M127 closed** — plan `plans/implementation/i2pcontrol-proposal-170/127-base-auth-token-lifetime-corrective.md`, closure `plans/closure/i2pcontrol-proposal-170/127-closure.md`.
 
 ### C11 — JSON-RPC batch conformance
 
 M126 proved that top-level arrays do not bypass authentication, but valid JSON-RPC 2.0 batches are still blanket-rejected. The corrective must add bounded batch cardinality, per-element authentication, notification suppression and no unbounded task fan-out.
 
-Owner: **M128** — written but queued/unregistered until M127 closes.
+Owner: **M128** — `plans/implementation/i2pcontrol-proposal-170/128-json-rpc-batch-conformance-corrective.md` (ready / registered).
 
 ### C12 — non-loopback managed-TLS identity
 
@@ -77,13 +77,11 @@ Shared base behavior is in scope only where required by the implemented extensio
 ## Dependency graph
 
 ```text
-M126 post-M125 requalification                 [HISTORICAL CLOSED; C10-C12 FOUND LATER]
+M126 post-M125 requalification                 [HISTORICAL CLOSED; C10 RESOLVED BY M127, C11-C12 OPEN]
+M127 token-lifetime corrective                 [CLOSED]
   |
   v
-M127 token-lifetime corrective                 [READY / REGISTERED]
-  |
-  v
-M128 JSON-RPC batch corrective                 [QUEUED / UNREGISTERED]
+M128 JSON-RPC batch corrective                 [READY / REGISTERED]
   |
   v
 M129 non-loopback TLS fail-closed corrective   [QUEUED / UNREGISTERED]
@@ -98,39 +96,38 @@ M130 post-corrective requalification           [BLOCKED / UNREGISTERED]
 
 Only the next dependency-ready plan is registered, consistent with `plans/003-planning-process.md`.
 
-## Current Emissary handoff — M127
-
-Plan:
-
-- `plans/implementation/i2pcontrol-proposal-170/127-base-auth-token-lifetime-corrective.md`
-
-Status: **ready**.
-
-Planning baseline:
-
-- `9948cfd0782a3defbd5f68cf2d4523603bdc7940`.
-
-Objective:
-
-- give every issued authentication token finite in-process validity;
-- use a deterministic/testable monotonic lifetime model;
-- distinguish valid, expired-and-removed and unknown credentials;
-- map expiry to existing `-32004 TOKEN_EXPIRED` and later unknown use to `-32003`;
-- preserve token entropy, capacity, conflict rejection, throttle, shutdown clearing and secret safety;
-- keep every production change under `emissary-cli/src/i2pcontrol/**`;
-- change no Proposal 170 matrix cell.
-
-M127 supersedes only M126's affected authentication-lifetime qualification claim. Historical M126 closure is not rewritten.
-
-## Queued handoff — M128
+## Current Emissary handoff — M128
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/128-json-rpc-batch-conformance-corrective.md`
 
-Status: **queued / unregistered** until M127 closes.
+Status: **ready**.
 
-M128 adds bounded valid JSON-RPC batch handling with independent auth/errors/results, exact notification suppression, zero execution for over-cap batches, and no per-element unbounded task fan-out. Single-request behavior remains compatible.
+Planning baseline:
+
+- `9948cfd0782a3defbd5f68cf2d4523603bdc7940` for plan creation; M128 implementation/review baseline MUST be reset to the closed-M127 head.
+
+Objective:
+
+- replace blanket top-level-array rejection with bounded JSON-RPC 2.0 batch behavior;
+- authenticate every protected element independently with M127 valid/expired/unknown semantics;
+- preserve independent errors/results, exact notification suppression, and zero execution for over-cap batches;
+- allow no implicit intra-batch token propagation, transaction semantics, or unbounded task fan-out;
+- keep every production change under `emissary-cli/src/i2pcontrol/**`;
+- change no Proposal 170 matrix cell.
+
+M127 is closed (`plans/closure/i2pcontrol-proposal-170/127-closure.md`, implementation `098c9d1`) and is the batch work's token-authority predecessor. M128 starts from the closed-M127 head so batch dispatch inherits the corrected lifetime semantics.
+
+## Closed handoff — M127
+
+Plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/127-base-auth-token-lifetime-corrective.md`
+
+Status: **closed**; closure `plans/closure/i2pcontrol-proposal-170/127-closure.md`, implementation `098c9d1`.
+
+M127 gave every issued token finite one-day monotonic validity, distinguished valid/expired-and-removed/unknown, mapped expiry to `-32004` and later unknown use to `-32003`, and preserved entropy/capacity/conflict/throttle/shutdown/secret bounds with no matrix change. It supersedes only M126's affected authentication-lifetime claim.
 
 ## Queued handoff — M129
 
@@ -180,14 +177,15 @@ No reopened plan changes this dependency boundary.
 | M123 | closed |
 | M124 | closed at exact Y005 pin |
 | M125 | closed; corrected two `AllowInternalSSL` classifications |
-| M126 | historical closed; current shared auth/TLS/JSON-RPC clean-qualification claim superseded pending M127-M130 |
+| M126 | historical closed; current shared auth/TLS/JSON-RPC clean-qualification claim superseded pending M128-M130 (C10 resolved by M127) |
+| M127 | closed; finite one-day token lifetime, expired/unknown distinction, `-32004`/`-32003` mapping; matrix unchanged |
 
 Historical closure records remain unchanged. Corrective closures supersede only affected claims.
 
 ## Registry rules
 
-1. M127 is the only currently registered Proposal 170 implementation handoff.
-2. Close M127 before promoting M128; close M128 before promoting M129; close M129 before promoting M130.
+1. M128 is the only currently registered Proposal 170 implementation handoff.
+2. M127 is closed; close M128 before promoting M129; close M129 before promoting M130.
 3. Matrix authority remains `284 / 96 / 460`; shared-control-plane corrective work is not capability evidence.
 4. Keep Proposal policy in `emissary-cli/src/i2pcontrol/**` wherever possible. Any production path outside that boundary requires accepted neutral-owner justification and containment evidence.
 5. No unrelated base-I2PControl method parity is authorized by this corrective line.

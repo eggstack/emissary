@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; post-M126 corrective line reopened**. M127 is the current registered handoff. The authoritative M095 matrix remains `284 apply / 96 blocked_primitive / 460 not_applicable`.
+Status: **partial Proposal 170 support; post-M126 corrective line reopened**. M127 closed; M128 is the current registered handoff. The authoritative M095 matrix remains `284 apply / 96 blocked_primitive / 460 not_applicable`.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -36,7 +36,7 @@ Containment/support evidence:
 - M121 truthfully demoted unsupported `SigType` and `Close`/`CloseTime`/`NewDest` semantics instead of retaining approximate support.
 - M124 exact-pins Yosemite Y005 `59140a2277bf296928d2e8ce39a148182eeff044` only through the optional I2PControl alias; ordinary Yosemite remains registry 0.7.0.
 - M125 corrected two server-role `AllowInternalSSL` applicability cells and left 96 blocked cells with no dependency-ready owner.
-- M126 is historical current-head evidence, but subsequent review found three shared-control-plane defects/gaps; its clean auth/TLS/JSON-RPC qualification is superseded pending M127-M130.
+- M126 is historical current-head evidence, but subsequent review found three shared-control-plane defects/gaps; its clean auth/TLS/JSON-RPC qualification is superseded pending M128-M130 (C10 resolved by closed M127).
 
 Full Proposal 170 support is not claimed.
 
@@ -44,8 +44,8 @@ Full Proposal 170 support is not claimed.
 
 | Handoff | Status | Scope |
 |---|---|---|
-| M127 | **ready / registered** | finite API-1 token lifetime; expired-vs-unknown behavior; auth bounds |
-| M128 | queued / unregistered | bounded JSON-RPC batch conformance and per-element auth/resource rules |
+| M127 | **closed** | finite API-1 token lifetime; expired-vs-unknown behavior; auth bounds |
+| M128 | **ready / registered** | bounded JSON-RPC batch conformance and per-element auth/resource rules |
 | M129 | queued / unregistered | non-loopback bind requires explicit TLS certificate/key; managed TLS loopback-only |
 | M130 | blocked / unregistered | integrated post-M127-M129 current-head requalification |
 
@@ -53,37 +53,45 @@ Source roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md`
 
-Only M127 is registered now, consistent with `plans/003-planning-process.md`. Later plan files are written to make the full corrective line explicit, but their implementation status remains gated until predecessor closure.
+Only M128 is registered now, consistent with `plans/003-planning-process.md`. Later plan files are written to make the full corrective line explicit, but their implementation status remains gated until predecessor closure.
 
-## M127 — current registered handoff
+## M127 — closed corrective
 
 Plan:
 
 - `127-base-auth-token-lifetime-corrective.md`
 
-Planning baseline:
+Closure:
 
-- `9948cfd0782a3defbd5f68cf2d4523603bdc7940`.
+- `plans/closure/i2pcontrol-proposal-170/127-closure.md` (implementation `098c9d1`).
 
-M127 corrects the concrete authentication-lifetime defect missed by M126:
+M127 corrected the concrete authentication-lifetime defect missed by M126:
 
-- issued opaque tokens gain finite monotonic in-process validity;
+- issued opaque tokens gained finite one-day monotonic in-process validity;
 - validation distinguishes valid, expired-and-removed and unknown credentials;
 - expired lookup maps to existing `-32004 TOKEN_EXPIRED`;
 - later use of the removed token maps to existing `-32003 INVALID_TOKEN`;
 - token capacity/input, conflict rejection, throttle, shutdown clearing and secret safety remain bounded;
-- no production change outside `emissary-cli/src/i2pcontrol/**` is authorized;
-- no Proposal matrix cell changes.
+- no production change outside `emissary-cli/src/i2pcontrol/**` occurred;
+- no Proposal matrix cell changed.
 
 M127 does not add unrelated base I2PControl methods.
 
-## M128 — queued JSON-RPC batch corrective
+## M128 — current registered handoff
 
 Plan:
 
 - `128-json-rpc-batch-conformance-corrective.md`
 
-M128 is written but unregistered until M127 closes. It replaces blanket top-level-array rejection with bounded JSON-RPC 2.0 batch behavior:
+M128 starts from the closed-M127 head and inherits the corrected token-lifetime semantics.
+
+## M128 — ready JSON-RPC batch corrective
+
+Plan:
+
+- `128-json-rpc-batch-conformance-corrective.md`
+
+M128 replaces blanket top-level-array rejection with bounded JSON-RPC 2.0 batch behavior:
 
 - non-empty batch support;
 - per-element authentication and independent result/error handling;
@@ -134,7 +142,8 @@ The reopened line therefore fixes only shared base behavior required by the exte
 | M123 | closed — commit-phase cancellation/lifecycle atomicity |
 | M124 | closed — exact Y005 dependency adoption; no Proposal mapping |
 | M125 | closed — M113 capability/crypto audit; two cells reclassified |
-| M126 | historical closed — later C10-C12 findings supersede its clean shared-control-plane qualification |
+| M126 | historical closed — later C10-C12 findings supersede its clean shared-control-plane qualification (C10 resolved by M127) |
+| M127 | closed — finite token lifetime, expired/unknown mapping, bounds; matrix unchanged |
 
 Historical closure records are retained unchanged.
 

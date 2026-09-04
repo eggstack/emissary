@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 — Post-M114 Corrective Roadmap
 
-Status: **active corrective workstream; M127 ready; M128-M129 queued; M130 blocked on corrective closure**
+Status: **active corrective workstream; M127 closed; M128 ready; M129 queued; M130 blocked on corrective closure**
 
 Original corrective baseline: `feafc6a1d9650887015a01f87bf21b57a4e92085`
 
@@ -161,14 +161,12 @@ No M127-M130 production behavior belongs below the I2PControl application layer.
 ## 7. Dependency graph and classes
 
 ```text
-M126 post-M125 requalification                 [HISTORICAL CLOSED; C10-C12 FOUND LATER]
+M126 post-M125 requalification                 [HISTORICAL CLOSED; C10 RESOLVED BY M127, C11-C12 OPEN]
+M127 token-lifetime corrective                 [CLOSED]
   |
+  | sequencing dependency satisfied: batch inherits corrected token authority
   v
-M127 token-lifetime corrective                 [READY / REGISTERED]
-  |
-  | sequencing dependency: close auth authority before batch integration
-  v
-M128 JSON-RPC batch corrective                 [QUEUED / UNREGISTERED]
+M128 JSON-RPC batch corrective                 [READY / REGISTERED]
   |
   | sequencing dependency for linear shared-control-plane closure
   v
@@ -197,7 +195,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/127-base-auth-token-lifetime-corrective.md`
 
-Status: **ready / registered**.
+Status: **closed**; closure `plans/closure/i2pcontrol-proposal-170/127-closure.md`, implementation `098c9d1`.
 
 Primary exit conditions:
 
@@ -215,7 +213,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/128-json-rpc-batch-conformance-corrective.md`
 
-Status: **queued / unregistered**.
+Status: **ready / registered** (promoted on M127 closure).
 
 Primary exit conditions:
 
@@ -324,7 +322,8 @@ Mitigation is the milestone decomposition above plus a new M130 integrated requa
 
 ## 16. Closure and successor policy
 
-Every milestone gets a separate closure record with:
+M127 closed on the `098c9d1` head with no matrix change; M128 is now the
+registered handoff. Every milestone gets a separate closure record with:
 
 - exact implementation commit(s);
 - requirement-to-evidence table;

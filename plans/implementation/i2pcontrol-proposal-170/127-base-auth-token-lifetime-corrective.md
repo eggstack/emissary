@@ -1,6 +1,8 @@
 # M127 — Base I2PControl Authentication Token-Lifetime Corrective
 
-Status: **ready**
+Status: **closed**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/127-closure.md`
 
 Class: corrective / authentication / conformance / security
 

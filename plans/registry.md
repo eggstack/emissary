@@ -28,17 +28,29 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
-| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **NewDest future** (M137 closed as complete) |
-| Proposal 170 session-lifecycle completion | **active / corrective** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | **NewDest future** (M137 closed; M134 rebase or M138) |
+| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **lifecycle complete** (M134 closed as complete; 47 non-lifecycle residuals unregistered under M131) |
+| Proposal 170 session-lifecycle completion | **closed as complete** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | M134 closed as complete (lifecycle line complete) |
 | Post-M114 shared-control-plane corrective line | closed | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | M130 current runtime/security authority |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
 
 ## Active Proposal-170 implementation handoff
 
-No active implementation handoff. M137 is closed as complete (see below);
-the sole future is a NewDest successor (historical M134 rebase or corrective
-M138) gated on the M137 §12 consumer contract. No NewDest execution is
-authorized now.
+No active implementation handoff. M134 is closed as complete (see below); the
+session-lifecycle line is complete and the remaining 47 non-lifecycle residuals
+stay unregistered under M131 authority. No successor is authorized by M134.
+
+### M134 — NewDest on proven idle resume (closed)
+
+Plan/closure:
+
+- `134-newdest-on-proven-idle-resume.md`;
+- `plans/closure/i2pcontrol-proposal-170/134-closure.md`.
+
+Status: **closed as complete**, six promotions, matrix `325/47/468`. M134
+rebases historical NewDest design material on the proven M137 §12
+reason/reopen contract and implements exact Proposal `NewDest` for the six
+non-Streamr TCP families with one-shot tracker-proven rotation, staged secret
+transaction, one shared successor and manual/restart/failure preservation.
 
 ### M137 — M133 corrective: SAM idle close and reasoned termination (closed)
 
@@ -91,23 +103,28 @@ Plan/closure:
 - `137-m133-corrective-sam-idle-close-and-reasoned-termination.md`;
 - `plans/closure/i2pcontrol-proposal-170/137-closure.md`.
 
-Status: **closed as complete**, 14 promotions, matrix `319/53/468`. M137
+Status: **closed as complete**, 14 promotions, matrix `319/53/468` (now
+superseded by M134 `325/47/468`). M137
 extends the same owner with standard `i2cp.close*` close-before-reduce
 ordering, canonical teardown, neutral `IdlePolicy`/`Requested`/`Failure`/
 `Unknown` reason, and Proposal `Close`/`CloseTime` validation plus Yosemite
 generic mapping for all seven client families including Streamr.
 
+### M134
+
+Plan/closure:
+
+- `134-newdest-on-proven-idle-resume.md`;
+- `plans/closure/i2pcontrol-proposal-170/134-closure.md`.
+
+Status: **closed as complete**, six promotions, matrix `325/47/468`. M134
+closes the session-lifecycle line: `NewDest` rotates exactly once on a proven
+`IdlePolicy` resume for the six TCP families with Streamr staying N/A.
+
 ## Deferred corrective successors
 
-### NewDest successor
-
-Historical plan:
-
-- `plans/implementation/i2pcontrol-proposal-170/134-newdest-on-proven-idle-resume.md`.
-
-Status: **deferred / unregistered / requires explicit rebase after M137**.
-
-After successful M137 closure, M134 may be amended/rebased only if its assumptions match the proven termination/reopen interface. Otherwise create a corrective M138. No NewDest execution is authorized now.
+No deferred lifecycle successor remains. M138 was not required: historical
+M134 assumptions matched the M137 contract after rebase.
 
 ## Closed failed predecessor line
 
@@ -159,8 +176,8 @@ Current supported surface according to closure evidence:
 
 Current M095 matrix:
 
-- `319 apply`;
-- `53 blocked_primitive`;
+- `325 apply`;
+- `47 blocked_primitive`;
 - `468 not_applicable`.
 
 Full Proposal 170 status remains **partial**.
@@ -187,7 +204,7 @@ M131 residual primitive re-freeze                  [CLOSED AS BLOCKED — 284/88
  M137 M133 corrective Close*                        [CLOSED AS COMPLETE — 319/53/468]
   |
   v
-M134 rebased OR M138 NewDest corrective            [FUTURE / UNREGISTERED]
+M134 NewDest on proven idle resume                  [CLOSED AS COMPLETE — 325/47/468]
 ```
 
 ## Residual clusters outside the active line
@@ -204,7 +221,7 @@ Remain unregistered under M131 authority:
 - `MultiHoming` / `shouldBundleReplyInfo`;
 - encrypted/authenticated LeaseSets.
 
-No successor from these clusters may be smuggled into M135-M137.
+No successor from these clusters may be smuggled into M134-M137.
 
 ## Canonical containment rules
 
@@ -213,6 +230,7 @@ No successor from these clusters may be smuggled into M135-M137.
 3. M135 authorizes no SAM or I2PControl production change and no matrix promotion.
 4. M136 is an explicit neutral SAM idle-policy exception (`sam/session.rs`) plus I2PControl consumer (`backends/runtime/session.rs`, four TCP client allowlists via shared `socks` owner, matrix/ledger/docs); it promotes only the 21 evidence-backed `Reduce*` cells.
 5. M137 is an explicit neutral SAM idle-close exception (`sam/session.rs`, `sam/mod.rs`, `lib.rs`) plus I2PControl consumer (`backends/runtime/session.rs`, four TCP client allowlists, `sam_observer.rs`, matrix/ledger/docs); it promotes only the 14 evidence-backed `Close`/`CloseTime` cells.
+6. M134 is an I2PControl-only proven-resume exception (`idle_resume.rs`, `client_secret_store.rs`, `backends/runtime/session.rs`, `backends/runtime/client_listener.rs`, `backends/options.rs`, six TCP client allowlists, `production.rs`, `sam_observer.rs`, `server.rs` + `main.rs` composition seams sharing one tracker, `tunnel_manager.rs` guard, matrix/ledger/docs); it promotes only the six evidence-backed `NewDest` cells with no core change.
 6. No Proposal-shaped `emissary-core` API is accepted merely to improve matrix counts.
 7. Yosemite remains the sole accepted SAM implementation; no parallel raw SAM stack.
 8. Exact Y005 remains isolated behind optional `yosemite-i2pcontrol`.
@@ -224,10 +242,11 @@ No successor from these clusters may be smuggled into M135-M137.
 
 ## Registration rules
 
-1. **No active implementation handoff; NewDest (M134 rebase or M138) registers
-   only against the M137 §12 consumer contract.**
+1. **No active implementation handoff; the session-lifecycle line is complete
+   (M134 closed). Remaining residuals register only under M131 authority with
+   independent gates.**
 2. M137 registered only because M136 closure explicitly proved its readiness contract (now closed).
-3. NewDest registers only after successful M137 closure proves an authoritative idle-close/reopen contract.
+3. M134 registered only after successful M137 closure proved an authoritative idle-close/reopen contract (now closed).
 4. Material path/architecture deviations require plan amendment before code.
 5. Closure evidence, not implementation assertions, determines support/matrix promotion.
 6. Active documentation retains partial-support wording until all applicable residuals are resolved and requalified.
@@ -248,6 +267,7 @@ No successor from these clusters may be smuggled into M135-M137.
 | M133 | closed as blocked; zero close promotions |
 | M135 | **closed as complete**; neutral live-quantity/LeaseSet primitive, zero promotions, matrix 284/88/468 at closure |
 | M136 | **closed as complete**; SAM idle decrease/restore + Proposal Reduce mapping, 21 promotions, matrix 305/67/468 |
-| M137 | **closed as complete**; SAM idle close + reasoned termination + Proposal Close mapping, 14 promotions, matrix 319/53/468 |
+| M137 | **closed as complete**; SAM idle close + reasoned termination + Proposal Close mapping, 14 promotions, matrix 319/53/468 at closure (now superseded by M134 325/47/468) |
+| M134 | **closed as complete**; NewDest proven-resume + staged secret transaction + one shared successor, six promotions, matrix 325/47/468 |
 
 Historical closure files remain unchanged.

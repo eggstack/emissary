@@ -867,7 +867,7 @@ pub async fn init_server(
         ))
     })?;
     let startup_tunnel_inventory = ctx.startup_tunnel_inventory.unwrap_or_default();
-    let tunnels: Arc<ProductionTunnelManagerControl> = Arc::new(
+    let tunnels_manager =
         ProductionTunnelManagerControl::new_with_startup_inventory_and_sam_port_and_address_book(
             tm_dir.clone(),
             startup_tunnel_inventory,
@@ -876,8 +876,19 @@ pub async fn init_server(
         )
         .map_err(|e| {
             I2pControlError::Persistence(format!("failed to create tunnel manager: {e}"))
-        })?,
-    );
+        })?;
+    // M134: share one volatile idle-resume tracker between the neutral SAM
+    // observation handle (authoritative `IdlePolicy` facts) and the tunnel
+    // manager (proven-resume decisions). When no observation handle exists
+    // (SAM disabled/tests) the manager keeps its own empty tracker: `NewDest`
+    // validates but never qualifies, so no rotation occurs.
+    let tunnels_manager = ctx
+        .sam_session_observation
+        .as_ref()
+        .and_then(|handle| handle.resume_tracker())
+        .map(|tracker| tunnels_manager.clone().with_idle_resume_tracker(tracker))
+        .unwrap_or(tunnels_manager);
+    let tunnels: Arc<ProductionTunnelManagerControl> = Arc::new(tunnels_manager);
     tunnels
         .load()
         .await
@@ -1853,7 +1864,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(response["error"]["code"], rpc::error_codes::UNSUPPORTED_API_VERSION);
+        assert_eq!(
+            response["error"]["code"],
+            rpc::error_codes::UNSUPPORTED_API_VERSION
+        );
         assert_eq!(state.token_service().count(), 0);
     }
 
@@ -2469,8 +2483,8 @@ mod tests {
             serde_json::json!({"Token": token, "i2p.router.version": true}),
             Some(RequestId::Number(2)),
         );
-        let expired = authenticate_protected_request(&state, &HeaderMap::new(), &expired)
-            .unwrap_err();
+        let expired =
+            authenticate_protected_request(&state, &HeaderMap::new(), &expired).unwrap_err();
         assert_eq!(expired.error.code, rpc::error_codes::TOKEN_EXPIRED);
         assert_eq!(
             expired.error.message,
@@ -2483,8 +2497,7 @@ mod tests {
             serde_json::json!({"Token": token, "i2p.router.version": true}),
             Some(RequestId::Number(3)),
         );
-        let again =
-            authenticate_protected_request(&state, &HeaderMap::new(), &again).unwrap_err();
+        let again = authenticate_protected_request(&state, &HeaderMap::new(), &again).unwrap_err();
         assert_eq!(again.error.code, rpc::error_codes::INVALID_TOKEN);
         assert_eq!(again.error.message, rpc::error_codes::INVALID_TOKEN_MESSAGE);
     }

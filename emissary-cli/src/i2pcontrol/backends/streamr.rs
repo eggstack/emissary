@@ -303,13 +303,14 @@ impl SubscriptionState {
             return false;
         }
         match control[0] {
-            0 =>
+            0 => {
                 if self.entries.contains_key(peer) || self.entries.len() < MAX_SUBSCRIBERS {
                     self.entries.insert(peer.to_owned(), now);
                     true
                 } else {
                     false
-                },
+                }
+            }
             1 => self.entries.remove(peer).is_some(),
             _ => false,
         }
@@ -353,7 +354,10 @@ async fn run_streamr_client(
         };
         match tokio::select! {
             _ = cancellation.changed() => None,
-            result = registry.acquire_datagram(config.session_options.clone()) =>
+            // Streamr `NewDest` remains `not_applicable` (M131/M134): the
+            // datagram/session contract has no NewDest resume owner, so the
+            // shared policy is always disabled here.
+            result = registry.acquire_datagram(config.session_options.clone(), false) =>
                 match result {
                     Ok(lease) => Some(lease),
                     Err(_) => {
@@ -576,11 +580,10 @@ impl StreamrClientTunnelBackend {
             .ok_or_else(|| BackendError::Internal {
                 message: "streamrclient producer destination is invalid".to_owned(),
             })?;
-        let producer_identity = canonical_destination_identity(producer).ok_or_else(|| {
-            BackendError::Internal {
+        let producer_identity =
+            canonical_destination_identity(producer).ok_or_else(|| BackendError::Internal {
                 message: "streamrclient producer destination is not canonical".to_owned(),
-            }
-        })?;
+            })?;
         let target_host = local_loopback_address(definition, TunnelType::StreamrClient)?;
         let target_port =
             definition.options.target_port.ok_or_else(|| BackendError::MissingOption {
@@ -789,10 +792,7 @@ impl TunnelBackend for StreamrServerTunnelBackend {
     fn validate_start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
         // Pure preflight: the dummy destination is never used for I/O; it
         // only lets the shared config validator run without store access.
-        let _ = self.config(
-            definition,
-            StoredDestination::from_private(String::new()),
-        )?;
+        let _ = self.config(definition, StoredDestination::from_private(String::new()))?;
         Ok(())
     }
 
@@ -997,8 +997,7 @@ mod tests {
     #[test]
     fn streamr_server_preflight_matches_start_without_store() {
         let root = tempfile::tempdir().unwrap();
-        let backend =
-            StreamrServerTunnelBackend::new(1, ServerDestinationStore::new(root.path()));
+        let backend = StreamrServerTunnelBackend::new(1, ServerDestinationStore::new(root.path()));
         let mut valid = definition(TunnelType::StreamrServer);
         valid.options.listen_port = Some(0);
         assert!(backend.validate_start(&valid).is_ok());
@@ -1058,7 +1057,10 @@ mod tests {
     #[test]
     fn streamr_peer_matching_requires_canonical_destination_identity() {
         let producer = producer_destination();
-        assert_eq!(canonical_destination_identity(&producer), Some(producer.clone()));
+        assert_eq!(
+            canonical_destination_identity(&producer),
+            Some(producer.clone())
+        );
         assert_eq!(
             canonical_destination_identity(&format!("{producer}.b32.i2p")),
             Some(producer.clone())

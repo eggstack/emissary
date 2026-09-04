@@ -428,13 +428,14 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "ReduceTime",
         "Close",
         "CloseTime",
+        "NewDest",
         "Shared",
         "PersistentClientKey",
         "PrivKeyFile",
     ];
-    // M121: "NewDest" remains demoted to blocked_primitive. Any supplied
-    // value fails in client_lifecycle_config / validate_common_options
-    // before allocation.
+    // M134: "NewDest" is applied as a proven idle-resume policy (M137 IdlePolicy
+    // gate + tracker/secret transaction); conflicts/prerequisites fail in
+    // client_lifecycle_config / validate_common_options before allocation.
     // M136: "Reduce"/"ReduceCount"/"ReduceTime" are supported via the
     // canonical SAM idle owner and Yosemite generic session options.
     // M137: "Close"/"CloseTime" are supported via the same canonical owner

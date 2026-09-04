@@ -163,25 +163,23 @@ pub fn validate_common_options(
     if options.use_ssl.is_some() {
         return Err(common_unsupported(tunnel_type, "UseSSL"));
     }
-    for (present, field) in [
-        (
-            options.priv_key_file.is_some()
-                && !matches!(
-                    tunnel_type,
-                    TunnelType::Client
-                        | TunnelType::HttpClient
-                        | TunnelType::IrcClient
-                        | TunnelType::Socks
-                        | TunnelType::SocksIrc
-                        | TunnelType::ConnectClient
-                        | TunnelType::Server
-                        | TunnelType::HttpServer
-                        | TunnelType::HttpBidirServer
-                        | TunnelType::IrcServer
-                ),
-            "PrivKeyFile",
-        ),
-    ] {
+    for (present, field) in [(
+        options.priv_key_file.is_some()
+            && !matches!(
+                tunnel_type,
+                TunnelType::Client
+                    | TunnelType::HttpClient
+                    | TunnelType::IrcClient
+                    | TunnelType::Socks
+                    | TunnelType::SocksIrc
+                    | TunnelType::ConnectClient
+                    | TunnelType::Server
+                    | TunnelType::HttpServer
+                    | TunnelType::HttpBidirServer
+                    | TunnelType::IrcServer
+            ),
+        "PrivKeyFile",
+    )] {
         if present {
             return Err(common_unsupported(tunnel_type, field));
         }
@@ -226,13 +224,35 @@ pub fn validate_common_options(
             return Err(common_unsupported(tunnel_type, field));
         }
     }
-    // M121 §5.2: NewDest is demoted to blocked_primitive for all families.
-    // Reference newDestOnResume allocates a new identity only on resume after
-    // an actual I2P-session idle close; the local TCP-handler-count heuristic
-    // cannot observe that trigger without a lower-layer session-activity
-    // primitive. Any supplied value fails before allocation.
-    if options.new_dest.is_some() {
-        return Err(common_unsupported(tunnel_type, "NewDest"));
+    // M134 (rebased on M137): `NewDest` is applied for the six non-Streamr
+    // TCP client families as a proven idle-resume policy. Reference
+    // `newDestOnResume` allocates exactly one transient successor only on
+    // resume after an actual I2P-session idle close; manual Stop/Start,
+    // Restart, failure and unrelated edits never rotate. `NewDest=true`
+    // requires `Close=true` (checked where raw config is available:
+    // `client_lifecycle_config` / session gates), conflicts with
+    // `PersistentClientKey=true` and any `PrivKeyFile` import, and stays
+    // `not_applicable` for Streamr and servers. `NewDest=false` is an
+    // explicit disabled value for the six families (no prerequisites).
+    if let Some(new_dest) = options.new_dest {
+        let applicable = matches!(
+            tunnel_type,
+            TunnelType::Client
+                | TunnelType::HttpClient
+                | TunnelType::IrcClient
+                | TunnelType::Socks
+                | TunnelType::SocksIrc
+                | TunnelType::ConnectClient
+        );
+        if !applicable {
+            return Err(common_unsupported(tunnel_type, "NewDest"));
+        }
+        if new_dest && options.persistent_client_key.unwrap_or(false) {
+            return Err(common_unsupported(tunnel_type, "NewDest"));
+        }
+        if new_dest && options.priv_key_file.is_some() {
+            return Err(common_unsupported(tunnel_type, "NewDest"));
+        }
     }
     // PersistentClientKey and Shared are meaningful only for the control-plane
     // client families and are applied by the bounded owner.
@@ -512,8 +532,11 @@ mod tests {
         ] {
             let options = TunnelOptions {
                 delay_open: Some(true),
-                target_destination: matches!(tunnel_type, TunnelType::Client | TunnelType::IrcClient)
-                    .then(|| "destination".to_owned()),
+                target_destination: matches!(
+                    tunnel_type,
+                    TunnelType::Client | TunnelType::IrcClient
+                )
+                .then(|| "destination".to_owned()),
                 listen_port: Some(0),
                 ..Default::default()
             };
@@ -548,10 +571,10 @@ mod tests {
     }
 
     #[test]
-    fn new_dest_is_rejected_for_all_families_after_m121_demotion() {
-        // M121 §5.2: NewDest is blocked_primitive for every family. Reference
-        // newDestOnResume allocates only on resume after an actual I2P-session
-        // idle close; no local observation primitive exists.
+    fn m134_new_dest_applies_to_six_tcp_families_with_conflicts() {
+        // M134 (rebased on M137): `NewDest` is applied for the six non-Streamr
+        // TCP clients. `NewDest=true` conflicts with persistent/import identity;
+        // `NewDest=false` is explicit disabled. Streamr and servers stay N/A.
         for tunnel_type in [
             TunnelType::Client,
             TunnelType::HttpClient,
@@ -559,6 +582,46 @@ mod tests {
             TunnelType::Socks,
             TunnelType::SocksIrc,
             TunnelType::ConnectClient,
+        ] {
+            for value in [true, false] {
+                let options = TunnelOptions {
+                    new_dest: Some(value),
+                    ..Default::default()
+                };
+                assert!(
+                    validate_common_options(tunnel_type, &options).is_ok(),
+                    "{tunnel_type} NewDest={value} must validate (Close prerequisite is enforced where raw config is available)"
+                );
+            }
+            // `NewDest=true` + persistent conflicts before allocation.
+            let options = TunnelOptions {
+                new_dest: Some(true),
+                persistent_client_key: Some(true),
+                ..Default::default()
+            };
+            assert_eq!(
+                validate_common_options(tunnel_type, &options).unwrap_err().to_string(),
+                format!("{tunnel_type} does not support option NewDest")
+            );
+            // `NewDest=true` + import conflicts before allocation.
+            let options = TunnelOptions {
+                new_dest: Some(true),
+                priv_key_file: Some("import.key".to_owned()),
+                ..Default::default()
+            };
+            assert_eq!(
+                validate_common_options(tunnel_type, &options).unwrap_err().to_string(),
+                format!("{tunnel_type} does not support option NewDest")
+            );
+            // `NewDest=false` + persistent/import stays compatible (disabled).
+            let options = TunnelOptions {
+                new_dest: Some(false),
+                persistent_client_key: Some(true),
+                ..Default::default()
+            };
+            assert!(validate_common_options(tunnel_type, &options).is_ok());
+        }
+        for tunnel_type in [
             TunnelType::StreamrClient,
             TunnelType::Server,
             TunnelType::HttpServer,
@@ -606,27 +669,21 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            validate_common_options(TunnelType::Client, &options)
-                .unwrap_err()
-                .to_string(),
+            validate_common_options(TunnelType::Client, &options).unwrap_err().to_string(),
             "client does not support option TunnelVariance"
         );
 
         options.tunnel_variance = None;
         options.tunnel_backup_quantity = Some(4);
         assert_eq!(
-            validate_common_options(TunnelType::Client, &options)
-                .unwrap_err()
-                .to_string(),
+            validate_common_options(TunnelType::Client, &options).unwrap_err().to_string(),
             "client does not support option TunnelBackupQuantity"
         );
 
         options.tunnel_backup_quantity = None;
         options.sig_type = Some("11".to_owned());
         assert_eq!(
-            validate_common_options(TunnelType::Client, &options)
-                .unwrap_err()
-                .to_string(),
+            validate_common_options(TunnelType::Client, &options).unwrap_err().to_string(),
             "client does not support option SigType"
         );
 
@@ -648,9 +705,7 @@ mod tests {
         }
         options.sig_type = Some(String::new());
         assert_eq!(
-            validate_common_options(TunnelType::Client, &options)
-                .unwrap_err()
-                .to_string(),
+            validate_common_options(TunnelType::Client, &options).unwrap_err().to_string(),
             "client does not support option SigType"
         );
     }
@@ -684,9 +739,7 @@ mod tests {
     #[test]
     fn custom_options_are_bounded_namespaced_and_cannot_override_typed_fields() {
         let mut options = TunnelOptions::default();
-        options
-            .custom_options
-            .insert("i2cp.custom".to_owned(), "safe-value".to_owned());
+        options.custom_options.insert("i2cp.custom".to_owned(), "safe-value".to_owned());
         assert!(validate_common_options(TunnelType::Client, &options).is_ok());
 
         options.custom_options.insert("custom".to_owned(), "value".to_owned());
@@ -699,9 +752,7 @@ mod tests {
         assert!(validate_common_options(TunnelType::Client, &options).is_err());
 
         options.custom_options.clear();
-        options
-            .custom_options
-            .insert("i2cp.custom".to_owned(), "bad value".to_owned());
+        options.custom_options.insert("i2cp.custom".to_owned(), "bad value".to_owned());
         assert!(validate_common_options(TunnelType::Client, &options).is_err());
     }
 }

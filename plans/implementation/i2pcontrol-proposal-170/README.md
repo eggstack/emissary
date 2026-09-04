@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M135/M136/M137 closed as complete, NewDest future**.
+Status: **partial Proposal 170 support; M134/M135/M136/M137 closed as complete, lifecycle line complete**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -11,8 +11,9 @@ Current authorities:
 - neutral live-quantity primitive: M135 closure `plans/closure/i2pcontrol-proposal-170/135-closure.md`;
 - idle reduction: M136 closure `plans/closure/i2pcontrol-proposal-170/136-closure.md`;
 - idle close: M137 closure `plans/closure/i2pcontrol-proposal-170/137-closure.md`;
-- current matrix: `319 apply / 53 blocked_primitive / 468 not_applicable`;
-- next handoff: NewDest future (M134 rebase or M138, gated on M137 §12).
+- proven NewDest resume: M134 closure `plans/closure/i2pcontrol-proposal-170/134-closure.md`;
+- current matrix: `325 apply / 47 blocked_primitive / 468 not_applicable`;
+- next handoff: none from the lifecycle line (47 non-lifecycle residuals unregistered under M131).
 
 ## Authority order
 
@@ -90,14 +91,15 @@ Historical plan:
 
 - `134-newdest-on-proven-idle-resume.md`.
 
-Status: **deferred / unregistered / stale dependency until M137**.
+Status: **closed as complete** (`plans/closure/i2pcontrol-proposal-170/134-closure.md`).
 
-After successful M137 closure, either:
-
-- explicitly amend/rebase M134 against the proven termination/reopen contract; or
-- create a corrective M138 if M134 assumptions no longer match.
-
-No NewDest implementation is authorized before that gate.
+M134 rebased historical NewDest design material on the proven M137 §12
+termination/reopen contract (no M138 required) and implements exact Proposal
+`NewDest` for the six non-Streamr TCP families with one-shot tracker-proven
+rotation, staged secret transaction, one shared successor and
+manual/restart/failure preservation. Six cells promote (`325/47/468`);
+Streamr stays not applicable. No NewDest execution remains authorized beyond
+this closed handoff.
 
 ## Closed predecessor attempts
 
@@ -130,7 +132,9 @@ According to current closure authority:
 - M127 finite token lifetime, M128 bounded batch conformance and M129 fail-closed non-loopback TLS are requalified by M130;
 - M131 corrected eight false applicability blockers and retained 88 genuine primitive blockers at its closure;
 - M135 proved the neutral live-quantity primitive with zero promotions;
-- M136 promotes 21 `Reduce*` client cells (six TCP families plus Streamr) to `apply`; 67 blocked remain.
+- M136 promotes 21 `Reduce*` client cells (six TCP families plus Streamr) to `apply`;
+- M137 promotes 14 `Close`/`CloseTime` client cells (six TCP families plus Streamr) to `apply`;
+- M134 promotes six non-Streamr TCP `NewDest` cells to `apply`; 47 blocked remain.
 
 Full Proposal 170 support is not claimed.
 
@@ -153,10 +157,10 @@ M131 residual primitive re-freeze                    [CLOSED AS BLOCKED — 284/
  M136 M132 corrective Reduce*                       [CLOSED AS COMPLETE — 305/67/468]
   |
   v
-M137 M133 corrective Close*                          [DEPENDENCY-READY / UNREGISTERED]
+M137 M133 corrective Close*                          [CLOSED AS COMPLETE — 319/53/468]
   |
   v
-M134 rebased OR M138 corrective NewDest              [FUTURE / UNREGISTERED]
+M134 NewDest on proven idle resume                   [CLOSED AS COMPLETE — 325/47/468]
 ```
 
 ## Other residual clusters
@@ -181,7 +185,7 @@ Preferred Proposal production ownership remains `emissary-cli/src/i2pcontrol/**`
 
 M135 is a narrowly registered lower-layer exception limited to the existing tunnel-pool/destination/LeaseSet owners named in that plan. It authorizes no SAM or I2PControl production source and no Cargo/Yosemite changes.
 
-M136/M137 are planning documents only until registered by predecessor closure. Their presence does not authorize production changes.
+M136/M137/M134 are closed; their presence authorizes no further production changes beyond their closures.
 
 Core APIs must remain neutral and contain no Proposal/I2PControl business concepts.
 

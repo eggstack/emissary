@@ -13,8 +13,8 @@ current_production_head = "a68094e128d2b92f0fd5b350e38512ef6b65cb6b"
 
 [current_matrix_counts]
 total = 840
-apply = 319
-blocked_primitive = 53
+apply = 325
+blocked_primitive = 47
 not_applicable = 468
 
 [contract_counts]
@@ -1234,12 +1234,11 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = true
 compatibility_aliases = []
-completion_owner = "M112"
-current_or_planned_disposition = "apply_or_blocked_primitive_or_not_applicable"
-cells = ["blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+completion_owner = "M134"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["apply", "apply", "apply", "apply", "apply", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
 cell_notes = { "client" = "M121 §5.2: blocked; reference newDestOnResume allocates only on resume after an actual I2P-session idle close, which has no local observation primitive. Any supplied value fails before allocation.", "httpclient" = "M121 §5.2: blocked; reference newDestOnResume allocates only on resume after an actual I2P-session idle close, which has no local observation primitive. Any supplied value fails before allocation.", "ircclient" = "M121 §5.2: blocked; reference newDestOnResume allocates only on resume after an actual I2P-session idle close, which has no local observation primitive. Any supplied value fails before allocation.", "socks" = "M121 §5.2: blocked; reference newDestOnResume allocates only on resume after an actual I2P-session idle close, which has no local observation primitive. Any supplied value fails before allocation.", "socksirc" = "M121 §5.2: blocked; reference newDestOnResume allocates only on resume after an actual I2P-session idle close, which has no local observation primitive. Any supplied value fails before allocation.", "connectclient" = "M121 §5.2: blocked; reference newDestOnResume allocates only on resume after an actual I2P-session idle close, which has no local observation primitive. Any supplied value fails before allocation.", "streamrclient" = "Affirmative reference evidence: the Java parser excludes Streamr from persistent client-key/NewDest resume handling, and the UDP client has no streaming-session resume owner; this cell is not applicable.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "The pinned option is not applicable to this tunnel family.", "httpbidirserver" = "The pinned option is not applicable to this tunnel family.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
-blocked_primitive = "I2P-session idle-close/resume observation with transient successor identity exactly on resume; no local TCP-handler-count trigger"
-blocking_milestone = "M121"
+implementation_evidence = "M134 validates NewDest with Close prerequisite and persistent/import conflicts before allocation, then stages one fresh successor via the existing secret transaction only on a tracker-proven IdlePolicy resume with Yosemite session construction outside locks; Streamr stays not applicable."
 
 [[tunnel_manager.options]]
 canonical_key = "PersistentClientKey"

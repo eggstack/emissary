@@ -365,8 +365,11 @@ I2P-session activity while the local owner can only count accepted TCP handler
 tasks and Yosemite exposes no session-activity observation primitive. M137
 closes that gap router-side: `Close`/`CloseTime` are applied through the
 canonical SAM idle owner (standard `i2cp.close*`, close-before-reduce,
-canonical teardown, neutral reason); `NewDest` remains blocked and any supplied
-value fails before allocation. `ConnectDelay`
+canonical teardown, neutral reason); M134 then applies `NewDest` for the six
+non-Streamr TCP families as a proven idle-resume policy — one fresh successor
+only on a tracker-proven `IdlePolicy` resume via the staged secret transaction,
+with `Close=true` prerequisite, persistent/import conflicts, one shared
+successor, and manual/restart/failure preservation. `ConnectDelay`
 (0–60,000 ms) remains applied via the generation-local outbound connector.
 Shared definitions must carry compatible close/reduce policy to share one
 underlying session; activity from any member resets the common idle clock and
@@ -396,7 +399,8 @@ allocation. M131 closes the residual ledger at `284 apply / 88 blocked /
 | Applied by six streaming client lifecycle owners | `ConnectDelay` (0–60,000 ms) |
 | Applied by seven client idle owners (M136) | `Reduce` (boolean master switch), `ReduceCount` (1–6, default 1), `ReduceTime` (ms, minimum 300000, default 1200000) via standard `i2cp.reduce*` and the live-quantity primitive; `ReduceTime`/`ReduceCount` without `Reduce=true` fail before allocation |
 | Applied by seven client idle owners (M137) | `Close` (boolean master switch), `CloseTime` (ms, minimum 300000, default 1800000) via standard `i2cp.close*` with close-before-reduce ordering and canonical teardown; `CloseTime` without `Close=true` fails before allocation |
-| Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, `Profile`, `NewDest`, Streamr `ConnectDelay` and other retained Streamr lifecycle cells; `SigType` for all applicable families |
+| Applied by six TCP proven-resume owners (M134) | `NewDest` only on a proven `IdlePolicy` resume (requires `Close=true`, conflicts with `PersistentClientKey`/`PrivKeyFile`, Streamr/servers not applicable); ordinary/manual/restart/failure paths reuse without rotation |
+| Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, `Profile`, Streamr `ConnectDelay` and other retained Streamr lifecycle cells; `SigType` for all applicable families |
 | Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime` |
 | Rejected before allocation as residual server blockers | `UniqueLocalAddressPerClient`, `MultiHoming`, `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
 | Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
@@ -415,7 +419,14 @@ primitive and restore on activity; malformed or server-family values fail
 before allocation. The Close family is applied by M137: idle SAM sessions
 tear down through the canonical session/pool path with a neutral
 `IdlePolicy`/`Requested`/`Failure`/`Unknown` reason; malformed or
-server-family values fail before allocation.
+server-family values fail before allocation. The `NewDest` family is applied
+by M134 for the six TCP families: validation enforces the `Close=true`
+prerequisite and the persistent/import conflicts before allocation, then the
+generation-local one-shot tracker plus the staged secret transaction rotates
+exactly once on a proven `IdlePolicy` resume (one shared successor, shared
+compatibility includes `NewDest`); manual Stop/Start, Restart, process
+restart, transport failure, failed/cancelled resume, stale reasons and
+unrelated edits all preserve without rotation.
 Streamr `DelayOpen` and `NewDest` are not applicable by affirmative reference gates; its other retained
 lifecycle cells remain explicit blocked responses because generic reference
 setters do not establish a datagram runtime owner, except Reduce and Close

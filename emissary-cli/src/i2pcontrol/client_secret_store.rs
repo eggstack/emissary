@@ -18,6 +18,7 @@ use tokio::sync::Mutex;
 
 use crate::i2pcontrol::{
     domain::tunnel::TunnelDefinition,
+    idle_resume::{is_shared_synthetic_name, shared_synthetic_name},
     stores::publication::publish_with_backup,
 };
 
@@ -125,35 +126,76 @@ impl ClientDestinationStore {
 
     /// Prepare the identity for a generation.  This performs generation or
     /// import, but does not publish a replacement identity until `commit`.
+    #[allow(dead_code)]
     pub(crate) async fn stage(
         &self,
         definition: &TunnelDefinition,
         sam_tcp_port: u16,
+    ) -> Result<(), String> {
+        self.stage_with_resume(definition, sam_tcp_port, false).await
+    }
+
+    /// Prepare the identity for a generation with an explicit proven
+    /// idle-resume decision (M134).
+    ///
+    /// `is_qualifying_resume` must be true only when the immediately preceding
+    /// owning generation was authoritatively closed by the configured
+    /// idle-close policy (`SamTerminationReason::IdlePolicy` via the
+    /// I2PControl-owned `IdleResumeTracker`). A fresh successor is staged only
+    /// in that case; all other starts reuse the committed identity (or stage
+    /// the initial identity when none exists). Failed or cancelled starts must
+    /// call `discard` so the staged successor never becomes authoritative and
+    /// eligibility stays retryable.
+    pub(crate) async fn stage_with_resume(
+        &self,
+        definition: &TunnelDefinition,
+        sam_tcp_port: u16,
+        is_qualifying_resume: bool,
     ) -> Result<(), String> {
         if !definition.tunnel_type.is_client() {
             return Ok(());
         }
         let options = &definition.options;
         let name = definition.name.as_str().to_owned();
+        // Synthetic shared entries are owned by the shared resume path below,
+        // never by per-name staging. A user tunnel can never carry a synthetic
+        // name (rejected at the administrative boundary).
+        if is_shared_synthetic_name(&name) {
+            return Err("client destination name is reserved".to_string());
+        }
         let persistent = options.persistent_client_key.unwrap_or(false);
-        let new_destination = options.new_dest.unwrap_or(false);
+        let new_dest = options.new_dest.unwrap_or(false);
         let import_reference = options.priv_key_file.as_deref();
         let existing = self.state.lock().await.entries.get(&name).cloned();
 
         let (private_key, imported_reference) = if let Some(reference) = import_reference {
             validate_reference(reference)?;
-            if existing
-                .as_ref()
-                .and_then(|entry| entry.import_reference.as_deref())
+            if existing.as_ref().and_then(|entry| entry.import_reference.as_deref())
                 == Some(reference)
             {
                 let entry = existing.as_ref().expect("reference comparison implies entry");
                 (entry.private_key.clone(), Some(reference.to_owned()))
             } else {
-                (self.import_reference(reference).await?, Some(reference.to_owned()))
+                (
+                    self.import_reference(reference).await?,
+                    Some(reference.to_owned()),
+                )
             }
-        } else if new_destination {
-            generate_private_key(sam_tcp_port, options.sig_type.as_deref()).await?
+        } else if new_dest {
+            // M134: `NewDest=true` behaves like a stable stored identity
+            // except that a qualifying idle resume replaces the committed
+            // successor exactly once. Without a qualifying fact the committed
+            // identity is reused (or initially generated when none exists);
+            // no rotation occurs on manual Stop/Start, Restart, failure or
+            // unrelated edits.
+            if is_qualifying_resume {
+                generate_private_key(sam_tcp_port, options.sig_type.as_deref()).await?
+            } else {
+                match existing {
+                    Some(entry) => (entry.private_key, entry.import_reference),
+                    None => generate_private_key(sam_tcp_port, options.sig_type.as_deref()).await?,
+                }
+            }
         } else if persistent {
             match existing {
                 Some(entry) => (entry.private_key, entry.import_reference),
@@ -173,7 +215,10 @@ impl ClientDestinationStore {
         };
 
         validate_private_key(&private_key)?;
-        let persist = persistent || import_reference.is_some();
+        // M134: `NewDest=true` successors are durably committed (like
+        // persistent) so ordinary starts reuse them without rotation; only a
+        // qualifying resume replaces them.
+        let persist = persistent || import_reference.is_some() || new_dest;
         self.state.lock().await.pending.insert(
             name,
             PendingEntry {
@@ -185,15 +230,76 @@ impl ClientDestinationStore {
         Ok(())
     }
 
+    /// Stage a shared successor for one stable shared policy key (M134).
+    ///
+    /// Shared identities live under synthetic names in the same atomic
+    /// envelope so one qualifying idle close yields one shared successor, not
+    /// one per member. `is_qualifying_resume` follows the same proven-resume
+    /// rule as the dedicated path. All shared stages persist so ordinary
+    /// member starts reuse the current shared identity without rotation.
+    pub(crate) async fn shared_stage(
+        &self,
+        policy_key: &str,
+        sam_tcp_port: u16,
+        signature_type: Option<&str>,
+        is_qualifying_resume: bool,
+    ) -> Result<(), String> {
+        let name = shared_synthetic_name(policy_key);
+        let existing = self.state.lock().await.entries.get(&name).cloned();
+        let (private_key, imported_reference) = if is_qualifying_resume {
+            generate_private_key(sam_tcp_port, signature_type).await?
+        } else {
+            match existing {
+                Some(entry) => (entry.private_key, entry.import_reference),
+                None => generate_private_key(sam_tcp_port, signature_type).await?,
+            }
+        };
+        validate_private_key(&private_key)?;
+        self.state.lock().await.pending.insert(
+            name,
+            PendingEntry {
+                private_key: Some(private_key),
+                import_reference: imported_reference,
+                persist: true,
+            },
+        );
+        Ok(())
+    }
+
+    /// Return the staged-or-committed shared identity for a policy key.
+    pub(crate) async fn shared_active(
+        &self,
+        policy_key: &str,
+    ) -> Result<Option<StoredClientDestination>, String> {
+        self.active(&shared_synthetic_name(policy_key)).await
+    }
+
+    /// Commit a staged shared successor after the shared session is
+    /// irreversibly accepted. A failed start must call `shared_discard`.
+    pub(crate) async fn shared_commit(&self, policy_key: &str) -> Result<(), String> {
+        self.commit(&shared_synthetic_name(policy_key)).await
+    }
+
+    /// Discard a staged shared successor after a failed or cancelled resume.
+    /// Eligibility stays retryable; no durable state changes.
+    pub(crate) async fn shared_discard(&self, policy_key: &str) {
+        self.discard(&shared_synthetic_name(policy_key)).await;
+    }
+
+    /// Remove a shared synthetic entry once no member references its policy.
+    pub(crate) async fn shared_remove(&self, policy_key: &str) -> Result<bool, String> {
+        self.remove(&shared_synthetic_name(policy_key)).await
+    }
+
     /// Return the staged identity, or the committed identity when no stage is
     /// active.  Private material never crosses the public domain boundary.
-    pub(crate) async fn active(&self, name: &str) -> Result<Option<StoredClientDestination>, String> {
+    pub(crate) async fn active(
+        &self,
+        name: &str,
+    ) -> Result<Option<StoredClientDestination>, String> {
         let state = self.state.lock().await;
         if let Some(pending) = state.pending.get(name) {
-            return Ok(pending
-                .private_key
-                .clone()
-                .map(StoredClientDestination));
+            return Ok(pending.private_key.clone().map(StoredClientDestination));
         }
         Ok(state
             .entries
@@ -206,7 +312,9 @@ impl ClientDestinationStore {
     pub(crate) async fn commit(&self, name: &str) -> Result<(), String> {
         let _guard = self.mutation.lock().await;
         let pending = self.state.lock().await.pending.remove(name);
-        let Some(pending) = pending else { return Ok(()) };
+        let Some(pending) = pending else {
+            return Ok(());
+        };
         let mut entries = self.state.lock().await.entries.clone();
         if pending.persist {
             let private_key = pending
@@ -252,7 +360,9 @@ impl ClientDestinationStore {
         }
         let _guard = self.mutation.lock().await;
         let mut entries = self.state.lock().await.entries.clone();
-        let Some(entry) = entries.remove(old_name) else { return Ok(()) };
+        let Some(entry) = entries.remove(old_name) else {
+            return Ok(());
+        };
         if entries.contains_key(new_name) {
             return Err("client destination identity name already exists".to_string());
         }
@@ -266,9 +376,22 @@ impl ClientDestinationStore {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn prune_unreferenced(
         &self,
         referenced: &std::collections::BTreeSet<String>,
+    ) -> Result<(), String> {
+        self.prune_unreferenced_with_shared(referenced, &std::collections::BTreeSet::new())
+            .await
+    }
+
+    /// Prune durable entries that are referenced by neither a per-name tunnel
+    /// nor a live shared policy. Synthetic shared entries are retained only
+    /// while their policy remains referenced.
+    pub(crate) async fn prune_unreferenced_with_shared(
+        &self,
+        referenced: &std::collections::BTreeSet<String>,
+        referenced_shared: &std::collections::BTreeSet<String>,
     ) -> Result<(), String> {
         let _guard = self.mutation.lock().await;
         let entries = self
@@ -277,7 +400,13 @@ impl ClientDestinationStore {
             .await
             .entries
             .iter()
-            .filter(|(name, _)| referenced.contains(*name))
+            .filter(|(name, _)| {
+                if is_shared_synthetic_name(name) {
+                    referenced_shared.contains(*name)
+                } else {
+                    referenced.contains(*name)
+                }
+            })
             .map(|(name, entry)| (name.clone(), entry.clone()))
             .collect::<BTreeMap<_, _>>();
         let changed = entries.len() != self.state.lock().await.entries.len();
@@ -329,13 +458,21 @@ impl ClientDestinationStore {
         let metadata = match tokio::fs::symlink_metadata(&path).await {
             Ok(metadata) => metadata,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(_) => return Ok(Some(Err("client destination state is unavailable".to_string()))),
+            Err(_) => {
+                return Ok(Some(Err(
+                    "client destination state is unavailable".to_string()
+                )))
+            }
         };
         if metadata.file_type().is_symlink() || !metadata.is_file() {
-            return Ok(Some(Err("client destination state is not regular".to_string())));
+            return Ok(Some(Err(
+                "client destination state is not regular".to_string()
+            )));
         }
         if metadata.len() as usize > MAX_STORE_SIZE {
-            return Ok(Some(Err("client destination state is oversized".to_string())));
+            return Ok(Some(Err(
+                "client destination state is oversized".to_string()
+            )));
         }
         let bytes = tokio::fs::read(path)
             .await
@@ -343,7 +480,9 @@ impl ClientDestinationStore {
         let envelope: Envelope = serde_json::from_slice(&bytes)
             .map_err(|_| "client destination state is corrupt".to_string())?;
         if envelope.version != 1 || envelope.entries.len() > MAX_ENTRIES {
-            return Ok(Some(Err("unsupported client destination state".to_string())));
+            return Ok(Some(
+                Err("unsupported client destination state".to_string()),
+            ));
         }
         for entry in envelope.entries.values() {
             validate_private_key(&entry.private_key)?;
@@ -385,13 +524,15 @@ async fn generate_private_key(
 ) -> Result<(String, Option<String>), String> {
     let router = yosemite_i2pcontrol::RouterApi::new(sam_tcp_port);
     let generated = match signature_type {
-        Some(value) => router
-            .generate_destination_with_signature_type(parse_signature_type(value)?)
-            .await,
+        Some(value) => {
+            router
+                .generate_destination_with_signature_type(parse_signature_type(value)?)
+                .await
+        }
         None => router.generate_destination().await,
     };
-    let (_, private_key) = generated
-        .map_err(|_| "client destination generation failed".to_string())?;
+    let (_, private_key) =
+        generated.map_err(|_| "client destination generation failed".to_string())?;
     Ok((private_key, None))
 }
 
@@ -407,7 +548,8 @@ fn validate_private_key(value: &str) -> Result<(), String> {
     if value.is_empty() || value.len() > MAX_SECRET_SIZE || value.chars().any(char::is_control) {
         return Err("client private destination is invalid".to_string());
     }
-    let decoded = base64_decode(value).ok_or_else(|| "client private destination is invalid".to_string())?;
+    let decoded =
+        base64_decode(value).ok_or_else(|| "client private destination is invalid".to_string())?;
     if decoded.is_empty() {
         return Err("client private destination is invalid".to_string());
     }
@@ -425,7 +567,10 @@ fn validate_reference(reference: &str) -> Result<(), String> {
     }
     let path = Path::new(reference);
     if path.components().any(|component| {
-        matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_))
+        matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
     }) {
         return Err("PrivKeyFile must not escape the client import root".to_string());
     }
@@ -499,9 +644,7 @@ mod tests {
         let store = ClientDestinationStore::new(directory.path());
         let import_root = directory.path().join(IMPORT_DIRECTORY);
         tokio::fs::create_dir_all(&import_root).await.unwrap();
-        tokio::fs::write(import_root.join("alice.key"), b"aGVsbG8=")
-            .await
-            .unwrap();
+        tokio::fs::write(import_root.join("alice.key"), b"aGVsbG8=").await.unwrap();
 
         let mut definition = definition("alice");
         definition.options.priv_key_file = Some("alice.key".to_owned());
@@ -513,7 +656,10 @@ mod tests {
 
         let reloaded = ClientDestinationStore::new(directory.path());
         reloaded.load().await.unwrap();
-        assert_eq!(reloaded.active("alice").await.unwrap().unwrap().as_str(), "aGVsbG8=");
+        assert_eq!(
+            reloaded.active("alice").await.unwrap().unwrap().as_str(),
+            "aGVsbG8="
+        );
         let metadata =
             tokio::fs::metadata(directory.path().join(STORE_DIRECTORY).join(CURRENT_FILE))
                 .await
@@ -536,9 +682,7 @@ mod tests {
         }
         let import_root = directory.path().join(IMPORT_DIRECTORY);
         tokio::fs::create_dir_all(&import_root).await.unwrap();
-        tokio::fs::create_dir(import_root.join("directory.key"))
-            .await
-            .unwrap();
+        tokio::fs::create_dir(import_root.join("directory.key")).await.unwrap();
         definition.options.priv_key_file = Some("directory.key".to_owned());
         assert!(store.stage(&definition, 7656).await.is_err());
     }
@@ -555,10 +699,7 @@ mod tests {
             let mut line = String::new();
             reader.read_line(&mut line).await.unwrap();
             assert_eq!(line, "HELLO VERSION\n");
-            write_half
-                .write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n")
-                .await
-                .unwrap();
+            write_half.write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n").await.unwrap();
             line.clear();
             reader.read_line(&mut line).await.unwrap();
             command_tx.send(line).unwrap();
@@ -575,7 +716,10 @@ mod tests {
         definition.options.sig_type = Some("7".to_owned());
         store.stage(&definition, port).await.unwrap();
 
-        assert_eq!(command_rx.await.unwrap(), "DEST GENERATE SIGNATURE_TYPE=7\n");
+        assert_eq!(
+            command_rx.await.unwrap(),
+            "DEST GENERATE SIGNATURE_TYPE=7\n"
+        );
         assert_eq!(
             store.active("selected-signature").await.unwrap().unwrap().as_str(),
             "cHJpdmF0ZQ=="
@@ -592,5 +736,187 @@ mod tests {
         definition.options.sig_type = Some("not-a-number".to_owned());
 
         assert!(store.stage(&definition, 7656).await.is_err());
+    }
+
+    /// Fake SAM that serves `DEST GENERATE` with a programmed sequence of
+    /// distinct private keys and counts generations. Each `DEST GENERATE`
+    /// consumes the next key; `SESSION CREATE` is rejected (secret tests never
+    /// construct Yosemite sessions).
+    async fn counting_dest_generate(
+        keys: Vec<&'static str>,
+    ) -> (
+        u16,
+        tokio::task::JoinHandle<()>,
+        Arc<std::sync::atomic::AtomicUsize>,
+    ) {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let count = Arc::new(AtomicUsize::new(0));
+        let count_for_task = Arc::clone(&count);
+        let task = tokio::spawn(async move {
+            // Serve one connection per generation (Yosemite opens a fresh SAM
+            // connection per `generate_destination` call).
+            for key in keys {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                count_for_task.fetch_add(1, Ordering::AcqRel);
+                let (read_half, mut write_half) = stream.into_split();
+                let mut reader = BufReader::new(read_half);
+                let mut line = String::new();
+                reader.read_line(&mut line).await.unwrap();
+                assert_eq!(line, "HELLO VERSION\n");
+                write_half.write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n").await.unwrap();
+                line.clear();
+                reader.read_line(&mut line).await.unwrap();
+                assert!(line.starts_with("DEST GENERATE"));
+                write_half
+                    .write_all(format!("DEST REPLY PUB=destination PRIV={key}\n").as_bytes())
+                    .await
+                    .unwrap();
+            }
+        });
+        (port, task, count)
+    }
+
+    #[tokio::test]
+    async fn m134_newdest_reuses_without_qualifying_resume() {
+        use std::sync::atomic::Ordering;
+        let (port, task, count) = counting_dest_generate(vec!["aGVsbG8=", "d29ybGQ="]).await;
+        let directory = tempfile::tempdir().unwrap();
+        let store = ClientDestinationStore::new(directory.path());
+        let mut definition = definition("newdest-reuse");
+        definition.options.new_dest = Some(true);
+
+        // Initial generation (no qualifying fact, no committed): generates once.
+        store.stage_with_resume(&definition, port, false).await.unwrap();
+        let initial = store.active("newdest-reuse").await.unwrap().unwrap();
+        assert_eq!(initial.as_str(), "aGVsbG8=");
+        store.commit("newdest-reuse").await.unwrap();
+        assert_eq!(count.load(Ordering::Acquire), 1);
+
+        // Ordinary start without a qualifying fact reuses: no new generation.
+        store.stage_with_resume(&definition, port, false).await.unwrap();
+        let reused = store.active("newdest-reuse").await.unwrap().unwrap();
+        assert_eq!(reused.as_str(), "aGVsbG8=");
+        store.commit("newdest-reuse").await.unwrap();
+        assert_eq!(count.load(Ordering::Acquire), 1);
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn m134_qualifying_resume_rotates_once_then_stabilizes() {
+        use std::sync::atomic::Ordering;
+        let (port, task, count) =
+            counting_dest_generate(vec!["aGVsbG8=", "d29ybGQ=", "c2VjcmV0"]).await;
+        let directory = tempfile::tempdir().unwrap();
+        let store = ClientDestinationStore::new(directory.path());
+        let mut definition = definition("newdest-rotate");
+        definition.options.new_dest = Some(true);
+
+        store.stage_with_resume(&definition, port, false).await.unwrap();
+        store.commit("newdest-rotate").await.unwrap();
+        assert_eq!(count.load(Ordering::Acquire), 1);
+
+        // Qualifying resume stages exactly one fresh successor.
+        store.stage_with_resume(&definition, port, true).await.unwrap();
+        let successor = store.active("newdest-rotate").await.unwrap().unwrap();
+        assert_eq!(successor.as_str(), "d29ybGQ=");
+        assert_eq!(count.load(Ordering::Acquire), 2);
+        store.commit("newdest-rotate").await.unwrap();
+
+        // Second ordinary start after the resume does not rotate again.
+        store.stage_with_resume(&definition, port, false).await.unwrap();
+        let stable = store.active("newdest-rotate").await.unwrap().unwrap();
+        assert_eq!(stable.as_str(), "d29ybGQ=");
+        store.commit("newdest-rotate").await.unwrap();
+        assert_eq!(count.load(Ordering::Acquire), 2);
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn m134_failed_resume_discards_staged_successor() {
+        let (port, task, _) =
+            counting_dest_generate(vec!["aGVsbG8=", "d29ybGQ=", "c2VjcmV0"]).await;
+        let directory = tempfile::tempdir().unwrap();
+        let store = ClientDestinationStore::new(directory.path());
+        let mut definition = definition("newdest-failure");
+        definition.options.new_dest = Some(true);
+
+        store.stage_with_resume(&definition, port, false).await.unwrap();
+        store.commit("newdest-failure").await.unwrap();
+
+        // Qualifying stage succeeds, then the start fails before commit:
+        // discard must restore the committed identity with no leak.
+        store.stage_with_resume(&definition, port, true).await.unwrap();
+        assert_eq!(
+            store.active("newdest-failure").await.unwrap().unwrap().as_str(),
+            "d29ybGQ="
+        );
+        store.discard("newdest-failure").await;
+        assert_eq!(
+            store.active("newdest-failure").await.unwrap().unwrap().as_str(),
+            "aGVsbG8="
+        );
+        // Retry of the same logical resume may stage again (eligibility is
+        // tracker-owned and stays retryable; the store itself never consumes).
+        store.stage_with_resume(&definition, port, true).await.unwrap();
+        store.discard("newdest-failure").await;
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn m134_shared_policy_yields_one_successor_for_all_members() {
+        let (port, task, _) =
+            counting_dest_generate(vec!["aGVsbG8=", "d29ybGQ=", "c2VjcmV0"]).await;
+        let directory = tempfile::tempdir().unwrap();
+        let store = ClientDestinationStore::new(directory.path());
+        let policy = "shared-policy-m134";
+
+        // Initial shared generation: one successor, visible to every member
+        // through the same synthetic name.
+        store.shared_stage(policy, port, None, false).await.unwrap();
+        store.shared_commit(policy).await.unwrap();
+        let first = store.shared_active(policy).await.unwrap().unwrap();
+        assert_eq!(first.as_str(), "aGVsbG8=");
+
+        // Qualifying shared resume: one fresh successor, not one per member.
+        store.shared_stage(policy, port, None, true).await.unwrap();
+        let successor = store.shared_active(policy).await.unwrap().unwrap();
+        assert_eq!(successor.as_str(), "d29ybGQ=");
+        store.shared_commit(policy).await.unwrap();
+        assert_eq!(
+            store.shared_active(policy).await.unwrap().unwrap().as_str(),
+            "d29ybGQ="
+        );
+
+        // Failed shared resume discards without touching the committed.
+        store.shared_stage(policy, port, None, true).await.unwrap();
+        store.shared_discard(policy).await;
+        assert_eq!(
+            store.shared_active(policy).await.unwrap().unwrap().as_str(),
+            "d29ybGQ="
+        );
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn m134_no_secret_material_in_debug_or_display() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = ClientDestinationStore::new(directory.path());
+        let debug = format!("{store:?}");
+        assert!(!debug.contains("aGVsbG8="));
+        let (port, task, _) = counting_dest_generate(vec!["aGVsbG8="]).await;
+        let mut definition = definition("redaction-check");
+        definition.options.new_dest = Some(true);
+        store.stage_with_resume(&definition, port, false).await.unwrap();
+        let active = store.active("redaction-check").await.unwrap().unwrap();
+        assert_eq!(format!("{active:?}"), "StoredClientDestination(***)");
+        assert_eq!(format!("{active}"), "***");
+        task.abort();
     }
 }

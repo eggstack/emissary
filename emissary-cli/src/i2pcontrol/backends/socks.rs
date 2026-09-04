@@ -1131,11 +1131,12 @@ fn validate_raw_options(
         "ReduceTime",
         "Close",
         "CloseTime",
+        "NewDest",
         "Shared",
         "PersistentClientKey",
         "PrivKeyFile",
     ];
-    // M121: "NewDest" remains demoted to blocked_primitive;
+    // M134: "NewDest" applied as proven idle-resume policy;
     // "ConnectDelay" remains applied via the shared lifecycle connector.
     // M136: Reduce family supported via the canonical idle owner.
     // M137: Close family supported via the same owner.

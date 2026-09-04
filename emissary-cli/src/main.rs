@@ -272,7 +272,16 @@ async fn setup_router<R: Runtime>(arguments: Arguments) -> anyhow::Result<Router
 
     #[cfg(feature = "i2pcontrol")]
     let sam_observation = if i2pcontrol_enabled {
-        let (source, handle) = i2pcontrol::sam_observer::SamObservationSource::new();
+        // M134: share one I2PControl-owned idle-resume tracker between the
+        // neutral SAM observation source (authoritative `IdlePolicy` facts)
+        // and the tunnel manager (proven-resume decisions). The tracker is
+        // volatile by construction; process restart never replays eligibility.
+        let tracker = i2pcontrol::idle_resume::IdleResumeTracker::new();
+        let (source, mut handle) =
+            i2pcontrol::sam_observer::SamObservationSource::new_with_resume_tracker(Some(
+                tracker.clone(),
+            ));
+        handle.set_resume_tracker(tracker);
         Some((source as Arc<dyn emissary_core::SamObservationHook>, handle))
     } else {
         None

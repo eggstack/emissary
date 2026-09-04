@@ -729,11 +729,12 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "ReduceTime",
         "Close",
         "CloseTime",
+        "NewDest",
         "Shared",
         "PersistentClientKey",
         "PrivKeyFile",
     ];
-    // M121: "NewDest" remains demoted to blocked_primitive.
+    // M134: "NewDest" applied as proven idle-resume policy.
     // M136: "Reduce"/"ReduceCount"/"ReduceTime" supported via idle owner.
     // M137: "Close"/"CloseTime" supported via the same canonical owner.
     for key in definition.raw_config.keys() {

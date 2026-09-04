@@ -16,8 +16,8 @@ use tokio::{
 };
 use yosemite_i2pcontrol::{style, Session, SessionOptions, StreamOptions};
 
-use super::task_group::BoundedTaskGroup;
 use super::session::{SharedClientSessionRegistry, SharedStreamSessionLease};
+use super::task_group::BoundedTaskGroup;
 
 const STOP_TIMEOUT: Duration = Duration::from_secs(5);
 const DEFAULT_MAX_CONNECTIONS: usize = 128;
@@ -59,6 +59,7 @@ struct ClientSessionOwner {
     setup_failed: mpsc::UnboundedSender<()>,
     shared_registry: Option<Arc<SharedClientSessionRegistry>>,
     shared: bool,
+    new_dest_policy: bool,
 }
 
 impl ClientSessionOwner {
@@ -69,6 +70,7 @@ impl ClientSessionOwner {
         setup_failed: mpsc::UnboundedSender<()>,
         shared_registry: Option<Arc<SharedClientSessionRegistry>>,
         shared: bool,
+        new_dest_policy: bool,
     ) -> Self {
         Self {
             state: tokio::sync::Mutex::new(SessionState {
@@ -83,6 +85,7 @@ impl ClientSessionOwner {
             setup_failed,
             shared_registry,
             shared,
+            new_dest_policy,
         }
     }
 
@@ -93,9 +96,10 @@ impl ClientSessionOwner {
         setup_failed: mpsc::UnboundedSender<()>,
         shared_lease: Option<SharedStreamSessionLease>,
     ) -> Self {
-        let session = shared_lease
-            .as_ref()
-            .map_or_else(|| Arc::new(Mutex::new(session)), |lease| Arc::clone(&lease.session));
+        let session = shared_lease.as_ref().map_or_else(
+            || Arc::new(Mutex::new(session)),
+            |lease| Arc::clone(&lease.session),
+        );
         Self {
             state: tokio::sync::Mutex::new(SessionState {
                 session: Some(SessionResource {
@@ -112,6 +116,7 @@ impl ClientSessionOwner {
             setup_failed,
             shared_registry: None,
             shared: false,
+            new_dest_policy: false,
         }
     }
 
@@ -137,6 +142,7 @@ impl ClientSessionOwner {
             setup_failed,
             shared_registry: None,
             shared: false,
+            new_dest_policy: false,
         }
     }
 
@@ -174,6 +180,7 @@ impl ClientSessionOwner {
             };
             let cancellation = self.cancellation.clone();
             let shared_registry = self.shared_registry.clone();
+            let new_dest_policy = self.new_dest_policy;
             let result = tokio::select! {
                 biased;
                 _ = cancellation_won(cancellation) => Err(ClientListenerRuntimeError::SessionSetup),
@@ -182,7 +189,7 @@ impl ClientSessionOwner {
                         let Some(registry) = shared_registry else {
                             return Err(ClientListenerRuntimeError::SessionSetup);
                         };
-                        registry.acquire_stream(session_options).await
+                        registry.acquire_stream(session_options, new_dest_policy).await
                             .map(|lease| SessionResource {
                                 session: Arc::clone(&lease.session),
                                 _shared_lease: Some(lease),
@@ -434,7 +441,10 @@ pub async fn run_client_listener_with_shared_session(
                         return Err(());
                     };
                     registry
-                        .acquire_stream(config.session_options.clone())
+                        .acquire_stream(
+                            config.session_options.clone(),
+                            config.new_dest_on_resume,
+                        )
                         .await
                         .map(EagerSession::Shared)
                         .map_err(|_| ())
@@ -464,37 +474,38 @@ pub async fn run_client_listener_with_shared_session(
     let local_address = listener.local_addr().map_err(|_| ClientListenerRuntimeError::Bind)?;
     let initial_session_options = config.session_options.clone();
     let mut resume_session_options = initial_session_options.clone();
+    // Legacy local-resume Transient path (M112): retained for the local
+    // handler-count closer only, which Proposal `Close` never arms (M137 keeps
+    // `close_on_idle` disabled). M134 proven-resume successors come from the
+    // secret-store transaction via the TunnelManager start path, not from
+    // this Transient fallback.
     if config.new_dest_on_resume {
         resume_session_options.destination = yosemite_i2pcontrol::DestinationKind::Transient;
     }
+    let new_dest_policy = config.new_dest_on_resume;
     let session = Arc::new(match eager_session {
-        Some(EagerSession::Shared(lease)) => {
-            ClientSessionOwner::eager_shared(
-                lease,
-                resume_session_options.clone(),
-                cancellation.clone(),
-                setup_failed,
-            )
-        }
-        Some(EagerSession::Local(session)) => {
-            ClientSessionOwner::eager(
-                *session,
-                resume_session_options.clone(),
-                cancellation.clone(),
-                setup_failed,
-                None,
-            )
-        },
-        None => {
-            ClientSessionOwner::delayed(
-                initial_session_options,
-                resume_session_options,
-                cancellation.clone(),
-                setup_failed,
-                shared_registry,
-                shared,
-            )
-        }
+        Some(EagerSession::Shared(lease)) => ClientSessionOwner::eager_shared(
+            lease,
+            resume_session_options.clone(),
+            cancellation.clone(),
+            setup_failed,
+        ),
+        Some(EagerSession::Local(session)) => ClientSessionOwner::eager(
+            *session,
+            resume_session_options.clone(),
+            cancellation.clone(),
+            setup_failed,
+            None,
+        ),
+        None => ClientSessionOwner::delayed(
+            initial_session_options,
+            resume_session_options,
+            cancellation.clone(),
+            setup_failed,
+            shared_registry,
+            shared,
+            new_dest_policy,
+        ),
     });
     let connector = ClientStreamConnector {
         session,
@@ -903,10 +914,8 @@ mod tests {
         let runtime = tokio::spawn(run_client_listener(runtime_config, cancel_rx, ready_tx));
         let address = ready_rx.await.unwrap().unwrap();
         drop(TcpStream::connect(address).await.unwrap());
-        let elapsed = tokio::time::timeout(Duration::from_secs(1), elapsed_rx)
-            .await
-            .unwrap()
-            .unwrap();
+        let elapsed =
+            tokio::time::timeout(Duration::from_secs(1), elapsed_rx).await.unwrap().unwrap();
         assert!(elapsed >= Duration::from_millis(45), "elapsed={elapsed:?}");
         cancel_tx.send(true).unwrap();
         assert!(runtime.await.unwrap().is_ok());

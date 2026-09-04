@@ -332,7 +332,26 @@ fn audit_covers_the_exact_m104_residual_inventory() {
     assert_eq!(m137_completed.len(), 14);
     let expected_post_m137 =
         expected_post_m136.difference(&m137_completed).cloned().collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m137);
+    // M134 promotes the six non-Streamr TCP NewDest cells to apply.
+    let m134_completed: BTreeSet<(String, String)> = ["NewDest"]
+        .into_iter()
+        .flat_map(|option| {
+            [
+                "client",
+                "httpclient",
+                "ircclient",
+                "socks",
+                "socksirc",
+                "connectclient",
+            ]
+            .into_iter()
+            .map(move |tunnel_type| (option.to_owned(), tunnel_type.to_owned()))
+        })
+        .collect();
+    assert_eq!(m134_completed.len(), 6);
+    let expected_post_m134 =
+        expected_post_m137.difference(&m134_completed).cloned().collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m134);
     assert_eq!(
         audit["summary"]["post_m116_reclassified_cells"].as_integer(),
         Some(7)

@@ -1,6 +1,6 @@
 # Proposal 170 Session-Lifecycle Completion Roadmap
 
-Status: **active / partial; M135/M136/M137 closed as complete, NewDest future**
+Status: **closed as complete; M134/M135/M136/M137 closed, lifecycle line complete**
 
 Parent roadmap:
 
@@ -8,17 +8,18 @@ Parent roadmap:
 
 Current handoff:
 
-- NewDest successor (historical M134 rebase or corrective M138), gated on the M137 §12 consumer contract. No NewDest execution is authorized now.
+- none from this line. M134 is closed as complete (`plans/closure/i2pcontrol-proposal-170/134-closure.md`, six promotions, `325/47/468`).
 
 Closed correctives:
 
 - M135 `plans/implementation/i2pcontrol-proposal-170/135-neutral-live-tunnel-quantity-and-leaseset-reconfiguration-primitive.md` — **closed as complete** (`plans/closure/i2pcontrol-proposal-170/135-closure.md`), zero promotions, matrix `284/88/468` at closure;
 - M136 `plans/implementation/i2pcontrol-proposal-170/136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md` — **closed as complete** (`plans/closure/i2pcontrol-proposal-170/136-closure.md`), 21 promotions, matrix `305/67/468`;
-- M137 `plans/implementation/i2pcontrol-proposal-170/137-m133-corrective-sam-idle-close-and-reasoned-termination.md` — **closed as complete** (`plans/closure/i2pcontrol-proposal-170/137-closure.md`), 14 promotions, matrix `319/53/468`.
+- M137 `plans/implementation/i2pcontrol-proposal-170/137-m133-corrective-sam-idle-close-and-reasoned-termination.md` — **closed as complete** (`plans/closure/i2pcontrol-proposal-170/137-closure.md`), 14 promotions, matrix `319/53/468`;
+- M134 `plans/implementation/i2pcontrol-proposal-170/134-newdest-on-proven-idle-resume.md` — **closed as complete** (`plans/closure/i2pcontrol-proposal-170/134-closure.md`), six promotions, matrix `325/47/468`.
 
 Deferred corrective successors:
 
-- M134 `134-newdest-on-proven-idle-resume.md` — historical deferred plan; must be explicitly rebased/amended against the M137 closure contract or superseded by a corrective M138.
+- none. M138 was not required: historical M134 assumptions matched the proven M137 contract after rebase.
 
 Failed/blocked predecessor evidence:
 
@@ -27,7 +28,7 @@ Failed/blocked predecessor evidence:
 
 Planning baseline:
 
-- M137 closure matrix `319 apply / 53 blocked_primitive / 468 not_applicable`;
+- M134 closure matrix `325 apply / 47 blocked_primitive / 468 not_applicable`;
 - M130 remains implemented-subset runtime/security authority;
 - M131 remains residual applicability/primitive authority.
 
@@ -136,10 +137,10 @@ M136 M132 corrective: activity + Reduce*                  [CLOSED AS COMPLETE �
 M137 M133 corrective: Close* + reasoned termination       [CLOSED AS COMPLETE — 319/53/468]
   |
   v
-M134 amended/rebased OR M138 corrective NewDest           [FUTURE — NOT REGISTERED]
+M134 NewDest on proven idle resume                        [CLOSED AS COMPLETE — 325/47/468]
 ```
 
-No active implementation handoff; NewDest registers only against the M137 §12 contract.
+No active implementation handoff; this focused line is complete.
 
 ## 5. M135 — lower-layer primitive only
 
@@ -185,16 +186,14 @@ neutral authoritative in-process termination cause; I2PControl mapped Proposal
 
 M137 did not implement `NewDest`.
 
-## 8. NewDest successor rule
+## 8. M134 — NewDest successor (closed)
 
-Historical M134 remains useful design material but its dependency statement references the failed M133 line.
-
-After successful M137 closure:
-
-- if M134's assumptions exactly match the proven M137 reason/reopen contract, amend/rebase M134 and register it;
-- otherwise create M138 as a corrective NewDest plan.
-
-No NewDest plan may execute before an authoritative generation-local `IdlePolicy` close fact exists.
+M134 closed as complete (`134-closure.md`, six promotions, `325/47/468`). It
+rebased historical M134 design material on the proven M137 §12 contract (no
+M138 required) and implements exact Proposal `NewDest` for the six TCP
+families with tracker-proven one-shot rotation, staged secret transaction, one
+shared successor and manual/restart/failure preservation. No NewDest work
+remains authorized on this line.
 
 Destination/key staging/commit/rollback remains I2PControl-owned. Manual stop/start, explicit restart, process restart and non-idle failure must never imply rotation.
 
@@ -270,9 +269,9 @@ M137 may register only if M136 closure proves:
 - stable standard option parsing;
 - no unresolved high/medium lifecycle defect.
 
-### M137 exit gate for NewDest
+### M137 exit gate for NewDest (satisfied by M134)
 
-A future NewDest plan may register only if M137 closure proves:
+M134 registered and closed after M137 closure proved:
 
 - canonical real session teardown;
 - authoritative generation-local termination cause;
@@ -339,4 +338,4 @@ These remain separate M131 primitive clusters.
 
 This focused roadmap completes only when the lifecycle cells are either operational with evidence or truthfully retained blocked after the corrective chain.
 
-M135 alone cannot change Proposal support. M136/M137 may promote their own cells only after their prerequisites close. Whole-surface Proposal 170 completion remains governed by the parent roadmap and a future final requalification.
+M135 alone cannot change Proposal support. M136/M137/M134 promote their own cells only after their prerequisites close. This line is now complete (M134 closed); whole-surface Proposal 170 completion remains governed by the parent roadmap and a future final requalification.

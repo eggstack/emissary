@@ -41,11 +41,12 @@ turn the administrative API into a router lifecycle or protocol implementation.
 The current Proposal 170 baseline remains partial: RouterInfo is 43 additions with
 42 available, 1 protocol-permitted neutral, and 0 unavailable; AddressBook all 13
 SetConfig keys are operational; and unapplied runtime options (including 4 UseSSL,
-10 SigType, 20 client proxy/lifecycle, and 19 server LeaseSet/presentation cells,
-with client idle `Reduce*` applied by M136 and `Close`/`CloseTime` applied by M137)
+10 SigType, 14 client proxy/lifecycle, and 19 server LeaseSet/presentation cells,
+with client idle `Reduce*` applied by M136, `Close`/`CloseTime` applied by M137,
+and `NewDest` proven-resume applied by M134)
 fail before allocation. The authoritative completion inventory is
-`plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (319
-apply / 53 blocked_primitive / 468 not_applicable after M137).
+`plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (325
+apply / 47 blocked_primitive / 468 not_applicable after M134).
 
 Streamr is intentionally separate from TCP tunnel helpers. Preserve its documented
 16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh,

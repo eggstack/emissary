@@ -231,18 +231,18 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
             .unwrap_or_else(|| panic!("M098 option {key} must be present"))
     };
     let new_dest = option("NewDest");
-    assert_eq!(string_field(new_dest, "completion_owner"), "M112");
+    assert_eq!(string_field(new_dest, "completion_owner"), "M134");
     assert_eq!(
         string_field(new_dest, "current_or_planned_disposition"),
-        "apply_or_blocked_primitive_or_not_applicable"
+        "apply_or_not_applicable"
     );
     let new_dest_cells = new_dest["cells"].as_array().unwrap();
-    // M121 §5.2 demotes all six TCP NewDest cells to blocked_primitive.
-    assert!(new_dest_cells[..6]
-        .iter()
-        .all(|cell| cell.as_str() == Some("blocked_primitive")));
+    // M134 promotes the six non-Streamr TCP NewDest cells to apply;
+    // Streamr and servers stay not applicable.
+    assert!(new_dest_cells[..6].iter().all(|cell| cell.as_str() == Some("apply")));
     assert!(new_dest_cells[6..].iter().all(|cell| cell.as_str() == Some("not_applicable")));
-    assert_eq!(string_field(new_dest, "blocking_milestone"), "M121");
+    assert!(new_dest.get("blocking_milestone").is_none());
+    assert!(new_dest.get("blocked_primitive").is_none());
     for tunnel_type in &tunnel_types[..7] {
         assert!(new_dest["cell_notes"].as_table().unwrap().contains_key(*tunnel_type));
     }
@@ -562,13 +562,13 @@ fn current_matrix_counts_are_explicit_and_exact() {
             counts
         },
     );
-    assert_eq!(counts, (319, 53, 468));
+    assert_eq!(counts, (325, 47, 468));
     let declared = root
         .get("current_matrix_counts")
         .and_then(Value::as_table)
         .expect("current matrix counts are declared");
-    assert_eq!(declared["apply"].as_integer(), Some(319));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(53));
+    assert_eq!(declared["apply"].as_integer(), Some(325));
+    assert_eq!(declared["blocked_primitive"].as_integer(), Some(47));
     assert_eq!(declared["not_applicable"].as_integer(), Some(468));
 }
 

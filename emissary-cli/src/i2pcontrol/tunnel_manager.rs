@@ -122,12 +122,13 @@ pub(crate) async fn handle_tunnel_manager(
     let all = match params.get("All") {
         Some(value) => match value.as_bool() {
             Some(value) => value,
-            None =>
+            None => {
                 return error_response(
                     id,
                     rpc::error_codes::INVALID_PARAMS,
                     "'All' must be a boolean",
-                ),
+                )
+            }
         },
         None => false,
     };
@@ -162,9 +163,10 @@ pub(crate) async fn handle_tunnel_manager(
     // Dispatch based on action
     match action {
         crate::i2pcontrol::domain::tunnel::TunnelAction::List => handle_list(state, id).await,
-        crate::i2pcontrol::domain::tunnel::TunnelAction::Create =>
-            handle_create(state, id, params, tunnel_type_str, name, canonical).await,
-        crate::i2pcontrol::domain::tunnel::TunnelAction::Edit =>
+        crate::i2pcontrol::domain::tunnel::TunnelAction::Create => {
+            handle_create(state, id, params, tunnel_type_str, name, canonical).await
+        }
+        crate::i2pcontrol::domain::tunnel::TunnelAction::Edit => {
             handle_edit(
                 state,
                 id,
@@ -174,17 +176,23 @@ pub(crate) async fn handle_tunnel_manager(
                 tunnel_type_str,
                 canonical,
             )
-            .await,
-        crate::i2pcontrol::domain::tunnel::TunnelAction::Get =>
-            handle_get(state, id, name, all, canonical).await,
-        crate::i2pcontrol::domain::tunnel::TunnelAction::Delete =>
-            handle_delete(state, id, name, canonical).await,
-        crate::i2pcontrol::domain::tunnel::TunnelAction::Start =>
-            handle_lifecycle(state, id, name, all, "start", canonical).await,
-        crate::i2pcontrol::domain::tunnel::TunnelAction::Stop =>
-            handle_lifecycle(state, id, name, all, "stop", canonical).await,
-        crate::i2pcontrol::domain::tunnel::TunnelAction::Restart =>
-            handle_lifecycle(state, id, name, all, "restart", canonical).await,
+            .await
+        }
+        crate::i2pcontrol::domain::tunnel::TunnelAction::Get => {
+            handle_get(state, id, name, all, canonical).await
+        }
+        crate::i2pcontrol::domain::tunnel::TunnelAction::Delete => {
+            handle_delete(state, id, name, canonical).await
+        }
+        crate::i2pcontrol::domain::tunnel::TunnelAction::Start => {
+            handle_lifecycle(state, id, name, all, "start", canonical).await
+        }
+        crate::i2pcontrol::domain::tunnel::TunnelAction::Stop => {
+            handle_lifecycle(state, id, name, all, "stop", canonical).await
+        }
+        crate::i2pcontrol::domain::tunnel::TunnelAction::Restart => {
+            handle_lifecycle(state, id, name, all, "restart", canonical).await
+        }
     }
 }
 
@@ -541,7 +549,7 @@ async fn handle_edit(
             None,
         ),
         Ok(true) => success_response(id, serde_json::json!("ok")),
-        Ok(false) =>
+        Ok(false) => {
             if canonical {
                 operation_error_response(id, format!("tunnel '{}' not found", tunnel_name), None)
             } else {
@@ -550,7 +558,8 @@ async fn handle_edit(
                     rpc::error_codes::APP_ERROR,
                     format!("error - tunnel '{}' not found", tunnel_name),
                 )
-            },
+            }
+        }
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "Edit failed: {}", e);
             if canonical {
@@ -629,7 +638,7 @@ async fn handle_get(
                 success_response(id, result)
             }
         }
-        Ok(None) =>
+        Ok(None) => {
             if canonical {
                 operation_error_response(id, format!("tunnel '{}' not found", tunnel_name), None)
             } else {
@@ -638,7 +647,8 @@ async fn handle_get(
                     rpc::error_codes::APP_ERROR,
                     format!("error - tunnel '{}' not found", tunnel_name),
                 )
-            },
+            }
+        }
         Err(e) => {
             tracing::error!(target: LOG_TARGET, "Get failed: {}", e);
             if canonical {
@@ -676,7 +686,7 @@ async fn handle_delete(
 
     // Check existence and ownership before delete
     match state.tunnel_get(tunnel_name).await {
-        Ok(Some(def)) =>
+        Ok(Some(def)) => {
             if def.ownership == TunnelOwnership::StartupManaged {
                 return if canonical {
                     operation_error_response(
@@ -691,7 +701,8 @@ async fn handle_delete(
                         "error - tunnel is managed by the startup configuration",
                     )
                 };
-            },
+            }
+        }
         Ok(None) => {
             // Delete of absent name is a successful no-op
             return if canonical {
@@ -1669,6 +1680,11 @@ fn validate_tunnel_name(value: &str, field: &str) -> Result<(), String> {
     if value.chars().any(char::is_control) {
         return Err(format!("{field} must not contain control characters"));
     }
+    // M134: synthetic shared-identity namespace is reserved for the
+    // I2PControl-owned secret store; user tunnels can never claim it.
+    if value.starts_with(crate::i2pcontrol::idle_resume::SHARED_SYNTHETIC_PREFIX) {
+        return Err(format!("{field} is reserved"));
+    }
     Ok(())
 }
 
@@ -1738,8 +1754,9 @@ fn validate_canonical_options(
             | "ReachableBy" | "ProxyList" | "ProxyUsername" | "OutproxyUsername"
             | "OutproxyType" | "SSLProxies" | "JumpList" | "Profile" | "WebsiteHostname"
             | "SpoofedHost" | "BlockUserAgents" | "UserAgents" | "AccessOption" | "AccessList"
-            | "FilterFilePath" | "OptionalLookup" | "ProxyPassword" | "OutproxyPassword" =>
-                validate_string(key, value)?,
+            | "FilterFilePath" | "OptionalLookup" | "ProxyPassword" | "OutproxyPassword" => {
+                validate_string(key, value)?
+            }
             "PrivKeyFile" => validate_string(key, value)?,
             _ if is_canonical_option_key(key) => validate_string_or_scalar(key, value)?,
             _ => {}
@@ -1911,8 +1928,9 @@ mod tests {
                 self.actions.lock().unwrap().push(action);
                 let mut state = self.state.lock().unwrap();
                 *state = match action {
-                    StartupTunnelAction::Start | StartupTunnelAction::Restart =>
-                        StartupTunnelState::Running,
+                    StartupTunnelAction::Start | StartupTunnelAction::Restart => {
+                        StartupTunnelState::Running
+                    }
                     StartupTunnelAction::Stop => StartupTunnelState::Stopped,
                 };
                 Ok(())

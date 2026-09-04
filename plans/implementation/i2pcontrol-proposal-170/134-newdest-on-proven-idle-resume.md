@@ -1,6 +1,15 @@
 # M134 — NewDest on Proven Idle Resume
 
-Status: **deferred / unregistered; hard-depends on M133 closure**
+Status: **closed as complete**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/134-closure.md`
+
+Rebased on M137: the hard M133 dependency is satisfied by corrective M137
+closure (`plans/closure/i2pcontrol-proposal-170/137-closure.md` §12 consumer
+contract: `idle_generation`, `SamTerminationReason`, `IdlePolicy` boundary,
+new-generation rule, no replay). Historical M134 design material is preserved;
+assumptions were mechanically rebased against the proven M137 reason/reopen
+interface before code, so no corrective M138 was required.
 
 Class: capability / I2PControl-owned identity lifecycle
 

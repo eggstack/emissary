@@ -208,6 +208,24 @@ reclassified_cells = [
 reclassification_reason = "M137 extends the same M136 activity/timer owner with standard i2cp.close* close-before-reduce ordering, canonical session/pool teardown, and neutral IdlePolicy/Requested/Failure/Unknown reason, plus I2PControl fail-before-allocation validation and Yosemite generic mapping for all seven client families including Streamr with runtime traces."
 closure = "plans/closure/i2pcontrol-proposal-170/137-closure.md"
 
+[post_m134]
+status = "closed as complete"
+matrix_before_apply = 319
+matrix_before_blocked_primitive = 53
+matrix_before_not_applicable = 468
+matrix_after_apply = 325
+matrix_after_blocked_primitive = 47
+matrix_after_not_applicable = 468
+completed_cell_count = 6
+completed_options = ["NewDest"]
+completed_tunnel_types = ["client", "httpclient", "ircclient", "socks", "socksirc", "connectclient"]
+reclassified_cells = [
+    "NewDest:client", "NewDest:httpclient", "NewDest:ircclient",
+    "NewDest:socks", "NewDest:socksirc", "NewDest:connectclient",
+]
+reclassification_reason = "M134 implements exact Proposal NewDest on proven idle resume for the six non-Streamr TCP families: fail-before-allocation NewDest prerequisites/conflicts with Close, PersistentClientKey and PrivKeyFile, generation-local one-shot IdlePolicy eligibility via the M137 neutral reason, staged secret successor transaction with cancellation rollback, one shared successor with compatibility equality, and manual/restart/failure preservation with end-to-end fake-SAM traces. Streamr stays not applicable."
+closure = "plans/closure/i2pcontrol-proposal-170/134-closure.md"
+
 [ownership]
 session_registry = "emissary-cli/src/i2pcontrol/backends/runtime/session.rs::SharedClientSessionRegistry"
 stream_listener_owner = "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"

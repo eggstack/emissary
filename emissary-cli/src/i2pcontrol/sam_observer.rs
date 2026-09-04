@@ -56,14 +56,26 @@ pub struct SamSessionObservationSnapshot {
 }
 
 /// Read-only handle used by ClientServicesInfo.
+///
+/// Carries an optional clone of the I2PControl-owned idle-resume tracker
+/// (M134) so production composition can share one volatile eligibility owner
+/// between the neutral observation source and the tunnel manager without
+/// persisting or logging any reason.
 #[derive(Clone)]
 pub struct SamSessionObservationHandle {
     state: Arc<RwLock<State>>,
+    resume_tracker: Option<crate::i2pcontrol::idle_resume::IdleResumeTracker>,
 }
 
 /// Application-owned SAM observer and bounded aggregator.
+///
+/// Forwards neutral `SessionRemoved` facts to the I2PControl-owned
+/// `IdleResumeTracker` (M134) without affecting snapshot identity: the reason
+/// never enters snapshots, logs or RPC, and publication failure never blocks
+/// authoritative teardown.
 pub struct SamObservationSource {
     state: Arc<RwLock<State>>,
+    resume_tracker: Option<crate::i2pcontrol::idle_resume::IdleResumeTracker>,
 }
 
 struct State {
@@ -89,6 +101,15 @@ struct SocketState {
 impl SamObservationSource {
     /// Create an empty source and its read-only handle.
     pub fn new() -> (Arc<Self>, SamSessionObservationHandle) {
+        Self::new_with_resume_tracker(None)
+    }
+
+    /// Create a source that forwards neutral termination facts to the given
+    /// idle-resume tracker (M134). Snapshot semantics are unchanged: the
+    /// reason is ignored for snapshot identity and stays out of logs/RPC.
+    pub(crate) fn new_with_resume_tracker(
+        resume_tracker: Option<crate::i2pcontrol::idle_resume::IdleResumeTracker>,
+    ) -> (Arc<Self>, SamSessionObservationHandle) {
         let state = Arc::new(RwLock::new(State {
             sessions: BTreeMap::new(),
             unknown_sockets: BTreeMap::new(),
@@ -96,11 +117,16 @@ impl SamObservationSource {
             complete: true,
             recovery_lost: false,
         }));
+        let handle_tracker = resume_tracker.clone();
         (
             Arc::new(Self {
                 state: Arc::clone(&state),
+                resume_tracker,
             }),
-            SamSessionObservationHandle { state },
+            SamSessionObservationHandle {
+                state,
+                resume_tracker: handle_tracker,
+            },
         )
     }
 }
@@ -109,6 +135,26 @@ impl SamSessionObservationHandle {
     /// Construct an empty source for isolated I2PControl tests.
     pub fn empty_for_test() -> Self {
         SamObservationSource::new().1
+    }
+
+    /// Attach (or replace) the idle-resume tracker shared with the tunnel
+    /// manager (M134 composition seam). Snapshot semantics are unchanged.
+    ///
+    /// Used by the binary composition root; the library build keeps it for
+    /// API symmetry.
+    #[allow(dead_code)]
+    pub(crate) fn set_resume_tracker(
+        &mut self,
+        tracker: crate::i2pcontrol::idle_resume::IdleResumeTracker,
+    ) {
+        self.resume_tracker = Some(tracker);
+    }
+
+    /// Borrow the shared idle-resume tracker, if composition provided one.
+    pub(crate) fn resume_tracker(
+        &self,
+    ) -> Option<crate::i2pcontrol::idle_resume::IdleResumeTracker> {
+        self.resume_tracker.clone()
     }
 
     /// Return a snapshot only when every active fact is represented completely.
@@ -151,6 +197,14 @@ impl SamSessionObservationHandle {
 
 impl SamObservationHook for SamObservationSource {
     fn publish(&self, event: SamObservationEvent) -> Result<(), SamObservationHookError> {
+        // M134: forward the neutral termination fact to the idle-resume
+        // tracker before snapshot bookkeeping. Forwarding is passive and
+        // never blocks teardown, and no secret enters the observation path.
+        if matches!(event, SamObservationEvent::SessionRemoved { .. }) {
+            if let Some(tracker) = &self.resume_tracker {
+                tracker.record_observation(&event);
+            }
+        }
         let mut state = self.state.write();
         let complete = match event {
             SamObservationEvent::SessionActivated {

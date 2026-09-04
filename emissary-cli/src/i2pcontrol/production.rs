@@ -38,8 +38,8 @@ use crate::i2pcontrol::{
         RuntimeAddressBookEntry, RuntimeAddressBookHandle, RuntimeAddressBookSnapshot,
         RuntimeAddressBookType,
     },
-    backends::{registry::TunnelBackendRegistry, BackendError, TunnelBackend},
     backends::options::validate_common_options,
+    backends::{registry::TunnelBackendRegistry, BackendError, TunnelBackend},
     client_secret_store::ClientDestinationStore,
     control_plane::{AddressBookControl, ControlPlane, TunnelManagerControl},
     domain::{
@@ -177,15 +177,17 @@ impl<R: Runtime> LivePeerDirectorySource<R> {
 impl<R: Runtime + Sync> PeerDirectorySource for LivePeerDirectorySource<R> {
     fn snapshot(&self) -> Result<PeerDirectorySnapshot, InspectionError> {
         let snapshot = self.inspection.snapshot(self.max_items).map_err(|error| match error {
-            PeerDirectoryInspectionError::ItemLimitExceeded { limit } =>
+            PeerDirectoryInspectionError::ItemLimitExceeded { limit } => {
                 InspectionError::ResultTooLarge {
                     group: InspectionGroup::PeerList,
                     limit,
-                },
-            PeerDirectoryInspectionError::IncompleteEntry =>
+                }
+            }
+            PeerDirectoryInspectionError::IncompleteEntry => {
                 InspectionError::TemporarilyUnavailable {
                     group: InspectionGroup::PeerLookup,
-                },
+                }
+            }
         })?;
 
         let mut peer_ids = Vec::with_capacity(snapshot.entries.len());
@@ -224,11 +226,12 @@ impl LiveActivePeerSource {
 impl ActivePeerSource for LiveActivePeerSource {
     fn snapshot(&self) -> Result<ActivePeerSnapshot, InspectionError> {
         let snapshot = self.inspection.snapshot(self.max_items).map_err(|error| match error {
-            TransportInspectionError::ItemLimitExceeded { limit } =>
+            TransportInspectionError::ItemLimitExceeded { limit } => {
                 InspectionError::ResultTooLarge {
                     group: InspectionGroup::PeerList,
                     limit,
-                },
+                }
+            }
         })?;
         Ok(ActivePeerSnapshot {
             peer_ids: snapshot.connected_peer_ids,
@@ -383,16 +386,21 @@ impl StartupTunnelInventory {
         name: &str,
     ) -> Option<crate::i2pcontrol::domain::tunnel::TunnelRuntimeState> {
         match self.lifecycle.as_ref()?.state(name).ok().flatten()? {
-            StartupTunnelState::Starting =>
-                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Starting),
-            StartupTunnelState::Running =>
-                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Running),
-            StartupTunnelState::Stopping =>
-                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopping),
-            StartupTunnelState::Stopped =>
-                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopped),
-            StartupTunnelState::Failed =>
-                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Failed),
+            StartupTunnelState::Starting => {
+                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Starting)
+            }
+            StartupTunnelState::Running => {
+                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Running)
+            }
+            StartupTunnelState::Stopping => {
+                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopping)
+            }
+            StartupTunnelState::Stopped => {
+                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Stopped)
+            }
+            StartupTunnelState::Failed => {
+                Some(crate::i2pcontrol::domain::tunnel::TunnelRuntimeState::Failed)
+            }
         }
     }
 
@@ -860,6 +868,7 @@ pub struct ProductionTunnelManagerControl {
     client_destinations: ClientDestinationStore,
     sam_tcp_port: Option<u16>,
     lifecycle: Arc<tokio::sync::Mutex<BTreeMap<String, Arc<tokio::sync::Mutex<()>>>>>,
+    idle_resume: crate::i2pcontrol::idle_resume::IdleResumeTracker,
     #[cfg(test)]
     commit_hook: Arc<CommitPhaseTestHook>,
 }
@@ -873,8 +882,13 @@ pub struct ProductionTunnelManagerControl {
 enum ServerStartKind {
     NotServer,
     ExistingUnchanged,
-    Fresh { identity: String },
-    Replacement { identity: String, previous_private: String },
+    Fresh {
+        identity: String,
+    },
+    Replacement {
+        identity: String,
+        previous_private: String,
+    },
 }
 
 /// In-memory prepared server definition with its transaction evidence.
@@ -967,9 +981,29 @@ impl ProductionTunnelManagerControl {
             client_destinations,
             sam_tcp_port,
             lifecycle: Arc::new(tokio::sync::Mutex::new(BTreeMap::new())),
+            idle_resume: crate::i2pcontrol::idle_resume::IdleResumeTracker::new(),
             #[cfg(test)]
             commit_hook: Arc::new(CommitPhaseTestHook::new()),
         })
+    }
+
+    /// Attach the I2PControl-owned idle-resume tracker (M134).
+    ///
+    /// Production composition wires the same tracker into the SAM observation
+    /// source so neutral `IdlePolicy` facts arm eligibility; tests drive the
+    /// tracker directly for deterministic proven-resume evidence.
+    pub(crate) fn with_idle_resume_tracker(
+        mut self,
+        tracker: crate::i2pcontrol::idle_resume::IdleResumeTracker,
+    ) -> Self {
+        self.idle_resume = tracker;
+        self
+    }
+
+    /// Borrow the idle-resume tracker (tests and composition seams).
+    #[cfg(test)]
+    pub(crate) fn idle_resume_tracker(&self) -> &crate::i2pcontrol::idle_resume::IdleResumeTracker {
+        &self.idle_resume
     }
 
     /// Load existing state from disk.
@@ -1024,17 +1058,43 @@ impl ProductionTunnelManagerControl {
             .iter()
             .filter(|definition| definition.tunnel_type.is_client())
             .filter(|definition| {
+                // M134: `NewDest=true` successors are durably committed like
+                // persistent identities so ordinary starts reuse them without
+                // rotation; only a qualifying resume replaces them.
                 definition.options.persistent_client_key.unwrap_or(false)
                     || definition.options.priv_key_file.is_some()
+                    || definition.options.new_dest.unwrap_or(false)
             })
             .map(|definition| definition.name.as_str().to_owned())
+            .collect::<std::collections::BTreeSet<_>>();
+        // M134 shared synthetic identities are referenced by live shared
+        // `NewDest` policies, not by tunnel names. Retain only those still
+        // referenced; process restart never replays idle eligibility (tracker
+        // is volatile) but reuses these committed shared successors.
+        let referenced_shared = store
+            .list()
+            .iter()
+            .filter(|definition| {
+                definition.tunnel_type.is_client()
+                    && definition.options.shared.unwrap_or(false)
+                    && definition.options.new_dest.unwrap_or(false)
+            })
+            .filter_map(|definition| {
+                self.sam_tcp_port.and_then(|port| {
+                    crate::i2pcontrol::backends::runtime::session::shared_policy_key(
+                        definition, port,
+                    )
+                    .ok()
+                    .map(|policy| crate::i2pcontrol::idle_resume::shared_synthetic_name(&policy))
+                })
+            })
             .collect::<std::collections::BTreeSet<_>>();
         drop(store);
         self.server_destinations
             .prune_unreferenced(&referenced_server_identities)
             .await?;
         self.client_destinations
-            .prune_unreferenced(&referenced_client_names)
+            .prune_unreferenced_with_shared(&referenced_client_names, &referenced_shared)
             .await?;
         self.reconcile_start_on_load().await;
         Ok(())
@@ -1167,11 +1227,41 @@ impl ProductionTunnelManagerControl {
             }
             Err(error) => return Ok(format!("error - {error}")),
         }
+        // M134: lifecycle preflight (including `NewDest`/`Close`
+        // prerequisites and conflicts) precedes any secret staging so invalid
+        // combinations fail before `DEST GENERATE` or session allocation.
+        // Client backends use the default `validate_start` (no lifecycle
+        // check), so this explicit gate is the fail-before-allocation owner.
         if definition.tunnel_type.is_client() {
+            if let Err(error) =
+                crate::i2pcontrol::backends::runtime::session::client_lifecycle_config(&definition)
+            {
+                return Ok(format!("error - {error}"));
+            }
+        }
+        // M134: shared `NewDest` resumes own one synthetic successor per
+        // policy, not one per member. Dedicated definitions use the per-name
+        // proven-resume transaction below.
+        if definition.tunnel_type.is_client()
+            && definition.options.shared.unwrap_or(false)
+            && definition.options.new_dest.unwrap_or(false)
+        {
+            let sam_port = self
+                .sam_tcp_port
+                .ok_or_else(|| "client backend requires the router SAM listener".to_string())?;
+            return self.start_shared_newdest(name, definition, sam_port).await;
+        }
+        if definition.tunnel_type.is_client() {
+            let sam_port = self
+                .sam_tcp_port
+                .ok_or_else(|| "client backend requires the router SAM listener".to_string())?;
+            // M134: stage a fresh successor only on a qualifying proven idle
+            // resume; otherwise reuse the committed identity (or stage the
+            // initial identity when none exists). No wall-clock heuristic.
+            let is_qualifying = definition.options.new_dest.unwrap_or(false)
+                && self.idle_resume.is_dedicated_eligible(name);
             self.client_destinations
-                .stage(&definition, self.sam_tcp_port.ok_or_else(|| {
-                    "client backend requires the router SAM listener".to_string()
-                })?)
+                .stage_with_resume(&definition, sam_port, is_qualifying)
                 .await?;
         }
         // Stage the server identity mutation without durable effects. The
@@ -1183,17 +1273,18 @@ impl ProductionTunnelManagerControl {
         match backend.start(&prepared.definition).await {
             Ok(()) => {
                 if prepared.definition.tunnel_type.is_client() {
-                    if let Err(error) = self
-                        .client_destinations
-                        .commit(prepared.definition.name.as_str())
-                        .await
+                    if let Err(error) =
+                        self.client_destinations.commit(prepared.definition.name.as_str()).await
                     {
                         let _ = backend.stop(&prepared.definition).await;
-                        self.client_destinations
-                            .discard(prepared.definition.name.as_str())
-                            .await;
+                        self.client_destinations.discard(prepared.definition.name.as_str()).await;
                         return Ok(format!("error - {error}"));
                     }
+                    // M134: advance the committed generation and consume any
+                    // qualifying eligibility exactly once per successful
+                    // resume. Failed/cancelled starts never reach here, so
+                    // their eligibility stays retryable.
+                    self.idle_resume.commit_dedicated_generation(prepared.definition.name.as_str());
                 }
                 if prepared.definition.tunnel_type.is_server() {
                     let status = backend.inspect(&prepared.definition);
@@ -1202,17 +1293,13 @@ impl ProductionTunnelManagerControl {
                         self.rollback_server_start(prepared).await;
                         return Ok("error - server runtime did not publish a destination".into());
                     };
-                    return self
-                        .terminalize_server_start(prepared, destination, lifecycle)
-                        .await;
+                    return self.terminalize_server_start(prepared, destination, lifecycle).await;
                 }
                 Ok("ok".to_string())
             }
             Err(BackendError::NotImplemented { tunnel_type }) => {
                 if prepared.definition.tunnel_type.is_client() {
-                    self.client_destinations
-                        .discard(prepared.definition.name.as_str())
-                        .await;
+                    self.client_destinations.discard(prepared.definition.name.as_str()).await;
                 }
                 if prepared.definition.tunnel_type.is_server() {
                     self.rollback_server_start(prepared).await;
@@ -1221,14 +1308,100 @@ impl ProductionTunnelManagerControl {
             }
             Err(error) => {
                 if prepared.definition.tunnel_type.is_client() {
-                    self.client_destinations
-                        .discard(prepared.definition.name.as_str())
-                        .await;
+                    self.client_destinations.discard(prepared.definition.name.as_str()).await;
                 }
                 if prepared.definition.tunnel_type.is_server() {
                     self.rollback_server_start(prepared).await;
                 }
                 Ok(format!("error - {error}"))
+            }
+        }
+    }
+
+    /// Start one shared `NewDest` definition through the single-successor
+    /// transaction (M134).
+    ///
+    /// Joins (current shared identity exists, no qualifying fact) reuse
+    /// without staging or generation advance. Initial and qualifying-resume
+    /// generations serialize through the per-policy creation reservation so
+    /// concurrent members yield one successor, never one per member. Failed
+    /// or cancelled generations discard the staged successor and keep
+    /// eligibility retryable; only a successful commit consumes it.
+    async fn start_shared_newdest(
+        &self,
+        name: &str,
+        definition: TunnelDefinition,
+        sam_port: u16,
+    ) -> Result<String, String> {
+        use crate::i2pcontrol::backends::runtime::session::shared_policy_key;
+        let policy_key = match shared_policy_key(&definition, sam_port) {
+            Ok(key) => key,
+            Err(error) => return Ok(format!("error - {error}")),
+        };
+        loop {
+            let is_eligible = self.idle_resume.is_shared_eligible(&policy_key);
+            let current = self.client_destinations.shared_active(&policy_key).await?;
+            let needs_generation = current.is_none() || is_eligible;
+            if !needs_generation {
+                // Join the current shared generation: no staging, no tracker
+                // advance. All members reuse the one committed successor.
+                let backend = self.registry.get(definition.tunnel_type);
+                match backend.start(&definition).await {
+                    Ok(()) => {
+                        self.idle_resume.register_shared_member(name, &policy_key);
+                        return Ok("ok".to_string());
+                    }
+                    Err(BackendError::NotImplemented { tunnel_type }) => {
+                        return Ok(format!("error - {} not implemented", tunnel_type.as_str()));
+                    }
+                    Err(error) => return Ok(format!("error - {error}")),
+                }
+            }
+            // Needs a new shared generation (initial or qualifying resume):
+            // serialize to one winner; losers wait then reuse.
+            let Some(mut reservation) = self.idle_resume.try_reserve_shared_creation(&policy_key)
+            else {
+                self.idle_resume.wait_shared_resume(&policy_key).await;
+                continue;
+            };
+            let is_qualifying = is_eligible;
+            if let Err(error) = self
+                .client_destinations
+                .shared_stage(
+                    &policy_key,
+                    sam_port,
+                    definition.options.sig_type.as_deref(),
+                    is_qualifying,
+                )
+                .await
+            {
+                drop(reservation);
+                return Err(error);
+            }
+            let backend = self.registry.get(definition.tunnel_type);
+            match backend.start(&definition).await {
+                Ok(()) => {
+                    if let Err(error) = self.client_destinations.shared_commit(&policy_key).await {
+                        let _ = backend.stop(&definition).await;
+                        self.client_destinations.shared_discard(&policy_key).await;
+                        drop(reservation);
+                        return Ok(format!("error - {error}"));
+                    }
+                    self.idle_resume.commit_shared_generation(&policy_key);
+                    self.idle_resume.register_shared_member(name, &policy_key);
+                    reservation.disarm();
+                    return Ok("ok".to_string());
+                }
+                Err(BackendError::NotImplemented { tunnel_type }) => {
+                    self.client_destinations.shared_discard(&policy_key).await;
+                    drop(reservation);
+                    return Ok(format!("error - {} not implemented", tunnel_type.as_str()));
+                }
+                Err(error) => {
+                    self.client_destinations.shared_discard(&policy_key).await;
+                    drop(reservation);
+                    return Ok(format!("error - {error}"));
+                }
             }
         }
     }
@@ -1277,7 +1450,9 @@ impl ProductionTunnelManagerControl {
                                 .ok()
                                 .flatten()
                                 .is_some() =>
-                            Some(public.to_string()),
+                        {
+                            Some(public.to_string())
+                        }
                         _ => None,
                     }
                 };
@@ -1382,8 +1557,7 @@ impl ProductionTunnelManagerControl {
     /// candidate shadowed durability without overwriting it).
     async fn rollback_server_start(&self, prepared: PreparedServerStart) {
         match &prepared.kind {
-            ServerStartKind::Fresh { identity }
-            | ServerStartKind::Replacement { identity, .. } => {
+            ServerStartKind::Fresh { identity } | ServerStartKind::Replacement { identity, .. } => {
                 self.server_destinations.discard(identity).await;
             }
             ServerStartKind::NotServer | ServerStartKind::ExistingUnchanged => {}
@@ -1434,12 +1608,9 @@ impl ProductionTunnelManagerControl {
             ServerStartKind::NotServer | ServerStartKind::ExistingUnchanged => {
                 let definition = prepared.definition.clone();
                 #[cfg(test)]
-                self.commit_hook
-                    .pause(CommitBoundary::BeforeExistingDefinitionPersist)
-                    .await;
-                if let Err(error) = self
-                    .persist_server_public_destination(definition.clone(), destination)
-                    .await
+                self.commit_hook.pause(CommitBoundary::BeforeExistingDefinitionPersist).await;
+                if let Err(error) =
+                    self.persist_server_public_destination(definition.clone(), destination).await
                 {
                     let _ = backend.stop(&definition).await;
                     return Err(error);
@@ -1457,12 +1628,9 @@ impl ProductionTunnelManagerControl {
                     return Err(error);
                 }
                 #[cfg(test)]
-                self.commit_hook
-                    .pause(CommitBoundary::AfterFreshSecretCommit)
-                    .await;
-                if let Err(error) = self
-                    .persist_server_public_destination(definition.clone(), destination)
-                    .await
+                self.commit_hook.pause(CommitBoundary::AfterFreshSecretCommit).await;
+                if let Err(error) =
+                    self.persist_server_public_destination(definition.clone(), destination).await
                 {
                     let _ = backend.stop(&definition).await;
                     let _ = self.server_destinations.remove(&identity).await;
@@ -1485,12 +1653,9 @@ impl ProductionTunnelManagerControl {
                     return Err(error);
                 }
                 #[cfg(test)]
-                self.commit_hook
-                    .pause(CommitBoundary::AfterReplacementSecretCommit)
-                    .await;
-                if let Err(error) = self
-                    .persist_server_public_destination(definition.clone(), destination)
-                    .await
+                self.commit_hook.pause(CommitBoundary::AfterReplacementSecretCommit).await;
+                if let Err(error) =
+                    self.persist_server_public_destination(definition.clone(), destination).await
                 {
                     let _ = backend.stop(&definition).await;
                     let _ = self
@@ -1533,6 +1698,7 @@ impl Clone for ProductionTunnelManagerControl {
             client_destinations: self.client_destinations.clone(),
             sam_tcp_port: self.sam_tcp_port,
             lifecycle: Arc::clone(&self.lifecycle),
+            idle_resume: self.idle_resume.clone(),
             #[cfg(test)]
             commit_hook: Arc::clone(&self.commit_hook),
         }
@@ -1582,6 +1748,9 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
     }
 
     async fn create(&self, definition: TunnelDefinition) -> Result<(), String> {
+        if crate::i2pcontrol::idle_resume::is_shared_synthetic_name(definition.name.as_str()) {
+            return Err("error - tunnel name is reserved".into());
+        }
         if self.startup.get(definition.name.as_str())?.is_some() {
             return Err("error - tunnel name is owned by startup configuration".into());
         }
@@ -1610,6 +1779,11 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         let new_name_str = new_name.as_ref().map(TunnelName::as_str);
         let names = new_name_str.map_or_else(|| vec![name], |new_name| vec![name, new_name]);
         let _lifecycle = self.lifecycle_locks(&names).await;
+        if let Some(candidate) = new_name.as_ref() {
+            if crate::i2pcontrol::idle_resume::is_shared_synthetic_name(candidate.as_str()) {
+                return Err("error - tunnel name is reserved".into());
+            }
+        }
         if self.startup.get(name)?.is_some() {
             return Err("error - tunnel name is owned by startup configuration".into());
         }
@@ -1660,6 +1834,22 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
             if let Some(new_name) = renamed_client.as_deref() {
                 let _ = self.client_destinations.rename(new_name, name).await;
             }
+        } else {
+            // M134: successful edits reconcile lifecycle state transactionally
+            // before any later Start. Pending eligibility is cleared so the
+            // edited definition never resumes from a stale pre-edit idle fact;
+            // renames carry the generation without eligibility.
+            if let Some(new_name) = new_name.as_ref() {
+                if new_name.as_str() != name {
+                    self.idle_resume.rename_dedicated(name, new_name.as_str());
+                } else {
+                    self.idle_resume.note_edit(name);
+                }
+                self.idle_resume.unregister_shared_member(name);
+            } else {
+                self.idle_resume.note_edit(name);
+                self.idle_resume.unregister_shared_member(name);
+            }
         }
         result
     }
@@ -1709,6 +1899,43 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
                 return Err(error);
             }
         }
+        // M134: delete removes any pending eligibility and staged successor
+        // with bounded cleanup. Shared synthetic cleanup happens only when no
+        // remaining definition references the deleted policy.
+        self.idle_resume.note_delete(name);
+        self.idle_resume.unregister_shared_member(name);
+        if definition.tunnel_type.is_client()
+            && definition.options.shared.unwrap_or(false)
+            && definition.options.new_dest.unwrap_or(false)
+        {
+            if let Some(port) = self.sam_tcp_port {
+                if let Ok(policy_key) =
+                    crate::i2pcontrol::backends::runtime::session::shared_policy_key(
+                        &definition,
+                        port,
+                    )
+                {
+                    let still_referenced = {
+                        let store = self.inner.lock().await;
+                        store.list().iter().any(|other| {
+                            other.tunnel_type.is_client()
+                                && other.options.shared.unwrap_or(false)
+                                && other.options.new_dest.unwrap_or(false)
+                                && self.sam_tcp_port.is_some_and(|port| {
+                                    crate::i2pcontrol::backends::runtime::session::shared_policy_key(
+                                        other, port,
+                                    )
+                                    .is_ok_and(|other_key| other_key == policy_key)
+                                })
+                        })
+                    };
+                    if !still_referenced {
+                        self.idle_resume.remove_shared(&policy_key);
+                        let _ = self.client_destinations.shared_remove(&policy_key).await;
+                    }
+                }
+            }
+        }
         Ok(true)
     }
 
@@ -1733,10 +1960,17 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
                 .clone()
         };
         let backend = self.registry.get(def.tunnel_type);
-        match backend.stop(&def).await {
+        let result = match backend.stop(&def).await {
             Ok(()) => Ok("ok".to_string()),
             Err(e) => Ok(format!("error - {e}")),
-        }
+        };
+        // M134: explicit manual Stop renders any stale idle-resume
+        // disposition ineligible; a later Start reuses the committed identity.
+        // Shared single-member release never arms eligibility here; final
+        // explicit release surfaces as `Requested` via observation and clears
+        // shared eligibility there.
+        self.idle_resume.note_manual_stop(name);
+        result
     }
 
     async fn restart(&self, name: &str) -> Result<String, String> {
@@ -1755,6 +1989,10 @@ impl TunnelManagerControl for ProductionTunnelManagerControl {
         if let Err(error) = backend.stop(&definition).await {
             return Ok(format!("error - {error}"));
         }
+        // M134: explicit Restart preserves identity: clear any stale
+        // eligibility so the reloaded generation reuses the committed
+        // successor instead of rotating.
+        self.idle_resume.note_manual_stop(name);
         // Reload after the exact stop. This prevents a restart from using a
         // stale pre-edit definition and keeps the old and new generations
         // strictly non-overlapping.
@@ -2613,7 +2851,11 @@ mod tests {
 
     fn m120_write_import(state_root: &std::path::Path, filename: &str, secret_b64: &str) {
         std::fs::create_dir_all(state_root.join("server-key-imports")).unwrap();
-        std::fs::write(state_root.join("server-key-imports").join(filename), secret_b64).unwrap();
+        std::fs::write(
+            state_root.join("server-key-imports").join(filename),
+            secret_b64,
+        )
+        .unwrap();
     }
 
     async fn m120_counting_sam() -> (
@@ -2679,7 +2921,8 @@ mod tests {
                             {
                                 break;
                             }
-                        } else if write_half.write_all(b"STREAM STATUS RESULT=OK\n").await.is_err() {
+                        } else if write_half.write_all(b"STREAM STATUS RESULT=OK\n").await.is_err()
+                        {
                             break;
                         }
                     }
@@ -2843,12 +3086,17 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let (sam_port, sam_count, sam_task) = m120_counting_sam().await;
         let manager = m120_manager_with_sam(&tmp, sam_port).await;
-        let mut definition =
-            m120_server_definition("fresh-i2cp", crate::i2pcontrol::domain::tunnel::TunnelType::Server);
+        let mut definition = m120_server_definition(
+            "fresh-i2cp",
+            crate::i2pcontrol::domain::tunnel::TunnelType::Server,
+        );
         definition.options.i2cp_options.insert("bogus".to_owned(), "1".to_owned());
         manager.create(definition).await.unwrap();
         let result = manager.start("fresh-i2cp").await.unwrap();
-        assert!(result.contains("I2CPOptions"), "I2CP rejection, got: {result}");
+        assert!(
+            result.contains("I2CPOptions"),
+            "I2CP rejection, got: {result}"
+        );
         assert!(m120_identity_of(&manager.get("fresh-i2cp").await.unwrap().unwrap()).is_none());
         assert_eq!(manager.server_destinations.staged_count().await, 0);
         assert_eq!(sam_count.load(std::sync::atomic::Ordering::SeqCst), 0);
@@ -2873,10 +3121,7 @@ mod tests {
         );
         assert!(!result.contains("missing.key"));
         assert!(
-            m120_identity_of(
-                &manager.get("fresh-import-order").await.unwrap().unwrap()
-            )
-            .is_none()
+            m120_identity_of(&manager.get("fresh-import-order").await.unwrap().unwrap()).is_none()
         );
         assert_eq!(manager.server_destinations.staged_count().await, 0);
         sam_task.abort();
@@ -2897,11 +3142,9 @@ mod tests {
         assert!(result.starts_with("error"));
         let stored = manager.get("no-identity").await.unwrap().unwrap();
         assert!(m120_identity_of(&stored).is_none());
-        assert!(
-            !stored.raw_config.contains_key(
-                crate::i2pcontrol::backends::server::SERVER_PUBLIC_DESTINATION_KEY,
-            )
-        );
+        assert!(!stored
+            .raw_config
+            .contains_key(crate::i2pcontrol::backends::server::SERVER_PUBLIC_DESTINATION_KEY,));
         // Reload proves nothing durable was written.
         drop(manager);
         let reloaded = ProductionTunnelManagerControl::new_with_startup_inventory_and_sam_port(
@@ -2955,7 +3198,10 @@ mod tests {
             store.upsert(definition).await.unwrap();
         }
         let result = manager.start("replace-server").await.unwrap();
-        assert!(result.starts_with("error"), "replacement must fail, got: {result}");
+        assert!(
+            result.starts_with("error"),
+            "replacement must fail, got: {result}"
+        );
         assert!(!result.contains(&secret_old));
         assert!(!result.contains(&secret_new));
         assert!(!result.contains("new.key"));
@@ -2966,7 +3212,10 @@ mod tests {
         );
         assert_eq!(manager.server_destinations.staged_count().await, 0);
         let stored = manager.get("replace-server").await.unwrap().unwrap();
-        assert_eq!(m120_identity_of(&stored).as_deref(), Some(identity.as_str()));
+        assert_eq!(
+            m120_identity_of(&stored).as_deref(),
+            Some(identity.as_str())
+        );
         bad_task.abort();
     }
 
@@ -2985,15 +3234,16 @@ mod tests {
         manager.create(definition).await.unwrap();
 
         let result = manager.start("fresh-failure").await.unwrap();
-        assert!(result.starts_with("error"), "fresh start must fail, got: {result}");
+        assert!(
+            result.starts_with("error"),
+            "fresh start must fail, got: {result}"
+        );
         assert!(!result.contains(&secret_new));
         let stored = manager.get("fresh-failure").await.unwrap().unwrap();
         assert!(m120_identity_of(&stored).is_none());
-        assert!(
-            !stored.raw_config.contains_key(
-                crate::i2pcontrol::backends::server::SERVER_PUBLIC_DESTINATION_KEY,
-            )
-        );
+        assert!(!stored
+            .raw_config
+            .contains_key(crate::i2pcontrol::backends::server::SERVER_PUBLIC_DESTINATION_KEY,));
         assert_eq!(manager.server_destinations.staged_count().await, 0);
         assert!(
             !tmp.path().join("server-destinations").join("current.json").exists(),
@@ -3015,7 +3265,10 @@ mod tests {
         manager.create(definition).await.unwrap();
 
         let result = manager.start("fresh-generated").await.unwrap();
-        assert!(result.starts_with("error"), "generated start must fail, got: {result}");
+        assert!(
+            result.starts_with("error"),
+            "generated start must fail, got: {result}"
+        );
         let stored = manager.get("fresh-generated").await.unwrap().unwrap();
         assert!(m120_identity_of(&stored).is_none());
         assert_eq!(manager.server_destinations.staged_count().await, 0);
@@ -3046,7 +3299,10 @@ mod tests {
         std::fs::write(&tunnels_dir, b"blocker").unwrap();
 
         let result = manager.start("persist-failure").await.unwrap();
-        assert!(result.starts_with("error"), "persist must fail, got: {result}");
+        assert!(
+            result.starts_with("error"),
+            "persist must fail, got: {result}"
+        );
         assert!(!result.contains(&secret));
         assert_eq!(manager.server_destinations.staged_count().await, 0);
         // The just-committed secret is removed again; the store returns to empty.
@@ -3096,11 +3352,17 @@ mod tests {
 
         manager.stop("stable-server").await.unwrap();
         let stopped = manager.get("stable-server").await.unwrap().unwrap();
-        assert_eq!(m120_identity_of(&stopped).as_deref(), Some(identity.as_str()));
+        assert_eq!(
+            m120_identity_of(&stopped).as_deref(),
+            Some(identity.as_str())
+        );
 
         assert_eq!(manager.start("stable-server").await.unwrap(), "ok");
         let restarted = manager.get("stable-server").await.unwrap().unwrap();
-        assert_eq!(m120_identity_of(&restarted).as_deref(), Some(identity.as_str()));
+        assert_eq!(
+            m120_identity_of(&restarted).as_deref(),
+            Some(identity.as_str())
+        );
         assert_eq!(
             manager.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
             secret.as_str()
@@ -3110,7 +3372,10 @@ mod tests {
 
         let reloaded = m120_manager_with_sam(&tmp, good_port).await;
         let stored = reloaded.get("stable-server").await.unwrap().unwrap();
-        assert_eq!(m120_identity_of(&stored).as_deref(), Some(identity.as_str()));
+        assert_eq!(
+            m120_identity_of(&stored).as_deref(),
+            Some(identity.as_str())
+        );
         assert_eq!(
             reloaded.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
             secret.as_str()
@@ -3233,12 +3498,13 @@ mod tests {
         assert!(!tmp.path().join("server-destinations/current.json").exists());
 
         let competing_manager = manager.clone();
-        let mut competing = tokio::spawn(async move {
-            competing_manager.stop("m123-fresh-before").await
-        });
-        assert!(tokio::time::timeout(std::time::Duration::from_millis(50), &mut competing)
-            .await
-            .is_err());
+        let mut competing =
+            tokio::spawn(async move { competing_manager.stop("m123-fresh-before").await });
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(50), &mut competing)
+                .await
+                .is_err()
+        );
 
         worker.abort();
         let _ = worker.await;
@@ -3251,7 +3517,10 @@ mod tests {
         let reloaded = m120_manager_with_sam(&tmp, sam_port).await;
         let stored = reloaded.get("m123-fresh-before").await.unwrap().unwrap();
         let identity = m120_identity_of(&stored).expect("fresh identity committed");
-        assert_eq!(stored.options.hosting_destination.as_deref(), Some("server-destination"));
+        assert_eq!(
+            stored.options.hosting_destination.as_deref(),
+            Some("server-destination")
+        );
         assert_eq!(
             reloaded.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
             secret
@@ -3290,13 +3559,19 @@ mod tests {
         hook.wait_terminalized().await;
         let stored = manager.get("m123-fresh-after").await.unwrap().unwrap();
         let identity = m120_identity_of(&stored).expect("fresh identity committed");
-        assert_eq!(stored.options.hosting_destination.as_deref(), Some("server-destination"));
+        assert_eq!(
+            stored.options.hosting_destination.as_deref(),
+            Some("server-destination")
+        );
         assert_eq!(manager.server_destinations.staged_count().await, 0);
 
         drop(manager);
         let reloaded = m120_manager_with_sam(&tmp, sam_port).await;
         let stored = reloaded.get("m123-fresh-after").await.unwrap().unwrap();
-        assert_eq!(m120_identity_of(&stored).as_deref(), Some(identity.as_str()));
+        assert_eq!(
+            m120_identity_of(&stored).as_deref(),
+            Some(identity.as_str())
+        );
         assert_eq!(
             reloaded.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
             secret
@@ -3361,7 +3636,10 @@ mod tests {
             new_secret
         );
         let stored = reloaded.get("m123-replacement").await.unwrap().unwrap();
-        assert_eq!(m120_identity_of(&stored).as_deref(), Some(identity.as_str()));
+        assert_eq!(
+            m120_identity_of(&stored).as_deref(),
+            Some(identity.as_str())
+        );
         sam_task.abort();
     }
 
@@ -3394,8 +3672,14 @@ mod tests {
         hook.wait_terminalized().await;
 
         let stored = manager.get("m123-existing").await.unwrap().unwrap();
-        assert_eq!(m120_identity_of(&stored).as_deref(), Some(identity.as_str()));
-        assert_eq!(stored.options.hosting_destination.as_deref(), Some("server-destination"));
+        assert_eq!(
+            m120_identity_of(&stored).as_deref(),
+            Some(identity.as_str())
+        );
+        assert_eq!(
+            stored.options.hosting_destination.as_deref(),
+            Some("server-destination")
+        );
         assert_eq!(
             manager.server_destinations.get(&identity).await.unwrap().unwrap().as_str(),
             secret
@@ -3423,12 +3707,13 @@ mod tests {
         let worker = tokio::spawn(async move { worker_manager.restart("m123-restart").await });
         hook.wait_entered().await;
         let competing_manager = manager.clone();
-        let mut competing = tokio::spawn(async move {
-            competing_manager.stop("m123-restart").await
-        });
-        assert!(tokio::time::timeout(std::time::Duration::from_millis(50), &mut competing)
-            .await
-            .is_err());
+        let mut competing =
+            tokio::spawn(async move { competing_manager.stop("m123-restart").await });
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(50), &mut competing)
+                .await
+                .is_err()
+        );
         worker.abort();
         let _ = worker.await;
         hook.release();
@@ -3459,5 +3744,343 @@ mod tests {
         assert!(result.is_err(), "startup path stays externally managed");
         assert_eq!(manager.server_destinations.staged_count().await, 0);
         assert!(manager.startup.get("startup-srv").unwrap().is_some());
+    }
+
+    // --- M134 NewDest proven-resume end-to-end ---
+
+    fn m134_client_definition(
+        name: &str,
+        shared: bool,
+        new_dest: Option<bool>,
+    ) -> TunnelDefinition {
+        use crate::i2pcontrol::domain::tunnel::{
+            StartIntent, TunnelName, TunnelOwnership, TunnelRuntimeState,
+        };
+        let options = crate::i2pcontrol::domain::tunnel::TunnelOptions {
+            target_destination: Some("destination".to_owned()),
+            listen_port: Some(0),
+            shared: shared.then_some(true),
+            new_dest,
+            ..Default::default()
+        };
+        let mut raw_config = std::collections::BTreeMap::new();
+        if new_dest == Some(true) {
+            raw_config.insert("Close".to_owned(), serde_json::json!(true));
+            raw_config.insert("NewDest".to_owned(), serde_json::json!(true));
+        } else if new_dest == Some(false) {
+            raw_config.insert("NewDest".to_owned(), serde_json::json!(false));
+        }
+        TunnelDefinition {
+            name: TunnelName::new(name).unwrap(),
+            tunnel_type: TunnelType::Client,
+            ownership: TunnelOwnership::ControlPlane,
+            runtime_state: TunnelRuntimeState::Stopped,
+            start_intent: StartIntent::DoNotStart,
+            options,
+            raw_config,
+        }
+    }
+
+    async fn m134_fake_sam() -> (
+        u16,
+        std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let session_creates = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let dest_generates = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let session_for_task = std::sync::Arc::clone(&session_creates);
+        let dest_for_task = std::sync::Arc::clone(&dest_generates);
+        let task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let session_count = std::sync::Arc::clone(&session_for_task);
+                let dest_count = std::sync::Arc::clone(&dest_for_task);
+                tokio::spawn(async move {
+                    let (read_half, mut write_half) = stream.into_split();
+                    let mut reader = BufReader::new(read_half);
+                    let mut line = String::new();
+                    // One HELLO per connection, then exactly one command
+                    // (DEST GENERATE or SESSION CREATE) for these tests.
+                    // Yosemite opens a fresh SAM connection per operation.
+                    if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                        return;
+                    }
+                    if !line.starts_with("HELLO") {
+                        return;
+                    }
+                    if write_half.write_all(b"HELLO REPLY RESULT=OK VERSION=3.3\n").await.is_err() {
+                        return;
+                    }
+                    line.clear();
+                    if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                        return;
+                    }
+                    if line.starts_with("DEST GENERATE") {
+                        let n = dest_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                        let private = emissary_core::crypto::base64_encode([(n & 0xff) as u8; 64]);
+                        let reply = format!("DEST REPLY PUB=destination PRIV={private}\n");
+                        let _ = write_half.write_all(reply.as_bytes()).await;
+                    } else if line.starts_with("SESSION CREATE") {
+                        session_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        let _ = write_half
+                            .write_all(b"SESSION STATUS RESULT=OK DESTINATION=client-destination\n")
+                            .await;
+                        // Keep the session connection open briefly so the
+                        // Yosemite client can complete setup; then close.
+                        // No STREAM traffic occurs in these Start-only tests.
+                        let mut extra = String::new();
+                        loop {
+                            extra.clear();
+                            if reader.read_line(&mut extra).await.unwrap_or(0) == 0 {
+                                break;
+                            }
+                            if extra.starts_with("STREAM") {
+                                if write_half.write_all(b"STREAM STATUS RESULT=OK\n").await.is_err()
+                                {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+        });
+        (port, session_creates, dest_generates, task)
+    }
+
+    async fn m134_manager_with_sam(
+        tmp: &tempfile::TempDir,
+        sam_port: u16,
+    ) -> ProductionTunnelManagerControl {
+        let manager = ProductionTunnelManagerControl::new_with_startup_inventory_and_sam_port(
+            tmp.path().join("tunnels"),
+            StartupTunnelInventory::default(),
+            Some(sam_port),
+        )
+        .unwrap();
+        manager.load().await.unwrap();
+        manager
+    }
+
+    async fn m134_active_key(manager: &ProductionTunnelManagerControl, name: &str) -> String {
+        manager
+            .client_destinations
+            .active(name)
+            .await
+            .unwrap()
+            .unwrap()
+            .as_str()
+            .to_owned()
+    }
+
+    fn m134_idle_close(manager: &ProductionTunnelManagerControl, session_id: &str) {
+        use emissary_core::{SamObservationEvent, SamTerminationReason};
+        manager
+            .idle_resume_tracker()
+            .record_observation(&SamObservationEvent::SessionRemoved {
+                session_id: std::sync::Arc::from(session_id),
+                reason: SamTerminationReason::IdlePolicy,
+            });
+    }
+
+    #[tokio::test]
+    async fn m134_dedicated_proven_resume_rotates_once_end_to_end() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, session_creates, dest_generates, sam_task) = m134_fake_sam().await;
+        let manager = m134_manager_with_sam(&tmp, sam_port).await;
+        manager
+            .create(m134_client_definition(
+                "newdest-dedicated",
+                false,
+                Some(true),
+            ))
+            .await
+            .unwrap();
+
+        // Initial generation: one DEST, one session, no prior eligibility.
+        assert_eq!(manager.start("newdest-dedicated").await.unwrap(), "ok");
+        let initial = m134_active_key(&manager, "newdest-dedicated").await;
+        assert_eq!(dest_generates.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(session_creates.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert!(!manager.idle_resume_tracker().is_dedicated_eligible("newdest-dedicated"));
+
+        // Authoritative idle close arms exactly one resume (observation path,
+        // same method the SAM hook forwards through).
+        m134_idle_close(&manager, "newdest-dedicated");
+        assert!(manager.idle_resume_tracker().is_dedicated_eligible("newdest-dedicated"));
+
+        // Manual Stop after the won idle fact preserves it for the resume.
+        assert_eq!(manager.stop("newdest-dedicated").await.unwrap(), "ok");
+        assert!(manager.idle_resume_tracker().is_dedicated_eligible("newdest-dedicated"));
+
+        // Qualifying resume stages exactly one fresh successor.
+        assert_eq!(manager.start("newdest-dedicated").await.unwrap(), "ok");
+        let successor = m134_active_key(&manager, "newdest-dedicated").await;
+        assert_ne!(successor, initial, "qualifying resume must rotate once");
+        assert_eq!(dest_generates.load(std::sync::atomic::Ordering::SeqCst), 2);
+        assert_eq!(session_creates.load(std::sync::atomic::Ordering::SeqCst), 2);
+        assert!(!manager.idle_resume_tracker().is_dedicated_eligible("newdest-dedicated"));
+
+        // Second ordinary start after the resume does not rotate again.
+        assert_eq!(manager.stop("newdest-dedicated").await.unwrap(), "ok");
+        assert_eq!(manager.start("newdest-dedicated").await.unwrap(), "ok");
+        assert_eq!(
+            m134_active_key(&manager, "newdest-dedicated").await,
+            successor,
+            "ordinary Start after resume must preserve"
+        );
+        assert_eq!(dest_generates.load(std::sync::atomic::Ordering::SeqCst), 2);
+
+        // Explicit Restart preserves as well.
+        assert_eq!(manager.restart("newdest-dedicated").await.unwrap(), "ok");
+        assert_eq!(
+            m134_active_key(&manager, "newdest-dedicated").await,
+            successor
+        );
+        assert_eq!(manager.stop("newdest-dedicated").await.unwrap(), "ok");
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m134_shared_single_successor_across_members() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, session_creates, dest_generates, sam_task) = m134_fake_sam().await;
+        let manager = m134_manager_with_sam(&tmp, sam_port).await;
+        manager
+            .create(m134_client_definition("shared-a", true, Some(true)))
+            .await
+            .unwrap();
+        manager
+            .create(m134_client_definition("shared-b", true, Some(true)))
+            .await
+            .unwrap();
+
+        // Initial: both members share one synthetic identity and one session.
+        assert_eq!(manager.start("shared-a").await.unwrap(), "ok");
+        assert_eq!(manager.start("shared-b").await.unwrap(), "ok");
+        assert_eq!(dest_generates.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(session_creates.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+        // Shared idle close (session id is the first creator's nickname) arms
+        // one shared successor, not one per member.
+        m134_idle_close(&manager, "shared-a");
+        // Eligibility is policy-keyed; assert via a fresh resume rotating once.
+        assert_eq!(manager.stop("shared-a").await.unwrap(), "ok");
+        assert_eq!(manager.stop("shared-b").await.unwrap(), "ok");
+        assert_eq!(manager.start("shared-a").await.unwrap(), "ok");
+        assert_eq!(dest_generates.load(std::sync::atomic::Ordering::SeqCst), 2);
+        assert_eq!(manager.start("shared-b").await.unwrap(), "ok");
+        // Second member joins the resumed shared session: no new DEST, no new
+        // SESSION CREATE beyond the single resumed successor.
+        assert_eq!(dest_generates.load(std::sync::atomic::Ordering::SeqCst), 2);
+        assert_eq!(session_creates.load(std::sync::atomic::Ordering::SeqCst), 2);
+
+        // Incompatible shared policy (different CloseTime) does not share the
+        // resumed session: it gets its own session.
+        let mut incompatible = m134_client_definition("shared-c", true, Some(true));
+        incompatible
+            .raw_config
+            .insert("CloseTime".to_owned(), serde_json::json!(900_000));
+        manager.create(incompatible).await.unwrap();
+        assert_eq!(manager.start("shared-c").await.unwrap(), "ok");
+        assert_eq!(session_creates.load(std::sync::atomic::Ordering::SeqCst), 3);
+
+        assert_eq!(manager.stop("shared-a").await.unwrap(), "ok");
+        assert_eq!(manager.stop("shared-b").await.unwrap(), "ok");
+        assert_eq!(manager.stop("shared-c").await.unwrap(), "ok");
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m134_process_restart_reuses_committed_without_replay() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, _sessions, dest_generates, sam_task) = m134_fake_sam().await;
+        let manager = m134_manager_with_sam(&tmp, sam_port).await;
+        manager
+            .create(m134_client_definition("restart-reuse", false, Some(true)))
+            .await
+            .unwrap();
+        assert_eq!(manager.start("restart-reuse").await.unwrap(), "ok");
+        let committed = m134_active_key(&manager, "restart-reuse").await;
+        assert_eq!(manager.stop("restart-reuse").await.unwrap(), "ok");
+        assert_eq!(dest_generates.load(std::sync::atomic::Ordering::SeqCst), 1);
+
+        // Simulate process restart: new manager over the same durable state
+        // gets a fresh volatile tracker with no replayed eligibility.
+        let restarted = m134_manager_with_sam(&tmp, sam_port).await;
+        assert!(!restarted.idle_resume_tracker().is_dedicated_eligible("restart-reuse"));
+        assert_eq!(restarted.start("restart-reuse").await.unwrap(), "ok");
+        assert_eq!(
+            m134_active_key(&restarted, "restart-reuse").await,
+            committed,
+            "restart must reuse committed without rotation"
+        );
+        assert_eq!(dest_generates.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(restarted.stop("restart-reuse").await.unwrap(), "ok");
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m134_edit_clears_stale_eligibility_before_resume() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, _sessions, _dests, sam_task) = m134_fake_sam().await;
+        let manager = m134_manager_with_sam(&tmp, sam_port).await;
+        manager
+            .create(m134_client_definition("edit-clear", false, Some(true)))
+            .await
+            .unwrap();
+        assert_eq!(manager.start("edit-clear").await.unwrap(), "ok");
+        let committed = m134_active_key(&manager, "edit-clear").await;
+        m134_idle_close(&manager, "edit-clear");
+        assert!(manager.idle_resume_tracker().is_dedicated_eligible("edit-clear"));
+        assert_eq!(manager.stop("edit-clear").await.unwrap(), "ok");
+
+        // Unrelated edit while stopped reconciles lifecycle: stale idle fact
+        // cannot cause rotation after the edit.
+        let mut edited = m134_client_definition("edit-clear", false, Some(true));
+        edited.options.description = Some("edited".to_owned());
+        assert!(manager.update("edit-clear", edited, None).await.unwrap());
+        assert!(!manager.idle_resume_tracker().is_dedicated_eligible("edit-clear"));
+        assert_eq!(manager.start("edit-clear").await.unwrap(), "ok");
+        assert_eq!(
+            m134_active_key(&manager, "edit-clear").await,
+            committed,
+            "post-edit Start must reuse committed"
+        );
+        assert_eq!(manager.stop("edit-clear").await.unwrap(), "ok");
+        sam_task.abort();
+    }
+
+    #[tokio::test]
+    async fn m134_newdest_conflicts_fail_before_allocation_without_secrets() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (sam_port, _sessions, dest_generates, sam_task) = m134_fake_sam().await;
+        let manager = m134_manager_with_sam(&tmp, sam_port).await;
+
+        // Missing Close prerequisite fails before any DEST generation.
+        let mut missing_close = m134_client_definition("conflict-close", false, Some(true));
+        missing_close.raw_config.remove("Close");
+        manager.create(missing_close).await.unwrap();
+        let result = manager.start("conflict-close").await.unwrap();
+        assert!(result.contains("NewDest"), "got: {result}");
+        assert_eq!(dest_generates.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(!result.contains("destination"));
+
+        // Persistent conflict fails the same way.
+        let mut persistent = m134_client_definition("conflict-persistent", false, Some(true));
+        persistent.options.persistent_client_key = Some(true);
+        manager.create(persistent).await.unwrap();
+        let result = manager.start("conflict-persistent").await.unwrap();
+        assert!(result.contains("NewDest"), "got: {result}");
+        assert!(!result.contains("destination"));
+        sam_task.abort();
     }
 }

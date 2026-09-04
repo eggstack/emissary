@@ -46,8 +46,10 @@ const CLOSE_MIN_IDLE_TIME_MS: u64 = 300_000;
 /// `i2cp.close*` through Yosemite generic session options), not via the
 /// local TCP-handler-count heuristic: the local `close_on_idle` switch
 /// stays disabled and `run_idle_closer` is never armed by Proposal
-/// values. `NewDest` remains `blocked_primitive` and any supplied value
-/// fails before allocation (see `client_lifecycle_config`).
+/// values. `NewDest` is M134-applied as a proven idle-resume flag: rotation
+/// happens only through the `IdleResumeTracker` + secret-store transaction on
+/// a qualifying `IdlePolicy` resume, never on manual/restart/failure paths
+/// (see `client_lifecycle_config`).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ClientLifecycleConfig {
     pub(crate) connect_delay: Option<Duration>,
@@ -175,12 +177,18 @@ struct SharedSessionState {
 
 /// Exact shared-session identity. The persistent key is retained only in this
 /// private equality/order authority; its formatting is always redacted.
+///
+/// `new_dest_policy` is the I2PControl-owned `NewDest` resume policy
+/// (`true` only when `NewDest=true`): it participates in sharing identity so
+/// incompatible lifecycle policies never share one Yosemite session, while
+/// staying off the SAM wire (core/Yosemite never see Proposal policy).
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct CompatibilityKey {
     style: String,
     identity: CompatibilityIdentity,
     session_options: String,
     session_options_identity: String,
+    new_dest_policy: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -201,13 +209,18 @@ impl std::fmt::Debug for CompatibilityKey {
                 },
             )
             .field("session_options", &self.session_options)
+            .field("new_dest_policy", &self.new_dest_policy)
             .finish()
     }
 }
 
 impl std::fmt::Display for CompatibilityKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}|{}", self.style, self.session_options)
+        write!(
+            f,
+            "{}|{}|newdest={}",
+            self.style, self.session_options, self.new_dest_policy
+        )
     }
 }
 
@@ -283,8 +296,9 @@ impl SharedClientSessionRegistry {
     pub async fn acquire_stream(
         &self,
         options: SessionOptions,
+        new_dest_policy: bool,
     ) -> Result<SharedStreamSessionLease, String> {
-        let key = compatibility_key(&options, "stream");
+        let key = compatibility_key(&options, "stream", new_dest_policy);
         loop {
             let waiter = {
                 let mut state = self.state.lock();
@@ -367,8 +381,9 @@ impl SharedClientSessionRegistry {
     pub async fn acquire_datagram(
         &self,
         options: SessionOptions,
+        new_dest_policy: bool,
     ) -> Result<SharedDatagramSessionLease, String> {
-        let key = compatibility_key(&options, "datagram");
+        let key = compatibility_key(&options, "datagram", new_dest_policy);
         loop {
             let waiter = {
                 let mut state = self.state.lock();
@@ -510,7 +525,11 @@ impl Drop for SharedDatagramSessionLease {
     }
 }
 
-fn compatibility_key(options: &SessionOptions, style: &str) -> CompatibilityKey {
+fn compatibility_key(
+    options: &SessionOptions,
+    style: &str,
+    new_dest_policy: bool,
+) -> CompatibilityKey {
     let mut safe_options = options.clone();
     let identity = match &safe_options.destination {
         DestinationKind::Transient => CompatibilityIdentity::Transient,
@@ -525,6 +544,7 @@ fn compatibility_key(options: &SessionOptions, style: &str) -> CompatibilityKey 
         identity,
         session_options: format!("{safe_options:?}"),
         session_options_identity: additional_options_identity(&safe_options),
+        new_dest_policy,
     }
 }
 
@@ -549,11 +569,34 @@ fn additional_options_identity(options: &SessionOptions) -> String {
 }
 
 /// Translate a client definition and its owned identity into Yosemite options.
+///
+/// For shared `NewDest` resumes the synthetic shared identity owns the single
+/// successor; all members use it so one idle close yields one successor.
+/// Dedicated definitions use their per-name committed-or-staged identity.
+/// Private material is carried only by Yosemite's redacted `DestinationKind`.
 pub(crate) async fn build_client_session_options(
     definition: &TunnelDefinition,
     sam_tcp_port: u16,
     store: Option<&ClientDestinationStore>,
 ) -> BackendResult<SessionOptions> {
+    if definition.options.shared.unwrap_or(false) && definition.options.new_dest.unwrap_or(false) {
+        let Some(store) = store else {
+            return Err(BackendError::Internal {
+                message: "client destination owner unavailable".to_string(),
+            });
+        };
+        let policy_key = shared_policy_key(definition, sam_tcp_port)?;
+        let identity =
+            store.shared_active(&policy_key).await.map_err(|_| BackendError::Internal {
+                message: "client destination owner unavailable".to_string(),
+            })?;
+        let destination = identity.map_or(DestinationKind::Transient, |identity| {
+            DestinationKind::Persistent {
+                private_key: identity.as_str().to_owned(),
+            }
+        });
+        return build_session_options(definition, sam_tcp_port, false, destination);
+    }
     let identity = if definition.options.new_dest.is_some()
         || definition.options.persistent_client_key.is_some()
         || definition.options.priv_key_file.is_some()
@@ -578,6 +621,82 @@ pub(crate) async fn build_client_session_options(
         }
     });
     build_session_options(definition, sam_tcp_port, false, destination)
+}
+
+/// Stable shared-policy key for one definition (M134).
+///
+/// Captures the exact Yosemite session settings that participate in sharing
+/// (via a Transient build, so no identity material enters the key) plus the
+/// I2PControl-owned `NewDest` policy. Two definitions share one Yosemite
+/// session only when their full compatibility keys match; two definitions
+/// share one *policy* (one eligibility, one synthetic successor) only when
+/// these policy keys match. Contains no secrets.
+pub(crate) fn shared_policy_key(
+    definition: &TunnelDefinition,
+    sam_tcp_port: u16,
+) -> BackendResult<String> {
+    let transient =
+        build_session_options(definition, sam_tcp_port, false, DestinationKind::Transient)?;
+    let mut safe = transient.clone();
+    safe.nickname.clear();
+    safe.destination = DestinationKind::Transient;
+    let session_options = format!("{safe:?}");
+    let identity = additional_options_identity(&safe);
+    let new_dest = definition.options.new_dest.unwrap_or(false);
+    Ok(format!(
+        "stream|{session_options}|{identity}|newdest={new_dest}"
+    ))
+}
+
+/// Validated Proposal `NewDest` policy for one definition (M134).
+///
+/// Returns `None` when absent, `Some(false)` for explicit disabled, and
+/// `Some(true)` for a fully qualified `NewDest=true` (six TCP families only,
+/// `Close=true` prerequisite, no persistent/import conflict, Streamr/servers
+/// remain not applicable). Malformed or conflicting values fail before
+/// allocation.
+fn parse_newdest_policy(definition: &TunnelDefinition) -> BackendResult<Option<bool>> {
+    let tunnel_type = definition.tunnel_type;
+    let Some(new_dest) = definition.options.new_dest else {
+        return Ok(None);
+    };
+    let applicable = matches!(
+        tunnel_type,
+        TunnelType::Client
+            | TunnelType::HttpClient
+            | TunnelType::IrcClient
+            | TunnelType::Socks
+            | TunnelType::SocksIrc
+            | TunnelType::ConnectClient
+    );
+    if !applicable {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "NewDest".to_owned(),
+        });
+    }
+    if !new_dest {
+        return Ok(Some(false));
+    }
+    if definition.options.persistent_client_key.unwrap_or(false) {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "NewDest".to_owned(),
+        });
+    }
+    if definition.options.priv_key_file.is_some() {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "NewDest".to_owned(),
+        });
+    }
+    match parse_close_policy(definition)? {
+        Some(_) => Ok(Some(true)),
+        None => Err(BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "NewDest".to_owned(),
+        }),
+    }
 }
 
 /// Validated Proposal idle-reduction policy for one definition.
@@ -872,6 +991,12 @@ pub fn build_session_options(
             })?;
     }
 
+    // M134: `NewDest` prerequisites/conflicts fail before allocation. The
+    // actual rotation is owned by the proven-resume transaction (tracker +
+    // secret store); no wire option is emitted for `NewDest` itself and no
+    // Yosemite change occurs.
+    let _ = parse_newdest_policy(definition)?;
+
     Ok(options)
 }
 
@@ -955,9 +1080,12 @@ fn option_error(error: super::super::options::OptionValidationError) -> BackendE
 /// `Close`/`CloseTime` are M137-applied router-side via `build_session_options`
 /// (standard `i2cp.close*`); they are validated here fail-before-allocation
 /// but never arm the local TCP-handler-count `run_idle_closer`, which stays
-/// disabled. `NewDest` remains `blocked_primitive` and any supplied value
-/// fails here, before listener/session allocation. Values remain in canonical
-/// raw config for lossless round-trip.
+/// disabled. `NewDest` is M134-applied as a proven idle-resume policy: the
+/// flag is validated here (including the `Close=true` prerequisite and the
+/// persistent/import conflicts) and the actual one-shot rotation is owned by
+/// the `IdleResumeTracker` + secret-store transaction in the start path, never
+/// by elapsed time or handler counts. Values remain in canonical raw config
+/// for lossless round-trip.
 pub(crate) fn client_lifecycle_config(
     definition: &TunnelDefinition,
 ) -> BackendResult<ClientLifecycleConfig> {
@@ -971,6 +1099,13 @@ pub(crate) fn client_lifecycle_config(
                 });
             }
         }
+        // M134: servers never support `NewDest` (not applicable, any value).
+        if definition.options.new_dest.is_some() {
+            return Err(BackendError::UnsupportedOption {
+                tunnel_type,
+                option: "NewDest".to_owned(),
+            });
+        }
         return Ok(ClientLifecycleConfig::DISABLED);
     }
 
@@ -979,18 +1114,17 @@ pub(crate) fn client_lifecycle_config(
     // runtime effect is router-side via Yosemite generic options, never via
     // the local handler-count heuristic.
     let _ = parse_close_policy(definition)?;
-    if definition.options.new_dest.is_some() {
-        return Err(BackendError::UnsupportedOption {
-            tunnel_type,
-            option: "NewDest".to_owned(),
-        });
-    }
+    // M134: validate `NewDest` conflicts/prerequisites here as well so every
+    // backend preflight fails before allocation even when `build_session_options`
+    // is bypassed (e.g. Streamr, which validates lifecycle but builds datagram
+    // sessions separately).
+    let new_dest_on_resume = parse_newdest_policy(definition)?.unwrap_or(false);
 
     Ok(ClientLifecycleConfig {
         connect_delay,
         close_on_idle: false,
         close_idle_time: DEFAULT_CLOSE_IDLE_TIME,
-        new_dest_on_resume: false,
+        new_dest_on_resume,
     })
 }
 
@@ -1090,11 +1224,11 @@ mod tests {
     }
 
     #[test]
-    fn m121_close_closetime_newdest_fail_before_allocation_for_all_clients() {
-        // M137 update: `Close`/`CloseTime` are now applied router-side via
-        // the canonical SAM idle owner (validated here and mapped through
-        // Yosemite generic options); the local handler-count heuristic stays
-        // disabled. `NewDest` remains blocked.
+    fn m134_newdest_proven_resume_validates_before_allocation() {
+        // M134 (rebased on M137): `Close`/`CloseTime` stay M137-applied
+        // router-side; `NewDest` is a proven idle-resume policy. `NewDest=true`
+        // requires `Close=true`, conflicts with persistent/import, and applies
+        // to the six TCP families (Streamr/servers stay N/A).
         use crate::i2pcontrol::domain::tunnel::TunnelType::*;
         for tunnel_type in [
             Client,
@@ -1126,6 +1260,7 @@ mod tests {
                 Err(BackendError::UnsupportedOption { option, .. }) if option == "CloseTime"
             ));
 
+            // `NewDest=true` without `Close=true` fails the prerequisite.
             let mut new_dest_def = definition();
             new_dest_def.tunnel_type = tunnel_type;
             new_dest_def.options.new_dest = Some(true);
@@ -1133,17 +1268,71 @@ mod tests {
                 client_lifecycle_config(&new_dest_def),
                 Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
             ));
-            // validate_common_options is the earlier gate in production start
-            // ordering (production.rs validates before stage/backend preflight).
-            let error = crate::i2pcontrol::backends::options::validate_common_options(
-                tunnel_type,
-                &new_dest_def.options,
-            )
-            .unwrap_err();
-            assert_eq!(
-                error.to_string(),
-                format!("{tunnel_type} does not support option NewDest")
+
+            // `NewDest=true` with `Close=true` passes lifecycle and maps.
+            let mut qualified = definition();
+            qualified.tunnel_type = tunnel_type;
+            qualified.raw_config.insert("Close".to_owned(), serde_json::json!(true));
+            qualified.options.new_dest = Some(true);
+            let lifecycle = client_lifecycle_config(&qualified).unwrap();
+            assert!(lifecycle.new_dest_on_resume);
+            assert!(
+                build_session_options(&qualified, 7656, false, DestinationKind::Transient).is_ok()
             );
+
+            // `NewDest=true` + persistent/import conflicts fail.
+            for mut conflict in [
+                {
+                    let mut def = definition();
+                    def.tunnel_type = tunnel_type;
+                    def.raw_config.insert("Close".to_owned(), serde_json::json!(true));
+                    def.options.new_dest = Some(true);
+                    def.options.persistent_client_key = Some(true);
+                    def
+                },
+                {
+                    let mut def = definition();
+                    def.tunnel_type = tunnel_type;
+                    def.raw_config.insert("Close".to_owned(), serde_json::json!(true));
+                    def.options.new_dest = Some(true);
+                    def.options.priv_key_file = Some("import.key".to_owned());
+                    def
+                },
+            ] {
+                // Ensure the conflict definition carries the prerequisite so
+                // the failure is the conflict, not a missing Close.
+                conflict.tunnel_type = tunnel_type;
+                assert!(matches!(
+                    client_lifecycle_config(&conflict),
+                    Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
+                ));
+            }
+
+            // `NewDest=false` is explicit disabled (no prerequisite).
+            let mut disabled = definition();
+            disabled.tunnel_type = tunnel_type;
+            disabled.options.new_dest = Some(false);
+            let lifecycle = client_lifecycle_config(&disabled).unwrap();
+            assert!(!lifecycle.new_dest_on_resume);
+        }
+        // Streamr and servers stay not applicable for any `NewDest` value.
+        for tunnel_type in [
+            StreamrClient,
+            Server,
+            HttpServer,
+            HttpBidirServer,
+            IrcServer,
+            StreamrServer,
+        ] {
+            for value in [true, false] {
+                let mut def = definition();
+                def.tunnel_type = tunnel_type;
+                def.options.new_dest = Some(value);
+                assert!(matches!(
+                    client_lifecycle_config(&def),
+                    Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
+                ));
+            }
         }
     }
 
@@ -1169,7 +1358,8 @@ mod tests {
     fn client_lifecycle_controls_are_bounded_and_fail_before_allocation() {
         // ConnectDelay remains applied; Close/CloseTime are M137-applied
         // router-side (validated here, local closer stays disabled);
-        // NewDest remains M121-demoted and any supplied value fails.
+        // NewDest is M134-applied as a proven-resume flag (prerequisite and
+        // conflicts fail here, rotation itself is tracker-owned).
         let mut valid = definition();
         valid.raw_config.insert("ConnectDelay".to_owned(), serde_json::json!(60_000));
         let lifecycle = client_lifecycle_config(&valid).unwrap();
@@ -1224,15 +1414,21 @@ mod tests {
             Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
         ));
 
-        // M121: NewDest=false is also blocked (no accept-inert). Close=true
+        // M134: `NewDest=true` with `Close=true` passes with resume armed;
+        // `NewDest=false` is explicit disabled (no prerequisite). Close=true
         // with Shared passes lifecycle (sharing compatibility is enforced
         // via the session-options identity, not by rejecting close).
+        let mut qualified = definition();
+        qualified.raw_config.insert("Close".to_owned(), serde_json::json!(true));
+        qualified.options.new_dest = Some(true);
+        let lifecycle = client_lifecycle_config(&qualified).unwrap();
+        assert!(lifecycle.new_dest_on_resume);
+        assert!(!lifecycle.close_on_idle);
+
         let mut new_dest_false = definition();
         new_dest_false.options.new_dest = Some(false);
-        assert!(matches!(
-            client_lifecycle_config(&new_dest_false),
-            Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
-        ));
+        let lifecycle = client_lifecycle_config(&new_dest_false).unwrap();
+        assert!(!lifecycle.new_dest_on_resume);
 
         let mut shared_close = definition();
         shared_close.raw_config.insert("Close".to_owned(), serde_json::json!(true));
@@ -1603,15 +1799,21 @@ mod tests {
         different_identity.destination = DestinationKind::Persistent {
             private_key: "b3RoZXIta2V5".to_owned(),
         };
-        let first_key = compatibility_key(&first, "stream");
-        assert_eq!(first_key, compatibility_key(&same, "stream"));
-        assert_ne!(first_key, compatibility_key(&different, "stream"));
-        assert_ne!(first_key, compatibility_key(&different_wire, "stream"));
+        let first_key = compatibility_key(&first, "stream", false);
+        assert_eq!(first_key, compatibility_key(&same, "stream", false));
+        assert_ne!(first_key, compatibility_key(&different, "stream", false));
         assert_ne!(
-            compatibility_key(&different_wire, "stream"),
-            compatibility_key(&different_custom_value, "stream")
+            first_key,
+            compatibility_key(&different_wire, "stream", false)
         );
-        assert_ne!(first_key, compatibility_key(&different_identity, "stream"));
+        assert_ne!(
+            compatibility_key(&different_wire, "stream", false),
+            compatibility_key(&different_custom_value, "stream", false)
+        );
+        assert_ne!(
+            first_key,
+            compatibility_key(&different_identity, "stream", false)
+        );
         let debug = format!("{first_key:?}");
         let display = format!("{first_key}");
         assert!(!debug.contains("c2VjcmV0"));
@@ -1633,7 +1835,7 @@ mod tests {
     #[test]
     fn dropped_creator_reservation_reopens_its_key() {
         let registry = SharedClientSessionRegistry::new();
-        let key = compatibility_key(&SessionOptions::default(), "stream");
+        let key = compatibility_key(&SessionOptions::default(), "stream", false);
         registry.state.lock().entries.insert(
             key.clone(),
             SharedSessionEntry {
@@ -1921,21 +2123,24 @@ mod tests {
         let disabled_options =
             build_session_options(&disabled, 7656, false, DestinationKind::Transient).unwrap();
 
-        let base_key = compatibility_key(&base_options, "stream");
+        let base_key = compatibility_key(&base_options, "stream", false);
         assert_ne!(
             base_key,
-            compatibility_key(&different_time_options, "stream")
+            compatibility_key(&different_time_options, "stream", false)
         );
         assert_ne!(
             base_key,
-            compatibility_key(&different_count_options, "stream")
+            compatibility_key(&different_count_options, "stream", false)
         );
-        assert_ne!(base_key, compatibility_key(&disabled_options, "stream"));
+        assert_ne!(
+            base_key,
+            compatibility_key(&disabled_options, "stream", false)
+        );
         // Identical policies share.
         let same = reduce_definition(TunnelType::Client, &[("Reduce", serde_json::json!(true))]);
         let same_options =
             build_session_options(&same, 7656, false, DestinationKind::Transient).unwrap();
-        assert_eq!(base_key, compatibility_key(&same_options, "stream"));
+        assert_eq!(base_key, compatibility_key(&same_options, "stream", false));
     }
 
     #[tokio::test]
@@ -2171,16 +2376,19 @@ mod tests {
         let disabled_options =
             build_session_options(&disabled, 7656, false, DestinationKind::Transient).unwrap();
 
-        let base_key = compatibility_key(&base_options, "stream");
+        let base_key = compatibility_key(&base_options, "stream", false);
         assert_ne!(
             base_key,
-            compatibility_key(&different_time_options, "stream")
+            compatibility_key(&different_time_options, "stream", false)
         );
-        assert_ne!(base_key, compatibility_key(&disabled_options, "stream"));
+        assert_ne!(
+            base_key,
+            compatibility_key(&disabled_options, "stream", false)
+        );
         let same = reduce_definition(TunnelType::Client, &[("Close", serde_json::json!(true))]);
         let same_options =
             build_session_options(&same, 7656, false, DestinationKind::Transient).unwrap();
-        assert_eq!(base_key, compatibility_key(&same_options, "stream"));
+        assert_eq!(base_key, compatibility_key(&same_options, "stream", false));
     }
 
     #[tokio::test]
@@ -2200,5 +2408,208 @@ mod tests {
         assert!(command.contains("i2cp.closeIdleTime=600000"));
         assert!(!command.contains(" Close="));
         assert!(!command.contains(" CloseTime="));
+    }
+
+    fn newdest_definition(
+        tunnel_type: TunnelType,
+        new_dest: Option<bool>,
+        close: bool,
+    ) -> TunnelDefinition {
+        let mut def = reduce_definition(tunnel_type, &[]);
+        if close {
+            def.raw_config.insert("Close".to_owned(), serde_json::json!(true));
+        }
+        def.options.new_dest = new_dest;
+        def
+    }
+
+    #[test]
+    fn m134_newdest_true_requires_close_and_rejects_conflicts() {
+        use TunnelType::*;
+        for tunnel_type in [
+            Client,
+            HttpClient,
+            IrcClient,
+            Socks,
+            SocksIrc,
+            ConnectClient,
+        ] {
+            // Prerequisite: true without Close fails.
+            let def = newdest_definition(tunnel_type, Some(true), false);
+            assert!(matches!(
+                parse_newdest_policy(&def),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
+            ));
+            assert!(matches!(
+                client_lifecycle_config(&def),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
+            ));
+            assert!(build_session_options(&def, 7656, false, DestinationKind::Transient).is_err());
+            // Qualified true passes with resume armed.
+            let def = newdest_definition(tunnel_type, Some(true), true);
+            assert_eq!(parse_newdest_policy(&def).unwrap(), Some(true));
+            assert!(client_lifecycle_config(&def).unwrap().new_dest_on_resume);
+            assert!(build_session_options(&def, 7656, false, DestinationKind::Transient).is_ok());
+            // Conflicts fail even with the prerequisite present.
+            let mut conflict = newdest_definition(tunnel_type, Some(true), true);
+            conflict.options.persistent_client_key = Some(true);
+            assert!(matches!(
+                parse_newdest_policy(&conflict),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
+            ));
+            let mut conflict = newdest_definition(tunnel_type, Some(true), true);
+            conflict.options.priv_key_file = Some("import.key".to_owned());
+            assert!(matches!(
+                parse_newdest_policy(&conflict),
+                Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
+            ));
+            // Explicit disabled passes without the prerequisite.
+            let def = newdest_definition(tunnel_type, Some(false), false);
+            assert_eq!(parse_newdest_policy(&def).unwrap(), Some(false));
+            assert!(!client_lifecycle_config(&def).unwrap().new_dest_on_resume);
+            // Absent stays disabled.
+            let def = newdest_definition(tunnel_type, None, false);
+            assert!(parse_newdest_policy(&def).unwrap().is_none());
+        }
+        // Streamr and servers stay not applicable for both values.
+        for tunnel_type in [
+            StreamrClient,
+            Server,
+            HttpServer,
+            HttpBidirServer,
+            IrcServer,
+            StreamrServer,
+        ] {
+            for value in [Some(true), Some(false)] {
+                let mut def = reduce_definition(tunnel_type, &[]);
+                def.options.new_dest = value;
+                assert!(matches!(
+                    parse_newdest_policy(&def),
+                    Err(BackendError::UnsupportedOption { option, .. }) if option == "NewDest"
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn m134_differing_newdest_policies_do_not_share() {
+        let mut base = newdest_definition(TunnelType::Client, Some(true), true);
+        base.options.tunnel_quantity = Some(2);
+        let base_options =
+            build_session_options(&base, 7656, false, DestinationKind::Transient).unwrap();
+        let mut different = newdest_definition(TunnelType::Client, Some(false), false);
+        different.options.tunnel_quantity = Some(2);
+        let different_options =
+            build_session_options(&different, 7656, false, DestinationKind::Transient).unwrap();
+        // Same wire settings except the I2PControl-owned NewDest policy still
+        // separate compatibility: incompatible lifecycle policies never share.
+        // (Here Close also differs, which already separates via the wire; the
+        // NewDest flag separates even when the wire is otherwise identical.)
+        assert_ne!(
+            compatibility_key(&base_options, "stream", true),
+            compatibility_key(&different_options, "stream", false)
+        );
+        assert_ne!(
+            compatibility_key(&base_options, "stream", true),
+            compatibility_key(&base_options, "stream", false)
+        );
+        let mut same = newdest_definition(TunnelType::Client, Some(true), true);
+        same.options.tunnel_quantity = Some(2);
+        let same_options =
+            build_session_options(&same, 7656, false, DestinationKind::Transient).unwrap();
+        assert_eq!(
+            compatibility_key(&base_options, "stream", true),
+            compatibility_key(&same_options, "stream", true)
+        );
+        // Debug/Display never expose identity material.
+        let key = compatibility_key(
+            &SessionOptions {
+                destination: DestinationKind::Persistent {
+                    private_key: "c2VjcmV0LWtleQ==".to_owned(),
+                },
+                ..Default::default()
+            },
+            "stream",
+            true,
+        );
+        let debug = format!("{key:?}");
+        let display = format!("{key}");
+        assert!(!debug.contains("c2VjcmV0"));
+        assert!(!display.contains("c2VjcmV0"));
+        assert!(debug.contains("new_dest_policy"));
+    }
+
+    #[test]
+    fn m134_shared_policy_key_is_stable_and_excludes_identity() {
+        let mut first = newdest_definition(TunnelType::Client, Some(true), true);
+        first.name = TunnelName::new("first").unwrap();
+        let mut second = newdest_definition(TunnelType::Client, Some(true), true);
+        second.name = TunnelName::new("second").unwrap();
+        // Same policy, different names: same policy key (one shared successor).
+        assert_eq!(
+            shared_policy_key(&first, 7656).unwrap(),
+            shared_policy_key(&second, 7656).unwrap()
+        );
+        // Different NewDest policy: different keys (do not share).
+        let mut other = newdest_definition(TunnelType::Client, Some(false), false);
+        other.name = TunnelName::new("first").unwrap();
+        // `other` lacks Close while `first` requires it; keys must differ.
+        // (If Close were added to `other` without NewDest, the NewDest flag
+        // alone still separates.)
+        assert_ne!(
+            shared_policy_key(&first, 7656).unwrap(),
+            shared_policy_key(&other, 7656).unwrap()
+        );
+        // Policy keys contain no secret material.
+        let key = shared_policy_key(&first, 7656).unwrap();
+        assert!(!key.contains("cHJpdmF0ZQ"));
+    }
+
+    #[test]
+    fn m134_all_six_tcp_families_translate_newdest_end_to_end() {
+        use TunnelType::*;
+        for tunnel_type in [
+            Client,
+            HttpClient,
+            IrcClient,
+            Socks,
+            SocksIrc,
+            ConnectClient,
+        ] {
+            let mut def = reduce_definition(tunnel_type, &[("Close", serde_json::json!(true))]);
+            def.options.new_dest = Some(true);
+            let options =
+                build_session_options(&def, 7656, false, DestinationKind::Transient).unwrap();
+            let map: std::collections::BTreeMap<_, _> = options
+                .additional_options
+                .iter()
+                .map(|o| (o.key().to_owned(), o.value().to_owned()))
+                .collect();
+            // Close still maps; NewDest itself emits no wire option.
+            assert_eq!(
+                map.get("i2cp.closeOnIdle").map(String::as_str),
+                Some("true")
+            );
+            let lifecycle = client_lifecycle_config(&def).unwrap();
+            assert!(lifecycle.new_dest_on_resume);
+            assert!(!lifecycle.close_on_idle);
+        }
+    }
+
+    #[tokio::test]
+    async fn m134_newdest_emits_no_wire_option_without_injection() {
+        let mut def = reduce_definition(TunnelType::Client, &[("Close", serde_json::json!(true))]);
+        def.options.new_dest = Some(true);
+        let mut options =
+            build_session_options(&def, 7656, false, DestinationKind::Transient).unwrap();
+        options.nickname = "m134-wire".to_owned();
+        let command = fake_sam_session_create_command(options).await;
+        assert!(command.contains("i2cp.closeOnIdle=true"));
+        assert!(!command.contains("NewDest"));
+        assert!(!command.contains("newDest"));
+        // Nickname is the only allowed `m134` marker; no Proposal lifecycle
+        // name may appear as a wire key.
+        assert!(!command.contains(" newDest="));
+        assert!(!command.contains(" NewDest="));
     }
 }

@@ -1,10 +1,10 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M135/M136/M137 closed as complete, NewDest future**
+Status: **active / partial; M134/M135/M136/M137 closed as complete, lifecycle line complete**
 
 Current handoff:
 
-- NewDest successor (historical M134 rebase or corrective M138), gated on the M137 §12 consumer contract. No NewDest execution is authorized now.
+- none from the lifecycle line (M134 closed as complete, six promotions, `325/47/468`).
 
 Closed correctives:
 
@@ -18,19 +18,19 @@ Focused lifecycle roadmap:
 
 Corrective successors already planned but unregistered:
 
-- NewDest successor only (M134 rebase or M138).
+- none from the lifecycle line (complete).
 
 Historical lifecycle attempts:
 
 - M132 closed as blocked;
 - M133 closed as blocked;
-- M134 remains deferred and must be rebased against the M137 contract or superseded.
+- M134 is closed as complete (`plans/closure/i2pcontrol-proposal-170/134-closure.md`, six `NewDest` promotions).
 
 Current authorities:
 
 - runtime/security qualification: M130 closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
 - residual applicability/primitive authority: M131 closure `plans/closure/i2pcontrol-proposal-170/131-closure.md` and `131-residual-primitive-map.toml`;
-- current matrix: `319 apply / 53 blocked_primitive / 468 not_applicable`;
+- current matrix: `325 apply / 47 blocked_primitive / 468 not_applicable`;
 - M136 closure: `plans/closure/i2pcontrol-proposal-170/136-closure.md`;
 - M137 closure: `plans/closure/i2pcontrol-proposal-170/137-closure.md`.
 
@@ -39,7 +39,7 @@ Pinned external authority:
 - I2P Proposal 170 revision `2026-05-20`, status Open;
 - read-only Java I2P lifecycle reference snapshot `i2p/i2p.i2p@2c3fd2a9532cd86ec06cb6f2b9f3f813ca752243` for M135-M137.
 
-All external specification/reference activity is read-only. Repository writes remain internal to `eggstack/emissary`; Yosemite writes require separate ADR-0005/Yosemite planning authority and are not authorized by M135-M137.
+All external specification/reference activity is read-only. Repository writes remain internal to `eggstack/emissary`; Yosemite writes require separate ADR-0005/Yosemite planning authority and are not authorized by M134-M137.
 
 ## 1. Purpose
 
@@ -178,10 +178,10 @@ M136 M132 corrective: session activity + Reduce*          [CLOSED AS COMPLETE �
 M137 M133 corrective: Close* + reasoned termination       [CLOSED AS COMPLETE — 319/53/468]
   |
   v
-M134 rebased/amended OR future M138 NewDest corrective    [FUTURE / UNREGISTERED]
+M134 NewDest on proven idle resume                        [CLOSED AS COMPLETE — 325/47/468]
 ```
 
-No active implementation handoff; NewDest registers only against the M137 §12 contract.
+No active implementation handoff from the lifecycle line (complete).
 
 ### M135
 
@@ -207,13 +207,13 @@ M137 closed as complete (`plans/closure/i2pcontrol-proposal-170/137-closure.md`,
 
 It did not implement `NewDest`.
 
-### NewDest
+### M134 NewDest (closed)
 
-Historical M134 is not executable. After successful M137 closure it must be explicitly rebased/amended against the proven termination/reopen contract or superseded by a new corrective M138.
+M134 closed as complete (`plans/closure/i2pcontrol-proposal-170/134-closure.md`, six promotions, `325/47/468`). Historical M134 was rebased on the proven M137 §12 contract (no M138 required).
 
 ## 8. Other residual clusters
 
-M135-M137 do not authorize work on:
+M134-M137 do not authorize work on:
 
 - presentation TLS;
 - HTTP SSL-outproxy/jump behavior;
@@ -279,7 +279,7 @@ Per `plans/003-planning-process.md`:
   registration step (status flip + gate citation)**;
 - M137 remains unregistered until M136 closure explicitly declares dependency readiness;
 - M137 remains unregistered until M136 closure explicitly declares dependency readiness;
-- M134 remains unregistered/stale until rebased after M137 or superseded;
+- M134 is closed as complete; no M138 exists;
 - all other residual clusters remain unregistered;
 - material deviations require plan amendment before production code;
 - closure evidence decides support and matrix promotion.

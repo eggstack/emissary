@@ -32,14 +32,17 @@ baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its
-# named production-path helpers. The M109-M134 entries and focused corrective /
+# named production-path helpers. The M109-M137 entries and focused corrective /
 # completion roadmaps below are planning documents only; their presence here
 # does not authorize any production path, dependency, or lockfile change.
 # Future execution still requires registry readiness and the exact production
 # authority stated by each plan. ADR-0005 authorizes only the I2PControl-owned
 # exact-revision Yosemite fork alias. M122 landed Y004 (c2db73d); M124 adopted
-# reviewed Y005 (59140a2) after Y005 and M123 closed. M132 is the sole active
-# implementation handoff; M133-M134 remain dependency-blocked and unregistered.
+# reviewed Y005 (59140a2) after Y005 and M123 closed. M132/M133 are closed as
+# blocked. M135 is the sole active implementation handoff; M136-M137 and M134
+# remain dependency-blocked/unregistered. M135 implementation must amend M062
+# to the exact realized neutral core diff before closure; this planning-only
+# entry does not pre-authorize those production paths.
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",
@@ -63,6 +66,9 @@ root_manifests = [
   "plans/implementation/i2pcontrol-proposal-170/132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md",
   "plans/implementation/i2pcontrol-proposal-170/133-neutral-sam-idle-close-and-reasoned-termination.md",
   "plans/implementation/i2pcontrol-proposal-170/134-newdest-on-proven-idle-resume.md",
+  "plans/implementation/i2pcontrol-proposal-170/135-neutral-live-tunnel-quantity-and-leaseset-reconfiguration-primitive.md",
+  "plans/implementation/i2pcontrol-proposal-170/136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/137-m133-corrective-sam-idle-close-and-reasoned-termination.md",
   "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md",
 ]

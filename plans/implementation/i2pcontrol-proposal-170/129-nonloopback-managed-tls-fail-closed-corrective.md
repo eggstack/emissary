@@ -1,6 +1,6 @@
 # M129 — Non-Loopback Managed-TLS Fail-Closed Corrective
 
-Status: **queued / unregistered**
+Status: **ready / registered** (promoted on M128 closure; see `plans/closure/i2pcontrol-proposal-170/128-closure.md` §11)
 
 Class: corrective / TLS configuration / operational security
 
@@ -40,6 +40,8 @@ M129 does not inspect or certify operator-provided certificate hostname/SAN poli
 M129 is queued and unregistered while earlier RPC/auth corrective work is active. It is implementation-independent of M128, but should be executed after M127/M128 to keep closure history linear around one shared control-plane boundary.
 
 Registration rule: promote M129 only after M128 closure unless a maintainer explicitly reorders the independent milestones.
+
+Registration note (2026-09-04): M128 closed (`plans/closure/i2pcontrol-proposal-170/128-closure.md`), so M129 is promoted to **ready / registered** as the single active handoff per `plans/003-planning-process.md`.
 
 ## 3. Why prior verification missed the defect
 

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 — Post-M114 Corrective Roadmap
 
-Status: **active corrective workstream; M127 closed; M128 ready; M129 queued; M130 blocked on corrective closure**
+Status: **active corrective workstream; M127-M128 closed; M129 ready; M130 blocked on corrective closure**
 
 Original corrective baseline: `feafc6a1d9650887015a01f87bf21b57a4e92085`
 
@@ -71,13 +71,13 @@ This invalidates only M126's affected authentication-lifetime qualification clai
 
 Owner: **M127**.
 
-### C11 — valid JSON-RPC batches are blanket-rejected
+### C11 — valid JSON-RPC batches are blanket-rejected (resolved)
 
 M126 proved that top-level arrays cannot bypass authentication, but treated blanket invalid-request rejection as sufficient. That is a security check, not JSON-RPC 2.0 batch conformance.
 
-The corrective must add bounded batch cardinality, per-element authentication, independent errors/results, correct notification suppression, and no unbounded task fan-out.
+The corrective added bounded batch cardinality (`MAX_BATCH_ELEMENTS = 32`), per-element authentication, independent errors/results, correct notification suppression, and no unbounded task fan-out.
 
-Owner: **M128**, queued after M127 so it inherits the corrected token semantics.
+Owner: **M128** — **closed** (`plans/closure/i2pcontrol-proposal-170/128-closure.md`, implementation `0ed60eb`).
 
 ### C12 — non-loopback bind may use a loopback-only managed certificate
 
@@ -85,7 +85,7 @@ Managed TLS generates an identity for `localhost`, `127.0.0.1`, and `::1`. Curre
 
 The fail-closed correction is to require complete explicit certificate/key configuration for every non-loopback bind. Managed TLS remains loopback-only.
 
-Owner: **M129**.
+Owner: **M129** — **ready / registered** (promoted on M128 closure).
 
 After M127-M129 close, **M130** performs a new current-head operational/security/spec requalification and supersedes M126 only for current authority. Historical M126 evidence remains intact.
 
@@ -161,16 +161,16 @@ No M127-M130 production behavior belongs below the I2PControl application layer.
 ## 7. Dependency graph and classes
 
 ```text
-M126 post-M125 requalification                 [HISTORICAL CLOSED; C10 RESOLVED BY M127, C11-C12 OPEN]
+M126 post-M125 requalification                 [HISTORICAL CLOSED; C10 RESOLVED BY M127, C11 RESOLVED BY M128, C12 OPEN]
 M127 token-lifetime corrective                 [CLOSED]
   |
   | sequencing dependency satisfied: batch inherits corrected token authority
   v
-M128 JSON-RPC batch corrective                 [READY / REGISTERED]
+M128 JSON-RPC batch corrective                 [CLOSED]
   |
   | sequencing dependency for linear shared-control-plane closure
   v
-M129 non-loopback TLS fail-closed corrective   [QUEUED / UNREGISTERED]
+M129 non-loopback TLS fail-closed corrective   [READY / REGISTERED]
   |
   v
 M130 post-corrective requalification           [BLOCKED; HARD DEPENDS M127-M129]
@@ -187,7 +187,7 @@ Dependency classes:
 - M129 is technically independent but intentionally sequencing-gated after M128 to keep one active implementation handoff and one closure authority at a time.
 - M130 has hard dependencies on closed M127, M128, and M129 implementations/closures.
 
-Only M127 is registered as the current handoff under `plans/003-planning-process.md`.
+Only M129 is registered as the current handoff under `plans/003-planning-process.md`.
 
 ## 8. M127 — finite authentication token lifetime
 
@@ -213,9 +213,9 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/128-json-rpc-batch-conformance-corrective.md`
 
-Status: **ready / registered** (promoted on M127 closure).
+Status: **closed**; closure `plans/closure/i2pcontrol-proposal-170/128-closure.md`, implementation `0ed60eb`.
 
-Primary exit conditions:
+Primary exit conditions (all met; see closure):
 
 - valid non-empty batches execute;
 - invalid entries produce independent invalid-request errors;
@@ -232,7 +232,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/129-nonloopback-managed-tls-fail-closed-corrective.md`
 
-Status: **queued / unregistered**.
+Status: **ready / registered** (promoted on M128 closure; see `plans/closure/i2pcontrol-proposal-170/128-closure.md` §11).
 
 Primary exit conditions:
 

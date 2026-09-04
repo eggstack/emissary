@@ -1,6 +1,8 @@
 # M128 — JSON-RPC 2.0 Batch Conformance Corrective
 
-Status: **ready**
+Status: **closed**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/128-closure.md`
 
 Class: corrective / JSON-RPC conformance / resource hardening
 

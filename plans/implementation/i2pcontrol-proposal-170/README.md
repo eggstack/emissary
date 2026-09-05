@@ -1,18 +1,21 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M139 ready / registered for post-lifecycle integrated requalification**.
+Status: **partial Proposal 170 support; M139 closed as the current post-lifecycle qualification authority**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
 Current authorities and handoff:
 
+- current runtime/security qualification: M139 closure `plans/closure/i2pcontrol-proposal-170/139-closure.md`;
 - historical runtime/security qualification: M130 closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
 - residual applicability/primitive authority: M131 closure `plans/closure/i2pcontrol-proposal-170/131-closure.md` and `131-residual-primitive-map.toml`;
 - lifecycle implementation authority: M135/M136/M137/M134 closures;
 - current M095 matrix: `325 apply / 47 blocked_primitive / 468 not_applicable`;
-- **current registered handoff: M139** `139-post-lifecycle-integrated-requalification-and-authority-rebase.md`.
+- no residual capability successor is registered; M139 is closed.
 
-M139 is expected to replace M130 as current-head runtime/security qualification authority only if its current-head verification closes cleanly. It has zero Proposal promotion budget and authorizes no production Rust/dependency/Yosemite change.
+M139 replaces M130 as current-head runtime/security qualification authority. It
+had zero Proposal promotion budget and authorized no production Rust/dependency/
+Yosemite change.
 
 ## Authority order
 
@@ -33,13 +36,13 @@ Containment/support evidence remains centered on:
 - `105-residual-option-audit.toml`;
 - `110-completion-ledger.toml`.
 
-## Active handoff — M139
+## Closed qualification — M139
 
 Plan:
 
 - `139-post-lifecycle-integrated-requalification-and-authority-rebase.md`.
 
-Status: **ready / registered**.
+Status: **closed as complete**.
 
 Purpose:
 
@@ -48,11 +51,11 @@ Purpose:
 - re-prove M127 finite token lifetime, M128 bounded JSON-RPC batches and M129 fail-closed TLS on the lifecycle head;
 - re-prove M135 quantity/LeaseSet, M136 Reduce*, M137 Close*/reason and M134 NewDest as one integrated lifecycle composition;
 - reconcile the registry, roadmaps, support docs and durable current-head guards;
-- make M139 the current runtime/security qualification authority only on clean closure.
+- make M139 the current runtime/security qualification authority.
 
 M139 is test/documentation/qualification work. Production-source changes are a stop condition requiring a separate corrective plan.
 
-M139 must not register the next residual capability cluster.
+M139 registered no residual capability successor.
 
 Numbering note: M137/M134 historical documents contemplated an optional NewDest-corrective “M138” and recorded it as unnecessary. No M138 implementation plan was registered. The unrelated requalification therefore uses M139.
 
@@ -137,12 +140,12 @@ M137 Close* corrective                         [CLOSED AS COMPLETE — 319/53/46
 M134 NewDest proven idle resume                [CLOSED AS COMPLETE — 325/47/468]
   |
   v
-M139 post-lifecycle integrated requalification [READY / REGISTERED — ZERO PROMOTION]
+M139 post-lifecycle integrated requalification [CLOSED AS COMPLETE — ZERO PROMOTION]
 ```
 
 ## Remaining residual clusters
 
-Remain unregistered under M131 while M139 runs:
+Remain unregistered under M131 after M139 closure:
 
 - `SigType` destination signing — 10;
 - encrypted/authenticated LeaseSets — 15;
@@ -160,7 +163,7 @@ Expected total: 47, to be mechanically re-derived by M139.
 
 Preferred production ownership remains `emissary-cli/src/i2pcontrol/**`.
 
-M135–M137 are accepted neutral lower-layer exceptions only in their exact named owners. M134 is I2PControl-owned except the minimal application-composition seam required to share its volatile tracker with the neutral SAM observation source. M139 authorizes no new production-source seam.
+M135–M137 are accepted neutral lower-layer exceptions only in their exact named owners. M134 is I2PControl-owned except the minimal application-composition seam required to share its volatile tracker with the neutral SAM observation source. M139 authorized no new production-source seam.
 
 Yosemite remains exact-pinned through optional `yosemite-i2pcontrol`; no global patch, vendoring, path dependency, floating ref or parallel SAM stack is permitted.
 

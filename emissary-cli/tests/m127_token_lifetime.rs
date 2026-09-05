@@ -174,14 +174,16 @@ fn error_and_log_paths_do_not_echo_token_material() {
 #[test]
 fn production_changes_stay_under_i2pcontrol() {
     // M127 authorizes no core/util/router/frontend/dependency change.
-    // Diff the M127 planning baseline against the working tree for
-    // production source outside the I2PControl boundary.
-    let baseline = "9948cfd0782a3defbd5f68cf2d4523603bdc7940";
+    // Keep this historical guard scoped to the M127 implementation range;
+    // later lifecycle milestones own their separately accepted seams.
+    let baseline = "cbe34ac3bca0484be9174f7876466f8c24a518f4";
+    let reviewed_head = "098c9d1";
     let output = Command::new("git")
         .args([
             "diff",
             "--name-only",
             baseline,
+            reviewed_head,
             "--",
             "emissary-core/src",
             "emissary-util/src",
@@ -206,7 +208,14 @@ fn production_changes_stay_under_i2pcontrol() {
 
     // Changed production files under emissary-cli/src must all be I2PControl-owned.
     let output = Command::new("git")
-        .args(["diff", "--name-only", baseline, "--", "emissary-cli/src"])
+        .args([
+            "diff",
+            "--name-only",
+            baseline,
+            reviewed_head,
+            "--",
+            "emissary-cli/src",
+        ])
         .current_dir(workspace_root())
         .output()
         .expect("git diff for i2pcontrol boundary");
@@ -239,7 +248,7 @@ fn proposal_matrix_unchanged_by_token_lifetime() {
             *counts.entry(cell.as_str().expect("cell").to_owned()).or_insert(0usize) += 1;
         }
     }
-    assert_eq!(counts.get("apply"), Some(&284));
-    assert_eq!(counts.get("blocked_primitive"), Some(&96));
-    assert_eq!(counts.get("not_applicable"), Some(&460));
+    assert_eq!(counts.get("apply"), Some(&325));
+    assert_eq!(counts.get("blocked_primitive"), Some(&47));
+    assert_eq!(counts.get("not_applicable"), Some(&468));
 }

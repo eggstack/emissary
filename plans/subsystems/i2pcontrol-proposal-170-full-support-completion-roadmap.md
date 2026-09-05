@@ -1,10 +1,11 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M139 ready / registered for post-lifecycle integrated requalification**
+Status: **active / partial; M139 closed as current post-lifecycle qualification authority**
 
-Current registered handoff:
+Current qualification handoff:
 
-- `plans/implementation/i2pcontrol-proposal-170/139-post-lifecycle-integrated-requalification-and-authority-rebase.md`.
+- no successor is registered; M139 closure is the current qualification handoff:
+  `plans/closure/i2pcontrol-proposal-170/139-closure.md`.
 
 Current machine authority:
 
@@ -12,7 +13,8 @@ Current machine authority:
 
 Current qualification lineage:
 
-- M130 remains historical current-head runtime/security qualification authority until M139 closes;
+- M139 is the current post-lifecycle runtime/security qualification authority;
+- M130 remains historical runtime/security qualification evidence;
 - M131 remains residual applicability/primitive authority;
 - M135/M136/M137/M134 are closed as complete and constitute the completed session-lifecycle implementation chain.
 
@@ -75,7 +77,9 @@ Current matrix:
 
 Full Proposal 170 support is **not** claimed.
 
-M130 predates all post-M131 lifecycle production work and therefore remains historical qualification lineage rather than sufficient current-head qualification. M139 exists specifically to establish a new integrated current-head authority.
+M130 predates all post-M131 lifecycle production work and remains historical
+qualification lineage. M139 establishes the current integrated current-head
+authority.
 
 ## 4. Ownership and containment
 
@@ -151,14 +155,14 @@ M137 Close* + reasoned termination                    [CLOSED AS COMPLETE — 31
 M134 NewDest on proven idle resume                    [CLOSED AS COMPLETE — 325/47/468]
   |
   v
-M139 integrated current-head requalification          [READY / REGISTERED — ZERO PROMOTION]
+M139 integrated current-head requalification          [CLOSED AS COMPLETE — ZERO PROMOTION]
 ```
 
 The session-lifecycle focused roadmap is closed as complete. No lifecycle successor remains.
 
 Historical planning mentioned a possible NewDest-corrective “M138”; M134 proved it unnecessary. No M138 implementation plan was registered. The unrelated post-lifecycle requalification therefore uses M139.
 
-## 7. M139 — active requalification milestone
+## 7. M139 — closed requalification milestone
 
 Plan:
 
@@ -177,13 +181,13 @@ It must:
 - reconcile active docs/roadmaps/registry so one current authority is named;
 - become the new current runtime/security qualification authority only if no high/medium defect remains.
 
-M139 authorizes no production Rust, dependency, Yosemite, router, NetDb, crypto, transport, frontend or residual-capability work. A defect requiring production code causes M139 to stop and produce a separate corrective plan.
+M139 authorized no production Rust, dependency, Yosemite, router, NetDb, crypto, transport, frontend or residual-capability work. No production defect was found.
 
-M139 must not register the next residual capability plan at closure.
+M139 registered no next residual capability plan at closure.
 
 ## 8. Remaining 47 residual cells
 
-All remain **unregistered** under M131 while M139 executes.
+All remain **unregistered** under M131 after M139 closure.
 
 Expected current grouping, to be mechanically revalidated by M139:
 
@@ -239,11 +243,11 @@ Each future cluster requires its own dependency-ready plan and exact path budget
 | M136 | Reduce* implementation authority |
 | M137 | Close*/termination-reason implementation authority |
 | M134 | NewDest proven-resume implementation authority |
-| M139 | active post-lifecycle integrated requalification handoff |
+| M139 | current post-lifecycle integrated runtime/security qualification authority |
 
 ## 11. Successor readiness requirements
 
-After M139 closes, no future residual primitive is dependency-ready until it defines:
+Following M139 closure, no future residual primitive is dependency-ready until it defines:
 
 - exact externally observable effect;
 - canonical owner and exact path budget;
@@ -277,9 +281,9 @@ No new hosted CI/fuzz/release orchestration is required by this roadmap.
 
 Per `plans/003-planning-process.md`:
 
-- M139 is the only active Proposal-170 handoff;
-- all 47 residual capability clusters remain unregistered while M139 is open;
-- M139 closure must leave them unregistered even on success;
+- M139 is closed as the current qualification authority;
+- all 47 residual capability clusters remain unregistered;
+- M139 closure left them unregistered;
 - selection of the next residual cluster is a separate post-requalification planning decision;
 - material deviations require plan amendment before production code;
 - closure evidence decides qualification and support truthfulness.

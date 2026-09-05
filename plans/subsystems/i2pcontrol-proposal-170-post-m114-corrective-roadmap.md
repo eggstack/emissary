@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 — Post-M114 Corrective Roadmap
 
-Status: **corrective workstream closed; M127-M130 closed; M130 is the current-head requalification authority**
+Status: **corrective workstream closed; M127-M130 historical; M139 is the current-head requalification authority**
 
 Original corrective baseline: `feafc6a1d9650887015a01f87bf21b57a4e92085`
 
@@ -85,22 +85,27 @@ Managed TLS generates an identity for `localhost`, `127.0.0.1`, and `::1`. M129 
 
 Owner: **M129** — **closed** (`plans/closure/i2pcontrol-proposal-170/129-closure.md`, implementation `39ccdd7`).
 
-After M127-M129 close, **M130** performs a new current-head operational/security/spec requalification and supersedes M126 only for current authority. Historical M126 evidence remains intact.
+After M127-M129 close, **M130** performed a historical operational/security/spec
+requalification. M139 later supersedes M130 for current-head qualification
+after the lifecycle implementation chain. Historical M126/M130 evidence remains
+intact.
 
 ## 4. Current Proposal support state
 
-The authoritative M095 matrix remains:
+The authoritative M095 matrix is:
 
-`284 apply / 96 blocked_primitive / 460 not_applicable`.
+`325 apply / 47 blocked_primitive / 468 not_applicable`.
 
-The 96 residual applicable blockers remain:
+The 47 residual applicable blockers remain:
 
 - 4 `UseSSL` cells;
 - 10 `SigType` cells;
-- 63 client proxy/profile/reduction/lifecycle cells, including 18 `Close`/`CloseTime`/`NewDest` cells;
+- 14 client proxy/profile/lifecycle cells;
 - 19 server presentation/routing/LeaseSet cells.
 
-M127-M130 are shared-control-plane corrective/qualification work. They do not promote residual cells.
+M127-M130 are historical shared-control-plane corrective/qualification work;
+M139 is the current integrated qualification authority. M135-M137/M134 own the
+21 `Reduce*`, 14 `Close*`, and six `NewDest` promotions reflected above.
 
 Full Proposal 170 status remains **partial** until genuine owners exist for every applicable residual and a later zero-residual final reclosure completes live interoperability/security evidence.
 
@@ -171,9 +176,9 @@ M128 JSON-RPC batch corrective                 [CLOSED]
 M129 non-loopback TLS fail-closed corrective   [CLOSED]
   |
   v
-M130 post-corrective requalification           [CLOSED as current-head authority]
+M130 post-corrective requalification           [CLOSED — HISTORICAL AUTHORITY]
   |
-  +--> closed clean: partial 284/96/460 retained with current-head qualification
+  +--> historical clean: partial 284/96/460 at the pre-lifecycle head
   |
   +--> concrete defect found later: register M131+ focused corrective
 ```
@@ -258,11 +263,15 @@ M130 froze the post-M129 head and requalified:
 - M061/M062 containment and Yosemite isolation;
 - active matrix/support documentation.
 
-M130 was the only milestone in this reopened sequence allowed to restore a clean “current implemented subset operationally/security qualified” statement, and it closed cleanly. Historical M126–M129 closures remain unchanged.
+M130 was the only milestone in its reopened sequence allowed to restore a clean
+“current implemented subset operationally/security qualified” statement, and it
+closed cleanly for its pre-lifecycle head. M139 is the later current-head
+authority. Historical M126–M130 closures remain unchanged.
 
 ## 12. Residual capability work remains deferred
 
-M127-M130 do not make the residual 96 cells dependency-ready.
+M127-M130 do not make the residual 47 cells dependency-ready. M139 likewise
+selected no successor; future residual planning remains a separate decision.
 
 Do not register residual implementations merely because their input fields serialize. A future residual plan requires:
 
@@ -338,7 +347,10 @@ milestone gets a separate closure record with:
 
 M127 closure promotes M128; M128 closure promotes M129; M129 closure promotes M130 (done: M130 closed). Registry updates should occur only when the predecessor closes.
 
-M130 clean closure restores current-head qualification but does not equal full Proposal 170 completion while applicable residuals remain blocked. No successor is registered; any new concrete defect becomes a separately numbered M131+ focused corrective.
+M130 clean closure restored qualification for its historical head but did not
+equal full Proposal 170 completion. M139 now governs current-head qualification
+while applicable residuals remain blocked. No successor is registered; any new
+concrete defect becomes a separately numbered corrective.
 
 Any new concrete defect found by these milestones becomes an M131+ focused corrective. Do not opportunistically broaden an active milestone.
 

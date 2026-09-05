@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 current-head requalification, M131 residual re-freeze, M135 neutral live-quantity primitive, M136 Reduce completion, M137 Close completion and M134 NewDest proven-resume completion recorded; residual option cells remain (47 blocked: 4 UseSSL + 10 SigType + 14 client lifecycle/proxy + 19 server LeaseSet/presentation)
+Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 historical requalification, M131 residual re-freeze, M135 neutral live-quantity primitive, M136 Reduce completion, M137 Close completion, M134 NewDest proven-resume completion, and M139 current-head post-lifecycle requalification recorded; residual option cells remain (47 blocked: 4 UseSSL + 10 SigType + 14 client lifecycle/proxy + 19 server LeaseSet/presentation)
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -14,7 +14,7 @@ Current roadmap:
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 - tunnel-runtime completion: `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`
 - full-support completion: `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`
-- authoritative aggregate matrix: `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml`
+- authoritative aggregate matrix: `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (`325/47/468`); current runtime/security qualification: `plans/closure/i2pcontrol-proposal-170/139-closure.md`
 
 Tunnel-runtime reclosure:
 
@@ -513,7 +513,7 @@ influenced by stale, corrupt, or attacker-planted Proposal 170 control state.
 | M112 | closed as blocked | client proxy and session-lifecycle residuals; 24 apply / 45 blocked; see `plans/closure/i2pcontrol-proposal-170/112-closure.md`; M121 later demotes the 18 `Close`/`CloseTime`/`NewDest` cells to blocked (§5.2), leaving `ConnectDelay` applied |
 | M113 | historical closed as blocked | server presentation/routing/LeaseSet residuals; historical result 0 apply / 21 blocked; M125 corrected two server-role `AllowInternalSSL` classifications; see `plans/closure/i2pcontrol-proposal-170/113-closure.md` and `plans/closure/i2pcontrol-proposal-170/125-closure.md` |
 | M121 | closed | M111/M112 semantic truthfulness corrective; demotes 28 cells (`SigType` × 10, `Close`/`CloseTime`/`NewDest` × 18) to blocked; matrix is 284 apply / 98 blocked / 458 not_applicable; see `plans/closure/i2pcontrol-proposal-170/121-closure.md` |
-| M125 | closed | focused M113 capability/crypto-ownership audit; reclassifies two server-role `AllowInternalSSL` cells and confirms 19 M113 residual blockers; current matrix is 284 apply / 96 blocked / 460 not_applicable; see `plans/closure/i2pcontrol-proposal-170/125-closure.md` |
+| M125 | closed | focused M113 capability/crypto-ownership audit; reclassifies two server-role `AllowInternalSSL` cells and confirms 19 M113 residual blockers; historical matrix was 284 apply / 96 blocked / 460 not_applicable; see `plans/closure/i2pcontrol-proposal-170/125-closure.md` |
 | M126 | closed | current-head operational/security/spec requalification; implemented subset qualified, 96 residual cells remain blocked, and no M127+ corrective was required; see `plans/closure/i2pcontrol-proposal-170/126-closure.md` |
 | M131 | closed as blocked | residual applicability/primitive re-freeze; 8 affirmative applicability corrections, 88 residual primitive blockers, no dependency-ready successor; see `plans/closure/i2pcontrol-proposal-170/131-closure.md` |
 

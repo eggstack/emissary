@@ -5,6 +5,7 @@
 use std::{collections::BTreeSet, path::Path};
 
 const UPSTREAM_BASELINE: &str = "9b43484a21d5a1291c4881cdae62a36c527f8c0f";
+const M060_IMPLEMENTATION_HEAD: &str = "6085eca";
 
 fn workspace_root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("workspace root")
@@ -56,7 +57,14 @@ fn core_changes_stay_inside_the_accepted_m060_budget() {
     .map(String::from)
     .collect::<BTreeSet<_>>();
     let output = std::process::Command::new("git")
-        .args(["diff", "--name-only", UPSTREAM_BASELINE, "--", "emissary-core"])
+        .args([
+            "diff",
+            "--name-only",
+            UPSTREAM_BASELINE,
+            M060_IMPLEMENTATION_HEAD,
+            "--",
+            "emissary-core",
+        ])
         .current_dir(workspace_root())
         .output()
         .expect("git diff");

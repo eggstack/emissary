@@ -9,7 +9,7 @@ proposal_revision = "2026-05-20"
 source_url = "https://i2p.net/proposals/170-i2pcontrol-expansion.txt"
 source_sha256 = "f13ae00b886c5e72131bc5d5b138a371148d1faa6899a119a1dacb65a555e7dc"
 planning_baseline = "630a8fd1cd4e5943fcde0b5c16f5fc1e88b5d207"
-current_production_head = "a68094e128d2b92f0fd5b350e38512ef6b65cb6b"
+current_production_head = "e4f217cb1459e26bf011da46b67fc2c83cd192b5"
 
 [current_matrix_counts]
 total = 840

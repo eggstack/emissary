@@ -29,7 +29,8 @@ Failed/blocked predecessor evidence:
 Planning baseline:
 
 - M134 closure matrix `325 apply / 47 blocked_primitive / 468 not_applicable`;
-- M130 remains implemented-subset runtime/security authority;
+- M139 is the current implemented-subset runtime/security authority;
+- M130 remains historical runtime/security qualification evidence;
 - M131 remains residual applicability/primitive authority.
 
 Pinned Proposal authority: I2P Proposal 170 revision `2026-05-20`, status Open.

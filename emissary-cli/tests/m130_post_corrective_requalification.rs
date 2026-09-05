@@ -568,14 +568,14 @@ fn proposal_matrix_is_mechanically_recomputed() {
             *counts.entry(cell.as_str().expect("cell").to_owned()).or_insert(0usize) += 1;
         }
     }
-    assert_eq!(counts.get("apply"), Some(&284));
-    assert_eq!(counts.get("blocked_primitive"), Some(&96));
-    assert_eq!(counts.get("not_applicable"), Some(&460));
+    assert_eq!(counts.get("apply"), Some(&325));
+    assert_eq!(counts.get("blocked_primitive"), Some(&47));
+    assert_eq!(counts.get("not_applicable"), Some(&468));
 
     let declared = matrix["current_matrix_counts"].as_table().expect("declared counts");
-    assert_eq!(declared["apply"].as_integer(), Some(284));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(96));
-    assert_eq!(declared["not_applicable"].as_integer(), Some(460));
+    assert_eq!(declared["apply"].as_integer(), Some(325));
+    assert_eq!(declared["blocked_primitive"].as_integer(), Some(47));
+    assert_eq!(declared["not_applicable"].as_integer(), Some(468));
 }
 
 #[test]
@@ -610,14 +610,16 @@ fn no_unrelated_base_method_parity_is_smuggled() {
 #[test]
 fn production_changes_stay_under_i2pcontrol() {
     // M130 authorizes no core/util/router/frontend/dependency change.
-    // Diff the reopened-line planning baseline for production source
-    // outside the I2PControl boundary.
-    let baseline = "9948cfd0782a3defbd5f68cf2d4523603bdc7940";
+    // Scope this historical guard to the M130 implementation range so later
+    // accepted lifecycle seams are evaluated by M061/M062 and M139.
+    let baseline = "579a22c";
+    let reviewed_head = "fe1a981";
     let output = Command::new("git")
         .args([
             "diff",
             "--name-only",
             baseline,
+            reviewed_head,
             "--",
             "emissary-core/src",
             "emissary-util/src",
@@ -641,7 +643,14 @@ fn production_changes_stay_under_i2pcontrol() {
     );
 
     let output = Command::new("git")
-        .args(["diff", "--name-only", baseline, "--", "emissary-cli/src"])
+        .args([
+            "diff",
+            "--name-only",
+            baseline,
+            reviewed_head,
+            "--",
+            "emissary-cli/src",
+        ])
         .current_dir(workspace_root())
         .output()
         .expect("git diff for i2pcontrol boundary");
@@ -686,8 +695,8 @@ fn active_authority_retains_partial_support_and_m130_lineage() {
         let text = std::fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
         assert!(
-            text.contains("284") && text.contains("96") && text.contains("460"),
-            "{} does not state the current 284/96/460 authority",
+            text.contains("325") && text.contains("47") && text.contains("468"),
+            "{} does not state the current 325/47/468 authority",
             path.display()
         );
         assert!(

@@ -605,6 +605,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m136 = is_authorized_m136_path(path);
         let authorized_m137 = is_authorized_m137_path(path);
         let authorized_m134 = is_authorized_m134_path(path);
+        let authorized_m139 = is_authorized_m139_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -636,6 +637,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m136
                 || authorized_m137
                 || authorized_m134
+                || authorized_m139
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -669,6 +671,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m136
                     || authorized_m137
                     || authorized_m134
+                    || authorized_m139
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -985,6 +988,31 @@ fn is_authorized_m134_path(path: &str) -> bool {
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
             | "AGENTS.md"
             | "README.md"
+    )
+}
+
+fn is_authorized_m139_path(path: &str) -> bool {
+    matches!(
+        path,
+        "AGENTS.md"
+            | "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/tunnel-manager.md"
+            | "emissary-cli/tests/m060_containment.rs"
+            | "emissary-cli/tests/m126_requalification.rs"
+            | "emissary-cli/tests/m127_token_lifetime.rs"
+            | "emissary-cli/tests/m128_jsonrpc_batch.rs"
+            | "emissary-cli/tests/m129_nonloopback_tls.rs"
+            | "emissary-cli/tests/m130_post_corrective_requalification.rs"
+            | "emissary-cli/tests/m139_post_lifecycle_requalification.rs"
+            | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/139-post-lifecycle-integrated-requalification-and-authority-rebase.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md"
+            | "plans/closure/i2pcontrol-proposal-170/139-closure.md"
     )
 }
 

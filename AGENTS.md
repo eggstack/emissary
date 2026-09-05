@@ -38,6 +38,9 @@ and inspection sources without a canonical Emissary owner remain explicit unsupp
 responses. Keep changes within `emissary-cli/src/i2pcontrol/` and its composition seams; do not
 turn the administrative API into a router lifecycle or protocol implementation.
 
+The current implemented-subset runtime/security qualification authority is M139
+(`plans/closure/i2pcontrol-proposal-170/139-closure.md`); M130 remains historical evidence.
+
 The current Proposal 170 baseline remains partial: RouterInfo is 43 additions with
 42 available, 1 protocol-permitted neutral, and 0 unavailable; AddressBook all 13
 SetConfig keys are operational; and unapplied runtime options (including 4 UseSSL,

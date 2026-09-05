@@ -28,12 +28,12 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
-| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | **M139 ready / registered** |
+| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | M139 current qualification; no successor registered |
 | Proposal 170 session-lifecycle completion | **closed as complete** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | M134 closed as complete |
-| Post-M114 shared-control-plane corrective line | **closed / historical qualification lineage** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | M130 remains historical current-head authority pending M139 |
+| Post-M114 shared-control-plane corrective line | **closed / historical qualification lineage** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | M130 historical; superseded by M139 for current-head qualification |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
 
-## Active Proposal-170 implementation handoff
+## Current Proposal-170 qualification authority
 
 ### M139 — post-lifecycle integrated requalification and authority rebase
 
@@ -41,14 +41,15 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/139-post-lifecycle-integrated-requalification-and-authority-rebase.md`.
 
-Status: **ready / registered**.
+Status: **closed as complete**.
 
 Planning/runtime baseline:
 
 - lifecycle implementation head `e4f217cb1459e26bf011da46b67fc2c83cd192b5`;
 - M134/M135/M136/M137 closed as complete;
 - current M095 matrix `325 apply / 47 blocked_primitive / 468 not_applicable`;
-- M130 remains historical runtime/security qualification authority until M139 closes;
+- M139 is the current runtime/security qualification authority;
+- M130 remains historical runtime/security qualification evidence;
 - M131 remains residual applicability/primitive authority.
 
 Objective:
@@ -57,11 +58,12 @@ Objective:
 - separate historical M126/M130 assertions from durable current-head guards;
 - reconcile stale roadmap/test authority language;
 - re-prove M127-M129 shared-control-plane security plus M135-M137/M134 lifecycle composition;
-- establish M139 as current runtime/security qualification authority if and only if all current-head evidence is clean.
+- establish M139 as current runtime/security qualification authority after the clean current-head evidence recorded in its closure.
 
 M139 has **zero Proposal promotion budget** and authorizes **no production Rust, dependency, Yosemite, router, transport, NetDb, crypto, or frontend change**. A production defect is a stop condition requiring a separate corrective plan.
 
-M139 must not register a residual capability successor at closure.
+M139 did not register a residual capability successor at closure. Selection of
+the next residual cluster is a separate planning decision.
 
 Numbering note: historical M137/M134 planning used “M138” as a possible NewDest corrective and recorded that it was not needed. No M138 plan was registered; this unrelated requalification uses M139 to avoid ambiguity.
 
@@ -114,10 +116,10 @@ M137 Close* + reasoned termination              [CLOSED AS COMPLETE — 319/53/4
 M134 NewDest proven idle resume                 [CLOSED AS COMPLETE — 325/47/468]
   |
   v
-M139 post-lifecycle integrated requalification  [READY / REGISTERED — ZERO PROMOTION]
+M139 post-lifecycle integrated requalification  [CLOSED AS COMPLETE — ZERO PROMOTION]
 ```
 
-A successful M139 closure supersedes M130 only for current-head runtime/security qualification. Historical M130 closure evidence remains unchanged.
+M139 supersedes M130 only for current-head runtime/security qualification. Historical M130 closure evidence remains unchanged.
 
 ## Remaining residual clusters
 
@@ -150,11 +152,11 @@ Expected residual total: 47. M139 must mechanically re-derive this from M095 and
 
 ## Registration rules
 
-1. M139 is the **only active Proposal-170 implementation handoff**.
-2. No remaining residual capability plan may register while M139 is open.
+1. M139 is closed and is the current qualification authority.
+2. No residual capability plan is registered after M139 closure.
 3. Material path/architecture deviations require plan amendment before implementation.
 4. Closure evidence, not implementation assertions, determines support and qualification.
-5. M139 must leave no residual capability successor registered even when it closes cleanly; selection is a separate planning decision.
+5. Selection of a residual successor is a separate planning decision.
 6. Active documentation retains partial-support wording until all applicable residuals are resolved and requalified.
 
 ## Recently closed / current lineage
@@ -164,7 +166,7 @@ Expected residual total: 47. M139 must mechanically re-derive this from M095 and
 | M127 | closed; finite token lifetime |
 | M128 | closed; bounded JSON-RPC batch conformance |
 | M129 | closed; non-loopback managed-TLS fail-closed |
-| M130 | closed; historical integrated runtime/security qualification authority pending M139 supersession |
+| M130 | closed; historical integrated runtime/security qualification; superseded by M139 for current head |
 | M131 | closed as blocked; residual applicability/primitive re-freeze; matrix `284/88/468` |
 | M132 | closed as blocked; zero reduction promotions |
 | M133 | closed as blocked; zero close promotions |
@@ -172,5 +174,6 @@ Expected residual total: 47. M139 must mechanically re-derive this from M095 and
 | M136 | closed as complete; 21 `Reduce*` promotions; matrix `305/67/468` |
 | M137 | closed as complete; 14 `Close*` promotions; matrix `319/53/468` |
 | M134 | closed as complete; six `NewDest` promotions; matrix `325/47/468` |
+| M139 | closed as complete; current post-lifecycle runtime/security qualification; zero promotions; matrix `325/47/468` |
 
 Historical closure files remain unchanged.

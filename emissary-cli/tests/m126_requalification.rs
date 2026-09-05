@@ -97,9 +97,9 @@ fn current_matrix_is_mechanically_requalified() {
             *counts.entry(cell.as_str().expect("cell disposition")).or_insert(0usize) += 1;
         }
     }
-    assert_eq!(counts.get("apply"), Some(&284));
-    assert_eq!(counts.get("blocked_primitive"), Some(&96));
-    assert_eq!(counts.get("not_applicable"), Some(&460));
+    assert_eq!(counts.get("apply"), Some(&325));
+    assert_eq!(counts.get("blocked_primitive"), Some(&47));
+    assert_eq!(counts.get("not_applicable"), Some(&468));
     assert_eq!(counts.get("planned_apply").copied().unwrap_or_default(), 0);
 }
 
@@ -117,8 +117,8 @@ fn active_support_docs_agree_with_the_current_partial_claim() {
         let text = fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
         assert!(
-            text.contains("284") && text.contains("96") && text.contains("460"),
-            "{} does not state the current 284/96/460 authority",
+            text.contains("325") && text.contains("47") && text.contains("468"),
+            "{} does not state the current 325/47/468 authority",
             path.display()
         );
         assert!(

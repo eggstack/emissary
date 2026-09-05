@@ -389,8 +389,8 @@ M124) adds cross-field auth/type consistency validation. The dependency now
 serializes corrected generic fields, proven reachable by I2PControl adapter
 tests, but that is transport reachability only; no Proposal runtime path maps
 them and no downgrade is permitted, so the remaining 19 cells fail before
-allocation. M131 closes the residual ledger at `284 apply / 88 blocked /
-468 not_applicable`; no dependency-ready M132+ handoff exists.
+allocation. M139 closes the current residual ledger at `325 apply / 47 blocked /
+468 not_applicable`; no residual capability successor is registered.
 
 | Disposition | Proposal 170 fields |
 |---|---|

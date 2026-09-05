@@ -1,6 +1,11 @@
 # M139 — Post-Lifecycle Integrated Requalification and Authority Rebase
 
-Status: **ready / registered**
+Status: **closed as complete**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/139-closure.md`
+
+Reviewed head: `e4f217cb1459e26bf011da46b67fc2c83cd192b5` before the
+qualification-only closure changes.
 
 Class: invariant / qualification / roadmap-correction
 
@@ -16,7 +21,8 @@ Planning baseline:
 - M136 closure: `plans/closure/i2pcontrol-proposal-170/136-closure.md`;
 - M137 closure: `plans/closure/i2pcontrol-proposal-170/137-closure.md`;
 - current M095 authority: `325 apply / 47 blocked_primitive / 468 not_applicable`;
-- M130 remains historical implemented-subset runtime/security qualification authority pending M139 closure;
+- M139 is the current implemented-subset runtime/security qualification authority;
+- M130 remains historical implemented-subset runtime/security qualification evidence;
 - M131 remains residual applicability/primitive authority for the remaining non-lifecycle clusters.
 
 Numbering note:
@@ -342,7 +348,7 @@ M095 wins if exact row accounting differs; explain any discrepancy. No residual 
 
 Write `139-closure.md` containing exact commits, failure ledger, requirement-to-evidence matrix, current matrix hash/count evidence, containment/dependency evidence, integrated lifecycle/security results, compatibility/security review, unresolved findings, and explicit M130 supersession decision.
 
-If M139 closes cleanly, leave **no residual capability plan registered**. Selection of the next residual cluster is a separate planning decision after requalification.
+M139 closed cleanly and left **no residual capability plan registered**. Selection of the next residual cluster is a separate planning decision after requalification.
 
 ## 8. Failure, cancellation, restart and contention review
 

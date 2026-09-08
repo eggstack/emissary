@@ -384,7 +384,16 @@ fn audit_covers_the_exact_m104_residual_inventory() {
     assert_eq!(m141_completed.len(), 2);
     let expected_post_m141 =
         expected_post_m140.difference(&m141_completed).cloned().collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m141);
+    // M142 promotes the two HTTP-client SSLProxies/JumpList cells to apply
+    // with bounded I2P-only routing/presentation evidence.
+    let m142_completed = [("SSLProxies", "httpclient"), ("JumpList", "httpclient")]
+        .into_iter()
+        .map(|(option, tunnel_type)| (option.to_owned(), tunnel_type.to_owned()))
+        .collect::<BTreeSet<_>>();
+    assert_eq!(m142_completed.len(), 2);
+    let expected_post_m142 =
+        expected_post_m141.difference(&m142_completed).cloned().collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m142);
     assert_eq!(
         audit["summary"]["post_m116_reclassified_cells"].as_integer(),
         Some(7)

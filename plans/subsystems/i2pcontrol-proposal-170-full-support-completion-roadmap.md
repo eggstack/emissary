@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M140 closed as complete; M141 registered under the residual primitive completion roadmap**
+Status: **active / partial; M140 closed as complete; M141 closed; M142 closed as complete (329/36/475); no registered successor**
 
 Current runtime/security qualification authority:
 
@@ -12,15 +12,15 @@ Current residual applicability authority:
 
 Current registered handoff:
 
-- M141: `plans/implementation/i2pcontrol-proposal-170/141-http-unique-local-source-address-completion.md`.
+- none (M142 closed; M143 deferred pending its exact-file amendment). Last closed: M142 `plans/implementation/i2pcontrol-proposal-170/142-httpclient-sslproxies-and-jumplist-completion.md`.
 
 Focused residual execution roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`.
 
-Current machine authority after M140 closure:
+Current machine authority after M142 closure:
 
-- M095 matrix: `325 apply / 40 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells.
+- M095 matrix: `329 apply / 36 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells.
 
 Pinned Proposal authority:
 
@@ -161,7 +161,7 @@ M140 streaming applicability re-freeze               [CLOSED AS COMPLETE — 325
 M141 HTTP unique local source address                [CLOSED AS COMPLETE — 327/38/475, 2 PROMOTIONS]
   |
   v
-M142 HTTP SSLProxies + JumpList                      [REGISTERED / DEPENDENCY-READY]
+M142 HTTP SSLProxies + JumpList                      [CLOSED AS COMPLETE — 329/36/475, 2 PROMOTIONS]
 ```
 
 M139 supersedes M130 for current-head runtime/security qualification only. M130 remains historical evidence. M131 remains historical residual authority except where M140 explicitly reclassifies seven cells to current-head `not_applicable` and where M141 promotes two cells to `apply`.
@@ -182,7 +182,7 @@ M140 streaming applicability re-freeze                 [CLOSED AS COMPLETE — 3
 M141 UniqueLocalAddressPerClient                       [CLOSED AS COMPLETE — 327/38/475, 2 PROMOTIONS]
   |
   v
-M142 HTTP SSLProxies + JumpList                       [REGISTERED / DEPENDENCY-READY]
+M142 HTTP SSLProxies + JumpList                       [CLOSED AS COMPLETE — 329/36/475, 2 PROMOTIONS]
   -> M143 retained streaming Profile (Profile:client × 1) [DEFERRED; exact neutral files amendment still required]
   -> M144 application/presentation UseSSL              [DEFERRED]
   -> M145 reply LeaseSet bundling / MultiHoming        [DEFERRED]
@@ -195,7 +195,7 @@ M142 HTTP SSLProxies + JumpList                       [REGISTERED / DEPENDENCY-R
   -> M152 final whole-surface requalification          [DEFERRED / ZERO PROMOTION]
 ```
 
-M142-M152 are committed handoff documents but are not executable authority until the registry promotes them after their hard dependencies close (M142 is now registered; M143-M152 remain deferred). M143/M145/M147/M149-M151 require explicit pre-registration amendments to freeze exact cells/files/spec/security decisions.
+M142-M152 are committed handoff documents but are not executable authority until the registry promotes them after their hard dependencies close (M142 closed; M143-M152 remain deferred pending M143 amendment). M143/M145/M147/M149-M151 require explicit pre-registration amendments to freeze exact cells/files/spec/security decisions.
 
 ## 8. Remaining 38 residual cells after M141 closure
 

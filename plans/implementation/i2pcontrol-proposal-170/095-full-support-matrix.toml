@@ -13,8 +13,8 @@ current_production_head = "e4f217cb1459e26bf011da46b67fc2c83cd192b5"
 
 [current_matrix_counts]
 total = 840
-apply = 327
-blocked_primitive = 38
+apply = 329
+blocked_primitive = 36
 not_applicable = 475
 
 [contract_counts]
@@ -1080,12 +1080,11 @@ secret_bearing = false
 path_bearing = true
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M112"
-current_or_planned_disposition = "blocked_primitive_or_not_applicable"
-cells = ["not_applicable", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpclient" = "No accepted TLS-capable outbound proxy data plane exists; the option is rejected before allocation.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "socks" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates SSLProxies to HTTP clients, and the I2PTunnel owner is HTTP SSL-outproxy handling; this cell is not applicable.", "socksirc" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates SSLProxies to HTTP clients, and the I2PTunnel owner is HTTP SSL-outproxy handling; this cell is not applicable.", "connectclient" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates SSLProxies to HTTP clients, and the I2PTunnel owner is HTTP SSL-outproxy handling; this cell is not applicable.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this proxy option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this proxy option." }
-blocked_primitive = "accepted TLS-capable outbound proxy data plane with trust-preserving configuration"
-blocking_milestone = "M112"
+completion_owner = "M142"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpclient" = "M142 applies HTTP-only SSL-outproxy selection with bounded I2P-only routing, hostname-scoped cache, and last-failure avoidance.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "socks" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates SSLProxies to HTTP clients, and the I2PTunnel owner is HTTP SSL-outproxy handling; this cell is not applicable.", "socksirc" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates SSLProxies to HTTP clients, and the I2PTunnel owner is HTTP SSL-outproxy handling; this cell is not applicable.", "connectclient" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates SSLProxies to HTTP clients, and the I2PTunnel owner is HTTP SSL-outproxy handling; this cell is not applicable.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this proxy option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this proxy option." }
+
 
 [[tunnel_manager.options]]
 canonical_key = "JumpList"
@@ -1096,12 +1095,11 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M112"
-current_or_planned_disposition = "blocked_primitive_or_not_applicable"
-cells = ["not_applicable", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpclient" = "No bounded multi-outproxy selection or failover owner exists; the option is rejected before allocation.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "socks" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates JumpList to HTTP address-helper lookup, and the I2PTunnel owner is HTTP jump-server handling; this cell is not applicable.", "socksirc" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates JumpList to HTTP address-helper lookup, and the I2PTunnel owner is HTTP jump-server handling; this cell is not applicable.", "connectclient" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates JumpList to HTTP address-helper lookup, and the I2PTunnel owner is HTTP jump-server handling; this cell is not applicable.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this proxy option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this proxy option." }
-blocked_primitive = "bounded multi-outproxy selection and failover owner"
-blocking_milestone = "M112"
+completion_owner = "M142"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpclient" = "M142 applies the bounded HTTP address-helper jump-server list with strict escaping and no network side effect.", "ircclient" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "socks" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates JumpList to HTTP address-helper lookup, and the I2PTunnel owner is HTTP jump-server handling; this cell is not applicable.", "socksirc" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates JumpList to HTTP address-helper lookup, and the I2PTunnel owner is HTTP jump-server handling; this cell is not applicable.", "connectclient" = "Affirmative reference applicability is absent: the Java Proposal-170 parser gates JumpList to HTTP address-helper lookup, and the I2PTunnel owner is HTTP jump-server handling; this cell is not applicable.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this proxy option.", "server" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "httpbidirserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "ircserver" = "This tunnel type has no Proposal 170 proxy/outproxy role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this proxy option." }
+
 
 [[tunnel_manager.options]]
 canonical_key = "ConnectDelay"

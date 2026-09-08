@@ -147,7 +147,7 @@ All 12 tunnel types are mapped to backends:
 | Type | Category | Backend |
 |---|---|---|
 | `client` | Client | Yosemite streaming client with per-name supervisor |
-| `httpclient` | Client | Bounded HTTP client proxy with direct-I2P routing and explicit I2P outproxy support |
+| `httpclient` | Client | Bounded HTTP client proxy with direct-I2P routing, explicit I2P outproxy plus M142 HTTPS/CONNECT SSL-outproxy selection and jump-server address-helper response |
 | `ircclient` | Client | Bounded IRC anonymity filter over a Yosemite stream |
 | `socks` | Client | Bounded SOCKS4a/SOCKS5 CONNECT proxy |
 | `socksirc` | Client | SOCKS CONNECT composed with the IRC anonymity filter |
@@ -208,7 +208,7 @@ support.
 | Tunnel types | Consumed runtime fields | Recognized-but-unimplemented fields rejected before allocation |
 |---|---|---|
 | `client` | `TargetDestination`, `TargetPort`, `ListenInterface`, `ListenPort` | access/plaintext/custom/I2CP and other typed/raw fields |
-| `httpclient` | listener, proxy auth, HTTP policy, direct I2P target, explicit I2P outproxy | TLS, arbitrary clearnet/direct target, unsupported proxy/outproxy modes, custom/I2CP |
+| `httpclient` | listener, proxy auth, HTTP policy, direct I2P target, explicit I2P outproxy, M142 `SSLProxies` (bounded I2P-only HTTPS/CONNECT selection with hostname cache + last-failure avoidance) and `JumpList` (bounded http-only jump-server address-helper response) | TLS, arbitrary clearnet/direct target, unsupported proxy/outproxy modes, custom/I2CP |
 | `ircclient` | I2P target, ports, listener, common IRC filter | IRC automation, access/auth/WEBIRC/cloak, custom/I2CP |
 | `socks`, `socksirc` | loopback/authenticated listener, SOCKS CONNECT policy and (for `socksirc`) IRC filter | BIND, UDP ASSOCIATE, arbitrary DNS, unsafe targets, custom/I2CP |
 | `connectclient` | listener/auth, strict CONNECT parsing, direct I2P or explicit I2P outproxy | unsupported methods, unsafe direct targets, unsupported proxy/outproxy modes, custom/I2CP |

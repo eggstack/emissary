@@ -300,11 +300,9 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
     for key in ["SSLProxies", "JumpList"] {
         let row = option(key);
         let cells = row["cells"].as_array().unwrap();
-        assert_eq!(
-            cells[1].as_str(),
-            Some("blocked_primitive"),
-            "{key} HTTP cell"
-        );
+        // M142 promotes the two HTTP-client cells to apply with bounded
+        // I2P-only routing/presentation evidence.
+        assert_eq!(cells[1].as_str(), Some("apply"), "{key} HTTP cell");
         for index in [3, 4, 5] {
             assert_eq!(
                 cells[index].as_str(),
@@ -312,9 +310,13 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
                 "{key} cell {index}"
             );
         }
-        assert_eq!(string_field(row, "completion_owner"), "M112");
-        assert!(!string_field(row, "blocked_primitive").is_empty());
-        assert!(!string_field(row, "blocking_milestone").is_empty());
+        assert_eq!(string_field(row, "completion_owner"), "M142");
+        assert_eq!(
+            string_field(row, "current_or_planned_disposition"),
+            "apply_or_not_applicable"
+        );
+        assert!(row.get("blocking_milestone").is_none());
+        assert!(row.get("blocked_primitive").is_none());
     }
     for key in [
         "ConnectDelay",
@@ -637,13 +639,13 @@ fn current_matrix_counts_are_explicit_and_exact() {
             counts
         },
     );
-    assert_eq!(counts, (327, 38, 475));
+    assert_eq!(counts, (329, 36, 475));
     let declared = root
         .get("current_matrix_counts")
         .and_then(Value::as_table)
         .expect("current matrix counts are declared");
-    assert_eq!(declared["apply"].as_integer(), Some(327));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(38));
+    assert_eq!(declared["apply"].as_integer(), Some(329));
+    assert_eq!(declared["blocked_primitive"].as_integer(), Some(36));
     assert_eq!(declared["not_applicable"].as_integer(), Some(475));
 }
 

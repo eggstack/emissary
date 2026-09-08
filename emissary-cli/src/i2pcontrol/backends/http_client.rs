@@ -13,12 +13,15 @@ use tokio::{
 use super::{
     filters::{
         http_client::{
-            copy_body, read_header_block, HttpClientPolicy, HttpClientRequest, HttpTarget,
-            OutproxyTarget,
+            copy_body, is_i2p_destination, is_plain_i2p_hostname_for_jump, parse_jump_server_list,
+            parse_ssl_proxy_list, read_header_block, render_jump_helper_response, HttpClientPolicy,
+            HttpClientRequest, HttpTarget, OutproxyTarget, SslProxySelector,
         },
         proxy::{basic_authorization, credentials_match},
     },
-    options::{validate_options, OptionValidationError, HTTP_CLIENT_OPTIONS},
+    options::{
+        validate_common_options, validate_options, OptionValidationError, HTTP_CLIENT_OPTIONS,
+    },
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
 use crate::i2pcontrol::{
@@ -45,6 +48,12 @@ struct HttpClientConfig {
     port: u16,
     sam_tcp_port: u16,
     outproxy: Option<OutproxyTarget>,
+    // M142: distinct bounded SSL-outproxy list for HTTPS/CONNECT clearnet.
+    // Selection state is generation-local and discarded on stop/restart.
+    ssl_selector: Option<Arc<Mutex<SslProxySelector>>>,
+    // M142: bounded jump-service URL prefixes for the destination-not-found
+    // address-helper path. Pure response metadata; never fetched.
+    jump_servers: Vec<String>,
     proxy_username: Option<String>,
     proxy_password: Option<String>,
     require_auth: bool,
@@ -63,6 +72,11 @@ impl std::fmt::Debug for HttpClientConfig {
             .field("port", &self.port)
             .field("sam_tcp_port", &self.sam_tcp_port)
             .field("outproxy", &self.outproxy)
+            .field(
+                "ssl_proxies",
+                &self.ssl_selector.as_ref().map(|selector| selector.lock().len()),
+            )
+            .field("jump_servers", &self.jump_servers.len())
             .field("proxy_username", &self.proxy_username)
             .field(
                 "proxy_password",
@@ -317,6 +331,8 @@ impl RuntimeSupervisor {
 fn make_handler(config: HttpClientConfig) -> ClientConnectionHandler {
     make_handler_parts(
         config.outproxy,
+        config.ssl_selector,
+        config.jump_servers,
         config.proxy_username,
         config.proxy_password,
         config.require_auth,
@@ -337,6 +353,8 @@ pub(crate) fn make_no_outproxy_handler(
 ) -> ClientConnectionHandler {
     make_handler_parts(
         None,
+        None,
+        Vec::new(),
         proxy_username,
         proxy_password,
         require_auth,
@@ -345,8 +363,11 @@ pub(crate) fn make_no_outproxy_handler(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_handler_parts(
     outproxy: Option<OutproxyTarget>,
+    ssl_selector: Option<Arc<Mutex<SslProxySelector>>>,
+    jump_servers: Vec<String>,
     proxy_username: Option<String>,
     proxy_password: Option<String>,
     require_auth: bool,
@@ -355,6 +376,8 @@ fn make_handler_parts(
 ) -> ClientConnectionHandler {
     Arc::new(move |stream, connector| {
         let outproxy = outproxy.clone();
+        let ssl_selector = ssl_selector.clone();
+        let jump_servers = jump_servers.clone();
         let proxy_username = proxy_username.clone();
         let proxy_password = proxy_password.clone();
         let policy = policy.clone();
@@ -382,51 +405,233 @@ fn make_handler_parts(
                 let _ = write_proxy_error(&mut stream, 407, "Proxy Authentication Required").await;
                 return;
             }
-            let Ok(mut target) = request.target(outproxy.clone()) else {
+            let is_i2p = request.is_i2p();
+            let is_ssl = request.is_ssl;
+            let is_connect = request.is_connect();
+            // M142: I2P targets never use either outproxy list. Clearnet
+            // HTTP uses the ordinary ProxyList; clearnet HTTPS/CONNECT uses
+            // only the SSLProxies selector. No clearnet fallback exists.
+            if is_i2p {
+                let mut destination = request.host.clone();
+                let resolved = resolve_destination(&destination, address_book.as_ref()).await;
+                let Some(resolved) = resolved else {
+                    let mut stream = reader.into_inner();
+                    if is_plain_i2p_hostname_for_jump(&request.host) && !jump_servers.is_empty() {
+                        let response = render_jump_helper_response(&request.host, &jump_servers);
+                        let _ = stream.write_all(&response).await;
+                    } else {
+                        let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
+                    }
+                    return;
+                };
+                destination = resolved;
+                if is_connect {
+                    let Ok(mut remote) = connector.connect_to(&destination, request.port).await
+                    else {
+                        let mut stream = reader.into_inner();
+                        let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
+                        return;
+                    };
+                    let mut local = reader.into_inner();
+                    if local
+                        .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
+                    let _ = tokio::io::copy_bidirectional(&mut local, &mut remote).await;
+                    return;
+                }
+                let target = HttpTarget::I2p {
+                    destination: destination.clone(),
+                    port: request.port,
+                };
+                let Ok(serialized) = request.serialize(&destination, &target, &policy) else {
+                    let mut stream = reader.into_inner();
+                    let _ = write_proxy_error(&mut stream, 400, "Bad Request").await;
+                    return;
+                };
+                let Ok(mut remote) = connector.connect_to(&destination, request.port).await else {
+                    let mut stream = reader.into_inner();
+                    let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
+                    return;
+                };
+                if remote.write_all(&serialized).await.is_err() {
+                    return;
+                }
+                if copy_body(&mut reader, &mut remote, request.content_length).await.is_err() {
+                    return;
+                }
+                let mut local = reader.into_inner();
+                let _ = tokio::time::timeout(
+                    super::filters::http_client::BODY_TIMEOUT,
+                    tokio::io::copy(&mut remote, &mut local),
+                )
+                .await;
+                let _ = local.shutdown().await;
+                return;
+            }
+            if is_ssl {
+                let host_key = request.host_key();
+                // Selection holds the lock only for the map lookup/clone.
+                let selected =
+                    ssl_selector.as_ref().and_then(|selector| selector.lock().select(&host_key));
+                let Some(selected) = selected else {
+                    let mut stream = reader.into_inner();
+                    let _ = write_proxy_error(&mut stream, 403, "Forbidden").await;
+                    return;
+                };
+                if is_connect {
+                    // CONNECT via the selected I2P SSL outproxy. The clearnet
+                    // hostname never reaches OS DNS or direct TCP; only the
+                    // selected I2P destination is resolved/connected.
+                    let resolved =
+                        resolve_destination(&selected.destination, address_book.as_ref()).await;
+                    let Some(resolved) = resolved else {
+                        if let Some(selector) = ssl_selector.as_ref() {
+                            selector.lock().note_result(&selected, &host_key, false);
+                        }
+                        let mut stream = reader.into_inner();
+                        let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
+                        return;
+                    };
+                    let remote = connector.connect_to(&resolved, selected.port).await;
+                    let Ok(mut remote) = remote else {
+                        if let Some(selector) = ssl_selector.as_ref() {
+                            selector.lock().note_result(&selected, &host_key, false);
+                        }
+                        let mut stream = reader.into_inner();
+                        let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
+                        return;
+                    };
+                    let authority = if request.host.contains(':') {
+                        format!("[{}]:{}", request.host, request.port)
+                    } else {
+                        format!("{}:{}", request.host, request.port)
+                    };
+                    let mut handshake = format!(
+                        "CONNECT {authority} HTTP/1.1\r\nHost: {authority}\r\nConnection: close\r\n"
+                    )
+                    .into_bytes();
+                    if let Some(auth) = &policy.outproxy_authorization {
+                        handshake.extend_from_slice(
+                            format!("Proxy-Authorization: {auth}\r\n").as_bytes(),
+                        );
+                    }
+                    handshake.extend_from_slice(b"\r\n");
+                    if remote.write_all(&handshake).await.is_err() {
+                        if let Some(selector) = ssl_selector.as_ref() {
+                            selector.lock().note_result(&selected, &host_key, false);
+                        }
+                        return;
+                    }
+                    let mut remote_reader = BufReader::new(remote);
+                    let Ok(response) = read_header_block(&mut remote_reader).await else {
+                        if let Some(selector) = ssl_selector.as_ref() {
+                            selector.lock().note_result(&selected, &host_key, false);
+                        }
+                        return;
+                    };
+                    if !successful_connect_response(&response) {
+                        if let Some(selector) = ssl_selector.as_ref() {
+                            selector.lock().note_result(&selected, &host_key, false);
+                        }
+                        let mut stream = reader.into_inner();
+                        let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
+                        return;
+                    }
+                    if let Some(selector) = ssl_selector.as_ref() {
+                        selector.lock().note_result(&selected, &host_key, true);
+                    }
+                    let mut local = reader.into_inner();
+                    if local
+                        .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
+                    let _ = tokio::io::copy_bidirectional(&mut local, &mut remote_reader).await;
+                    return;
+                }
+                // HTTPS absolute-form via the selected I2P SSL outproxy.
+                let target = HttpTarget::Clearnet {
+                    host: request.host.clone(),
+                    port: request.port,
+                    outproxy: selected.clone(),
+                };
+                let resolved =
+                    resolve_destination(&selected.destination, address_book.as_ref()).await;
+                let Some(resolved) = resolved else {
+                    if let Some(selector) = ssl_selector.as_ref() {
+                        selector.lock().note_result(&selected, &host_key, false);
+                    }
+                    let mut stream = reader.into_inner();
+                    let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
+                    return;
+                };
+                let remote = connector.connect_to(&resolved, selected.port).await;
+                let Ok(mut remote) = remote else {
+                    if let Some(selector) = ssl_selector.as_ref() {
+                        selector.lock().note_result(&selected, &host_key, false);
+                    }
+                    let mut stream = reader.into_inner();
+                    let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
+                    return;
+                };
+                if let Some(selector) = ssl_selector.as_ref() {
+                    selector.lock().note_result(&selected, &host_key, true);
+                }
+                let Ok(serialized) = request.serialize(&resolved, &target, &policy) else {
+                    let mut stream = reader.into_inner();
+                    let _ = write_proxy_error(&mut stream, 400, "Bad Request").await;
+                    return;
+                };
+                if remote.write_all(&serialized).await.is_err() {
+                    return;
+                }
+                if copy_body(&mut reader, &mut remote, request.content_length).await.is_err() {
+                    return;
+                }
+                let mut local = reader.into_inner();
+                let _ = tokio::time::timeout(
+                    super::filters::http_client::BODY_TIMEOUT,
+                    tokio::io::copy(&mut remote, &mut local),
+                )
+                .await;
+                let _ = local.shutdown().await;
+                return;
+            }
+            // Ordinary HTTP clearnet via the single ProxyList outproxy.
+            let Some(ordinary) = outproxy.clone() else {
                 let mut stream = reader.into_inner();
                 let _ = write_proxy_error(&mut stream, 403, "Forbidden").await;
                 return;
             };
-            let destination = match &mut target {
-                HttpTarget::I2p { destination, .. } => {
-                    match resolve_destination(destination, address_book.as_ref()).await {
-                        Some(resolved) => {
-                            *destination = resolved.clone();
-                            resolved
-                        }
-                        None => {
-                            let mut stream = reader.into_inner();
-                            let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
-                            return;
-                        }
-                    }
-                }
-                HttpTarget::Clearnet { outproxy, .. } => {
-                    match resolve_destination(&outproxy.destination, address_book.as_ref()).await {
-                        Some(resolved) => resolved,
-                        None => {
-                            let mut stream = reader.into_inner();
-                            let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
-                            return;
-                        }
-                    }
-                }
+            if !is_i2p_destination(&ordinary.destination) {
+                let mut stream = reader.into_inner();
+                let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
+                return;
+            }
+            let target = HttpTarget::Clearnet {
+                host: request.host.clone(),
+                port: request.port,
+                outproxy: ordinary.clone(),
             };
-            let Ok(serialized) = request.serialize(&destination, &target, &policy) else {
+            let Some(resolved) =
+                resolve_destination(&ordinary.destination, address_book.as_ref()).await
+            else {
+                let mut stream = reader.into_inner();
+                let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
+                return;
+            };
+            let Ok(serialized) = request.serialize(&resolved, &target, &policy) else {
                 let mut stream = reader.into_inner();
                 let _ = write_proxy_error(&mut stream, 400, "Bad Request").await;
                 return;
             };
-            let Ok(mut remote) = connector
-                .connect_to(
-                    &destination,
-                    match &target {
-                        HttpTarget::I2p { port, .. } => *port,
-                        HttpTarget::Clearnet { outproxy, .. } => outproxy.port,
-                    },
-                )
-                .await
-            else {
+            let Ok(mut remote) = connector.connect_to(&resolved, ordinary.port).await else {
                 let mut stream = reader.into_inner();
                 let _ = write_proxy_error(&mut stream, 502, "Bad Gateway").await;
                 return;
@@ -446,6 +651,14 @@ fn make_handler_parts(
             let _ = local.shutdown().await;
         })
     })
+}
+
+fn successful_connect_response(response: &[u8]) -> bool {
+    response
+        .split(|byte| *byte == b'\n')
+        .next()
+        .and_then(|line| std::str::from_utf8(line).ok())
+        .is_some_and(|line| line.starts_with("HTTP/1.0 2") || line.starts_with("HTTP/1.1 2"))
 }
 
 pub(crate) async fn resolve_destination(
@@ -583,6 +796,33 @@ impl HttpClientTunnelBackend {
         let (proxy_username, proxy_password) = proxy_credentials
             .map(|(username, password)| (Some(username), Some(password)))
             .unwrap_or((None, None));
+        // M142: typed JSON validation happens in TunnelManager; re-check here
+        // so a non-string can never be silently treated as absent.
+        for key in ["SSLProxies", "JumpList"] {
+            if let Some(value) = definition.raw_config.get(key) {
+                if !value.is_string() {
+                    return Err(BackendError::UnsupportedOption {
+                        tunnel_type: TunnelType::HttpClient,
+                        option: key.to_owned(),
+                    });
+                }
+            }
+        }
+        let ssl_proxies = raw_string(definition, "SSLProxies")
+            .as_deref()
+            .map(parse_ssl_proxies)
+            .transpose()?
+            .unwrap_or_default();
+        let jump_servers = raw_string(definition, "JumpList")
+            .as_deref()
+            .map(parse_jump_servers)
+            .transpose()?
+            .unwrap_or_default();
+        let ssl_selector = if ssl_proxies.is_empty() {
+            None
+        } else {
+            Some(Arc::new(Mutex::new(SslProxySelector::new(ssl_proxies))))
+        };
         Ok(HttpClientConfig {
             name: definition.name.as_str().to_owned(),
             bind_address,
@@ -592,6 +832,8 @@ impl HttpClientTunnelBackend {
             })?,
             sam_tcp_port: self.sam_tcp_port,
             outproxy,
+            ssl_selector,
+            jump_servers,
             proxy_username,
             proxy_password,
             require_auth,
@@ -639,6 +881,18 @@ fn parse_outproxy(value: &str) -> BackendResult<OutproxyTarget> {
         });
     }
     Ok(OutproxyTarget { destination, port })
+}
+
+fn parse_ssl_proxies(value: &str) -> BackendResult<Vec<OutproxyTarget>> {
+    parse_ssl_proxy_list(value).map_err(|_| BackendError::Internal {
+        message: "httpclient SSLProxies is invalid".to_owned(),
+    })
+}
+
+fn parse_jump_servers(value: &str) -> BackendResult<Vec<String>> {
+    parse_jump_server_list(value).map_err(|_| BackendError::Internal {
+        message: "httpclient JumpList is invalid".to_owned(),
+    })
 }
 
 fn credentials(
@@ -702,6 +956,8 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "OutproxyUsername",
         "OutproxyPassword",
         "OutproxyType",
+        "SSLProxies",
+        "JumpList",
         "AllowUserAgent",
         "AllowReferer",
         "AllowAccept",
@@ -722,6 +978,9 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
     ];
     // M134: "NewDest" applied as proven idle-resume policy.
     // M136: Reduce family supported. M137: Close family supported.
+    // M142: "SSLProxies" selects I2P SSL outproxies for HTTPS/CONNECT
+    // clearnet; "JumpList" supplies bounded jump-service URL prefixes for the
+    // destination-not-found address-helper path.
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
             continue;
@@ -730,6 +989,19 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
             tunnel_type: TunnelType::HttpClient,
             option: key.clone(),
         });
+    }
+    for key in ["SSLProxies", "JumpList"] {
+        if let Some(value) = definition.raw_config.get(key) {
+            let text = value.as_str().ok_or_else(|| BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::HttpClient,
+                option: key.to_owned(),
+            })?;
+            if key == "SSLProxies" {
+                parse_ssl_proxies(text)?;
+            } else {
+                parse_jump_servers(text)?;
+            }
+        }
     }
     if raw_bool(definition, "BlockReferers")?.unwrap_or(false) {
         // BlockReferers is a stronger spelling of the default safe policy.
@@ -770,7 +1042,24 @@ impl TunnelBackend for HttpClientTunnelBackend {
         TunnelType::HttpClient
     }
 
+    fn validate_start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
+        // Pure preflight mirroring `start` before listener/session work.
+        validate_common_options(TunnelType::HttpClient, &definition.options)
+            .map_err(option_error)?;
+        validate_options(
+            TunnelType::HttpClient,
+            &definition.options,
+            HTTP_CLIENT_OPTIONS,
+        )
+        .map_err(option_error)?;
+        validate_raw_options(definition)?;
+        let _ = client_lifecycle_config(definition)?;
+        Ok(())
+    }
+
     async fn start(&self, definition: &TunnelDefinition) -> BackendResult<()> {
+        // Reuse the exact preflight helpers so validation cannot drift.
+        self.validate_start(definition)?;
         let mut config = self.config(definition)?;
         config.session_options = super::runtime::session::build_client_session_options(
             definition,

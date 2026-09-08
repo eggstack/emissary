@@ -38,10 +38,12 @@ baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 # Future execution still requires registry readiness and exact production
 # authority from the registered plan. ADR-0005 authorizes only the
 # I2PControl-owned exact-revision Yosemite fork alias. M132/M133 are closed as
-# blocked; M135/M136/M137/M134 are closed as complete. M139 is the sole active
-# handoff and is qualification/test/documentation-only: it pre-authorizes no
-# production Rust/dependency change. A production defect found by M139 requires
-# a separate corrective plan.
+# blocked; M135/M136/M137/M134 and M139 are closed as complete. M140 is the sole
+# registered residual handoff and is qualification/planning/test/documentation
+# only: it authorizes no production Rust/dependency change. M141-M152 are
+# deferred/unregistered handoff documents. Their candidate path budgets are not
+# executable production authority; each future core/security milestone must be
+# amended and registered with exact-file M061/M062 authorization before coding.
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",
@@ -69,9 +71,23 @@ root_manifests = [
   "plans/implementation/i2pcontrol-proposal-170/136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md",
   "plans/implementation/i2pcontrol-proposal-170/137-m133-corrective-sam-idle-close-and-reasoned-termination.md",
   "plans/implementation/i2pcontrol-proposal-170/139-post-lifecycle-integrated-requalification-and-authority-rebase.md",
+  "plans/implementation/i2pcontrol-proposal-170/140-residual-streaming-applicability-refreeze.md",
+  "plans/implementation/i2pcontrol-proposal-170/141-http-unique-local-source-address-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/142-httpclient-sslproxies-and-jumplist-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/143-streaming-profile-runtime-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/144-presentation-usessl-runtime-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/145-leaseset-reply-bundling-multihoming-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/146-outproxy-provider-useoutproxyplugin-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/147-neutral-destination-signature-suite-primitive.md",
+  "plans/implementation/i2pcontrol-proposal-170/148-proposal-sigtype-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/149-encrypted-leaseset-runtime-and-encryptleaseset-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/150-leaseset-optionallookup-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/151-leaseset-client-auths-completion.md",
+  "plans/implementation/i2pcontrol-proposal-170/152-final-residual-proposal-170-requalification.md",
   "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md",
+  "plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md",
 ]
 
 [prohibited_production_paths]

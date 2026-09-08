@@ -1,0 +1,275 @@
+# M140 — Residual Streaming Applicability Map (eight-cell re-freeze)
+#
+# Status: implementation evidence for
+# `plans/implementation/i2pcontrol-proposal-170/140-residual-streaming-applicability-refreeze.md`.
+#
+# Zero apply-promotion budget. Each record adjudicates one currently blocked
+# cell against pinned actual tunnel-family runtime consumption, not generic
+# Proposal/I2PControl setter reachability.
+
+[baseline]
+milestone = "M140"
+status = "implementation"
+source_plan = "plans/implementation/i2pcontrol-proposal-170/140-residual-streaming-applicability-refreeze.md"
+planning_baseline = "7b51da725e83c3ec4a7b806a4e242730b7cb93d7"
+implementation_head = "a02d269d35b312c33061a3d797dabd9961cf295a"
+worktree = "clean at implementation start; no production source change authorized"
+m131_authority = "plans/closure/i2pcontrol-proposal-170/131-closure.md (historical residual authority, immutable)"
+m139_authority = "plans/closure/i2pcontrol-proposal-170/139-closure.md (current runtime/security qualification authority, immutable)"
+matrix = "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+starting_apply = 325
+starting_blocked_primitive = 47
+starting_not_applicable = 468
+starting_total = 840
+final_apply = 325
+final_blocked_primitive = 40
+final_not_applicable = 475
+final_total = 840
+apply_promotions = 0
+cell_record_count = 8
+reclassified_cell_count = 7
+retained_cell_count = 1
+reclassified_cells = ["Profile:httpclient", "Profile:ircclient", "Profile:socks", "Profile:socksirc", "Profile:connectclient", "Profile:streamrclient", "ConnectDelay:streamrclient"]
+retained_cells = ["Profile:client"]
+closure = "plans/closure/i2pcontrol-proposal-170/140-closure.md"
+
+[references]
+proposal_url = "https://i2p.net/proposals/170-i2pcontrol-expansion.txt"
+proposal_revision = "2026-05-20"
+proposal_status = "Open"
+proposal_sha256 = "f13ae00b886c5e72131bc5d5b138a371148d1faa6899a119a1dacb65a555e7dc"
+proposal_location = "Client management options list names ConnectDelay and Profile without a per-family applicability partition; family applicability is derived from the pinned reference runtime, not the Proposal text alone"
+java_i2pcontrol_repo = "i2p/i2p.plugins.i2pcontrol"
+java_i2pcontrol_head = "45bb593000408071dd376b78848fdc246dccd964"
+java_i2pcontrol_parser = "src/java/net/i2p/i2pcontrol/servlets/jsonrpc2handlers/TunnelRequestParser.java:getProfile (Map Profile string); getConnectDelay (Map ConnectDelay boolean TRUE check)"
+java_i2pcontrol_creator = "src/java/net/i2p/i2pcontrol/servlets/jsonrpc2handlers/ClientTunnelCreator.java:setTunnelManagementOptions (ConnectDelay boolean maps to option.i2p.streaming.connectDelay 500-or-0; Profile interactive maps to option.i2p.streaming.maxWindowSize 16 else removed)"
+java_i2pcontrol_support = "src/java/net/i2p/i2pcontrol/servlets/jsonrpc2handlers/TunnelSupport.java:PROP_DELAY_DEFAULT_ACTIVE 500; PROP_DEFAULT_STREAMING_MAX_WINDOW_SIZE 16"
+java_i2ptunnel_repo = "i2p/i2p.i2p"
+java_i2ptunnel_head = "2c3fd2a9532cd86ec06cb6f2b9f3f813ca752243"
+java_http_base = "apps/i2ptunnel/java/src/net/i2p/i2ptunnel/I2PTunnelHTTPClientBase.java: both constructors force bulk profile (opts.setProperty i2p.streaming.connectDelay 200; opts.remove i2p.streaming.maxWindowSize)"
+java_connect_client = "apps/i2ptunnel/java/src/net/i2p/i2ptunnel/I2PTunnelConnectClient.java: extends I2PTunnelHTTPClientBase; no streaming-option override of its own; inherits forced bulk profile"
+java_irc_client = "apps/i2ptunnel/java/src/net/i2p/i2ptunnel/I2PTunnelIRCClient.java: constructor forces bulk profile (same two lines: connectDelay 200; remove maxWindowSize)"
+java_socks_tunnel = "apps/i2ptunnel/java/src/net/i2p/i2ptunnel/socks/I2PSOCKSTunnel.java: constructor forces bulk profile (same two lines)"
+java_socks_irc_tunnel = "apps/i2ptunnel/java/src/net/i2p/i2ptunnel/socks/I2PSOCKSIRCTunnel.java: extends I2PSOCKSTunnel; overrides only clientConnectionRun IRC filtering; inherits forced bulk profile"
+java_plain_client = "apps/i2ptunnel/java/src/net/i2p/i2ptunnel/I2PTunnelClient.java: no streaming connectDelay/maxWindowSize override; caller configuration survives to the streaming manager"
+java_streamr_consumer = "apps/i2ptunnel/java/src/net/i2p/i2ptunnel/streamr/StreamrConsumer.java: extends I2PTunnelUDPClientBase; UDPSink plus Pinger subscribe/unsubscribe; no I2P streaming socket"
+java_udp_client_base = "apps/i2ptunnel/java/src/net/i2p/i2ptunnel/udpTunnel/I2PTunnelUDPClientBase.java: creates I2P datagram I2PSession via I2PClient.createSession, I2PSource/I2PSink datagram path, _session.connect; no streaming ConnectionOptions/SYN path"
+java_tunnel_controller_default = "apps/i2ptunnel/java/src/net/i2p/i2ptunnel/TunnelController.java: defaults PROP_PROFILE to bulk when absent; setSessionOptions passes option.* through to the tunnel task"
+java_ui_interactive = "apps/i2ptunnel/java/src/net/i2p/i2ptunnel/ui/GeneralHelper.java:isInteractive (i2p.streaming.maxWindowSize == 16); shouldDelayConnect (i2p.streaming.connectDelay > 0)"
+java_streaming_connection_options = "apps/streaming/java/src/net/i2p/client/streaming/impl/ConnectionOptions.java: PROP_CONNECT_DELAY, PROP_MAX_WINDOW_SIZE, PROP_PROFILE; cinit/setProperties/update; setProfile notes Warning unused through 0.9.64-era semantics; maxWindowSize and connectDelay are the consumed streaming knobs"
+java_streaming_connection = "apps/streaming/java/src/net/i2p/client/streaming/impl/Connection.java: MAX_WINDOW_SIZE 128; window/inboundBuffer derived from options.getMaxWindowSize"
+java_streaming_connection_manager = "apps/streaming/java/src/net/i2p/client/streaming/impl/ConnectionManager.java: Connect() conDelay gate (connectDelay <= 0 waits for connect, else delayed SYN path)"
+java_streaming_preconnect = "apps/streaming/java/src/net/i2p/client/streaming/impl/SchedulerPreconnect.java: eventOccurred delays initial SYN by options.getConnectDelay via nextSendTime"
+yosemite_revision = "59140a2277bf296928d2e8ce39a148182eeff044"
+yosemite_options = "src/options.rs: SessionOptions.additional_options plus add_session_option validated generic wire path (transport-only; not a streaming runtime consumer)"
+yosemite_session_wire = "src/proto/session.rs: SAM session command serialization (transport-only)"
+yosemite_role = "accepted SAM serializer only; wire reachability does not prove a streaming SYN-delay or max-window runtime consumer"
+
+[disposition_rules]
+rule = "Retain blocked_primitive unless pinned actual-runtime evidence affirmatively proves the field is non-applicable to that family after constructor/family overrides. No cell may move to apply. A Java I2PControl generic setter cannot outweigh an actual tunnel-family constructor/runtime override without an explicit reference path showing survival and consumption. Yosemite wire serialization is separated from runtime semantics."
+not_applicable_standard = "M131 not_applicable standard: affirmative pinned Proposal/reference family-runtime evidence, not absence of a convenient Emissary primitive"
+apply_promotions = 0
+
+[[cells]]
+canonical_option = "Profile"
+tunnel_family = "client"
+starting_disposition = "blocked_primitive"
+final_disposition = "blocked_primitive"
+proposal_evidence = "Proposal 170 lists Profile as a client management option without a per-family partition; the plain client family is not excluded by the Proposal text."
+java_parser_behavior = "TunnelRequestParser.getProfile returns the raw Profile string; ClientTunnelCreator maps interactive to option.i2p.streaming.maxWindowSize 16, else removes the property. Generic setter reachability holds for this family."
+java_runtime_class = "net.i2p.i2ptunnel.I2PTunnelClient extends I2PTunnelClientBase"
+java_constructor_hierarchy = "I2PTunnelClient constructor builds addresses only; it performs no streaming connectDelay/maxWindowSize override. I2PTunnelClientBase normalizes dontPublishLeaseSet/answerPings only. TunnelController defaults absent Profile to bulk but preserves an explicit interactive/maxWindowSize setting."
+emitted_property = "option.i2p.streaming.maxWindowSize = 16 when Profile is interactive; absent (bulk default) otherwise"
+runtime_consumer = "Streaming manager ConnectionOptions (maxWindowSize via cinit/setProperties/update) consumed by Connection window/inboundBuffer accounting; ConnectionManager/SchedulerPreconnect path remains a streaming SYN path for this TCP family. Legacy i2p.streaming.profile itself is documented as Warning unused in contemporary ConnectionOptions, while the I2PTunnel Profile field is implemented through maxWindowSize (UI isInteractive checks maxWindowSize == 16)."
+constructor_override = "none: no remove/set of i2p.streaming.maxWindowSize or i2p.streaming.connectDelay in I2PTunnelClient or its base for this family; caller-provided interactive/max-window configuration survives to sockMgr.buildOptions."
+yosemite_wire_capability = "Yosemite SessionOptions.additional_options can serialize i2p.streaming.maxWindowSize as SAM wire bytes, but wire reachability alone is not a streaming runtime consumer; no accepted Emissary neutral streaming manager/max-window consumer exists for this Proposal path."
+emissary_data_plane = "emissary-cli/src/i2pcontrol/backends/client.rs ClientTunnelBackend (TCP streaming via generation-local connector plus SAM session owner); Profile absent from SUPPORTED raw allowlist and rejected before listener/session allocation."
+rationale = "Applicable under pinned Proposal and reference family partition; no affirmative non-applicability evidence. Retain blocked pending the M143 neutral streaming-window/profile consumer."
+source_locations = "Proposal Client management options; TunnelRequestParser getProfile; ClientTunnelCreator setTunnelManagementOptions; TunnelSupport 16; I2PTunnelClient (no override); I2PTunnelClientBase; TunnelController default-bulk; GeneralHelper isInteractive; ConnectionOptions maxWindowSize/profile; Connection MAX_WINDOW_SIZE/window; Yosemite options.rs additional_options; emissary-cli/src/i2pcontrol/backends/client.rs validate_raw_options"
+future_primitive_required = true
+missing_primitive = "canonical streaming-session configuration owner and exact Profile=interactive to bounded max-window effect"
+canonical_owner = "neutral streaming manager/config seam consumed by the actual SAM streaming owner"
+primitive_cluster = "streaming-profile"
+blocking_milestone = "M097"
+production_validation = "current M095 unsupported value remains fail-before-allocation; no runtime path is changed"
+
+[[cells]]
+canonical_option = "Profile"
+tunnel_family = "httpclient"
+starting_disposition = "blocked_primitive"
+final_disposition = "not_applicable"
+proposal_evidence = "Proposal 170 lists Profile as a client management option without a per-family partition; applicability is decided by pinned family runtime consumption, not the generic list."
+java_parser_behavior = "Same generic setter as client: interactive maps to option.i2p.streaming.maxWindowSize 16, else removed. Reachability alone does not prove consumption."
+java_runtime_class = "net.i2p.i2ptunnel.I2PTunnelHTTPClient (via abstract I2PTunnelHTTPClientBase extends I2PTunnelClientBase)"
+java_constructor_hierarchy = "I2PTunnelHTTPClientBase both constructors (direct and chained-socket-manager) forcibly set i2p.streaming.connectDelay 200 and remove i2p.streaming.maxWindowSize after generic option insertion. I2PTunnelHTTPClient inherits this base without restoring the property."
+emitted_property = "option.i2p.streaming.maxWindowSize = 16 transiently when Profile is interactive, then removed by the family constructor; final effective maxWindowSize is absent (bulk)"
+runtime_consumer = "none for the interactive max-window setting in this family: the removal means ConnectionOptions never receives an interactive maxWindowSize from this path; the forced bulk behavior is the observable runtime semantic."
+constructor_override = "affirmative override: opts.setProperty(i2p.streaming.connectDelay, 200) plus opts.remove(i2p.streaming.maxWindowSize) in I2PTunnelHTTPClientBase both constructors; generic interactive value does not survive."
+yosemite_wire_capability = "Yosemite generic additional_options could carry maxWindowSize bytes, but the reference family never consumes an interactive value; wire capability is separated and does not create applicability."
+emissary_data_plane = "emissary-cli/src/i2pcontrol/backends/http_client.rs HttpClientTunnelBackend (TCP streaming proxy); Profile absent from SUPPORTED raw allowlist and rejected before allocation; no streaming-window consumer exists."
+rationale = "Affirmative pinned constructor evidence proves the generic interactive setting is removed before the streaming manager; there is no reference interactive event/consumer for this family despite generic setter reachability. Meets the M131 not_applicable standard."
+source_locations = "ClientTunnelCreator setTunnelManagementOptions; TunnelSupport 16; I2PTunnelHTTPClientBase both constructors force-bulk lines; ConnectionOptions maxWindowSize; GeneralHelper isInteractive; Yosemite options.rs; emissary-cli/src/i2pcontrol/backends/http_client.rs validate_raw_options"
+future_primitive_required = false
+missing_primitive = "none: not applicable; no M143 implementation primitive is required for this family"
+canonical_owner = "reference I2PTunnelHTTPClientBase forced-bulk owner; no Emissary primitive required"
+primitive_cluster = "streaming-profile-na"
+blocking_milestone = "none"
+production_validation = "current M095 unsupported value remains fail-before-allocation (allowlist rejection); no runtime path is changed"
+
+[[cells]]
+canonical_option = "Profile"
+tunnel_family = "connectclient"
+starting_disposition = "blocked_primitive"
+final_disposition = "not_applicable"
+proposal_evidence = "Proposal 170 lists Profile as a client management option without a per-family partition; applicability follows the actual CONNECT runtime owner."
+java_parser_behavior = "Same generic interactive-to-maxWindowSize mapping as other clients; reachability holds before family construction."
+java_runtime_class = "net.i2p.i2ptunnel.I2PTunnelConnectClient extends I2PTunnelHTTPClientBase"
+java_constructor_hierarchy = "I2PTunnelConnectClient constructor chains to I2PTunnelHTTPClientBase (which forces connectDelay 200 and removes maxWindowSize), then only parses outproxy list. No code restores maxWindowSize. Inheritance of the forced-bulk override is exact."
+emitted_property = "option.i2p.streaming.maxWindowSize = 16 transiently when interactive, then removed by the inherited HTTP-base constructor"
+runtime_consumer = "none for interactive in this family; same forced-bulk observable as httpclient."
+constructor_override = "affirmative inherited override from I2PTunnelHTTPClientBase: remove maxWindowSize plus force connectDelay 200; proven by extends plus base-constructor lines and absence of any restore in I2PTunnelConnectClient."
+yosemite_wire_capability = "Generic wire serialization remains possible but unconsumed for interactive semantics; separated from runtime applicability."
+emissary_data_plane = "emissary-cli/src/i2pcontrol/backends/connect_client.rs ConnectClientTunnelBackend (TCP CONNECT proxy); Profile absent from SUPPORTED raw allowlist and rejected before allocation."
+rationale = "Inheritance proof plus base-constructor override lines affirmatively exclude an interactive consumer for CONNECT despite generic setter reachability."
+source_locations = "ClientTunnelCreator; TunnelSupport 16; I2PTunnelConnectClient extends plus constructor; I2PTunnelHTTPClientBase force-bulk lines; ConnectionOptions; Yosemite options.rs; emissary-cli/src/i2pcontrol/backends/connect_client.rs"
+future_primitive_required = false
+missing_primitive = "none: not applicable"
+canonical_owner = "inherited I2PTunnelHTTPClientBase forced-bulk owner"
+primitive_cluster = "streaming-profile-na"
+blocking_milestone = "none"
+production_validation = "unsupported value remains fail-before-allocation; no runtime path is changed"
+
+[[cells]]
+canonical_option = "Profile"
+tunnel_family = "ircclient"
+starting_disposition = "blocked_primitive"
+final_disposition = "not_applicable"
+proposal_evidence = "Proposal lists Profile generically; IRC-client applicability is decided by the actual IRC runtime constructor."
+java_parser_behavior = "Generic interactive-to-16 mapping; reachability holds before construction."
+java_runtime_class = "net.i2p.i2ptunnel.I2PTunnelIRCClient extends I2PTunnelClientBase"
+java_constructor_hierarchy = "I2PTunnelIRCClient constructor independently forces bulk behavior with the same two lines as the HTTP base (set connectDelay 200; remove maxWindowSize) after super(), before address/DCC setup. No restore occurs."
+emitted_property = "option.i2p.streaming.maxWindowSize = 16 transiently when interactive, then removed; final effective is absent (bulk)"
+runtime_consumer = "none for interactive in this family; forced bulk is the observable streaming semantic."
+constructor_override = "affirmative independent override in I2PTunnelIRCClient constructor; generic value does not survive to ConnectionOptions."
+yosemite_wire_capability = "Wire serialization possible but unconsumed for interactive; separated."
+emissary_data_plane = "emissary-cli/src/i2pcontrol/backends/irc_client.rs IrcClientTunnelBackend (filtered TCP streaming); Profile not in SUPPORTED allowlist; rejected before allocation."
+rationale = "Independent pinned constructor override lines prove no interactive consumer survives; meets affirmative N/A standard."
+source_locations = "ClientTunnelCreator; TunnelSupport 16; I2PTunnelIRCClient constructor force-bulk lines; ConnectionOptions; GeneralHelper isInteractive; Yosemite options.rs; emissary-cli/src/i2pcontrol/backends/irc_client.rs"
+future_primitive_required = false
+missing_primitive = "none: not applicable"
+canonical_owner = "I2PTunnelIRCClient forced-bulk owner"
+primitive_cluster = "streaming-profile-na"
+blocking_milestone = "none"
+production_validation = "unsupported value remains fail-before-allocation; no runtime path is changed"
+
+[[cells]]
+canonical_option = "Profile"
+tunnel_family = "socks"
+starting_disposition = "blocked_primitive"
+final_disposition = "not_applicable"
+proposal_evidence = "Proposal lists Profile generically; SOCKS applicability follows the actual SOCKS runtime constructor."
+java_parser_behavior = "Generic interactive-to-16 mapping; reachability holds before construction."
+java_runtime_class = "net.i2p.i2ptunnel.socks.I2PSOCKSTunnel extends I2PTunnelClientBase"
+java_constructor_hierarchy = "I2PSOCKSTunnel constructor forces bulk behavior (set connectDelay 200; remove maxWindowSize) after super(), before proxy-map parsing. No restore."
+emitted_property = "option.i2p.streaming.maxWindowSize = 16 transiently when interactive, then removed"
+runtime_consumer = "none for interactive in this family."
+constructor_override = "affirmative override in I2PSOCKSTunnel constructor; generic interactive value does not survive."
+yosemite_wire_capability = "Wire serialization separated; no interactive consumer."
+emissary_data_plane = "emissary-cli/src/i2pcontrol/backends/socks.rs SocksTunnelBackend (TCP SOCKS proxy via shared config_for); Profile not in SUPPORTED allowlist; rejected before allocation."
+rationale = "Pinned SOCKS constructor override affirmatively excludes interactive consumption."
+source_locations = "ClientTunnelCreator; TunnelSupport 16; socks/I2PSOCKSTunnel constructor force-bulk lines; ConnectionOptions; Yosemite options.rs; emissary-cli/src/i2pcontrol/backends/socks.rs validate_raw_options"
+future_primitive_required = false
+missing_primitive = "none: not applicable"
+canonical_owner = "I2PSOCKSTunnel forced-bulk owner"
+primitive_cluster = "streaming-profile-na"
+blocking_milestone = "none"
+production_validation = "unsupported value remains fail-before-allocation; no runtime path is changed"
+
+[[cells]]
+canonical_option = "Profile"
+tunnel_family = "socksirc"
+starting_disposition = "blocked_primitive"
+final_disposition = "not_applicable"
+proposal_evidence = "Proposal lists Profile generically; SOCKS-IRC applicability follows its actual inherited SOCKS runtime."
+java_parser_behavior = "Generic interactive-to-16 mapping; reachability holds before construction."
+java_runtime_class = "net.i2p.i2ptunnel.socks.I2PSOCKSIRCTunnel extends I2PSOCKSTunnel"
+java_constructor_hierarchy = "I2PSOCKSIRCTunnel constructor chains to I2PSOCKSTunnel (which forces bulk), then only renames and overrides clientConnectionRun IRC filtering. No streaming-option restore."
+emitted_property = "option.i2p.streaming.maxWindowSize = 16 transiently when interactive, then removed by inherited SOCKS constructor"
+runtime_consumer = "none for interactive in this family."
+constructor_override = "affirmative inherited override from I2PSOCKSTunnel; proven by extends plus base-constructor lines and absence of restore in I2PSOCKSIRCTunnel."
+yosemite_wire_capability = "Wire serialization separated; no interactive consumer."
+emissary_data_plane = "emissary-cli/src/i2pcontrol/backends/socks.rs SocksIrc path (same SUPPORTED allowlist via shared config_for); Profile rejected before allocation."
+rationale = "Inheritance proof affirmatively excludes interactive consumption for SOCKS-IRC."
+source_locations = "ClientTunnelCreator; TunnelSupport 16; socks/I2PSOCKSIRCTunnel extends plus constructor; socks/I2PSOCKSTunnel force-bulk lines; ConnectionOptions; Yosemite options.rs; emissary-cli/src/i2pcontrol/backends/socks.rs"
+future_primitive_required = false
+missing_primitive = "none: not applicable"
+canonical_owner = "inherited I2PSOCKSTunnel forced-bulk owner"
+primitive_cluster = "streaming-profile-na"
+blocking_milestone = "none"
+production_validation = "unsupported value remains fail-before-allocation; no runtime path is changed"
+
+[[cells]]
+canonical_option = "Profile"
+tunnel_family = "streamrclient"
+starting_disposition = "blocked_primitive"
+final_disposition = "not_applicable"
+proposal_evidence = "Proposal lists Profile generically; Streamr is a UDP/datagram family, not an I2P streaming-socket family, so generic streaming-window applicability does not transfer."
+java_parser_behavior = "Generic interactive-to-16 mapping still emits option.i2p.streaming.maxWindowSize 16 for Streamr before family construction; reachability is generic only."
+java_runtime_class = "net.i2p.i2ptunnel.streamr.StreamrConsumer extends udpTunnel.I2PTunnelUDPClientBase"
+java_constructor_hierarchy = "StreamrConsumer constructor chains to I2PTunnelUDPClientBase (datagram I2PSession via I2PClient.createSession, I2PSource/I2PSink, _session.connect), then creates UDPSink plus Pinger subscribe/unsubscribe. No I2PSocketManager, no I2PSocket, no streaming Connection is ever created."
+emitted_property = "option.i2p.streaming.maxWindowSize = 16 when interactive (generic emission); never delivered to a streaming ConnectionOptions consumer in this family"
+runtime_consumer = "none: no streaming ConnectionOptions, ConnectionManager SYN path, SchedulerPreconnect delay, Connection window, or maxWindowSize consumer is entered; UDP/datagram session start, control pinger, send and receive never consult maxWindowSize/profile."
+constructor_override = "family-ownership exclusion (stronger than a property remove): the UDP/datagram owner has no streaming-socket construction site at which maxWindowSize could be consumed; generic streaming properties cannot survive as observable behavior."
+yosemite_wire_capability = "Yosemite datagram SessionOptions can carry additional_options bytes, but Streamr sessions are repliable-datagram sessions (from_port/to_port, 16-subscriber/60s-expiry/1200-byte/4095-buffer/15s-refresh contract in Emissary); wire bytes do not create a streaming window consumer."
+emissary_data_plane = "emissary-cli/src/i2pcontrol/backends/streamr.rs StreamrClientTunnelBackend (bounded datagram producer/consumer; 16-subscriber, 60s expiry, 1200-byte payload, 4095-byte transport buffer, 15s refresh, bounded shutdown; remote datagrams never choose a local UDP destination); no streaming-window consumer."
+rationale = "Affirmative UDP-ownership proof: StreamrConsumer/I2PTunnelUDPClientBase never creates the streaming socket whose window could implement Profile. Do not invent a datagram window timer to preserve a blocker. Meets N/A standard."
+source_locations = "ClientTunnelCreator; TunnelSupport 16; streamr/StreamrConsumer; udpTunnel/I2PTunnelUDPClientBase session/source/sink; streaming ConnectionOptions/Connection/ConnectionManager/SchedulerPreconnect (unentered); Yosemite options.rs; emissary-cli/src/i2pcontrol/backends/streamr.rs"
+future_primitive_required = false
+missing_primitive = "none: not applicable; Streamr must never gain a streaming-window consumer"
+canonical_owner = "neutral Streamr datagram session owner (reference UDP base); no streaming owner"
+primitive_cluster = "streaming-profile-na"
+blocking_milestone = "none"
+production_validation = "no streaming effect exists to preserve; no runtime path is changed; datagram limits unchanged"
+
+[[cells]]
+canonical_option = "ConnectDelay"
+tunnel_family = "streamrclient"
+starting_disposition = "blocked_primitive"
+final_disposition = "not_applicable"
+proposal_evidence = "Proposal lists ConnectDelay as a client management option without a per-family event definition; Streamr has no reference ConnectDelay event."
+java_parser_behavior = "TunnelRequestParser.getConnectDelay returns boolean TRUE check; ClientTunnelCreator maps true to option.i2p.streaming.connectDelay 500 (PROP_DELAY_DEFAULT_ACTIVE) else 0. Generic emission reaches Streamr config before family construction."
+java_runtime_class = "net.i2p.i2ptunnel.streamr.StreamrConsumer extends udpTunnel.I2PTunnelUDPClientBase (same UDP owner as Profile:streamrclient)"
+java_constructor_hierarchy = "Same UDP construction as above: I2PClient.createDestination/createSession, I2PSource BOTH plus I2PSink/I2PSinkAnywhere, _session.connect, UDPSink plus Pinger. No I2PSocketManager.connect SYN path."
+emitted_property = "option.i2p.streaming.connectDelay = 500 when true else 0 (generic emission)"
+runtime_consumer = "none in this family: no streaming ConnectionOptions connectDelay is read (ConnectionOptions/SchedulerPreconnect/ConnectionManager SYN-delay path unentered); UDP session start, control pinger subscribe/unsubscribe, datagram send and receive never consult connectDelay."
+constructor_override = "family-ownership exclusion: no streaming SYN-delay construction site exists in the UDP owner; the generic delay value has no UDP/datagram session-start, pinger, send or receive consumer. Do not invent a datagram delay timer to preserve a blocker."
+yosemite_wire_capability = "Yosemite generic additional_options could carry connectDelay bytes, but Streamr datagram sessions never enter the streaming SchedulerPreconnect/ConnectionManager delay consumer; wire separated."
+emissary_data_plane = "emissary-cli/src/i2pcontrol/backends/streamr.rs StreamrClientTunnelBackend (same bounded datagram contract as above); ConnectDelay has no datagram connector consumer; TCP ConnectDelay remains applied via the generation-local outbound stream connector for the six TCP families (unchanged)."
+rationale = "Pinned runtime positively proves no reference ConnectDelay event/consumer for Streamr despite generic setter reachability. Trace required by plan section 6.1 is complete: creator acceptance, StreamrConsumer construction, UDP-base session creation, no streaming ConnectionOptions/SYN-delay entry, no UDP start/pinger/send/receive effect."
+source_locations = "TunnelRequestParser getConnectDelay; ClientTunnelCreator connectDelay 500-or-0; TunnelSupport 500; streamr/StreamrConsumer; udpTunnel/I2PTunnelUDPClientBase; streaming ConnectionOptions connectDelay, ConnectionManager conDelay gate, SchedulerPreconnect SYN delay (all unentered for Streamr); Yosemite options.rs; emissary-cli/src/i2pcontrol/backends/streamr.rs plus runtime/session.rs TCP connector (unchanged)"
+future_primitive_required = false
+missing_primitive = "none: not applicable; no datagram delay timer may be invented"
+canonical_owner = "neutral Streamr datagram session owner; no streaming SYN-delay owner"
+primitive_cluster = "session-lifecycle-na"
+blocking_milestone = "none"
+production_validation = "no datagram delay effect exists; no runtime path is changed"
+
+[counts]
+pre_apply = 325
+pre_blocked = 47
+pre_not_applicable = 468
+pre_total = 840
+post_apply = 325
+post_blocked = 40
+post_not_applicable = 475
+post_total = 840
+delta_blocked_to_na = 7
+apply_delta = 0
+
+[evidence_review]
+m131_map = "plans/implementation/i2pcontrol-proposal-170/131-residual-primitive-map.toml (starting blocked dispositions for all eight cells; M131 retained ambiguity, now resolved by constructor/UDP-ownership proof)"
+m139_matrix_sha = "c06236cb3eb014cbe7f04b3b065155da85720e66c6c7a106bdb7624405d5ff9d (pre-M140 M095 SHA)"
+independent_na_review = "every proposed N/A row was independently reviewed against the M131 not_applicable standard: each cites the actual family constructor/runtime path plus the exact override or UDP-ownership exclusion, not absence of a convenient Emissary primitive"
+no_prose_only_count_edit = "counts are mechanically derived from row changes: 47 minus 7 reclassified equals 40 blocked; 468 plus 7 equals 475 N/A; 325 apply unchanged"
+retained_profile_set_for_m143 = ["Profile:client"]
+m143_note = "M143 must be amended before registration to target only Profile:client (one cell) with the exact neutral streaming files; its current candidate path descriptions do not authorize production work"

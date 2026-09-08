@@ -1,20 +1,21 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M139 is current runtime/security qualification authority; M140 is the sole registered residual handoff**.
+Status: **partial Proposal 170 support; M139 is current runtime/security qualification authority; M140 closed as residual streaming applicability authority; M141 is the sole registered residual handoff**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
 Current authorities:
 
 - current runtime/security qualification: M139 closure `plans/closure/i2pcontrol-proposal-170/139-closure.md`;
+- current residual streaming applicability: M140 closure `plans/closure/i2pcontrol-proposal-170/140-closure.md` (`325/40/475`, zero promotions, retained `Profile:client` frozen for M143);
 - historical runtime/security qualification: M130 closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
-- historical residual applicability/primitive authority: M131 closure and `131-residual-primitive-map.toml`, superseded only by explicit later current-head closures;
+- historical residual applicability/primitive authority: M131 closure and `131-residual-primitive-map.toml`, superseded only by explicit later current-head closures (M140 for seven cells);
 - lifecycle implementation authority: M135/M136/M137/M134 closures;
-- current M095 matrix at M140 registration: `325 apply / 47 blocked_primitive / 468 not_applicable`;
+- current M095 matrix after M140: `325 apply / 40 blocked_primitive / 475 not_applicable`;
 - active residual roadmap: `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`;
-- registered plan: `140-residual-streaming-applicability-refreeze.md`.
+- registered plan: `141-http-unique-local-source-address-completion.md`.
 
-M140 has zero Proposal promotion budget and authorizes no production code/dependency change. The matrix remains `325/47/468` until M140 closes with mechanically proven dispositions.
+M140 has zero Proposal promotion budget and authorizes no production code/dependency change. The matrix is `325/40/475` after M140 closure with mechanically proven dispositions.
 
 ## Authority order
 
@@ -35,25 +36,19 @@ Containment/support evidence remains centered on:
 - `105-residual-option-audit.toml`;
 - `110-completion-ledger.toml`.
 
-## Current registered handoff — M140
+## Current registered handoff — M141
 
 Plan:
 
-- `140-residual-streaming-applicability-refreeze.md`.
+- `141-http-unique-local-source-address-completion.md`.
 
 Status: **registered / dependency-ready**.
 
-Scope: exactly eight blocked cells — seven `Profile` client-family cells plus `ConnectDelay:streamrclient`.
+Scope: exactly two blocked cells — `UniqueLocalAddressPerClient` × `httpserver`, `httpbidirserver`.
 
-Purpose:
+Purpose: implement reference-compatible per-client loopback source binding through the canonical peer-hash owner, entirely I2PControl-local.
 
-- distinguish generic Proposal/I2PControl setter reachability from actual pinned tunnel-family runtime consumption;
-- trace constructor overrides in HTTP/CONNECT/IRC/SOCKS families and UDP ownership in Streamr;
-- retain blockers or reclassify only `blocked_primitive -> not_applicable` with affirmative source evidence;
-- produce an eight-row applicability map and reconcile machine/docs/tests;
-- freeze the exact retained Profile target set for M143.
-
-Expected `325/40/475` is only a planning hypothesis. M140 must not force it.
+M140 is closed as complete (`plans/closure/i2pcontrol-proposal-170/140-closure.md`): eight cells adjudicated, seven reclassified to `not_applicable` with affirmative constructor/UDP-ownership evidence, `Profile:client` retained as the exact M143 target set, matrix `325/40/475`, zero promotions.
 
 ## Deferred residual implementation chain
 
@@ -106,7 +101,7 @@ Numbering note: historical planning contemplated an optional NewDest-corrective 
 
 ## Current support state
 
-Current machine authority at M140 registration is M095 `325/47/468` across 840 TunnelManager option/family cells.
+Current machine authority after M140 is M095 `325/40/475` across 840 TunnelManager option/family cells.
 
 Qualified/implemented surface includes:
 
@@ -131,25 +126,25 @@ M130 historical qualification
   -> M131 residual re-freeze
   -> M135 -> M136 -> M137 -> M134
   -> M139 current integrated qualification
-  -> M140 [REGISTERED / ZERO PROMOTION]
-  -> M141 -> M142 -> M143 -> M144 -> M145 -> M146
+  -> M140 [CLOSED AS COMPLETE — 325/40/475, ZERO PROMOTION]
+  -> M141 [REGISTERED / DEPENDENCY-READY]
+  -> M142 -> M143 -> M144 -> M145 -> M146
   -> M147 -> M148 -> M149 -> M150 -> M151 -> M152
-     [ALL AFTER M140 DEFERRED / UNREGISTERED]
+     [ALL AFTER M141 DEFERRED / UNREGISTERED]
 ```
 
-## Residual inventory before M140
+## Residual inventory after M140
 
-Machine-derived blockers total 47:
+Machine-derived blockers total 40:
 
 - `SigType` — 10;
 - encrypted/authenticated LeaseSets — 15;
-- `Profile` — 7;
+- `Profile` (retained `client` only) — 1;
 - `UseSSL` — 4;
 - `UseOutproxyPlugin` — 4;
 - HTTP `SSLProxies` + `JumpList` — 2;
-- `UniqueLocalAddressPerClient` — 2;
-- `MultiHoming` / `shouldBundleReplyInfo` — 2;
-- Streamr `ConnectDelay` — 1.
+- `UniqueLocalAddressPerClient` — 2 (M141 registered target);
+- `MultiHoming` / `shouldBundleReplyInfo` — 2.
 
 ## Containment
 

@@ -389,8 +389,9 @@ M124) adds cross-field auth/type consistency validation. The dependency now
 serializes corrected generic fields, proven reachable by I2PControl adapter
 tests, but that is transport reachability only; no Proposal runtime path maps
 them and no downgrade is permitted, so the remaining 19 cells fail before
-allocation. M139 closes the current residual ledger at `325 apply / 47 blocked /
-468 not_applicable`; no residual capability successor is registered.
+allocation. M139 closes the current runtime/security qualification at `325 apply / 47 blocked /
+468 not_applicable`; M140 re-freezes the streaming applicability to `325 apply / 40 blocked /
+475 not_applicable` with zero promotions; no residual capability successor is registered beyond the deferred M141-M152 chain.
 
 | Disposition | Proposal 170 fields |
 |---|---|
@@ -400,7 +401,7 @@ allocation. M139 closes the current residual ledger at `325 apply / 47 blocked /
 | Applied by seven client idle owners (M136) | `Reduce` (boolean master switch), `ReduceCount` (1–6, default 1), `ReduceTime` (ms, minimum 300000, default 1200000) via standard `i2cp.reduce*` and the live-quantity primitive; `ReduceTime`/`ReduceCount` without `Reduce=true` fail before allocation |
 | Applied by seven client idle owners (M137) | `Close` (boolean master switch), `CloseTime` (ms, minimum 300000, default 1800000) via standard `i2cp.close*` with close-before-reduce ordering and canonical teardown; `CloseTime` without `Close=true` fails before allocation |
 | Applied by six TCP proven-resume owners (M134) | `NewDest` only on a proven `IdlePolicy` resume (requires `Close=true`, conflicts with `PersistentClientKey`/`PrivKeyFile`, Streamr/servers not applicable); ordinary/manual/restart/failure paths reuse without rotation |
-| Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, `Profile`, Streamr `ConnectDelay` and other retained Streamr lifecycle cells; `SigType` for all applicable families |
+| Rejected before allocation as residual client blockers | `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, retained `Profile:client`, and `SigType` for all applicable families (M140 re-freezes six constructor-overridden/UDP `Profile` cells and Streamr `ConnectDelay` as not_applicable) |
 | Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime` |
 | Rejected before allocation as residual server blockers | `UniqueLocalAddressPerClient`, `MultiHoming`, `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
 | Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
@@ -411,9 +412,9 @@ handoff into an I2PControl-owned key store exist. New `OutproxyPassword` values
 are held in the same typed redacted boundary as `ProxyPassword`; legacy raw
 compatibility values remain response-redacted. Proxy credentials are bounded, separated between the local
 listener and the configured I2P outproxy, and never serialized in canonical
-`get` output. `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, and `Profile`
-fail before listener/session allocation because no exact Emissary-owned
-primitive exists for them. The Reduce family is applied by M136: idle SAM
+`get` output. `UseOutproxyPlugin`, HTTP `SSLProxies`/`JumpList`, and retained
+`Profile:client` fail before listener/session allocation because no exact Emissary-owned
+primitive exists for them. Constructor-overridden/UDP `Profile` cells (HTTP, IRC, SOCKS, SOCKS-IRC, CONNECT, Streamr) and Streamr `ConnectDelay` are not applicable by affirmative M140 reference gates (forced-bulk removals and UDP/datagram ownership). The Reduce family is applied by M136: idle SAM
 sessions decrease to the configured quantity through the live-quantity
 primitive and restore on activity; malformed or server-family values fail
 before allocation. The Close family is applied by M137: idle SAM sessions
@@ -427,7 +428,7 @@ exactly once on a proven `IdlePolicy` resume (one shared successor, shared
 compatibility includes `NewDest`); manual Stop/Start, Restart, process
 restart, transport failure, failed/cancelled resume, stale reasons and
 unrelated edits all preserve without rotation.
-Streamr `DelayOpen` and `NewDest` are not applicable by affirmative reference gates; its other retained
+Streamr `DelayOpen`, `NewDest`, `ConnectDelay` and six `Profile` family cells are not applicable by affirmative reference gates (M131 for DelayOpen/NewDest; M140 for ConnectDelay/Profile with constructor/UDP-ownership proof); its other retained
 lifecycle cells remain explicit blocked responses because generic reference
 setters do not establish a datagram runtime owner, except Reduce and Close
 which now use the shared datagram session owner. `AllowInternalSSL` is not

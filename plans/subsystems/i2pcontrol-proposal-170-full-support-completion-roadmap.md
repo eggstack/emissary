@@ -1,22 +1,26 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M140 registered under the residual primitive completion roadmap**
+Status: **active / partial; M140 closed as complete; M141 registered under the residual primitive completion roadmap**
 
 Current runtime/security qualification authority:
 
 - M139 closure: `plans/closure/i2pcontrol-proposal-170/139-closure.md`.
 
+Current residual applicability authority:
+
+- M140 closure: `plans/closure/i2pcontrol-proposal-170/140-closure.md` (zero promotions; `325/40/475`).
+
 Current registered handoff:
 
-- M140: `plans/implementation/i2pcontrol-proposal-170/140-residual-streaming-applicability-refreeze.md`.
+- M141: `plans/implementation/i2pcontrol-proposal-170/141-http-unique-local-source-address-completion.md`.
 
 Focused residual execution roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`.
 
-Current machine authority at M140 registration:
+Current machine authority after M140 closure:
 
-- M095 matrix: `325 apply / 47 blocked_primitive / 468 not_applicable` across 840 TunnelManager option/family cells.
+- M095 matrix: `325 apply / 40 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells.
 
 Pinned Proposal authority:
 
@@ -71,13 +75,13 @@ Current implemented/qualified subset includes:
 - Proposal `Close`/`CloseTime` for all seven client families plus authoritative idle termination cause from M137;
 - Proposal `NewDest` for the six non-Streamr TCP client families from M134.
 
-Current matrix remains:
+Current matrix after M140 closure:
 
 - `325 apply`;
-- `47 blocked_primitive`;
-- `468 not_applicable`.
+- `40 blocked_primitive`;
+- `475 not_applicable`.
 
-M140 may change only evidence-backed blocked-to-N/A dispositions and has zero apply-promotion budget. Until an M140 closure says otherwise, `325/47/468` remains current authority.
+M140 made seven evidence-backed `blocked_primitive -> not_applicable` reclassifications with zero `apply` promotions (`325/40/475` is now current authority).
 
 Full Proposal 170 support is **not** claimed.
 
@@ -95,7 +99,7 @@ A production change outside that boundary is permitted only when:
 6. M061/M062 exact-path evidence is amended;
 7. a registered plan explicitly authorizes the change.
 
-M140 authorizes no production code. The deferred residual plans deliberately distinguish:
+M140 authorized no production code and made none. The deferred residual plans deliberately distinguish:
 
 - I2PControl-local targets: M141, M142, M144, preferred M146;
 - conditional small neutral core seams: M143, M145;
@@ -145,13 +149,19 @@ M136 SAM activity + Reduce*                           [CLOSED AS COMPLETE — 30
 M137 Close* + reasoned termination                    [CLOSED AS COMPLETE — 319/53/468]
   |
   v
-M134 NewDest on proven idle resume                    [CLOSED AS COMPLETE — 325/47/468]
+M134 NewDest on proven idle resume                    [CLOSED AS COMPLETE — 325/47/468 at M134 head]
   |
   v
 M139 integrated current-head requalification          [CLOSED AS COMPLETE — ZERO PROMOTION]
+  |
+  v
+M140 streaming applicability re-freeze               [CLOSED AS COMPLETE — 325/40/475, ZERO PROMOTION]
+  |
+  v
+M141 HTTP unique local source address                [REGISTERED / DEPENDENCY-READY]
 ```
 
-M139 supersedes M130 for current-head runtime/security qualification only. M130 remains historical evidence. M131 remains historical residual authority except where later closures explicitly change a current disposition.
+M139 supersedes M130 for current-head runtime/security qualification only. M130 remains historical evidence. M131 remains historical residual authority except where M140 explicitly reclassifies seven cells to current-head `not_applicable`.
 
 Historical planning mentioned a possible NewDest-corrective “M138”; M134 proved it unnecessary and no M138 implementation plan was registered.
 
@@ -163,12 +173,12 @@ The residual roadmap registers only the next dependency-ready plan:
 M139 current integrated qualification                  [CLOSED]
   |
   v
-M140 streaming applicability re-freeze                 [REGISTERED / ZERO PROMOTION]
+M140 streaming applicability re-freeze                 [CLOSED AS COMPLETE — 325/40/475, ZERO PROMOTION]
   |
   v
-M141 UniqueLocalAddressPerClient                       [DEFERRED]
+M141 UniqueLocalAddressPerClient                       [REGISTERED / DEPENDENCY-READY]
   -> M142 HTTP SSLProxies + JumpList                   [DEFERRED]
-  -> M143 retained streaming Profile                   [DEFERRED]
+  -> M143 retained streaming Profile (Profile:client × 1) [DEFERRED; exact neutral files amendment still required]
   -> M144 application/presentation UseSSL              [DEFERRED]
   -> M145 reply LeaseSet bundling / MultiHoming        [DEFERRED]
   -> M146 real outproxy provider / UseOutproxyPlugin   [DEFERRED]
@@ -182,22 +192,21 @@ M141 UniqueLocalAddressPerClient                       [DEFERRED]
 
 M141-M152 are committed handoff documents but are not executable authority until the registry promotes them after their hard dependencies close. M143/M145/M147/M149-M151 require explicit pre-registration amendments to freeze exact cells/files/spec/security decisions.
 
-## 8. Remaining 47 residual cells at M140 registration
+## 8. Remaining 40 residual cells after M140 closure
 
 | Primitive cluster | Blocked cells |
 |---|---:|
 | `SigType` destination signing | 10 |
 | encrypted/authenticated LeaseSet cluster | 15 |
-| streaming `Profile` | 7 |
+| streaming `Profile` (retained `client` only) | 1 |
 | presentation `UseSSL` | 4 |
 | `UseOutproxyPlugin` | 4 |
 | HTTP `SSLProxies` + `JumpList` | 2 |
 | `UniqueLocalAddressPerClient` | 2 |
 | `MultiHoming` / `shouldBundleReplyInfo` | 2 |
-| Streamr `ConnectDelay` | 1 |
-| **Total** | **47** |
+| **Total** | **40** |
 
-M095 machine authority wins over prose. M140 specifically re-freezes the seven Profile rows plus Streamr ConnectDelay using actual family constructor/runtime evidence and may only move blockers to affirmative N/A.
+M095 machine authority wins over prose. M140 re-froze the seven Profile rows plus Streamr ConnectDelay using actual family constructor/runtime evidence and moved only affirmatively proven blockers to N/A with zero apply promotions.
 
 ## 9. Residual architecture selection
 
@@ -235,7 +244,8 @@ This ordering minimizes contamination of upstream-reviewed Emissary code and pre
 | M137 | Close*/termination-reason implementation authority |
 | M134 | NewDest proven-resume implementation authority |
 | M139 | current post-lifecycle runtime/security qualification authority |
-| M140 | sole registered residual applicability handoff |
+| M140 | current residual streaming applicability authority (closed as complete; `325/40/475`; retained `Profile:client` frozen for M143) |
+| M141 | sole registered residual capability handoff |
 
 ## 11. Successor readiness requirements
 
@@ -273,9 +283,9 @@ No new hosted CI/fuzz/release orchestration is required by this roadmap.
 
 Per `plans/003-planning-process.md`:
 
-- M139 remains current runtime/security qualification authority;
-- M140 is the only registered residual plan;
-- M141-M152 are deferred/unregistered;
+- M139 remains current runtime/security qualification authority; M140 is closed as residual streaming applicability authority;
+- M141 is the only registered residual plan;
+- M142-M152 are deferred/unregistered;
 - after each closure, register only the next hard-dependency-ready plan;
 - amend deferred path/security assumptions before registration where required;
 - material deviations require plan amendment before production code;

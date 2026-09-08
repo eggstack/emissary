@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 historical requalification, M131 residual re-freeze, M135 neutral live-quantity primitive, M136 Reduce completion, M137 Close completion, M134 NewDest proven-resume completion, and M139 current-head post-lifecycle requalification recorded; residual option cells remain (47 blocked: 4 UseSSL + 10 SigType + 14 client lifecycle/proxy + 19 server LeaseSet/presentation)
+Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 historical requalification, M131 residual re-freeze, M135 neutral live-quantity primitive, M136 Reduce completion, M137 Close completion, M134 NewDest proven-resume completion, M139 current-head post-lifecycle requalification, and M140 residual streaming applicability re-freeze recorded; residual option cells remain (40 blocked: 4 UseSSL + 10 SigType + 7 client lifecycle/proxy + 19 server LeaseSet/presentation)
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -14,7 +14,7 @@ Current roadmap:
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 - tunnel-runtime completion: `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`
 - full-support completion: `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`
-- authoritative aggregate matrix: `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (`325/47/468`); current runtime/security qualification: `plans/closure/i2pcontrol-proposal-170/139-closure.md`
+- authoritative aggregate matrix: `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (`325/40/475`); current runtime/security qualification: `plans/closure/i2pcontrol-proposal-170/139-closure.md`; residual streaming applicability: `plans/closure/i2pcontrol-proposal-170/140-closure.md`
 
 Tunnel-runtime reclosure:
 

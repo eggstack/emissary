@@ -1,6 +1,6 @@
 # M140 — Residual Streaming Applicability Re-Freeze
 
-Status: **registered / dependency-ready**
+Status: **closed as complete**; closure: `plans/closure/i2pcontrol-proposal-170/140-closure.md`
 
 Class: invariant / qualification / matrix truthfulness
 

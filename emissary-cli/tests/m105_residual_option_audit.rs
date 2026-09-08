@@ -351,7 +351,28 @@ fn audit_covers_the_exact_m104_residual_inventory() {
     assert_eq!(m134_completed.len(), 6);
     let expected_post_m134 =
         expected_post_m137.difference(&m134_completed).cloned().collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m134);
+    // M140 re-freezes seven streaming cells as not_applicable with affirmative
+    // constructor/UDP-ownership evidence (zero apply promotions). The M105 input
+    // inventory is historical (164 rows); the current matrix blocked set must
+    // equal the post-M134 blocked set less exactly the M140 N/A cells.
+    let m140_reclassified = [
+        ("Profile", "httpclient"),
+        ("Profile", "ircclient"),
+        ("Profile", "socks"),
+        ("Profile", "socksirc"),
+        ("Profile", "connectclient"),
+        ("Profile", "streamrclient"),
+        ("ConnectDelay", "streamrclient"),
+    ]
+    .into_iter()
+    .map(|(option, tunnel_type)| (option.to_owned(), tunnel_type.to_owned()))
+    .collect::<BTreeSet<_>>();
+    assert_eq!(m140_reclassified.len(), 7);
+    let expected_post_m140 = expected_post_m134
+        .difference(&m140_reclassified)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m140);
     assert_eq!(
         audit["summary"]["post_m116_reclassified_cells"].as_integer(),
         Some(7)

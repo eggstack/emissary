@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Residual Primitive Completion Roadmap
 
-Status: **active / partial; M140 is the only registered successor**
+Status: **active / partial; M140 closed as complete; M141 is the only registered successor**
 
 Source roadmap:
 
@@ -12,11 +12,12 @@ Current qualification authority:
 
 Planning baseline:
 
-- repository head at planning start: `7b51da725e83c3ec4a7b806a4e242730b7cb93d7`;
-- current M095 matrix: `325 apply / 47 blocked_primitive / 468 not_applicable` across 840 TunnelManager option/family cells;
-- M131 remains the historical residual applicability/primitive authority;
+- repository head at M140 closure: `a02d269d35b312c33061a3d797dabd9961cf295a` (planning start `7b51da725e83c3ec4a7b806a4e242730b7cb93d7`);
+- current M095 matrix after M140: `325 apply / 40 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells;
+- M131 remains the historical residual applicability/primitive authority, superseded for seven cells by M140;
 - M135/M136/M137/M134 session-lifecycle line is closed as complete;
-- M139 is the current whole-implemented-subset runtime/security qualification authority.
+- M139 is the current whole-implemented-subset runtime/security qualification authority;
+- M140 is closed as complete as the residual streaming applicability authority with zero promotions.
 
 Pinned external authority:
 
@@ -78,22 +79,21 @@ Cross-cutting invariants:
 
 ## 3. Starting residual inventory
 
-M095 currently reports 47 blocked cells:
+M095 reported 47 blocked cells at M140 registration; M140 re-freezes seven to `not_applicable`, leaving 40 blocked cells:
 
-| Cluster | Cells | Current historical blocker |
+| Cluster | Cells | Current blocker (after M140) |
 |---|---:|---|
 | `SigType` | 10 | generalized destination signing/key generation |
 | encrypted/authenticated LeaseSets | 15 | LeaseSet2/blinding/lookup/auth crypto + NetDB + key custody |
-| streaming `Profile` | 7 | actual streaming max-window/config consumer |
+| streaming `Profile` (retained `client` only; M140 re-froze six cells as N/A) | 1 | actual streaming max-window/config consumer for `client` |
 | presentation `UseSSL` | 4 | local application endpoint TLS identity/trust owner |
 | `UseOutproxyPlugin` | 4 | real bounded local outproxy provider abstraction |
 | HTTP `SSLProxies` + `JumpList` | 2 | HTTP-only TLS-outproxy/address-helper behavior |
-| `UniqueLocalAddressPerClient` | 2 | deterministic per-client loopback source binding |
+| `UniqueLocalAddressPerClient` | 2 | deterministic per-client loopback source binding (M141 registered) |
 | `MultiHoming` / `shouldBundleReplyInfo` | 2 | outbound reply-LeaseSet bundling policy |
-| Streamr `ConnectDelay` | 1 | M131 retained ambiguity between generic setter and UDP owner |
-| **Total** | **47** | |
+| **Total** | **40** | |
 
-M140 must mechanically re-derive these cells from M095. This table is not allowed to force the matrix.
+M140 mechanically re-derived these cells from M095 (`325/40/475`). The pre-M140 47-cell table (with `Profile` × 7 and Streamr `ConnectDelay` × 1) is retained above in history via M140 closure; this table is the current-head authority.
 
 ## 4. New reference evidence driving this roadmap
 
@@ -107,9 +107,9 @@ The pinned Java runtime shows that several tunnel classes override or do not con
 - Streamr client is a UDP/datagram `StreamrConsumer` / `I2PTunnelUDPClientBase`, not an I2P streaming socket;
 - generic `client` remains the candidate family where an interactive/max-window profile can be meaningful.
 
-Similarly, Streamr has no streaming SYN/connect-delay event corresponding to `i2p.streaming.connectDelay`. M140 therefore re-freezes `Profile` × seven client families plus `ConnectDelay:streamrclient` against actual constructor/runtime consumption, not generic parser setters.
+Similarly, Streamr has no streaming SYN/connect-delay event corresponding to `i2p.streaming.connectDelay`. M140 re-froze `Profile` × seven client families plus `ConnectDelay:streamrclient` against actual constructor/runtime consumption, retaining only `Profile:client` as blocked and reclassifying seven cells to `not_applicable` with affirmative evidence (closure `plans/closure/i2pcontrol-proposal-170/140-closure.md`).
 
-No disposition changes are presumed by this roadmap. M140 may change only `blocked_primitive -> not_applicable` with affirmative pinned evidence. It has zero `apply` promotion budget.
+M140 changed only `blocked_primitive -> not_applicable` with affirmative pinned evidence. It made zero `apply` promotions.
 
 ### 4.2 I2PControl-local work should be exhausted next
 
@@ -143,16 +143,16 @@ They are staged in dependency order: confidentiality/publication first, lookup/b
 M139 current integrated qualification                      [CLOSED]
   |
   v
-M140 streaming applicability re-freeze                     [REGISTERED / ZERO PROMOTION]
+M140 streaming applicability re-freeze                     [CLOSED AS COMPLETE — 325/40/475, ZERO PROMOTION]
   |
   v
-M141 UniqueLocalAddressPerClient                           [DEFERRED]
+M141 UniqueLocalAddressPerClient                           [REGISTERED / DEPENDENCY-READY]
   |
   v
 M142 HTTP SSLProxies + JumpList                            [DEFERRED]
   |
   v
-M143 retained streaming Profile runtime                    [DEFERRED; exact cell set comes from M140]
+M143 retained streaming Profile runtime (Profile:client × 1, frozen by M140) [DEFERRED; amendment with exact neutral files still required before registration]
   |
   v
 M144 application/presentation UseSSL                       [DEFERRED]
@@ -188,19 +188,23 @@ The ordering is intentionally conservative. A later milestone may be made interf
 
 ### M140 — residual streaming applicability re-freeze
 
+Status: **closed as complete** (closure `plans/closure/i2pcontrol-proposal-170/140-closure.md`).
+
 Class: invariant / qualification.
 
 Objective: adjudicate the eight suspect cells (`Profile` × seven client families and `ConnectDelay:streamrclient`) using the pinned Proposal, Java I2PControl creator/parser, actual Java I2PTunnel constructor/runtime consumption, Yosemite wire behavior, and current Emissary data planes.
 
-Production changes: forbidden.
+Production changes: forbidden (none made).
 
-Promotion budget: zero.
+Promotion budget: zero (zero made).
 
-Permitted matrix effect: evidence-backed `blocked_primitive -> not_applicable` only.
+Matrix effect: seven evidence-backed `blocked_primitive -> not_applicable` reclassifications; `Profile:client` retained as the exact M143 target set. Final matrix `325/40/475`.
 
-Exit: every candidate has a source-cited runtime applicability verdict, M095/counts/docs are mechanically reconciled, and the exact retained Profile implementation set for M143 is frozen.
+Exit (met): every candidate has a source-cited runtime applicability verdict, M095/counts/docs are mechanically reconciled, and the exact retained Profile implementation set for M143 is frozen.
 
 ### M141 — `UniqueLocalAddressPerClient`
+
+Status: **registered / dependency-ready** (promoted by M140 closure; hard dependency M140 satisfied).
 
 Class: capability.
 
@@ -224,9 +228,11 @@ Requirements include bounded parsing, I2P-only proxy destinations, deterministic
 
 ### M143 — retained streaming `Profile`
 
+Status: deferred; retained set frozen by M140 as `Profile:client` × 1; amendment with exact neutral streaming files still required before registration.
+
 Class: infrastructure + capability.
 
-Target: only cells still `blocked_primitive` after M140.
+Target: only cells still `blocked_primitive` after M140 (`Profile:client` × 1).
 
 Preferred lower owner: the existing neutral SAM/streaming manager configuration path. Core changes are permitted only for the minimum neutral max-window/config consumer required by actual streaming behavior.
 
@@ -365,10 +371,10 @@ Pre-existing rustfmt stable/nightly drift must be recorded rather than normalize
 
 ## 10. Registration discipline
 
-- Only M140 is registered by this planning pass.
-- M141-M152 are committed as deferred handoff documents and are not executable authority until their hard dependencies close and the registry promotes exactly one next plan.
+- M140 is closed as complete; M141 is registered as the sole next dependency-ready plan by M140 closure.
+- M142-M152 are committed as deferred handoff documents and are not executable authority until their hard dependencies close and the registry promotes exactly one next plan.
 - A deferred plan's path budget is design intent, not production authorization.
-- If M140 changes the retained Profile cell set, M143 must be amended before registration so it names the exact cells and baseline counts.
+- M140 froze the retained Profile cell set as `Profile:client` × 1; M143 must still be amended before registration so it names the exact neutral streaming files and M140-closure baseline counts.
 - If reference/security research materially changes a later primitive contract, amend the deferred plan and roadmap before registration; do not silently reinterpret it during implementation.
 
 ## 11. Final completion rule

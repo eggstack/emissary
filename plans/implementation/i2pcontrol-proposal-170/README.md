@@ -1,21 +1,20 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M139 closed as the current post-lifecycle qualification authority**.
+Status: **partial Proposal 170 support; M139 is current runtime/security qualification authority; M140 is the sole registered residual handoff**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
-Current authorities and handoff:
+Current authorities:
 
 - current runtime/security qualification: M139 closure `plans/closure/i2pcontrol-proposal-170/139-closure.md`;
 - historical runtime/security qualification: M130 closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
-- residual applicability/primitive authority: M131 closure `plans/closure/i2pcontrol-proposal-170/131-closure.md` and `131-residual-primitive-map.toml`;
+- historical residual applicability/primitive authority: M131 closure and `131-residual-primitive-map.toml`, superseded only by explicit later current-head closures;
 - lifecycle implementation authority: M135/M136/M137/M134 closures;
-- current M095 matrix: `325 apply / 47 blocked_primitive / 468 not_applicable`;
-- no residual capability successor is registered; M139 is closed.
+- current M095 matrix at M140 registration: `325 apply / 47 blocked_primitive / 468 not_applicable`;
+- active residual roadmap: `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`;
+- registered plan: `140-residual-streaming-applicability-refreeze.md`.
 
-M139 replaces M130 as current-head runtime/security qualification authority. It
-had zero Proposal promotion budget and authorized no production Rust/dependency/
-Yosemite change.
+M140 has zero Proposal promotion budget and authorizes no production code/dependency change. The matrix remains `325/47/468` until M140 closes with mechanically proven dispositions.
 
 ## Authority order
 
@@ -36,69 +35,78 @@ Containment/support evidence remains centered on:
 - `105-residual-option-audit.toml`;
 - `110-completion-ledger.toml`.
 
-## Closed qualification — M139
+## Current registered handoff — M140
 
 Plan:
 
-- `139-post-lifecycle-integrated-requalification-and-authority-rebase.md`.
+- `140-residual-streaming-applicability-refreeze.md`.
 
-Status: **closed as complete**.
+Status: **registered / dependency-ready**.
+
+Scope: exactly eight blocked cells — seven `Profile` client-family cells plus `ConnectDelay:streamrclient`.
 
 Purpose:
 
-- mechanically requalify the current `325/47/468` head;
-- correct stale current-head assertions in historical M126/M130-era tests without erasing historical milestone facts;
-- re-prove M127 finite token lifetime, M128 bounded JSON-RPC batches and M129 fail-closed TLS on the lifecycle head;
-- re-prove M135 quantity/LeaseSet, M136 Reduce*, M137 Close*/reason and M134 NewDest as one integrated lifecycle composition;
-- reconcile the registry, roadmaps, support docs and durable current-head guards;
-- make M139 the current runtime/security qualification authority.
+- distinguish generic Proposal/I2PControl setter reachability from actual pinned tunnel-family runtime consumption;
+- trace constructor overrides in HTTP/CONNECT/IRC/SOCKS families and UDP ownership in Streamr;
+- retain blockers or reclassify only `blocked_primitive -> not_applicable` with affirmative source evidence;
+- produce an eight-row applicability map and reconcile machine/docs/tests;
+- freeze the exact retained Profile target set for M143.
 
-M139 is test/documentation/qualification work. Production-source changes are a stop condition requiring a separate corrective plan.
+Expected `325/40/475` is only a planning hypothesis. M140 must not force it.
 
-M139 registered no residual capability successor.
+## Deferred residual implementation chain
 
-Numbering note: M137/M134 historical documents contemplated an optional NewDest-corrective “M138” and recorded it as unnecessary. No M138 implementation plan was registered. The unrelated requalification therefore uses M139.
+All files below are committed for handoff but are **unregistered / non-executable** until their hard dependencies close and the registry promotes them:
 
-## Closed lifecycle chain
+| Milestone | Plan | Purpose |
+|---|---|---|
+| M141 | `141-http-unique-local-source-address-completion.md` | `UniqueLocalAddressPerClient` ×2 through canonical peer-hash loopback source binding |
+| M142 | `142-httpclient-sslproxies-and-jumplist-completion.md` | HTTP-only `SSLProxies` + `JumpList` with bounded I2P-only routing/presentation |
+| M143 | `143-streaming-profile-runtime-completion.md` | only M140-retained Profile cells; real neutral streaming-window/profile consumer |
+| M144 | `144-presentation-usessl-runtime-completion.md` | application/presentation `UseSSL` ×4, separate from management/SAM TLS |
+| M145 | `145-leaseset-reply-bundling-multihoming-completion.md` | `MultiHoming`/`shouldBundleReplyInfo` ×2 via real outbound reply-LeaseSet bundling |
+| M146 | `146-outproxy-provider-useoutproxyplugin-completion.md` | `UseOutproxyPlugin` ×4 with a real bounded I2P-routed provider |
+| M147 | `147-neutral-destination-signature-suite-primitive.md` | zero-promotion neutral signing/key-generation infrastructure |
+| M148 | `148-proposal-sigtype-completion.md` | `SigType` ×10 using actual selected destination/signature suites |
+| M149 | `149-encrypted-leaseset-runtime-and-encryptleaseset-completion.md` | encrypted LeaseSet runtime + `EncryptLeaseSet` ×5 |
+| M150 | `150-leaseset-optionallookup-completion.md` | blinded/secret lookup + `OptionalLookup` ×5 |
+| M151 | `151-leaseset-client-auths-completion.md` | PSK/DH client auth as required + `LeaseSetClientAuths` ×5 |
+| M152 | `152-final-residual-proposal-170-requalification.md` | zero-promotion final whole-surface qualification and completion decision |
+
+M143, M145 and M147/M149-M151 explicitly require pre-registration amendments with exact retained cells/files/spec/security decisions. Their current candidate path descriptions do not authorize production work.
+
+## Closed qualification / lifecycle chain
+
+### M139 — post-lifecycle integrated requalification
+
+- plan `139-post-lifecycle-integrated-requalification-and-authority-rebase.md`;
+- closure `plans/closure/i2pcontrol-proposal-170/139-closure.md`;
+- closed as complete; zero promotions; current runtime/security qualification authority at `325/47/468`.
 
 ### M135 — neutral live quantity + LeaseSet desired count
 
-- plan `135-neutral-live-tunnel-quantity-and-leaseset-reconfiguration-primitive.md`;
-- closure `plans/closure/i2pcontrol-proposal-170/135-closure.md`;
-- closed as complete with zero Proposal promotions; matrix remained `284/88/468` at that closure.
+- closed as complete with zero Proposal promotions; established reference-compatible live desired quantities and dynamic LeaseSet desired inbound count.
 
-M135 established immutable base quantities plus bounded destination-scoped live desired quantities, reference-compatible excess-tunnel convergence and dynamic LeaseSet desired inbound count.
+### M136 — Reduce*
 
-### M136 — M132 corrective: Reduce*
+- closed as complete; 21 promotions; matrix `305/67/468`.
 
-- plan `136-m132-corrective-sam-idle-reduction-and-proposal-reduce-completion.md`;
-- closure `plans/closure/i2pcontrol-proposal-170/136-closure.md`;
-- closed as complete; 21 client `Reduce`/`ReduceCount`/`ReduceTime` cells promoted; matrix `305/67/468`.
+### M137 — Close* + reasoned termination
 
-### M137 — M133 corrective: Close* + reasoned termination
-
-- plan `137-m133-corrective-sam-idle-close-and-reasoned-termination.md`;
-- closure `plans/closure/i2pcontrol-proposal-170/137-closure.md`;
-- closed as complete; 14 client `Close`/`CloseTime` cells promoted; matrix `319/53/468`.
+- closed as complete; 14 promotions; matrix `319/53/468`.
 
 ### M134 — NewDest on proven idle resume
 
-- plan `134-newdest-on-proven-idle-resume.md`;
-- closure `plans/closure/i2pcontrol-proposal-170/134-closure.md`;
-- closed as complete; six non-Streamr TCP `NewDest` cells promoted; matrix `325/47/468`.
+- closed as complete; six promotions; matrix `325/47/468`.
 
-M134 kept identity rotation I2PControl-owned and consumes only the authoritative M137 `IdlePolicy` lifecycle fact. Streamr NewDest remains not applicable.
+Historical M132/M133 remain closed as blocked and their closure files are unchanged.
 
-## Historical blocked predecessor attempts
-
-- M132 `132-neutral-sam-idle-reduction-and-proposal-reduce-completion.md` — closed as blocked, zero promotions;
-- M133 `133-neutral-sam-idle-close-and-reasoned-termination.md` — closed as blocked, zero promotions.
-
-Historical closure files are immutable. M135-M137 are corrective successors, not edits to those closures.
+Numbering note: historical planning contemplated an optional NewDest-corrective “M138” and recorded it as unnecessary. No M138 implementation plan was registered.
 
 ## Current support state
 
-Current machine authority is M095 `325/47/468` across 840 TunnelManager option/family cells.
+Current machine authority at M140 registration is M095 `325/47/468` across 840 TunnelManager option/family cells.
 
 Qualified/implemented surface includes:
 
@@ -108,7 +116,7 @@ Qualified/implemented surface includes:
 - all six ClientServicesInfo selectors;
 - M127 finite token lifetime;
 - M128 bounded batch conformance;
-- M129 fail-closed non-loopback TLS;
+- M129 fail-closed non-loopback management TLS;
 - M135 neutral live quantity/LeaseSet primitive;
 - M136 21 `Reduce*` promotions;
 - M137 14 `Close*` promotions;
@@ -116,54 +124,38 @@ Qualified/implemented surface includes:
 
 Full Proposal 170 support is **not** claimed.
 
-## Dependency graph
+## Current execution graph
 
 ```text
-M130 integrated requalification                [CLOSED — HISTORICAL CURRENT-HEAD AUTHORITY]
-  |
-  v
-M131 residual primitive re-freeze              [CLOSED AS BLOCKED — 284/88/468]
-  |
-  +--> M132 combined reduction attempt         [CLOSED AS BLOCKED]
-  +--> M133 combined close attempt             [CLOSED AS BLOCKED]
-  |
-  v
-M135 neutral quantity + LeaseSet primitive     [CLOSED AS COMPLETE]
-  |
-  v
-M136 Reduce* corrective                        [CLOSED AS COMPLETE — 305/67/468]
-  |
-  v
-M137 Close* corrective                         [CLOSED AS COMPLETE — 319/53/468]
-  |
-  v
-M134 NewDest proven idle resume                [CLOSED AS COMPLETE — 325/47/468]
-  |
-  v
-M139 post-lifecycle integrated requalification [CLOSED AS COMPLETE — ZERO PROMOTION]
+M130 historical qualification
+  -> M131 residual re-freeze
+  -> M135 -> M136 -> M137 -> M134
+  -> M139 current integrated qualification
+  -> M140 [REGISTERED / ZERO PROMOTION]
+  -> M141 -> M142 -> M143 -> M144 -> M145 -> M146
+  -> M147 -> M148 -> M149 -> M150 -> M151 -> M152
+     [ALL AFTER M140 DEFERRED / UNREGISTERED]
 ```
 
-## Remaining residual clusters
+## Residual inventory before M140
 
-Remain unregistered under M131 after M139 closure:
+Machine-derived blockers total 47:
 
-- `SigType` destination signing — 10;
+- `SigType` — 10;
 - encrypted/authenticated LeaseSets — 15;
-- streaming `Profile` — 7;
-- presentation `UseSSL` — 4;
+- `Profile` — 7;
+- `UseSSL` — 4;
 - `UseOutproxyPlugin` — 4;
 - HTTP `SSLProxies` + `JumpList` — 2;
 - `UniqueLocalAddressPerClient` — 2;
 - `MultiHoming` / `shouldBundleReplyInfo` — 2;
 - Streamr `ConnectDelay` — 1.
 
-Expected total: 47, to be mechanically re-derived by M139.
-
 ## Containment
 
 Preferred production ownership remains `emissary-cli/src/i2pcontrol/**`.
 
-M135–M137 are accepted neutral lower-layer exceptions only in their exact named owners. M134 is I2PControl-owned except the minimal application-composition seam required to share its volatile tracker with the neutral SAM observation source. M139 authorized no new production-source seam.
+M140 changes no production source. M141/M142/M144/M146 are designed to remain I2PControl-local. M143/M145 and cryptographic M147/M149-M151 may require neutral lower-layer seams, but their deferred plans require exact-file M061/M062 authorization before registration; no broad `crypto/`, `netdb/`, `i2np/`, `sam/` or other directory waiver is granted by planning.
 
 Yosemite remains exact-pinned through optional `yosemite-i2pcontrol`; no global patch, vendoring, path dependency, floating ref or parallel SAM stack is permitted.
 

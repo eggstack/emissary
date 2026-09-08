@@ -607,6 +607,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m134 = is_authorized_m134_path(path);
         let authorized_m139 = is_authorized_m139_path(path);
         let authorized_m140 = is_authorized_m140_path(path);
+        let authorized_m141 = is_authorized_m141_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -640,6 +641,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m134
                 || authorized_m139
                 || authorized_m140
+                || authorized_m141
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -675,6 +677,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m134
                     || authorized_m139
                     || authorized_m140
+                    || authorized_m141
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -1032,6 +1035,30 @@ fn is_authorized_m140_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/140-closure.md"
             | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
             | "plans/implementation/i2pcontrol-proposal-170/140-residual-streaming-applicability-map.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md"
+    )
+}
+
+fn is_authorized_m141_path(path: &str) -> bool {
+    matches!(
+        path,
+        "AGENTS.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/tunnel-manager.md"
+            | "docs/i2pcontrol/tunnel-backends.md"
+            | "emissary-cli/src/i2pcontrol/backends/http_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_bidir.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "emissary-cli/tests/m095_full_support_matrix.rs"
+            | "emissary-cli/tests/m105_residual_option_audit.rs"
+            | "emissary-cli/tests/m141_unique_local_source.rs"
+            | "plans/closure/i2pcontrol-proposal-170/141-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/110-completion-ledger.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/141-http-unique-local-source-address-completion.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"

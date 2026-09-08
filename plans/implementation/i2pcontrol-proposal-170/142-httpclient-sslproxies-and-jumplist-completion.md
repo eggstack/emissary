@@ -1,6 +1,6 @@
 # M142 — HTTP Client SSLProxies and JumpList Completion
 
-Status: **deferred / unregistered; hard-depends on M141 closure**
+Status: **registered / dependency-ready**; hard dependency M141 closed as complete (`plans/closure/i2pcontrol-proposal-170/141-closure.md`)
 
 Class: capability / HTTP proxy routing and presentation
 

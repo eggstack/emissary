@@ -1,6 +1,6 @@
 # M141 — HTTP Unique Local Source Address Completion
 
-Status: **registered / dependency-ready**; hard dependency M140 closed as complete (`plans/closure/i2pcontrol-proposal-170/140-closure.md`)
+Status: **closed as complete**; closure `plans/closure/i2pcontrol-proposal-170/141-closure.md`; hard dependency M140 closed as complete (`plans/closure/i2pcontrol-proposal-170/140-closure.md`)
 
 Class: capability / local-network confinement
 

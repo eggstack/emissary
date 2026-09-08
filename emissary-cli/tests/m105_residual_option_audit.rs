@@ -372,7 +372,19 @@ fn audit_covers_the_exact_m104_residual_inventory() {
         .difference(&m140_reclassified)
         .cloned()
         .collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m140);
+    // M141 promotes the two UniqueLocalAddressPerClient HTTP server cells to
+    // apply with reference-compatible source-bind evidence.
+    let m141_completed = [
+        ("UniqueLocalAddressPerClient", "httpserver"),
+        ("UniqueLocalAddressPerClient", "httpbidirserver"),
+    ]
+    .into_iter()
+    .map(|(option, tunnel_type)| (option.to_owned(), tunnel_type.to_owned()))
+    .collect::<BTreeSet<_>>();
+    assert_eq!(m141_completed.len(), 2);
+    let expected_post_m141 =
+        expected_post_m140.difference(&m141_completed).cloned().collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m141);
     assert_eq!(
         audit["summary"]["post_m116_reclassified_cells"].as_integer(),
         Some(7)

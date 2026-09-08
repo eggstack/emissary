@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M139 is current runtime/security qualification authority; M140 closed as residual streaming applicability authority; M141 is the sole registered residual handoff**.
+Status: **partial Proposal 170 support; M139 is current runtime/security qualification authority; M140 closed as residual streaming applicability authority; M141 closed as HTTP unique-local source-address completion; M142 is the sole registered residual handoff**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -8,14 +8,15 @@ Current authorities:
 
 - current runtime/security qualification: M139 closure `plans/closure/i2pcontrol-proposal-170/139-closure.md`;
 - current residual streaming applicability: M140 closure `plans/closure/i2pcontrol-proposal-170/140-closure.md` (`325/40/475`, zero promotions, retained `Profile:client` frozen for M143);
+- HTTP unique-local source-address completion: M141 closure `plans/closure/i2pcontrol-proposal-170/141-closure.md` (`327/38/475`, 2 promotions);
 - historical runtime/security qualification: M130 closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
-- historical residual applicability/primitive authority: M131 closure and `131-residual-primitive-map.toml`, superseded only by explicit later current-head closures (M140 for seven cells);
+- historical residual applicability/primitive authority: M131 closure and `131-residual-primitive-map.toml`, superseded where M140 reclassifies seven cells and where M141 promotes two cells;
 - lifecycle implementation authority: M135/M136/M137/M134 closures;
-- current M095 matrix after M140: `325 apply / 40 blocked_primitive / 475 not_applicable`;
+- current M095 matrix after M141: `327 apply / 38 blocked_primitive / 475 not_applicable`;
 - active residual roadmap: `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`;
-- registered plan: `141-http-unique-local-source-address-completion.md`.
+- registered plan: `142-httpclient-sslproxies-and-jumplist-completion.md`.
 
-M140 has zero Proposal promotion budget and authorizes no production code/dependency change. The matrix is `325/40/475` after M140 closure with mechanically proven dispositions.
+M140 has zero Proposal promotion budget and authorizes no production code/dependency change. The matrix was `325/40/475` after M140 closure. M141 promotes 2 cells to `327/38/475` with I2PControl-local accepted-handler changes only.
 
 ## Authority order
 
@@ -36,19 +37,19 @@ Containment/support evidence remains centered on:
 - `105-residual-option-audit.toml`;
 - `110-completion-ledger.toml`.
 
-## Current registered handoff — M141
+## Current registered handoff — M142
 
 Plan:
 
-- `141-http-unique-local-source-address-completion.md`.
+- `142-httpclient-sslproxies-and-jumplist-completion.md`.
 
 Status: **registered / dependency-ready**.
 
-Scope: exactly two blocked cells — `UniqueLocalAddressPerClient` × `httpserver`, `httpbidirserver`.
+Scope: exactly two blocked cells — `SSLProxies` × `httpclient`, `JumpList` × `httpclient`.
 
-Purpose: implement reference-compatible per-client loopback source binding through the canonical peer-hash owner, entirely I2PControl-local.
+Purpose: HTTP-only TLS-outproxy/address-helper behavior with bounded I2P-only routing.
 
-M140 is closed as complete (`plans/closure/i2pcontrol-proposal-170/140-closure.md`): eight cells adjudicated, seven reclassified to `not_applicable` with affirmative constructor/UDP-ownership evidence, `Profile:client` retained as the exact M143 target set, matrix `325/40/475`, zero promotions.
+M141 is closed as complete (`plans/closure/i2pcontrol-proposal-170/141-closure.md`): two `UniqueLocalAddressPerClient` cells promoted to `apply` with reference-compatible source-bind evidence, matrix `327/38/475`.
 
 ## Deferred residual implementation chain
 
@@ -56,7 +57,8 @@ All files below are committed for handoff but are **unregistered / non-executabl
 
 | Milestone | Plan | Purpose |
 |---|---|---|
-| M141 | `141-http-unique-local-source-address-completion.md` | `UniqueLocalAddressPerClient` ×2 through canonical peer-hash loopback source binding |
+| M141 | `141-http-unique-local-source-address-completion.md` | `UniqueLocalAddressPerClient` ×2 through canonical peer-hash loopback source binding — **closed as complete** |
+| M142 | `142-httpclient-sslproxies-and-jumplist-completion.md` | HTTP-only `SSLProxies` + `JumpList` with bounded I2P-only routing/presentation |
 | M142 | `142-httpclient-sslproxies-and-jumplist-completion.md` | HTTP-only `SSLProxies` + `JumpList` with bounded I2P-only routing/presentation |
 | M143 | `143-streaming-profile-runtime-completion.md` | only M140-retained Profile cells; real neutral streaming-window/profile consumer |
 | M144 | `144-presentation-usessl-runtime-completion.md` | application/presentation `UseSSL` ×4, separate from management/SAM TLS |
@@ -101,7 +103,7 @@ Numbering note: historical planning contemplated an optional NewDest-corrective 
 
 ## Current support state
 
-Current machine authority after M140 is M095 `325/40/475` across 840 TunnelManager option/family cells.
+Current machine authority after M141 is M095 `327/38/475` across 840 TunnelManager option/family cells.
 
 Qualified/implemented surface includes:
 
@@ -127,23 +129,23 @@ M130 historical qualification
   -> M135 -> M136 -> M137 -> M134
   -> M139 current integrated qualification
   -> M140 [CLOSED AS COMPLETE — 325/40/475, ZERO PROMOTION]
-  -> M141 [REGISTERED / DEPENDENCY-READY]
-  -> M142 -> M143 -> M144 -> M145 -> M146
+  -> M141 [CLOSED AS COMPLETE — 327/38/475, 2 PROMOTIONS]
+  -> M142 [REGISTERED / DEPENDENCY-READY]
+  -> M143 -> M144 -> M145 -> M146
   -> M147 -> M148 -> M149 -> M150 -> M151 -> M152
-     [ALL AFTER M141 DEFERRED / UNREGISTERED]
+     [ALL AFTER M142 DEFERRED / UNREGISTERED]
 ```
 
-## Residual inventory after M140
+## Residual inventory after M141
 
-Machine-derived blockers total 40:
+Machine-derived blockers total 38:
 
 - `SigType` — 10;
 - encrypted/authenticated LeaseSets — 15;
 - `Profile` (retained `client` only) — 1;
 - `UseSSL` — 4;
 - `UseOutproxyPlugin` — 4;
-- HTTP `SSLProxies` + `JumpList` — 2;
-- `UniqueLocalAddressPerClient` — 2 (M141 registered target);
+- HTTP `SSLProxies` + `JumpList` — 2 (M142 registered target);
 - `MultiHoming` / `shouldBundleReplyInfo` — 2.
 
 ## Containment

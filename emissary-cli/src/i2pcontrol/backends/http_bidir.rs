@@ -47,6 +47,7 @@ struct HttpBidirConfig {
     name: String,
     target_address: IpAddr,
     target_port: u16,
+    unique_local: bool,
     bind_address: IpAddr,
     listen_port: u16,
     sam_tcp_port: u16,
@@ -347,6 +348,7 @@ async fn run_composite(
         config.target_port,
         config.server_policy.clone(),
         config.post_limiter.clone(),
+        config.unique_local,
     );
     let client_handler = make_no_outproxy_handler(
         config.proxy_username.clone(),
@@ -533,6 +535,8 @@ impl HttpBidirServerTunnelBackend {
             .unwrap_or_else(|| "127.0.0.1".to_owned());
         let target_address = normalize_loopback_target(&target_host, true)
             .ok_or_else(|| invalid_option("TargetHost must be loopback"))?;
+        let unique_local = super::http_server::unique_local_enabled(definition)
+            .map_err(|_| invalid_option("UniqueLocalAddressPerClient"))?;
         let target_port =
             definition.options.target_port.ok_or_else(|| BackendError::MissingOption {
                 tunnel_type: TunnelType::HttpBidirServer,
@@ -626,6 +630,7 @@ impl HttpBidirServerTunnelBackend {
             name: definition.name.as_str().to_owned(),
             target_address,
             target_port,
+            unique_local,
             bind_address,
             listen_port,
             sam_tcp_port: self.sam_tcp_port,
@@ -804,6 +809,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "TotalPeriod",
         "TotalBanTime",
         "HostingDestination",
+        "UniqueLocalAddressPerClient",
         "Description",
         "PrivKeyFile",
         "StartOnLoad",
@@ -821,6 +827,9 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
             option: key.clone(),
         });
     }
+    // Boolean-typed extraction fails before allocation on malformed values.
+    let _ = super::http_server::unique_local_enabled(definition)
+        .map_err(|_| invalid_option("UniqueLocalAddressPerClient"))?;
     Ok(())
 }
 

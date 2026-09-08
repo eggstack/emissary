@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Residual Primitive Completion Roadmap
 
-Status: **active / partial; M140 closed as complete; M141 is the only registered successor**
+Status: **active / partial; M141 closed as complete; M142 is the only registered successor**
 
 Source roadmap:
 
@@ -12,12 +12,13 @@ Current qualification authority:
 
 Planning baseline:
 
-- repository head at M140 closure: `a02d269d35b312c33061a3d797dabd9961cf295a` (planning start `7b51da725e83c3ec4a7b806a4e242730b7cb93d7`);
-- current M095 matrix after M140: `325 apply / 40 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells;
-- M131 remains the historical residual applicability/primitive authority, superseded for seven cells by M140;
+- repository head at M141 closure: implementation plus closure in a single commit (see `141-closure.md` for SHA);
+- current M095 matrix after M141: `327 apply / 38 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells;
+- M131 remains the historical residual applicability/primitive authority, superseded for seven cells by M140 and for two cells by M141;
 - M135/M136/M137/M134 session-lifecycle line is closed as complete;
 - M139 is the current whole-implemented-subset runtime/security qualification authority;
-- M140 is closed as complete as the residual streaming applicability authority with zero promotions.
+- M140 is closed as complete as the residual streaming applicability authority with zero promotions;
+- M141 is closed as complete as the HTTP unique-local source-address completion with 2 promotions.
 
 Pinned external authority:
 
@@ -79,7 +80,7 @@ Cross-cutting invariants:
 
 ## 3. Starting residual inventory
 
-M095 reported 47 blocked cells at M140 registration; M140 re-freezes seven to `not_applicable`, leaving 40 blocked cells:
+M095 reported 47 blocked cells at M140 registration; M140 re-freezes seven to `not_applicable`, leaving 40 blocked cells; M141 promotes two to `apply`, leaving 38 blocked cells:
 
 | Cluster | Cells | Current blocker (after M140) |
 |---|---:|---|
@@ -89,11 +90,11 @@ M095 reported 47 blocked cells at M140 registration; M140 re-freezes seven to `n
 | presentation `UseSSL` | 4 | local application endpoint TLS identity/trust owner |
 | `UseOutproxyPlugin` | 4 | real bounded local outproxy provider abstraction |
 | HTTP `SSLProxies` + `JumpList` | 2 | HTTP-only TLS-outproxy/address-helper behavior |
-| `UniqueLocalAddressPerClient` | 2 | deterministic per-client loopback source binding (M141 registered) |
+| `UniqueLocalAddressPerClient` | 2 | deterministic per-client loopback source binding (M141 closed as complete) |
 | `MultiHoming` / `shouldBundleReplyInfo` | 2 | outbound reply-LeaseSet bundling policy |
 | **Total** | **40** | |
 
-M140 mechanically re-derived these cells from M095 (`325/40/475`). The pre-M140 47-cell table (with `Profile` × 7 and Streamr `ConnectDelay` × 1) is retained above in history via M140 closure; this table is the current-head authority.
+M140 mechanically re-derived these cells from M095 (`325/40/475`). M141 promotes the two `UniqueLocalAddressPerClient` cells to `apply` (`327/38/475`). The pre-M140 47-cell table (with `Profile` × 7 and Streamr `ConnectDelay` × 1) is retained in history via M140 closure; the pre-M141 40-cell table is retained via M141 closure; the table below is the current-head authority after M141.
 
 ## 4. New reference evidence driving this roadmap
 
@@ -146,10 +147,10 @@ M139 current integrated qualification                      [CLOSED]
 M140 streaming applicability re-freeze                     [CLOSED AS COMPLETE — 325/40/475, ZERO PROMOTION]
   |
   v
-M141 UniqueLocalAddressPerClient                           [REGISTERED / DEPENDENCY-READY]
+M141 UniqueLocalAddressPerClient                           [CLOSED AS COMPLETE — 327/38/475, 2 PROMOTIONS]
   |
   v
-M142 HTTP SSLProxies + JumpList                            [DEFERRED]
+M142 HTTP SSLProxies + JumpList                            [REGISTERED]
   |
   v
 M143 retained streaming Profile runtime (Profile:client × 1, frozen by M140) [DEFERRED; amendment with exact neutral files still required before registration]
@@ -204,11 +205,11 @@ Exit (met): every candidate has a source-cited runtime applicability verdict, M0
 
 ### M141 — `UniqueLocalAddressPerClient`
 
-Status: **registered / dependency-ready** (promoted by M140 closure; hard dependency M140 satisfied).
+Status: **closed as complete** (closure `plans/closure/i2pcontrol-proposal-170/141-closure.md`).
 
 Class: capability.
 
-Target: the two `httpserver` / `httpbidirserver` cells.
+Target: the two `httpserver` / `httpbidirserver` cells (both promoted).
 
 Preferred owner: I2PControl accepted HTTP server handler.
 
@@ -371,8 +372,8 @@ Pre-existing rustfmt stable/nightly drift must be recorded rather than normalize
 
 ## 10. Registration discipline
 
-- M140 is closed as complete; M141 is registered as the sole next dependency-ready plan by M140 closure.
-- M142-M152 are committed as deferred handoff documents and are not executable authority until their hard dependencies close and the registry promotes exactly one next plan.
+- M140 is closed as complete; M141 is closed as complete with 2 promotions; M142 is registered as the sole next dependency-ready plan by M141 closure.
+- M143-M152 are committed as deferred handoff documents and are not executable authority until their hard dependencies close and the registry promotes exactly one next plan.
 - A deferred plan's path budget is design intent, not production authorization.
 - M140 froze the retained Profile cell set as `Profile:client` × 1; M143 must still be amended before registration so it names the exact neutral streaming files and M140-closure baseline counts.
 - If reference/security research materially changes a later primitive contract, amend the deferred plan and roadmap before registration; do not silently reinterpret it during implementation.

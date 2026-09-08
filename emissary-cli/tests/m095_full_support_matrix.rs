@@ -533,6 +533,26 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
     ] {
         let row = option(key);
         let cells = row["cells"].as_array().unwrap();
+        if key == "UniqueLocalAddressPerClient" {
+            // M141 promotes the two HTTP server cells to apply with exact
+            // reference-compatible source-bind evidence.
+            assert_eq!(string_field(row, "completion_owner"), "M141", "{key} owner");
+            assert_eq!(
+                string_field(row, "current_or_planned_disposition"),
+                "apply_or_not_applicable",
+                "{key} disposition"
+            );
+            assert!(row.get("blocking_milestone").is_none(), "{key} milestone");
+            assert!(row.get("blocked_primitive").is_none(), "{key} primitive");
+            assert_eq!(cells[8].as_str(), Some("apply"), "{key} cell 8");
+            assert_eq!(cells[9].as_str(), Some("apply"), "{key} cell 9");
+            for (index, cell) in cells.iter().enumerate() {
+                if index != 8 && index != 9 {
+                    assert_eq!(cell.as_str(), Some("not_applicable"), "{key} cell {index}");
+                }
+            }
+            continue;
+        }
         assert_eq!(
             string_field(row, "completion_owner"),
             "residual-option-line",
@@ -547,7 +567,7 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
             "{key} milestone"
         );
         let (first, last) = match key {
-            "AllowInternalSSL" | "UniqueLocalAddressPerClient" | "MultiHoming" => (8, 9),
+            "AllowInternalSSL" | "MultiHoming" => (8, 9),
             _ => (7, 11),
         };
         for (index, cell) in cells.iter().enumerate().skip(first).take(last - first + 1) {
@@ -617,13 +637,13 @@ fn current_matrix_counts_are_explicit_and_exact() {
             counts
         },
     );
-    assert_eq!(counts, (325, 40, 475));
+    assert_eq!(counts, (327, 38, 475));
     let declared = root
         .get("current_matrix_counts")
         .and_then(Value::as_table)
         .expect("current matrix counts are declared");
-    assert_eq!(declared["apply"].as_integer(), Some(325));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(40));
+    assert_eq!(declared["apply"].as_integer(), Some(327));
+    assert_eq!(declared["blocked_primitive"].as_integer(), Some(38));
     assert_eq!(declared["not_applicable"].as_integer(), Some(475));
 }
 

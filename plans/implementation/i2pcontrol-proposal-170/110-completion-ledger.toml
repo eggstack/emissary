@@ -226,6 +226,36 @@ reclassified_cells = [
 reclassification_reason = "M134 implements exact Proposal NewDest on proven idle resume for the six non-Streamr TCP families: fail-before-allocation NewDest prerequisites/conflicts with Close, PersistentClientKey and PrivKeyFile, generation-local one-shot IdlePolicy eligibility via the M137 neutral reason, staged secret successor transaction with cancellation rollback, one shared successor with compatibility equality, and manual/restart/failure preservation with end-to-end fake-SAM traces. Streamr stays not applicable."
 closure = "plans/closure/i2pcontrol-proposal-170/134-closure.md"
 
+[post_m140]
+status = "closed as complete"
+matrix_before_apply = 325
+matrix_before_blocked_primitive = 47
+matrix_before_not_applicable = 468
+matrix_after_apply = 325
+matrix_after_blocked_primitive = 40
+matrix_after_not_applicable = 475
+reclassified_cell_count = 7
+reclassified_cells = ["Profile:httpclient", "Profile:ircclient", "Profile:socks", "Profile:socksirc", "Profile:connectclient", "Profile:streamrclient", "ConnectDelay:streamrclient"]
+reclassification_reason = "M140 re-freezes seven streaming cells to not_applicable with affirmative constructor/UDP-ownership evidence; zero apply promotions; Profile:client retained for M143."
+closure = "plans/closure/i2pcontrol-proposal-170/140-closure.md"
+
+[post_m141]
+status = "closed as complete"
+matrix_before_apply = 325
+matrix_before_blocked_primitive = 40
+matrix_before_not_applicable = 475
+matrix_after_apply = 327
+matrix_after_blocked_primitive = 38
+matrix_after_not_applicable = 475
+completed_cell_count = 2
+completed_options = ["UniqueLocalAddressPerClient"]
+completed_tunnel_types = ["httpserver", "httpbidirserver"]
+reclassified_cells = [
+    "UniqueLocalAddressPerClient:httpserver", "UniqueLocalAddressPerClient:httpbidirserver",
+]
+reclassification_reason = "M141 implements the reference-compatible per-client loopback source bind through the canonical peer-hash owner with literal-loopback target confinement (IPv4 127.hash[0..3], IPv6 fd + 15 hash bytes, TcpSocket bind port 0 before connect, no DNS/fallback, per-connection state, bounded 502 on failure)."
+closure = "plans/closure/i2pcontrol-proposal-170/141-closure.md"
+
 [ownership]
 session_registry = "emissary-cli/src/i2pcontrol/backends/runtime/session.rs::SharedClientSessionRegistry"
 stream_listener_owner = "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"

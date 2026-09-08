@@ -158,10 +158,13 @@ M139 integrated current-head requalification          [CLOSED AS COMPLETE — ZE
 M140 streaming applicability re-freeze               [CLOSED AS COMPLETE — 325/40/475, ZERO PROMOTION]
   |
   v
-M141 HTTP unique local source address                [REGISTERED / DEPENDENCY-READY]
+M141 HTTP unique local source address                [CLOSED AS COMPLETE — 327/38/475, 2 PROMOTIONS]
+  |
+  v
+M142 HTTP SSLProxies + JumpList                      [REGISTERED / DEPENDENCY-READY]
 ```
 
-M139 supersedes M130 for current-head runtime/security qualification only. M130 remains historical evidence. M131 remains historical residual authority except where M140 explicitly reclassifies seven cells to current-head `not_applicable`.
+M139 supersedes M130 for current-head runtime/security qualification only. M130 remains historical evidence. M131 remains historical residual authority except where M140 explicitly reclassifies seven cells to current-head `not_applicable` and where M141 promotes two cells to `apply`.
 
 Historical planning mentioned a possible NewDest-corrective “M138”; M134 proved it unnecessary and no M138 implementation plan was registered.
 
@@ -176,8 +179,10 @@ M139 current integrated qualification                  [CLOSED]
 M140 streaming applicability re-freeze                 [CLOSED AS COMPLETE — 325/40/475, ZERO PROMOTION]
   |
   v
-M141 UniqueLocalAddressPerClient                       [REGISTERED / DEPENDENCY-READY]
-  -> M142 HTTP SSLProxies + JumpList                   [DEFERRED]
+M141 UniqueLocalAddressPerClient                       [CLOSED AS COMPLETE — 327/38/475, 2 PROMOTIONS]
+  |
+  v
+M142 HTTP SSLProxies + JumpList                       [REGISTERED / DEPENDENCY-READY]
   -> M143 retained streaming Profile (Profile:client × 1) [DEFERRED; exact neutral files amendment still required]
   -> M144 application/presentation UseSSL              [DEFERRED]
   -> M145 reply LeaseSet bundling / MultiHoming        [DEFERRED]
@@ -190,9 +195,9 @@ M141 UniqueLocalAddressPerClient                       [REGISTERED / DEPENDENCY-
   -> M152 final whole-surface requalification          [DEFERRED / ZERO PROMOTION]
 ```
 
-M141-M152 are committed handoff documents but are not executable authority until the registry promotes them after their hard dependencies close. M143/M145/M147/M149-M151 require explicit pre-registration amendments to freeze exact cells/files/spec/security decisions.
+M142-M152 are committed handoff documents but are not executable authority until the registry promotes them after their hard dependencies close (M142 is now registered; M143-M152 remain deferred). M143/M145/M147/M149-M151 require explicit pre-registration amendments to freeze exact cells/files/spec/security decisions.
 
-## 8. Remaining 40 residual cells after M140 closure
+## 8. Remaining 38 residual cells after M141 closure
 
 | Primitive cluster | Blocked cells |
 |---|---:|
@@ -202,11 +207,10 @@ M141-M152 are committed handoff documents but are not executable authority until
 | presentation `UseSSL` | 4 |
 | `UseOutproxyPlugin` | 4 |
 | HTTP `SSLProxies` + `JumpList` | 2 |
-| `UniqueLocalAddressPerClient` | 2 |
 | `MultiHoming` / `shouldBundleReplyInfo` | 2 |
-| **Total** | **40** |
+| **Total** | **38** |
 
-M095 machine authority wins over prose. M140 re-froze the seven Profile rows plus Streamr ConnectDelay using actual family constructor/runtime evidence and moved only affirmatively proven blockers to N/A with zero apply promotions.
+M095 machine authority wins over prose. M140 re-froze the seven Profile rows plus Streamr ConnectDelay using actual family constructor/runtime evidence and moved only affirmatively proven blockers to N/A with zero apply promotions. M141 promotes the two `UniqueLocalAddressPerClient` HTTP server cells with exact source-bind evidence.
 
 ## 9. Residual architecture selection
 

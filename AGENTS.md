@@ -42,18 +42,20 @@ The current implemented-subset runtime/security qualification authority is M139
 (`plans/closure/i2pcontrol-proposal-170/139-closure.md`); M130 remains historical evidence.
 M140 (`plans/closure/i2pcontrol-proposal-170/140-closure.md`) is closed as complete
 as the residual streaming applicability re-freeze with zero promotions.
+M141 (`plans/closure/i2pcontrol-proposal-170/141-closure.md`) is closed as complete
+as the HTTP unique-local source-address completion with 2 promotions.
 
 The current Proposal 170 baseline remains partial: RouterInfo is 43 additions with
 42 available, 1 protocol-permitted neutral, and 0 unavailable; AddressBook all 13
 SetConfig keys are operational; and unapplied runtime options (including 4 UseSSL,
 10 SigType, 7 client proxy/lifecycle (1 retained Profile + 4 UseOutproxyPlugin + 2 HTTP
 SSLProxies/JumpList, with Streamr ConnectDelay re-frozen as not_applicable by M140),
-and 19 server LeaseSet/presentation cells,
+and 17 server LeaseSet/presentation cells (M141 applies 2 UniqueLocalAddressPerClient cells),
 with client idle `Reduce*` applied by M136, `Close`/`CloseTime` applied by M137,
 and `NewDest` proven-resume applied by M134)
 fail before allocation. The authoritative completion inventory is
-`plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (325
-apply / 40 blocked_primitive / 475 not_applicable after M140).
+`plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (327
+apply / 38 blocked_primitive / 475 not_applicable after M141).
 
 Streamr is intentionally separate from TCP tunnel helpers. Preserve its documented
 16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh,

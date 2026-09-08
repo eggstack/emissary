@@ -214,8 +214,8 @@ support.
 | `connectclient` | listener/auth, strict CONNECT parsing, direct I2P or explicit I2P outproxy | unsupported methods, unsafe direct targets, unsupported proxy/outproxy modes, custom/I2CP |
 | `streamrclient` | producer destination, loopback target, UDP target/source ports, 15-second refresh | non-loopback addresses, tunnel shaping/signature/encryption, custom/I2CP |
 | `server` | loopback target/port, persistent identity, trusted-peer access policy, shared admission and `leaseSetEncType` | privacy/consumer/signature/hashcash, unsupported raw fields, custom/I2CP |
-| `httpserver` | loopback target, Host/access/filter policy, shared admission, peer-keyed POST limiter, persistent identity | TLS, proxy/outproxy, `UniqueLocalAddressPerClient`, `MultiHoming`, LeaseSet security, custom/I2CP |
-| `httpbidirserver` | shared filtered inbound HTTP path plus authenticated local proxy, loopback bind/target, access/filter policy, shared admission and POST limiter | unsupported TLS/outproxy/address, `UniqueLocalAddressPerClient`, `MultiHoming`, LeaseSet security, custom/I2CP |
+| `httpserver` | loopback target, Host/access/filter policy, shared admission, peer-keyed POST limiter, persistent identity, `UniqueLocalAddressPerClient` per-client loopback source bind (M141) | TLS, proxy/outproxy, `MultiHoming`, LeaseSet security, custom/I2CP |
+| `httpbidirserver` | shared filtered inbound HTTP path plus authenticated local proxy, loopback bind/target, access/filter policy, shared admission and POST limiter, `UniqueLocalAddressPerClient` via the shared handler (M141) | unsupported TLS/outproxy/address, `MultiHoming`, LeaseSet security, custom/I2CP |
 | `ircserver` | bounded registration, trusted peer hostname, loopback target, access/filter policy, shared admission, inactivity relay | IRC automation, WEBIRC/cloak/auth/DCC options, LeaseSet security, custom/I2CP |
 | `streamrserver` | persistent identity, loopback UDP source, ten subscribers, 60-second expiry, 1200-byte payload, bounded transport | non-loopback addresses, tunnel shaping/signature/encryption, custom/I2CP |
 
@@ -226,9 +226,14 @@ backends. Access entries are parsed as full trusted Destinations or canonical
 is a newline-delimited access generation confined beneath the I2PControl server
 state root; invalid reloads do not replace a valid running generation.
 `PerClientPeriod`, `TotalPeriod`, and `TotalBanTime` are bounded,
-generation-local admission controls. `UniqueLocalAddressPerClient`,
-`MultiHoming`, server-side `AllowInternalSSL`, and LeaseSet security options
+generation-local admission controls. `MultiHoming`, server-side
+`AllowInternalSSL`, and LeaseSet security options
 remain explicitly rejected residuals where no exact owner exists.
+`UniqueLocalAddressPerClient` is applied by M141 for the two HTTP server
+families through the shared accepted-handler source bind (IPv4
+`127.<hash[0]>.<hash[1]>.<hash[2]>`, IPv6 `fd` + 15 hash bytes, port 0,
+literal-loopback targets only, canonical peer hash only, no DNS/fallback,
+per-connection state, bounded 502 on bind/connect failure).
 
 ## Design rationale
 

@@ -1,6 +1,6 @@
 # M144 — Presentation UseSSL Runtime Completion
 
-Status: **deferred / unregistered; hard-depends on M143 closure**
+Status: **closed as complete** (closure `plans/closure/i2pcontrol-proposal-170/144-closure.md`; registered for execution after M143 closure with the pinned family-direction/trust freeze recorded in the closure)
 
 Class: capability / TLS identity and trust
 

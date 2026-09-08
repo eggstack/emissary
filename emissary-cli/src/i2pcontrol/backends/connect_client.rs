@@ -16,7 +16,10 @@ use super::{
         },
         proxy::{basic_authorization, credentials_match},
     },
-    options::{validate_options, OptionValidationError, CONNECT_CLIENT_OPTIONS},
+    options::{
+        validate_common_options, validate_options, OptionValidationError, CONNECT_CLIENT_OPTIONS,
+    },
+    runtime::presentation_tls,
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
 use crate::i2pcontrol::{
@@ -116,6 +119,9 @@ struct ConnectConfig {
     delay_open: bool,
     lifecycle: ClientLifecycleConfig,
     session_options: SessionOptions,
+    // M144: presentation TLS listener (reference `I2PTunnelClientBase`).
+    use_ssl: bool,
+    tls_acceptor: Option<tokio_rustls::TlsAcceptor>,
 }
 
 impl std::fmt::Debug for ConnectConfig {
@@ -132,6 +138,8 @@ impl std::fmt::Debug for ConnectConfig {
                 &self.proxy_password.as_ref().map(|_| "***"),
             )
             .field("require_auth", &self.require_auth)
+            .field("use_ssl", &self.use_ssl)
+            .field("tls_acceptor", &self.tls_acceptor.as_ref().map(|_| "***"))
             .finish_non_exhaustive()
     }
 }
@@ -385,7 +393,17 @@ fn make_handler(config: ConnectConfig) -> ClientConnectionHandler {
     Arc::new(move |stream, connector| {
         let config = config.clone();
         Box::pin(async move {
-            let mut reader = BufReader::new(stream);
+            // M144: TLS termination immediately after accept, before parsing.
+            let boxed: Box<dyn presentation_tls::AsyncReadWrite> =
+                if let Some(acceptor) = config.tls_acceptor.clone() {
+                    match presentation_tls::accept_tls_with_timeout(&acceptor, stream).await {
+                        Ok(tls) => Box::new(tls),
+                        Err(_) => return,
+                    }
+                } else {
+                    Box::new(stream)
+                };
+            let mut reader = BufReader::new(boxed);
             let Ok(header_block) = read_header_block(&mut reader).await else {
                 let mut stream = reader.into_inner();
                 let _ = write_error(&mut stream, 400, "Bad Request").await;
@@ -499,15 +517,17 @@ fn successful_connect_response(response: &[u8]) -> bool {
         .is_some_and(|line| line.starts_with("HTTP/1.0 2") || line.starts_with("HTTP/1.1 2"))
 }
 
-async fn write_established(stream: &mut tokio::net::TcpStream) -> std::io::Result<()> {
+async fn write_established<S>(stream: &mut S) -> std::io::Result<()>
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
     stream.write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n").await
 }
 
-async fn write_error(
-    stream: &mut tokio::net::TcpStream,
-    status: u16,
-    reason: &str,
-) -> std::io::Result<()> {
+async fn write_error<S>(stream: &mut S, status: u16, reason: &str) -> std::io::Result<()>
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
     stream
         .write_all(
             format!("HTTP/1.1 {status} {reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n")
@@ -567,6 +587,8 @@ impl ConnectClientTunnelBackend {
                 attempted_action: "start",
             });
         }
+        validate_common_options(TunnelType::ConnectClient, &definition.options)
+            .map_err(option_error)?;
         validate_options(
             TunnelType::ConnectClient,
             &definition.options,
@@ -612,6 +634,13 @@ impl ConnectClientTunnelBackend {
         let (proxy_username, proxy_password) = proxy_credentials
             .map(|(username, password)| (Some(username), Some(password)))
             .unwrap_or((None, None));
+        // M144: presentation TLS listener, validated before allocation.
+        let use_ssl = presentation_tls::parse_use_ssl(definition)?;
+        let tls_acceptor = if use_ssl {
+            Some(presentation_tls::build_listener_tls_acceptor()?)
+        } else {
+            None
+        };
         Ok(ConnectConfig {
             name: definition.name.as_str().to_owned(),
             bind_address,
@@ -629,6 +658,8 @@ impl ConnectClientTunnelBackend {
             delay_open: definition.options.delay_open.unwrap_or(false),
             lifecycle: client_lifecycle_config(definition)?,
             session_options: SessionOptions::default(),
+            use_ssl,
+            tls_acceptor,
         })
     }
 }
@@ -733,10 +764,12 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "Shared",
         "PersistentClientKey",
         "PrivKeyFile",
+        "UseSSL",
     ];
     // M134: "NewDest" applied as proven idle-resume policy.
     // M136: "Reduce"/"ReduceCount"/"ReduceTime" supported via idle owner.
     // M137: "Close"/"CloseTime" supported via the same canonical owner.
+    // M144: "UseSSL" presents a generation-local TLS listener.
     for key in definition.raw_config.keys() {
         if key.starts_with("__emissary_") || SUPPORTED.contains(&key.as_str()) {
             continue;
@@ -746,6 +779,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
             option: key.clone(),
         });
     }
+    let _ = presentation_tls::parse_use_ssl(definition)?;
     if let Some(kind) = raw_string(definition, "OutproxyType") {
         if !kind.eq_ignore_ascii_case("http") && !kind.eq_ignore_ascii_case("connect") {
             return Err(BackendError::UnsupportedOption {

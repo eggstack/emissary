@@ -13,8 +13,8 @@ current_production_head = "e4f217cb1459e26bf011da46b67fc2c83cd192b5"
 
 [current_matrix_counts]
 total = 840
-apply = 330
-blocked_primitive = 35
+apply = 334
+blocked_primitive = 31
 not_applicable = 475
 
 [contract_counts]
@@ -832,12 +832,11 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "M111"
-current_or_planned_disposition = "blocked_primitive"
-cells = ["not_applicable", "blocked_primitive", "not_applicable", "not_applicable", "not_applicable", "blocked_primitive", "not_applicable", "not_applicable", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable"]
-blocked_primitive = "Proposal UseSSL means local application/session TLS; mapping it to Yosemite SessionOptions.ssl would select SAM-control-connection TLS, and no accepted Emissary owner currently provides the Proposal presentation-TLS effect"
-blocking_milestone = "M111"
-cell_notes = { "client" = "The pinned option is not applicable to this tunnel family.", "httpclient" = "blocked: Proposal UseSSL is local application/session TLS, not Yosemite SAM-control TLS; no accepted Emissary owner exists.", "ircclient" = "The pinned option is not applicable to this tunnel family.", "socks" = "The pinned option is not applicable to this tunnel family.", "socksirc" = "The pinned option is not applicable to this tunnel family.", "connectclient" = "blocked: Proposal UseSSL is local application/session TLS, not Yosemite SAM-control TLS; no accepted Emissary owner exists.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "blocked: Proposal UseSSL is local application/session TLS, not Yosemite SAM-control TLS; no accepted Emissary owner exists.", "httpbidirserver" = "blocked: Proposal UseSSL is local application/session TLS, not Yosemite SAM-control TLS; no accepted Emissary owner exists.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+completion_owner = "M144"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "apply", "not_applicable", "not_applicable", "not_applicable", "apply", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "The pinned option is not applicable to this tunnel family.", "httpclient" = "M144: UseSSL=true presents a generation-local ephemeral TLS listener terminated immediately after accept (reference I2PTunnelClientBase SSL listener); UseSSL=false preserves plaintext.", "ircclient" = "The pinned option is not applicable to this tunnel family.", "socks" = "The pinned option is not applicable to this tunnel family.", "socksirc" = "The pinned option is not applicable to this tunnel family.", "connectclient" = "M144: UseSSL=true presents a generation-local ephemeral TLS listener terminated immediately after accept (reference I2PTunnelClientBase SSL listener); UseSSL=false preserves plaintext.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "The pinned option is not applicable to this tunnel family.", "httpserver" = "M144: UseSSL=true originates TLS to the validated literal-loopback target after I2P admission (reference I2PTunnelServer.getSocket SSL path) with system-root verification and no plaintext fallback.", "httpbidirserver" = "M144: one boolean enables both halves via the shared server target-TLS owner plus a generation-local TLS listener (reference I2PTunnelHTTPBidirServer); no second TLS implementation.", "ircserver" = "The pinned option is not applicable to this tunnel family.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+implementation_evidence = "M144 promotes the four UseSSL cells with I2PControl-local presentation TLS: client listeners terminate ephemeral rcgen identities (localhost/127.0.0.1/::1) before HTTP/CONNECT parsing; server targets wrap the loopback TCP connection with strict system-root verification (SNI loopback, explicit handshake timeout, no fallback); httpbidir reuses the server owner for its target half. UseSSL=false preserves plaintext; malformed values fail before allocation with no echo."
 
 [[tunnel_manager.options]]
 canonical_key = "TunnelLength"

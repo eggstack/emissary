@@ -159,9 +159,20 @@ pub fn validate_common_options(
 
     // Proposal UseSSL controls the local application/session presentation side.
     // Yosemite's similarly named field controls TLS on the SAM control
-    // connection, so it is deliberately not mapped here.
-    if options.use_ssl.is_some() {
-        return Err(common_unsupported(tunnel_type, "UseSSL"));
+    // connection, so it is deliberately not mapped here. M144 applies UseSSL
+    // for the four pinned HTTP/CONNECT families (listener TLS for
+    // httpclient/connectclient, loopback-target TLS for
+    // httpserver/httpbidirserver); all other families stay not applicable.
+    if let Some(_use_ssl) = options.use_ssl {
+        if !matches!(
+            tunnel_type,
+            TunnelType::HttpClient
+                | TunnelType::ConnectClient
+                | TunnelType::HttpServer
+                | TunnelType::HttpBidirServer
+        ) {
+            return Err(common_unsupported(tunnel_type, "UseSSL"));
+        }
     }
     for (present, field) in [(
         options.priv_key_file.is_some()

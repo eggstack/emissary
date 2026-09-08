@@ -22,7 +22,7 @@ use super::{
         validate_common_options, validate_options, OptionValidationError, HTTP_BIDIR_SERVER_OPTIONS,
     },
     runtime::{
-        run_accepted_server, run_client_listener, AcceptedServerRuntimeConfig,
+        presentation_tls, run_accepted_server, run_client_listener, AcceptedServerRuntimeConfig,
         AcceptedServerRuntimeError, ClientListenerRuntimeConfig, ClientListenerRuntimeError,
         ServerAccessPolicy, ServerAdmissionPolicy,
     },
@@ -63,6 +63,31 @@ struct HttpBidirConfig {
     address_book: Option<Arc<RuntimeAddressBookHandle>>,
     server_session_options: SessionOptions,
     client_session_options: SessionOptions,
+    // M144: one `UseSSL` boolean enables TLS on both halves (reference
+    // `I2PTunnelHTTPBidirServer` shares the tunnel options): the client
+    // listener presents TLS and the server target originates TLS.
+    use_ssl: bool,
+    client_tls_acceptor: Option<tokio_rustls::TlsAcceptor>,
+    server_tls_connector: Option<tokio_rustls::TlsConnector>,
+}
+
+impl std::fmt::Debug for HttpBidirConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HttpBidirConfig")
+            .field("name", &self.name)
+            .field("target_address", &self.target_address)
+            .field("target_port", &self.target_port)
+            .field("use_ssl", &self.use_ssl)
+            .field(
+                "client_tls_acceptor",
+                &self.client_tls_acceptor.as_ref().map(|_| "***"),
+            )
+            .field(
+                "server_tls_connector",
+                &self.server_tls_connector.as_ref().map(|_| "***"),
+            )
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -343,12 +368,16 @@ async fn run_composite(
     ready: tokio::sync::oneshot::Sender<Result<String, CompositeRuntimeError>>,
 ) -> Result<(), CompositeRuntimeError> {
     let (child_cancellation, child_receiver) = tokio::sync::watch::channel(false);
+    // M144: reuse the exact HTTP server target-TLS owner; the client half
+    // presents TLS from the same boolean. No second TLS implementation.
     let server_handler = make_accepted_handler(
         config.target_address,
         config.target_port,
         config.server_policy.clone(),
         config.post_limiter.clone(),
         config.unique_local,
+        config.use_ssl,
+        config.server_tls_connector.clone(),
     );
     let client_handler = make_no_outproxy_handler(
         config.proxy_username.clone(),
@@ -356,6 +385,7 @@ async fn run_composite(
         config.require_proxy_auth,
         config.client_policy.clone(),
         config.address_book.clone(),
+        config.client_tls_acceptor.clone(),
     );
     let (server_ready_tx, server_ready_rx) = tokio::sync::oneshot::channel();
     let (client_ready_tx, client_ready_rx) = tokio::sync::oneshot::channel();
@@ -625,6 +655,31 @@ impl HttpBidirServerTunnelBackend {
         {
             return Err(invalid_option("PostLimit/PostLimitTime"));
         }
+        // M144: one boolean drives both halves. Built before allocation;
+        // generation-local material only.
+        let use_ssl =
+            presentation_tls::parse_use_ssl(definition).map_err(|_| invalid_option("UseSSL"))?;
+        let trust_anchors = presentation_tls::test_trust_anchors(definition)
+            .map_err(|_| invalid_option("UseSSL"))?;
+        if !use_ssl && trust_anchors.is_some() {
+            return Err(invalid_option("UseSSL"));
+        }
+        let server_tls_connector = if use_ssl {
+            Some(
+                presentation_tls::build_target_tls_connector(trust_anchors.as_deref())
+                    .map_err(|_| invalid_option("UseSSL"))?,
+            )
+        } else {
+            None
+        };
+        let client_tls_acceptor = if use_ssl {
+            Some(
+                presentation_tls::build_listener_tls_acceptor()
+                    .map_err(|_| invalid_option("UseSSL"))?,
+            )
+        } else {
+            None
+        };
 
         Ok(HttpBidirConfig {
             name: definition.name.as_str().to_owned(),
@@ -670,6 +725,9 @@ impl HttpBidirServerTunnelBackend {
             address_book: self.address_book.clone(),
             server_session_options: SessionOptions::default(),
             client_session_options: SessionOptions::default(),
+            use_ssl,
+            client_tls_acceptor,
+            server_tls_connector,
         })
     }
 }
@@ -810,6 +868,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "TotalBanTime",
         "HostingDestination",
         "UniqueLocalAddressPerClient",
+        "UseSSL",
         "Description",
         "PrivKeyFile",
         "StartOnLoad",
@@ -830,7 +889,17 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
     // Boolean-typed extraction fails before allocation on malformed values.
     let _ = super::http_server::unique_local_enabled(definition)
         .map_err(|_| invalid_option("UniqueLocalAddressPerClient"))?;
-    Ok(())
+    // M144: single `UseSSL` boolean for both halves.
+    match presentation_tls::parse_use_ssl(definition) {
+        Ok(_) => Ok(()),
+        Err(BackendError::UnsupportedOption { option, .. }) if option == "UseSSL" => {
+            Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::HttpBidirServer,
+                option,
+            })
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn invalid_option(option: &str) -> BackendError {

@@ -3001,10 +3001,11 @@ mod tests {
     #[tokio::test]
     async fn m120_common_option_fails_before_secret_allocation_for_all_server_families() {
         use crate::i2pcontrol::domain::tunnel::TunnelType;
+        // M144 promotes `UseSSL` for `httpserver`/`httpbidirserver` (target
+        // TLS); those two no longer fail here. The remaining server families
+        // stay not applicable and must still fail before secret allocation.
         for tunnel_type in [
             TunnelType::Server,
-            TunnelType::HttpServer,
-            TunnelType::HttpBidirServer,
             TunnelType::IrcServer,
             TunnelType::StreamrServer,
         ] {

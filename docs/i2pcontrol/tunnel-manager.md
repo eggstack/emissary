@@ -354,9 +354,17 @@ end-to-end, so a singleton domain is inert rather than support. Any supplied
 validated before session/listener allocation and participate in shared-session
 compatibility.
 
-`UseSSL` remains fail-closed: Proposal 170's local application/session TLS meaning
-is distinct from Yosemite's SAM control-connection TLS field and has no accepted
-Emissary owner. M131 also confirms that `SSLProxies` and `JumpList` are
+`UseSSL` is applied by M144 as presentation TLS, distinct from Yosemite's SAM
+control-connection TLS field: client families (`httpclient`, `connectclient`)
+present a generation-local ephemeral TLS listener terminated immediately after
+accept (reference `I2PTunnelClientBase` SSL listener); server families
+(`httpserver`, `httpbidirserver`) originate TLS to the validated
+literal-loopback target after I2P admission (reference
+`I2PTunnelServer.getSocket` SSL path) with strict system-root verification,
+explicit handshake timeouts, and no plaintext fallback; `httpbidirserver`
+reuses the server owner for its target half. `UseSSL=false` preserves
+plaintext; malformed values fail before allocation with no echo. M131 also
+confirms that `SSLProxies` and `JumpList` are
 HTTP-client-only reference behaviors; their non-HTTP cells are not applicable.
 M112 added bounded `ConnectDelay` behavior
 to the six streaming client listeners; M121 demotes M112's `Close`, `CloseTime`,
@@ -401,21 +409,23 @@ source-address completion to `327 apply / 38 blocked / 475 not_applicable`
 with 2 promotions; M142 applies the HTTP SSLProxies + JumpList completion to
 `329 apply / 36 blocked / 475 not_applicable` with 2 promotions; M143 applies the
 retained streaming Profile completion to `330 apply / 35 blocked /
-475 not_applicable` with 1 promotion; no successor is
-registered, M144-M152 remain deferred.
+475 not_applicable` with 1 promotion; M144 applies the presentation UseSSL
+completion to `334 apply / 31 blocked / 475 not_applicable` with 4 promotions;
+no successor is
+registered, M145-M152 remain deferred.
 
 | Disposition | Proposal 170 fields |
 |---|---|
 | Parsed and round-tripped | `Description`, `StartOnLoad`, `TargetDestination`, `Destination`, `TargetPort`, `ReachableBy`, `Port`, `TargetHost`, `Host` |
-| Applied by accepted client proxy/filter runtimes | `ProxyList`, `ProxyAuth`, `ProxyUsername`, `ProxyPassword`, `OutproxyAuth`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, HTTP `SSLProxies`/`JumpList` (M142 HTTP-client only: bounded I2P-only SSL-outproxy selection and jump-server address-helper response), `Profile` (M143 plain-client only: `bulk`/`interactive` to neutral streaming max window 128/16) |
+| Applied by accepted client proxy/filter runtimes | `ProxyList`, `ProxyAuth`, `ProxyUsername`, `ProxyPassword`, `OutproxyAuth`, `OutproxyUsername`, `OutproxyPassword`, `OutproxyType`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, HTTP `SSLProxies`/`JumpList` (M142 HTTP-client only: bounded I2P-only SSL-outproxy selection and jump-server address-helper response), `Profile` (M143 plain-client only: `bulk`/`interactive` to neutral streaming max window 128/16), `UseSSL` (M144 HTTP/CONNECT clients only: generation-local TLS listener) |
 | Applied by six streaming client lifecycle owners | `ConnectDelay` (0–60,000 ms) |
 | Applied by seven client idle owners (M136) | `Reduce` (boolean master switch), `ReduceCount` (1–6, default 1), `ReduceTime` (ms, minimum 300000, default 1200000) via standard `i2cp.reduce*` and the live-quantity primitive; `ReduceTime`/`ReduceCount` without `Reduce=true` fail before allocation |
 | Applied by seven client idle owners (M137) | `Close` (boolean master switch), `CloseTime` (ms, minimum 300000, default 1800000) via standard `i2cp.close*` with close-before-reduce ordering and canonical teardown; `CloseTime` without `Close=true` fails before allocation |
 | Applied by six TCP proven-resume owners (M134) | `NewDest` only on a proven `IdlePolicy` resume (requires `Close=true`, conflicts with `PersistentClientKey`/`PrivKeyFile`, Streamr/servers not applicable); ordinary/manual/restart/failure paths reuse without rotation |
-| Rejected before allocation as residual client blockers | `UseOutproxyPlugin` and `SigType` for all applicable families (M140 re-freezes six constructor-overridden/UDP `Profile` cells and Streamr `ConnectDelay` as not_applicable; M143 applies retained `Profile:client`) |
-| Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `UniqueLocalAddressPerClient` (M141 HTTP servers only, per-client loopback source bind) |
+| Rejected before allocation as residual client blockers | `UseOutproxyPlugin` and `SigType` for all applicable families (M140 re-freezes six constructor-overridden/UDP `Profile` cells and Streamr `ConnectDelay` as not_applicable; M143 applies retained `Profile:client`; M144 applies `UseSSL` for HTTP/CONNECT clients) |
+| Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `UniqueLocalAddressPerClient` (M141 HTTP servers only, per-client loopback source bind), `UseSSL` (M144 HTTP servers only, TLS to loopback target) |
 | Rejected before allocation as residual server blockers | `MultiHoming`, `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
-| Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `UseSSL`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
+| Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
 
 `PrivKeyFile` is part of the pinned input inventory and is retained as a redacted
 canonical path value, but start is rejected until confined import and atomic

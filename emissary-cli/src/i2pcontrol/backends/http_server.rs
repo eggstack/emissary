@@ -27,6 +27,7 @@ use super::{
         validate_common_options, validate_options, CustomOptionPolicy, OptionCapabilities,
         OptionValidationError,
     },
+    runtime::presentation_tls,
     BackendError, BackendResult, BackendStatus, TunnelBackend,
 };
 use crate::i2pcontrol::{
@@ -58,7 +59,7 @@ pub const HTTP_SERVER_OPTIONS: OptionCapabilities = OptionCapabilities::new(
     CustomOptionPolicy::Reject,
 );
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct HttpServerConfig {
     name: String,
     target_address: IpAddr,
@@ -71,6 +72,24 @@ struct HttpServerConfig {
     policy: HttpServerPolicy,
     post_limiter: PostLimiter,
     session_options: SessionOptions,
+    // M144: presentation TLS to the loopback target (reference
+    // `I2PTunnelServer.getSocket` SSL path). Generation-local connector;
+    // never persisted, never falls back to plaintext.
+    use_ssl: bool,
+    tls_connector: Option<tokio_rustls::TlsConnector>,
+}
+
+impl std::fmt::Debug for HttpServerConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HttpServerConfig")
+            .field("name", &self.name)
+            .field("target_address", &self.target_address)
+            .field("target_port", &self.target_port)
+            .field("unique_local", &self.unique_local)
+            .field("use_ssl", &self.use_ssl)
+            .field("tls_connector", &self.tls_connector.as_ref().map(|_| "***"))
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -353,6 +372,8 @@ impl HttpServerRuntimeSupervisor {
                 config.policy.clone(),
                 config.post_limiter.clone(),
                 config.unique_local,
+                config.use_ssl,
+                config.tls_connector.clone(),
             );
             let result = std::panic::AssertUnwindSafe(run_accepted_server(
                 AcceptedServerRuntimeConfig {
@@ -421,6 +442,7 @@ impl HttpServerRuntimeSupervisor {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_connection(
     connection: AcceptedServerConnection,
     target_address: IpAddr,
@@ -428,6 +450,8 @@ async fn handle_connection(
     policy: HttpServerPolicy,
     limiter: PostLimiter,
     unique_local: bool,
+    use_ssl: bool,
+    tls_connector: Option<tokio_rustls::TlsConnector>,
 ) -> io::Result<()> {
     let peer = connection.peer;
     let (remote_read, remote_write) = tokio::io::split(connection.stream);
@@ -440,6 +464,8 @@ async fn handle_connection(
         policy,
         limiter,
         unique_local,
+        use_ssl,
+        tls_connector,
     )
     .await
 }
@@ -447,17 +473,24 @@ async fn handle_connection(
 /// Build the accepted-stream handler used by both `httpserver` and the
 /// composed `httpbidirserver` backend. Keeping this seam here ensures the
 /// composite cannot accidentally grow a second HTTP server filter path.
+///
+/// M144 reuses this exact owner for `httpbidirserver` target TLS: the
+/// composite passes through its own `use_ssl`/connector rather than
+/// duplicating TLS-to-target logic.
 pub(crate) fn make_accepted_handler(
     target_address: IpAddr,
     target_port: u16,
     policy: HttpServerPolicy,
     limiter: PostLimiter,
     unique_local: bool,
+    use_ssl: bool,
+    tls_connector: Option<tokio_rustls::TlsConnector>,
 ) -> AcceptedServerHandler {
     Arc::new(move |connection| {
         let target_address = target_address;
         let policy = policy.clone();
         let limiter = limiter.clone();
+        let tls_connector = tls_connector.clone();
         Box::pin(async move {
             let _ = handle_connection(
                 connection,
@@ -466,6 +499,8 @@ pub(crate) fn make_accepted_handler(
                 policy,
                 limiter,
                 unique_local,
+                use_ssl,
+                tls_connector,
             )
             .await;
         })
@@ -482,6 +517,8 @@ async fn handle_http_stream<R, W>(
     policy: HttpServerPolicy,
     limiter: PostLimiter,
     unique_local: bool,
+    use_ssl: bool,
+    tls_connector: Option<tokio_rustls::TlsConnector>,
 ) -> io::Result<()>
 where
     R: AsyncRead + Unpin,
@@ -500,14 +537,39 @@ where
         return Ok(());
     }
 
-    let local = match connect_to_target(target_address, target_port, &peer, unique_local).await {
+    let tcp = match connect_to_target(target_address, target_port, &peer, unique_local).await {
         Ok(stream) => stream,
         Err(_) => {
             send_error(&mut remote_write, "502 Bad Gateway").await?;
             return Ok(());
         }
     };
-    let (local_read, mut local_write) = tokio::io::split(local);
+    // M144: TLS-wrap the loopback target when enabled. Admission/filtering
+    // already happened above; failures use the bounded 502 path with no
+    // plaintext fallback.
+    let boxed: Box<dyn presentation_tls::AsyncReadWrite> = if use_ssl {
+        let Some(connector) = tls_connector else {
+            send_error(&mut remote_write, "502 Bad Gateway").await?;
+            return Ok(());
+        };
+        let server_name = match presentation_tls::loopback_server_name(target_address) {
+            Ok(name) => name,
+            Err(_) => {
+                send_error(&mut remote_write, "502 Bad Gateway").await?;
+                return Ok(());
+            }
+        };
+        match presentation_tls::connect_tls_with_timeout(&connector, tcp, server_name).await {
+            Ok(tls) => Box::new(tls),
+            Err(_) => {
+                send_error(&mut remote_write, "502 Bad Gateway").await?;
+                return Ok(());
+            }
+        }
+    } else {
+        Box::new(tcp)
+    };
+    let (local_read, mut local_write) = tokio::io::split(boxed);
     local_write.write_all(&request.head).await?;
     copy_body(&mut remote_reader, &mut local_write, request.content_length).await?;
     local_write.shutdown().await?;
@@ -726,6 +788,23 @@ impl HttpServerTunnelBackend {
         {
             return Err(invalid_option("PostLimit/PostLimitTime"));
         }
+        // M144: presentation TLS to the loopback target. Validated and built
+        // before any listener/session allocation; generation-local connector.
+        let use_ssl = presentation_tls::parse_use_ssl(definition)
+            .map_err(|_| invalid_option("UseSSL"))?;
+        let trust_anchors = presentation_tls::test_trust_anchors(definition)
+            .map_err(|_| invalid_option("UseSSL"))?;
+        if !use_ssl && trust_anchors.is_some() {
+            return Err(invalid_option("UseSSL"));
+        }
+        let tls_connector = if use_ssl {
+            Some(
+                presentation_tls::build_target_tls_connector(trust_anchors.as_deref())
+                    .map_err(|_| invalid_option("UseSSL"))?,
+            )
+        } else {
+            None
+        };
         Ok(HttpServerConfig {
             name: definition.name.as_str().to_owned(),
             target_address,
@@ -756,6 +835,8 @@ impl HttpServerTunnelBackend {
             },
             post_limiter: PostLimiter::new(post_limit as usize, Duration::from_secs(post_window)),
             session_options: SessionOptions::default(),
+            use_ssl,
+            tls_connector,
         })
     }
 }
@@ -905,6 +986,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "TotalBanTime",
         "HostingDestination",
         "UniqueLocalAddressPerClient",
+        "UseSSL",
         "i2p.tunnel.httpHost",
         "i2p.tunnel.accessList",
     ];
@@ -921,7 +1003,6 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
     const REJECTED: &[&str] = &[
         "TargetDestination",
         "Destination",
-        "UseSSL",
         "SSLProxies",
         "SSLCertificate",
         "SSLKey",
@@ -962,7 +1043,19 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
     }
     // Boolean-typed extraction fails before allocation on malformed values.
     let _ = unique_local_enabled(definition)?;
-    Ok(())
+    // M144: `UseSSL` boolean validation before allocation with no echo.
+    // Mismatched/malformed values surface as `UseSSL` rejection here; the
+    // typed config builder re-validates before building TLS material.
+    match presentation_tls::parse_use_ssl(definition) {
+        Ok(_) => Ok(()),
+        Err(BackendError::UnsupportedOption { option, .. }) if option == "UseSSL" => {
+            Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::HttpServer,
+                option,
+            })
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn invalid_option(option: &str) -> BackendError {
@@ -1038,15 +1131,23 @@ mod tests {
     async fn option_validation_rejects_unsupported_security_modes_before_destination_lookup() {
         let root = tempfile::tempdir().unwrap();
         let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
-        let result = backend
-            .config_without_destination(&definition(&[("UseSSL", serde_json::json!(true))]));
+        // M144: `UseSSL` is applied (listener/target TLS). A malformed
+        // non-boolean must still fail before allocation with no echo.
+        let malformed = backend
+            .config_without_destination(&definition(&[("UseSSL", serde_json::json!("yes"))]));
         assert!(matches!(
-            result,
+            malformed,
             Err(BackendError::UnsupportedOption {
                 tunnel_type: TunnelType::HttpServer,
                 option
             }) if option == "UseSSL"
         ));
+        // Valid `UseSSL=true` builds target TLS material before allocation.
+        let enabled = backend
+            .config_without_destination(&definition(&[("UseSSL", serde_json::json!(true))]))
+            .unwrap();
+        assert!(enabled.use_ssl);
+        assert!(enabled.tls_connector.is_some());
     }
 
     #[tokio::test]
@@ -1217,6 +1318,8 @@ mod tests {
             },
             limiter,
             false,
+            false,
+            None,
         ));
         client
             .write_all(b"POST /write HTTP/1.1\r\nContent-Length: 0\r\n\r\n")
@@ -1278,6 +1381,8 @@ mod tests {
             },
             PostLimiter::new(0, Duration::from_secs(60)),
             false,
+            false,
+            None,
         ));
         client
             .write_all(b"GET /safe HTTP/1.1\r\nHost: evil.i2p\r\nx-i2p-destb64: attacker\r\n\r\n")
@@ -1326,6 +1431,8 @@ mod tests {
             },
             PostLimiter::new(0, Duration::from_secs(60)),
             false,
+            false,
+            None,
         ));
         client
             .write_all(
@@ -1541,6 +1648,8 @@ mod tests {
             },
             PostLimiter::new(0, Duration::from_secs(60)),
             false,
+            false,
+            None,
         ));
         client
             .write_all(b"GET /plain HTTP/1.1\r\nContent-Length: 0\r\n\r\n")
@@ -1606,6 +1715,8 @@ mod tests {
             },
             PostLimiter::new(0, Duration::from_secs(60)),
             true,
+            false,
+            None,
         ));
         client
             .write_all(b"GET /derived HTTP/1.1\r\nContent-Length: 0\r\n\r\n")
@@ -1662,6 +1773,8 @@ mod tests {
             },
             PostLimiter::new(0, Duration::from_secs(60)),
             true,
+            false,
+            None,
         ));
         client
             .write_all(
@@ -1725,6 +1838,8 @@ mod tests {
             },
             PostLimiter::new(0, Duration::from_secs(60)),
             true,
+            false,
+            None,
         ));
         client
             .write_all(b"GET /v6 HTTP/1.1\r\nContent-Length: 0\r\n\r\n")

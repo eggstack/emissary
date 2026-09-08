@@ -12,6 +12,7 @@ mod client_listener;
 #[cfg(test)]
 pub mod peer_identity;
 mod peer_identity_impl;
+pub mod presentation_tls;
 pub mod session;
 mod task_group;
 

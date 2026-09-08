@@ -147,15 +147,15 @@ All 12 tunnel types are mapped to backends:
 | Type | Category | Backend |
 |---|---|---|
 | `client` | Client | Yosemite streaming client with per-name supervisor and M143 `Profile` streaming-window mapping (bulk/omitted → 128, interactive → 16) |
-| `httpclient` | Client | Bounded HTTP client proxy with direct-I2P routing, explicit I2P outproxy plus M142 HTTPS/CONNECT SSL-outproxy selection and jump-server address-helper response |
+| `httpclient` | Client | Bounded HTTP client proxy with direct-I2P routing, explicit I2P outproxy plus M142 HTTPS/CONNECT SSL-outproxy selection and jump-server address-helper response plus M144 `UseSSL` TLS listener |
 | `ircclient` | Client | Bounded IRC anonymity filter over a Yosemite stream |
 | `socks` | Client | Bounded SOCKS4a/SOCKS5 CONNECT proxy |
 | `socksirc` | Client | SOCKS CONNECT composed with the IRC anonymity filter |
-| `connectclient` | Client | Strict HTTP CONNECT proxy with direct-I2P routing and explicit I2P outproxy support |
+| `connectclient` | Client | Strict HTTP CONNECT proxy with direct-I2P routing and explicit I2P outproxy support plus M144 `UseSSL` TLS listener |
 | `streamrclient` | Client | Bounded Yosemite repliable datagram consumer |
 | `server` | Server | Peer-admitted accepted-stream raw relay with per-name supervisor and persistent destination identity |
-| `httpserver` | Server | Bounded filtered accepted-stream HTTP server |
-| `httpbidirserver` | Server | Deprecated composed filtered HTTP server plus direct-I2P local proxy; no clearnet outproxy |
+| `httpserver` | Server | Bounded filtered accepted-stream HTTP server plus M144 `UseSSL` TLS to loopback target |
+| `httpbidirserver` | Server | Deprecated composed filtered HTTP server plus direct-I2P local proxy; no clearnet outproxy; M144 `UseSSL` enables TLS on both halves via the shared server owner |
 | `ircserver` | Server | Bounded filtered accepted-stream IRC server |
 | `streamrserver` | Server | Bounded Yosemite repliable datagram producer |
 

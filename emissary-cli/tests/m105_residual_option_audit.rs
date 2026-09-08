@@ -402,7 +402,22 @@ fn audit_covers_the_exact_m104_residual_inventory() {
     assert_eq!(m143_completed.len(), 1);
     let expected_post_m143 =
         expected_post_m142.difference(&m143_completed).cloned().collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m143);
+    // M144 promotes the four presentation UseSSL cells to apply with
+    // I2PControl-local TLS (listener termination for httpclient/connectclient,
+    // loopback-target origination for httpserver/httpbidirserver).
+    let m144_completed = [
+        ("UseSSL", "httpclient"),
+        ("UseSSL", "connectclient"),
+        ("UseSSL", "httpserver"),
+        ("UseSSL", "httpbidirserver"),
+    ]
+    .into_iter()
+    .map(|(option, tunnel_type)| (option.to_owned(), tunnel_type.to_owned()))
+    .collect::<BTreeSet<_>>();
+    assert_eq!(m144_completed.len(), 4);
+    let expected_post_m144 =
+        expected_post_m143.difference(&m144_completed).cloned().collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m144);
     assert_eq!(
         audit["summary"]["post_m116_reclassified_cells"].as_integer(),
         Some(7)

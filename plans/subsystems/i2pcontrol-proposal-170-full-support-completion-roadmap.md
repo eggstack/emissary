@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M140 closed as complete; M141 closed; M142 closed as complete (329/36/475); M143 closed as complete (330/35/475); no registered successor**
+Status: **active / partial; M140 closed as complete; M141 closed; M142 closed as complete (329/36/475); M143 closed as complete (330/35/475); M144 closed as complete (334/31/475); no registered successor**
 
 Current runtime/security qualification authority:
 
@@ -12,15 +12,15 @@ Current residual applicability authority:
 
 Current registered handoff:
 
-- none (M143 closed; M144-M152 deferred). Last closed: M143 `plans/implementation/i2pcontrol-proposal-170/143-streaming-profile-runtime-completion.md`.
+- none (M144 closed; M145-M152 deferred). Last closed: M144 `plans/implementation/i2pcontrol-proposal-170/144-presentation-usessl-runtime-completion.md`.
 
 Focused residual execution roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`.
 
-Current machine authority after M143 closure:
+Current machine authority after M144 closure:
 
-- M095 matrix: `330 apply / 35 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells.
+- M095 matrix: `334 apply / 31 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells.
 
 Pinned Proposal authority:
 
@@ -165,6 +165,9 @@ M142 HTTP SSLProxies + JumpList                      [CLOSED AS COMPLETE — 329
   |
   v
 M143 retained streaming Profile                     [CLOSED AS COMPLETE — 330/35/475, 1 PROMOTION]
+  |
+  v
+M144 presentation UseSSL                             [CLOSED AS COMPLETE — 334/31/475, 4 PROMOTIONS]
 ```
 
 M139 supersedes M130 for current-head runtime/security qualification only. M130 remains historical evidence. M131 remains historical residual authority except where M140 explicitly reclassifies seven cells to current-head `not_applicable` and where M141 promotes two cells to `apply`.
@@ -189,7 +192,9 @@ M142 HTTP SSLProxies + JumpList                       [CLOSED AS COMPLETE — 32
   |
   v
 M143 retained streaming Profile                       [CLOSED AS COMPLETE — 330/35/475, 1 PROMOTION]
-  -> M144 application/presentation UseSSL              [DEFERRED]
+  |
+  v
+M144 presentation UseSSL                               [CLOSED AS COMPLETE — 334/31/475, 4 PROMOTIONS]
   -> M145 reply LeaseSet bundling / MultiHoming        [DEFERRED]
   -> M146 real outproxy provider / UseOutproxyPlugin   [DEFERRED]
   -> M147 neutral destination signature suites         [DEFERRED / ZERO PROMOTION]
@@ -200,7 +205,7 @@ M143 retained streaming Profile                       [CLOSED AS COMPLETE — 33
   -> M152 final whole-surface requalification          [DEFERRED / ZERO PROMOTION]
 ```
 
-M142-M152 are committed handoff documents but are not executable authority until the registry promotes them after their hard dependencies close (M143 closed; M144-M152 remain deferred). M145/M147/M149-M151 require explicit pre-registration amendments to freeze exact cells/files/spec/security decisions.
+M142-M152 are committed handoff documents but are not executable authority until the registry promotes them after their hard dependencies close (M144 closed; M145-M152 remain deferred). M145/M147/M149-M151 require explicit pre-registration amendments to freeze exact cells/files/spec/security decisions.
 
 ## 8. Remaining 38 residual cells after M141 closure
 

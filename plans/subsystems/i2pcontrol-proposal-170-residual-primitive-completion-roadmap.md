@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Residual Primitive Completion Roadmap
 
-Status: **active / partial; M142 closed as complete; no registered successor (M143 deferred pending amendment)**
+Status: **active / partial; M143 closed as complete; no registered successor (M144-M152 deferred)**
 
 Source roadmap:
 
@@ -12,14 +12,15 @@ Current qualification authority:
 
 Planning baseline:
 
-- repository head at M142 closure: implementation plus closure in a single commit (see `142-closure.md` for SHA);
-- current M095 matrix after M142: `329 apply / 36 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells;
-- M131 remains the historical residual applicability/primitive authority, superseded for seven cells by M140 and for four cells by M141/M142;
+- repository head at M143 closure: implementation plus closure in a single commit (see `143-closure.md` for SHA);
+- current M095 matrix after M143: `330 apply / 35 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells;
+- M131 remains the historical residual applicability/primitive authority, superseded for seven cells by M140 and for five cells by M141/M142/M143;
 - M135/M136/M137/M134 session-lifecycle line is closed as complete;
 - M139 is the current whole-implemented-subset runtime/security qualification authority;
 - M140 is closed as complete as the residual streaming applicability authority with zero promotions;
 - M141 is closed as complete as the HTTP unique-local source-address completion with 2 promotions;
-- M142 is closed as complete as the HTTP SSLProxies + JumpList completion with 2 promotions.
+- M142 is closed as complete as the HTTP SSLProxies + JumpList completion with 2 promotions;
+- M143 is closed as complete as the retained streaming Profile completion with 1 promotion.
 
 Pinned external authority:
 
@@ -81,21 +82,18 @@ Cross-cutting invariants:
 
 ## 3. Starting residual inventory
 
-M095 reported 47 blocked cells at M140 registration; M140 re-freezes seven to `not_applicable`, leaving 40 blocked cells; M141 promotes two to `apply`, leaving 38 blocked cells; M142 promotes two to `apply`, leaving 36 blocked cells:
+M095 reported 47 blocked cells at M140 registration; M140 re-freezes seven to `not_applicable`, leaving 40 blocked cells; M141 promotes two to `apply`, leaving 38 blocked cells; M142 promotes two to `apply`, leaving 36 blocked cells; M143 promotes one to `apply`, leaving 35 blocked cells:
 
-| Cluster | Cells | Current blocker (after M140) |
+| Cluster | Cells | Current blocker (after M143) |
 |---|---:|---|
 | `SigType` | 10 | generalized destination signing/key generation |
 | encrypted/authenticated LeaseSets | 15 | LeaseSet2/blinding/lookup/auth crypto + NetDB + key custody |
-| streaming `Profile` (retained `client` only; M140 re-froze six cells as N/A) | 1 | actual streaming max-window/config consumer for `client` |
 | presentation `UseSSL` | 4 | local application endpoint TLS identity/trust owner |
 | `UseOutproxyPlugin` | 4 | real bounded local outproxy provider abstraction |
-| HTTP `SSLProxies` + `JumpList` | 2 | HTTP-only TLS-outproxy/address-helper behavior |
-| `UniqueLocalAddressPerClient` | 2 | deterministic per-client loopback source binding (M141 closed as complete) |
 | `MultiHoming` / `shouldBundleReplyInfo` | 2 | outbound reply-LeaseSet bundling policy |
-| **Total** | **40** | |
+| **Total** | **35** | |
 
-M140 mechanically re-derived these cells from M095 (`325/40/475`). M141 promotes the two `UniqueLocalAddressPerClient` cells to `apply` (`327/38/475`); M142 promotes the two HTTP-client `SSLProxies`/`JumpList` cells to `apply` (`329/36/475`). The pre-M140 47-cell table (with `Profile` × 7 and Streamr `ConnectDelay` × 1) is retained in history via M140 closure; the pre-M141 40-cell table is retained via M141 closure; the pre-M142 38-cell table is retained via M142 closure; the table below is the current-head authority after M142.
+M140 mechanically re-derived these cells from M095 (`325/40/475`). M141 promotes the two `UniqueLocalAddressPerClient` cells to `apply` (`327/38/475`); M142 promotes the two HTTP-client `SSLProxies`/`JumpList` cells to `apply` (`329/36/475`); M143 promotes the retained `Profile:client` cell to `apply` (`330/35/475`). The pre-M140 47-cell table (with `Profile` × 7 and Streamr `ConnectDelay` × 1) is retained in history via M140 closure; the pre-M141 40-cell table is retained via M141 closure; the pre-M142 38-cell table is retained via M142 closure; the pre-M143 36-cell table is retained via M143 closure; the table below is the current-head authority after M143.
 
 ## 4. New reference evidence driving this roadmap
 
@@ -154,7 +152,7 @@ M141 UniqueLocalAddressPerClient                           [CLOSED AS COMPLETE �
 M142 HTTP SSLProxies + JumpList                            [CLOSED AS COMPLETE — 329/36/475, 2 PROMOTIONS]
   |
   v
-M143 retained streaming Profile runtime (Profile:client × 1, frozen by M140) [DEFERRED; amendment with exact neutral files still required before registration]
+M143 retained streaming Profile runtime (Profile:client × 1) [CLOSED AS COMPLETE — 330/35/475, 1 PROMOTION]
   |
   v
 M144 application/presentation UseSSL                       [DEFERRED]
@@ -230,15 +228,13 @@ Requirements include bounded parsing, I2P-only proxy destinations, deterministic
 
 ### M143 — retained streaming `Profile`
 
-Status: deferred; retained set frozen by M140 as `Profile:client` × 1; amendment with exact neutral streaming files still required before registration.
+Status: **closed as complete** (closure `plans/closure/i2pcontrol-proposal-170/143-closure.md`; `330/35/475`, 1 promotion).
 
 Class: infrastructure + capability.
 
-Target: only cells still `blocked_primitive` after M140 (`Profile:client` × 1).
+Target: only cells still `blocked_primitive` after M140 (`Profile:client` × 1, promoted).
 
-Preferred lower owner: the existing neutral SAM/streaming manager configuration path. Core changes are permitted only for the minimum neutral max-window/config consumer required by actual streaming behavior.
-
-No Streamr or constructor-overridden family may be promoted merely because a generic property can be serialized.
+Lower owner: neutral SAM/streaming window configuration (`config.rs` parsing, `session.rs` handoff, `streaming/mod.rs` manager, `stream/active.rs` window consumer). No Streamr or constructor-overridden family promoted.
 
 ### M144 — presentation `UseSSL`
 
@@ -373,8 +369,8 @@ Pre-existing rustfmt stable/nightly drift must be recorded rather than normalize
 
 ## 10. Registration discipline
 
-- M140 is closed as complete; M141 is closed as complete with 2 promotions; M142 is closed as complete; no successor is registered until M143 is amended with exact neutral streaming files.
-- M143-M152 are committed as deferred handoff documents and are not executable authority until their hard dependencies close and the registry promotes exactly one next plan.
+- M140 is closed as complete; M141 is closed as complete with 2 promotions; M142 is closed as complete with 2 promotions; M143 is closed as complete with 1 promotion; no successor is registered (M144 deferred pending its own registration decision).
+- M144-M152 are committed as deferred handoff documents and are not executable authority until their hard dependencies close and the registry promotes exactly one next plan.
 - A deferred plan's path budget is design intent, not production authorization.
 - M140 froze the retained Profile cell set as `Profile:client` × 1; M143 must still be amended before registration so it names the exact neutral streaming files and M140-closure baseline counts.
 - If reference/security research materially changes a later primitive contract, amend the deferred plan and roadmap before registration; do not silently reinterpret it during implementation.

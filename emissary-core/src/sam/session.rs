@@ -30,7 +30,10 @@ use crate::{
         pending::session::SamSessionContext,
         protocol::{
             datagram::DatagramManager,
-            streaming::{Direction, ListenerKind, StreamManager, StreamManagerEvent},
+            streaming::{
+                parse_stream_max_window_size, Direction, ListenerKind, StreamManager,
+                StreamManagerEvent,
+            },
         },
         socket::SamSocket,
         types::{
@@ -496,6 +499,9 @@ impl<R: Runtime> SamSession<R> {
 
         let idle_policy = IdlePolicy::parse(&options);
         let idle_timer = enabled_idle_timer::<R>(&idle_policy);
+        // Neutral streaming window: parsed before the manager becomes active,
+        // immutable for the generation, bounded, fail-safe to default.
+        let stream_max_window_size = parse_stream_max_window_size(&options);
 
         Self {
             address_book,
@@ -532,7 +538,11 @@ impl<R: Runtime> SamSession<R> {
             },
             signing_key: *signing_key.clone(),
             socket: Some(socket),
-            stream_manager: StreamManager::new(dest, *signing_key),
+            stream_manager: StreamManager::new_with_max_window(
+                dest,
+                *signing_key,
+                stream_max_window_size,
+            ),
             sub_session_tx,
             waker: None,
             observation_hook,

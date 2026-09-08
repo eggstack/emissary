@@ -699,6 +699,59 @@ fn parse_newdest_policy(definition: &TunnelDefinition) -> BackendResult<Option<b
     }
 }
 
+/// Validated Proposal streaming-profile policy for one definition (M143).
+///
+/// `None` means omitted (bulk default, no wire option). `Some(false)` is
+/// explicit `"bulk"` (same effective window as omitted, distinct persisted
+/// string). `Some(true)` is `"interactive"` (neutral
+/// `i2p.streaming.maxWindowSize = "16"`).
+///
+/// Frozen semantics (Proposal + pinned Java reference):
+/// - exact accepted domain is `"bulk"` / `"interactive"` (case-sensitive per
+///   Java `"interactive".equals(profile)`); omitted means bulk default;
+/// - `"interactive"` maps to neutral max window `16`
+///   (`TunnelSupport.PROP_DEFAULT_STREAMING_MAX_WINDOW_SIZE`);
+/// - `"bulk"` maps to absent (same effective as omitted);
+/// - only plain `client` is applicable (M140 retained); all other families
+///   reject any `Profile` presence (not applicable, affirmative
+///   constructor/UDP-ownership evidence);
+/// - malformed types/values fail before allocation with no echo.
+///
+/// Core remains fail-safe for non-I2PControl SAM input, but I2PControl
+/// enforces Proposal-valid values here before listener/session allocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StreamProfile {
+    Bulk,
+    Interactive,
+}
+
+fn parse_profile_policy(definition: &TunnelDefinition) -> BackendResult<Option<StreamProfile>> {
+    let tunnel_type = definition.tunnel_type;
+    let Some(raw) = definition.raw_config.get("Profile") else {
+        return Ok(None);
+    };
+    // Only plain client may carry Profile; every other family rejects any
+    // supplied value (M140 N/A, no accidental inheritance).
+    if tunnel_type != TunnelType::Client {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "Profile".to_owned(),
+        });
+    }
+    let value = raw.as_str().ok_or_else(|| BackendError::UnsupportedOption {
+        tunnel_type,
+        option: "Profile".to_owned(),
+    })?;
+    match value {
+        "bulk" => Ok(Some(StreamProfile::Bulk)),
+        "interactive" => Ok(Some(StreamProfile::Interactive)),
+        _ => Err(BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "Profile".to_owned(),
+        }),
+    }
+}
+
 /// Validated Proposal idle-reduction policy for one definition.
 ///
 /// `None` means reduction disabled (no timer/work). `Some` carries the exact
@@ -996,6 +1049,24 @@ pub fn build_session_options(
     // secret store); no wire option is emitted for `NewDest` itself and no
     // Yosemite change occurs.
     let _ = parse_newdest_policy(definition)?;
+
+    // M143: map validated Proposal `Profile` (plain client only) through
+    // Yosemite's existing validated generic additional-session-option path.
+    // `interactive` emits neutral `i2p.streaming.maxWindowSize = "16"`;
+    // `bulk`/omitted emit nothing (bulk default). No Yosemite change, no raw
+    // SAM command construction. Shared-session compatibility follows from the
+    // existing `additional_options_identity`: different effective windows have
+    // different keys and never share one session.
+    if let Some(profile) = parse_profile_policy(definition)? {
+        if profile == StreamProfile::Interactive {
+            options
+                .add_session_option("i2p.streaming.maxWindowSize".to_owned(), "16".to_owned())
+                .map_err(|_| BackendError::UnsupportedOption {
+                    tunnel_type: definition.tunnel_type,
+                    option: "Profile".to_owned(),
+                })?;
+        }
+    }
 
     Ok(options)
 }

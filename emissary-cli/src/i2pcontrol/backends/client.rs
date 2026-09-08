@@ -423,6 +423,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "i2p.tunnel.listenPort",
         "DelayOpen",
         "ConnectDelay",
+        "Profile",
         "Reduce",
         "ReduceCount",
         "ReduceTime",
@@ -433,6 +434,11 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "PersistentClientKey",
         "PrivKeyFile",
     ];
+    // M143: "Profile" is applied for plain client only as the neutral
+    // streaming max-window (`interactive` -> `i2p.streaming.maxWindowSize=16`,
+    // `bulk`/omitted -> bulk default). Validation/mapping lives in
+    // `runtime::session::build_session_options` via the generic Yosemite path;
+    // all other families keep exact `UnsupportedOption` rejection.
     // M134: "NewDest" is applied as a proven idle-resume policy (M137 IdlePolicy
     // gate + tracker/secret transaction); conflicts/prerequisites fail in
     // client_lifecycle_config / validate_common_options before allocation.

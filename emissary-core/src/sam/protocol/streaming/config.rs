@@ -20,6 +20,7 @@
 
 use alloc::string::String;
 use core::{num::NonZeroUsize, time::Duration};
+use hashbrown::HashMap;
 
 /// Inactivity action.
 #[derive(Debug)]
@@ -52,13 +53,46 @@ pub enum LimitAction {
 /// See section `i2p.streaming.profile Notes` in the docs [1]
 ///
 /// [1]: https://geti2p.net/en/docs/api/streaming
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
     /// Bulk.
     Bulk,
 
     /// Interactive.
     Interactive,
+}
+
+/// Neutral SAM session option carrying the bounded streaming window.
+///
+/// This is the standard streaming session property consumed by the neutral
+/// streaming owner. It carries no administrative policy.
+pub const STREAM_MAX_WINDOW_SIZE_OPTION: &str = "i2p.streaming.maxWindowSize";
+
+/// Neutral default streaming max window (bulk behavior).
+///
+/// Matches the current effective connection cap so an omitted option preserves
+/// upstream-compatible behavior.
+pub const DEFAULT_STREAM_MAX_WINDOW_SIZE: usize = 128;
+
+/// Minimum protocol-safe streaming max window (reference clamp).
+pub const MIN_STREAM_MAX_WINDOW_SIZE: usize = 2;
+
+/// Maximum protocol-safe streaming max window (connection cap).
+pub const MAX_STREAM_MAX_WINDOW_SIZE: usize = 128;
+
+/// Parse the neutral streaming max window from SAM session options.
+///
+/// Fail-safe to the default when absent or malformed; out-of-range values are
+/// clamped to the protocol-safe `2..=128` interval. No logging per packet and
+/// no global state.
+pub fn parse_stream_max_window_size(options: &HashMap<String, String>) -> usize {
+    let Some(raw) = options.get(STREAM_MAX_WINDOW_SIZE_OPTION) else {
+        return DEFAULT_STREAM_MAX_WINDOW_SIZE;
+    };
+    let Ok(parsed) = raw.trim().parse::<usize>() else {
+        return DEFAULT_STREAM_MAX_WINDOW_SIZE;
+    };
+    parsed.clamp(MIN_STREAM_MAX_WINDOW_SIZE, MAX_STREAM_MAX_WINDOW_SIZE)
 }
 
 /// Streaming protocol configuration.
@@ -225,7 +259,7 @@ impl Default for StreamConfig {
             max_total_conns_per_minute: None,
             max_total_conns_per_hour: None,
             max_total_conns_per_day: None,
-            max_window_size: 12,
+            max_window_size: DEFAULT_STREAM_MAX_WINDOW_SIZE,
             profile: Profile::Bulk,
             read_timeout: None,
             slow_start_growth_rate_factor: 1,
@@ -234,5 +268,71 @@ impl Default for StreamConfig {
             wdw_dampening: 0.75f64,
             write_timeout: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::string::ToString;
+
+    fn options(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    }
+
+    #[test]
+    fn omitted_window_preserves_default() {
+        assert_eq!(
+            parse_stream_max_window_size(&HashMap::new()),
+            DEFAULT_STREAM_MAX_WINDOW_SIZE
+        );
+        assert_eq!(StreamConfig::default().max_window_size, 128);
+    }
+
+    #[test]
+    fn interactive_window_value_is_accepted() {
+        let opts = options(&[(STREAM_MAX_WINDOW_SIZE_OPTION, "16")]);
+        assert_eq!(parse_stream_max_window_size(&opts), 16);
+    }
+
+    #[test]
+    fn malformed_window_fails_safe_to_default() {
+        for raw in ["", " ", "bulk", "interactive", "16.0", "-1", "abc", "16,16"] {
+            let opts = options(&[(STREAM_MAX_WINDOW_SIZE_OPTION, raw)]);
+            assert_eq!(
+                parse_stream_max_window_size(&opts),
+                DEFAULT_STREAM_MAX_WINDOW_SIZE,
+                "raw {raw:?} must fail safe"
+            );
+        }
+    }
+
+    #[test]
+    fn out_of_range_window_is_clamped() {
+        assert_eq!(
+            parse_stream_max_window_size(&options(&[(STREAM_MAX_WINDOW_SIZE_OPTION, "0")])),
+            MIN_STREAM_MAX_WINDOW_SIZE
+        );
+        assert_eq!(
+            parse_stream_max_window_size(&options(&[(STREAM_MAX_WINDOW_SIZE_OPTION, "1")])),
+            MIN_STREAM_MAX_WINDOW_SIZE
+        );
+        assert_eq!(
+            parse_stream_max_window_size(&options(&[(STREAM_MAX_WINDOW_SIZE_OPTION, "256")])),
+            MAX_STREAM_MAX_WINDOW_SIZE
+        );
+        assert_eq!(
+            parse_stream_max_window_size(&options(&[(STREAM_MAX_WINDOW_SIZE_OPTION, "9999")])),
+            MAX_STREAM_MAX_WINDOW_SIZE
+        );
+    }
+
+    #[test]
+    fn option_key_is_exact_and_case_sensitive() {
+        let upper = options(&[("I2P.STREAMING.MAXWINDOWSIZE", "16")]);
+        assert_eq!(
+            parse_stream_max_window_size(&upper),
+            DEFAULT_STREAM_MAX_WINDOW_SIZE
+        );
     }
 }

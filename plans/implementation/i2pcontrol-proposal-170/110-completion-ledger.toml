@@ -273,6 +273,24 @@ reclassified_cells = [
 reclassification_reason = "M142 implements HTTP-only SSL-outproxy selection (bounded I2P-only list, hostname-scoped LRU-32 cache, last-failure avoidance, CONNECT/https class only) and the bounded jump-service address-helper response (http-only .i2p URL prefixes, strict escaping, no fetch) through the I2PControl HTTP client owner."
 closure = "plans/closure/i2pcontrol-proposal-170/142-closure.md"
 
+[post_m143]
+status = "closed as complete"
+matrix_before_apply = 329
+matrix_before_blocked_primitive = 36
+matrix_before_not_applicable = 475
+matrix_after_apply = 330
+matrix_after_blocked_primitive = 35
+matrix_after_not_applicable = 475
+completed_cell_count = 1
+completed_options = ["Profile"]
+completed_tunnel_types = ["client"]
+reclassified_cells = [
+    "Profile:client",
+]
+reclassification_reason = "M143 implements retained streaming Profile for plain client via the neutral streaming max-window primitive (interactive -> i2p.streaming.maxWindowSize=16, bulk/omitted -> bulk default 128); core SAM session parses before StreamManager activation and caps Stream growth with shared-session compatibility via additional_options identity. M140 N/A cells unchanged."
+matrix_sha256_after = "cdd38453b6402df7e9612bb62c2b3afad42e2db3d25da239cb4896e164c5fadd"
+closure = "plans/closure/i2pcontrol-proposal-170/143-closure.md"
+
 [ownership]
 session_registry = "emissary-cli/src/i2pcontrol/backends/runtime/session.rs::SharedClientSessionRegistry"
 stream_listener_owner = "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"

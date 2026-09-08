@@ -25,7 +25,7 @@ use crate::{
     runtime::{Instant, JoinSet, Runtime},
     sam::{
         protocol::streaming::{
-            config::StreamConfig,
+            config::{StreamConfig, DEFAULT_STREAM_MAX_WINDOW_SIZE, MAX_STREAM_MAX_WINDOW_SIZE},
             listener::{SocketKind, StreamListener, StreamListenerEvent},
             packet::PacketBuilder,
             stream::{
@@ -52,6 +52,7 @@ use core::{
 };
 
 mod config;
+pub(crate) use config::parse_stream_max_window_size;
 mod listener;
 mod packet;
 mod stream;
@@ -292,15 +293,36 @@ pub struct StreamManager<R: Runtime> {
     /// Signing key.
     signing_key: SigningPrivateKey,
 
+    /// Effective streaming max window for this generation.
+    ///
+    /// Neutral, bounded `2..=128`, immutable after construction. Initialized
+    /// before the manager becomes active; omitted options preserve the
+    /// default bulk behavior.
+    max_window_size: usize,
+
     /// Active streams.
     streams: R::JoinSet<u32>,
 }
 
 impl<R: Runtime> StreamManager<R> {
-    /// Create new [`StreamManager`].
+    /// Create new [`StreamManager`] with the default streaming window.
+    #[allow(dead_code)]
     pub fn new(destination: Destination, signing_key: SigningPrivateKey) -> Self {
+        Self::new_with_max_window(destination, signing_key, DEFAULT_STREAM_MAX_WINDOW_SIZE)
+    }
+
+    /// Create new [`StreamManager`] with an explicit bounded streaming window.
+    ///
+    /// Out-of-range values are clamped to the protocol-safe interval so no
+    /// caller can configure an unbounded window.
+    pub fn new_with_max_window(
+        destination: Destination,
+        signing_key: SigningPrivateKey,
+        max_window_size: usize,
+    ) -> Self {
         let (outbound_tx, outbound_rx) = channel(STREAM_MANAGER_CHANNEL_SIZE);
         let destination_id = destination.id();
+        let max_window_size = max_window_size.clamp(2, MAX_STREAM_MAX_WINDOW_SIZE);
 
         Self {
             active: HashMap::new(),
@@ -317,8 +339,15 @@ impl<R: Runtime> StreamManager<R> {
             prune_timer: R::timer(PENDING_STREAM_PRUNE_THRESHOLD),
             shutdown_handler: ShutdownHandler::new(),
             signing_key,
+            max_window_size,
             streams: R::join_set(),
         }
+    }
+
+    /// Effective streaming max window for this manager generation.
+    #[allow(dead_code)]
+    pub fn max_window_size(&self) -> usize {
+        self.max_window_size
     }
 
     /// Handle message with `SYN`.
@@ -584,16 +613,18 @@ impl<R: Runtime> StreamManager<R> {
         // to client before the socket is convered into a regural tcp stream
         let initial_message = match &socket {
             // `destination` must exist if this is an inbound stream
-            SocketKind::Accept { silent, .. } | SocketKind::Forwarded { silent, .. } if !silent =>
+            SocketKind::Accept { silent, .. } | SocketKind::Forwarded { silent, .. } if !silent => {
                 Some(
                     format!(
                         "{}\n",
                         base64_encode(destination.expect("to exist").serialized())
                     )
                     .into_bytes(),
-                ),
-            SocketKind::Connect { silent, .. } if !silent =>
-                Some(b"STREAM STATUS RESULT=OK\n".to_vec()),
+                )
+            }
+            SocketKind::Connect { silent, .. } if !silent => {
+                Some(b"STREAM STATUS RESULT=OK\n".to_vec())
+            }
             _ => None,
         };
 
@@ -616,16 +647,18 @@ impl<R: Runtime> StreamManager<R> {
         //
         // accept/forward indicates an inbound stream
         match &socket {
-            SocketKind::Connect { .. } =>
+            SocketKind::Connect { .. } => {
                 self.pending_events.push_back(StreamManagerEvent::StreamOpened {
                     destination_id: destination_id.clone(),
                     direction: Direction::Outbound,
-                }),
-            SocketKind::Accept { .. } | SocketKind::Forwarded { .. } =>
+                })
+            }
+            SocketKind::Accept { .. } | SocketKind::Forwarded { .. } => {
                 self.pending_events.push_back(StreamManagerEvent::StreamOpened {
                     destination_id: destination_id.clone(),
                     direction: Direction::Inbound,
-                }),
+                })
+            }
         }
 
         // start new future for the stream in the background
@@ -637,6 +670,7 @@ impl<R: Runtime> StreamManager<R> {
         // if the listener was created with `STREAM FORWARD`, a new tcp connection must be opened to
         // the forwarded listener before the stream can be started and if the listener is not
         // active, the stream is closed immediately
+        let max_window_size = self.max_window_size;
         match socket {
             SocketKind::Connect {
                 socket,
@@ -646,7 +680,10 @@ impl<R: Runtime> StreamManager<R> {
                 socket,
                 initial_message,
                 context,
-                StreamConfig::default(),
+                StreamConfig {
+                    max_window_size,
+                    ..StreamConfig::default()
+                },
                 stream_kind,
                 routing_path_handle,
             )),
@@ -670,7 +707,10 @@ impl<R: Runtime> StreamManager<R> {
                         socket,
                         initial_message,
                         context,
-                        StreamConfig::default(),
+                        StreamConfig {
+                            max_window_size,
+                            ..StreamConfig::default()
+                        },
                         stream_kind,
                         routing_path_handle,
                     )
@@ -704,7 +744,10 @@ impl<R: Runtime> StreamManager<R> {
                     stream,
                     initial_message,
                     context,
-                    StreamConfig::default(),
+                    StreamConfig {
+                        max_window_size,
+                        ..StreamConfig::default()
+                    },
                     stream_kind,
                     routing_path_handle,
                 )
@@ -1108,13 +1151,14 @@ impl<R: Runtime> futures::Stream for StreamManager<R> {
         match self.outbound_rx.poll_recv(cx) {
             Poll::Pending => {}
             Poll::Ready(None) => return Poll::Ready(None),
-            Poll::Ready(Some((delivery_style, packet, src_port, dst_port))) =>
+            Poll::Ready(Some((delivery_style, packet, src_port, dst_port))) => {
                 return Poll::Ready(Some(StreamManagerEvent::SendPacket {
                     delivery_style,
                     dst_port,
                     packet,
                     src_port,
-                })),
+                }))
+            }
         }
 
         loop {
@@ -3221,5 +3265,48 @@ mod tests {
             .expect("to succeed");
 
         assert_eq!(response, "STREAM STATUS RESULT=CANT_REACH_PEER\n");
+    }
+
+    #[tokio::test]
+    async fn manager_window_defaults_to_bulk_and_clamps() {
+        let signing_key = SigningPrivateKey::from_bytes(&[0u8; 32]).unwrap();
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+        let manager = StreamManager::<MockRuntime>::new(destination, signing_key);
+        assert_eq!(manager.max_window_size(), 128);
+
+        let signing_key = SigningPrivateKey::from_bytes(&[1u8; 32]).unwrap();
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+        let interactive =
+            StreamManager::<MockRuntime>::new_with_max_window(destination, signing_key, 16);
+        assert_eq!(interactive.max_window_size(), 16);
+
+        // Out-of-range values are clamped to the protocol-safe interval.
+        let signing_key = SigningPrivateKey::from_bytes(&[2u8; 32]).unwrap();
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+        let clamped =
+            StreamManager::<MockRuntime>::new_with_max_window(destination, signing_key, 9999);
+        assert_eq!(clamped.max_window_size(), 128);
+
+        let signing_key = SigningPrivateKey::from_bytes(&[3u8; 32]).unwrap();
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+        let clamped =
+            StreamManager::<MockRuntime>::new_with_max_window(destination, signing_key, 0);
+        assert_eq!(clamped.max_window_size(), 2);
+    }
+
+    #[tokio::test]
+    async fn manager_window_distinguishes_default_and_interactive() {
+        let signing_key = SigningPrivateKey::from_bytes(&[4u8; 32]).unwrap();
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+        let bulk = StreamManager::<MockRuntime>::new(destination, signing_key);
+
+        let signing_key = SigningPrivateKey::from_bytes(&[5u8; 32]).unwrap();
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+        let interactive =
+            StreamManager::<MockRuntime>::new_with_max_window(destination, signing_key, 16);
+
+        assert_ne!(bulk.max_window_size(), interactive.max_window_size());
+        assert_eq!(bulk.max_window_size(), 128);
+        assert_eq!(interactive.max_window_size(), 16);
     }
 }

@@ -1,6 +1,72 @@
 # M143 — Streaming Profile Runtime Completion
 
-Status: **deferred / unregistered; hard-depends on M142 and M140 closure**
+Status: **closed as complete**; closure `plans/closure/i2pcontrol-proposal-170/143-closure.md` (`330/35/475`, 1 promotion)
+
+Registration amendment (M143-AMEND-01, 2026-09-08, pre-implementation):
+
+- Retained target set (verified, not assumed): exactly `Profile:client` × 1,
+  frozen by M140 (`140-residual-streaming-applicability-map.toml`
+  `retained_cells = ["Profile:client"]`, `retained_profile_set_for_m143`);
+  all six other `Profile` family cells plus `ConnectDelay:streamrclient` are
+  `not_applicable` by affirmative constructor/UDP-ownership evidence and must
+  never inherit the new seam. M140 hypothesis §7 is superseded by M140 closure
+  evidence; this amendment names the verified single-cell set.
+- Matrix baselines: M140 closure `325/40/475` (SHA
+  `dd77613fb302b8bd04f42c8d1fe702b6c8c8920307776e40c4a8d8b1e8e0c44d`);
+  M141 `327/38/475`; current M142 head `329/36/475` (SHA
+  `e5fe8e2b28103bbceea3a92aa58c2e296c98337ce5c5df4625abb26f791a3576`).
+  Maximum promotion budget for M143 is exactly 1 cell (`Profile:client`).
+- Pinned value semantics (read-only reference, verified 2026-09-08):
+  `TunnelRequestParser.getProfile` returns raw `Profile` string or null;
+  `ClientTunnelCreator.setTunnelManagementOptions` maps exact
+  `"interactive".equals(profile)` to
+  `option.i2p.streaming.maxWindowSize = "16"` (from
+  `TunnelSupport.PROP_DEFAULT_STREAMING_MAX_WINDOW_SIZE = "16"`), else removes
+  the property (bulk default). `TunnelController` defaults absent Profile to
+  bulk. `GeneralHelper.isInteractive` is `maxWindowSize == 16`.
+  `ConnectionOptions` default when absent is `Connection.MAX_WINDOW_SIZE = 128`;
+  `setMaxWindowSize` clamps `<2` to `2` and `>256` to `256` (`2*MAX`);
+  `setProfile` is documented `Warning: unused`; the consumed knobs are
+  `maxWindowSize`/`connectDelay`. `Connection` window/inboundBuffer derive from
+  `getMaxWindowSize`; `MAX_WINDOW_SIZE = 128`.
+  Emissary freeze: Proposal `Profile` accepts exactly `"interactive"` and
+  `"bulk"` (exact lowercase, case-sensitive per Java `equals`); omitted means
+  bulk default (no wire option). `"interactive"` maps to neutral
+  `i2p.streaming.maxWindowSize = "16"`; `"bulk"` maps to absent (same effective
+  as omitted, distinct persisted string for round-trip). All other types/values
+  fail before allocation with no echo. The setting is a session-manager default
+  (one effective window per SAM STREAM session generation); no per-socket
+  override and no live mutation of an active stream. Family constructor
+  overrides: plain `I2PTunnelClient` performs none (survives); HTTP/IRC/SOCKS
+  families force bulk via `remove(maxWindowSize)` and Streamr never creates a
+  streaming socket (M140).
+- Exact-file core path budget (smallest, no broader allowance):
+  - neutral input/parsing: `emissary-core/src/sam/protocol/streaming/config.rs`
+    (neutral `i2p.streaming.maxWindowSize` bounds `2..=128`, default `128`,
+    fail-safe to default; no Proposal/I2PControl vocabulary);
+  - SAM handoff: `emissary-core/src/sam/session.rs` (parse at activation,
+    pass to manager before active; no global mutable);
+  - manager owner: `emissary-core/src/sam/protocol/streaming/mod.rs`
+    (holds immutable generation-local max window, passes to streams);
+  - actual window consumer: `emissary-core/src/sam/protocol/streaming/stream/active.rs`
+    (caps `window_size` growth at the configured max; immutable per stream).
+  No NetDB, crypto, transport, tunnel-pool, Cargo/dependency, Yosemite,
+  frontend, startup-tunnel or `.github/**` change. `parser.rs` unchanged
+  (pass-through). M061/M062 must be amended for exactly these four core files
+  before closure (no `sam/**` glob).
+- I2PControl path budget (exact):
+  - `emissary-cli/src/i2pcontrol/backends/runtime/session.rs` (validate
+    `Profile`, map to neutral `i2p.streaming.maxWindowSize` via Yosemite generic
+    `add_session_option`, shared-session compatibility via existing
+    `additional_options_identity`);
+  - `emissary-cli/src/i2pcontrol/backends/client.rs` (retained-family
+    `SUPPORTED` gate for `Profile` only).
+  No other backend file may accept `Profile`; N/A families keep exact
+  `UnsupportedOption` rejection.
+- M061/M062 readiness: this amendment is the required pre-registration exact-file
+  freeze. Implementation must amend `061-containment-boundary.toml` (add the two
+  not-yet-allowed core files with owner evidence) and `m062_dependency_containment.rs`
+  (`is_authorized_m143_path`) before closure. No broad prefix waiver.
 
 Class: infrastructure + capability / streaming runtime semantics
 

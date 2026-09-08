@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 historical requalification, M131 residual re-freeze, M135 neutral live-quantity primitive, M136 Reduce completion, M137 Close completion, M134 NewDest proven-resume completion, M139 current-head post-lifecycle requalification, M140 residual streaming applicability re-freeze, and M141 HTTP unique-local source-address completion and M142 HTTP SSLProxies + JumpList completion recorded; residual option cells remain (36 blocked: 4 UseSSL + 10 SigType + 5 client lifecycle/proxy + 17 server LeaseSet/presentation, with 2 UniqueLocalAddressPerClient applied by M141 and 2 SSLProxies/JumpList applied by M142)
+Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 historical requalification, M131 residual re-freeze, M135 neutral live-quantity primitive, M136 Reduce completion, M137 Close completion, M134 NewDest proven-resume completion, M139 current-head post-lifecycle requalification, M140 residual streaming applicability re-freeze, and M141 HTTP unique-local source-address completion and M142 HTTP SSLProxies + JumpList completion and M143 retained streaming Profile completion recorded; residual option cells remain (35 blocked: 4 UseSSL + 10 SigType + 4 client proxy/lifecycle + 17 server LeaseSet/presentation, with 2 UniqueLocalAddressPerClient applied by M141 and 2 SSLProxies/JumpList applied by M142 and 1 Profile applied by M143)
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -14,7 +14,7 @@ Current roadmap:
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 - tunnel-runtime completion: `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`
 - full-support completion: `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`
-- authoritative aggregate matrix: `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (`329/36/475`); current runtime/security qualification: `plans/closure/i2pcontrol-proposal-170/139-closure.md`; residual streaming applicability: `plans/closure/i2pcontrol-proposal-170/140-closure.md`; HTTP unique-local source-address completion: `plans/closure/i2pcontrol-proposal-170/141-closure.md`; HTTP SSLProxies + JumpList completion: `plans/closure/i2pcontrol-proposal-170/142-closure.md`
+- authoritative aggregate matrix: `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (`330/35/475`); current runtime/security qualification: `plans/closure/i2pcontrol-proposal-170/139-closure.md`; residual streaming applicability: `plans/closure/i2pcontrol-proposal-170/140-closure.md`; HTTP unique-local source-address completion: `plans/closure/i2pcontrol-proposal-170/141-closure.md`; HTTP SSLProxies + JumpList completion: `plans/closure/i2pcontrol-proposal-170/142-closure.md`; retained streaming Profile completion: `plans/closure/i2pcontrol-proposal-170/143-closure.md`
 
 Tunnel-runtime reclosure:
 
@@ -358,7 +358,9 @@ confirmed that `SSLProxies` and `JumpList` are HTTP-client-only and that
 Streamr `DelayOpen` and `NewDest` are not applicable. M142 applies the two HTTP-client
 `SSLProxies`/`JumpList` cells (bounded I2P-only SSL-outproxy selection with hostname cache
 and last-failure avoidance for HTTPS/CONNECT clearnet; bounded http-only jump-server
-address-helper response with strict escaping and no fetch). No server-side TLS trust
+address-helper response with strict escaping and no fetch). M143 applies the retained
+`Profile:client` cell (neutral streaming max window: bulk/omitted → 128 default,
+interactive → 16; six other Profile families stay not applicable by M140). No server-side TLS trust
 owner, per-client address allocator, neutral LeaseSet bundling owner, or
 end-to-end encrypted/authenticated LeaseSet runtime exists in this checkout;
 the remaining options fail before allocation and never silently downgrade.

@@ -26,8 +26,10 @@ core_inspection = [
   "emissary-core/src/router/context.rs",
   "emissary-core/src/router/mod.rs",
   "emissary-core/src/sam/pending/connection.rs",
+  "emissary-core/src/sam/protocol/streaming/config.rs",
   "emissary-core/src/sam/protocol/streaming/listener.rs",
   "emissary-core/src/sam/protocol/streaming/mod.rs",
+  "emissary-core/src/sam/protocol/streaming/stream/active.rs",
   "emissary-core/src/sam/session.rs",
   "emissary-core/src/sam/socket.rs",
   "emissary-core/src/transport/mod.rs",
@@ -256,6 +258,16 @@ seam = "passive lifecycle hook"
 reference = "M058 ledger path; M060 SAM review"
 
 [[evidence]]
+path = "emissary-core/src/sam/protocol/streaming/config.rs"
+owner = "SAM streaming window configuration owner"
+purpose = "Parses the neutral bounded streaming max-window from SAM session options fail-safe; no administrative vocabulary."
+consumer = "SAM session construction and streaming manager/stream window enforcement."
+why_upstream_insufficient = "The neutral streaming owner alone can bound the effective connection window without a router-global setting."
+sensitivity = "bounded owner-local configuration"
+seam = "pre-activation neutral parsing"
+reference = "M143 neutral streaming-window primitive; zero administrative vocabulary"
+
+[[evidence]]
 path = "emissary-core/src/sam/protocol/streaming/listener.rs"
 owner = "SAM streaming listener owner"
 purpose = "Carries the neutral observation hook through listener activation."
@@ -274,6 +286,16 @@ why_upstream_insufficient = "Moving stream close/reject ordering upward would re
 sensitivity = "lifecycle hook"
 seam = "passive lifecycle hook"
 reference = "M058 ledger path; M060 SAM review"
+
+[[evidence]]
+path = "emissary-core/src/sam/protocol/streaming/stream/active.rs"
+owner = "SAM streaming connection window owner"
+purpose = "Enforces the generation-local bounded max window as the congestion-window ceiling; immutable per stream."
+consumer = "Active streaming connections bound to one session generation."
+why_upstream_insufficient = "Only the active connection owner observes authoritative window growth and can cap it without cross-stream mutable state."
+sensitivity = "bounded owner-local enforcement"
+seam = "immutable generation-local cap"
+reference = "M143 neutral streaming-window primitive; zero administrative vocabulary"
 
 [[evidence]]
 path = "emissary-core/src/sam/session.rs"

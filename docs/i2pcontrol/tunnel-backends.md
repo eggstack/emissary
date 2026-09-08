@@ -146,7 +146,7 @@ All 12 tunnel types are mapped to backends:
 
 | Type | Category | Backend |
 |---|---|---|
-| `client` | Client | Yosemite streaming client with per-name supervisor |
+| `client` | Client | Yosemite streaming client with per-name supervisor and M143 `Profile` streaming-window mapping (bulk/omitted → 128, interactive → 16) |
 | `httpclient` | Client | Bounded HTTP client proxy with direct-I2P routing, explicit I2P outproxy plus M142 HTTPS/CONNECT SSL-outproxy selection and jump-server address-helper response |
 | `ircclient` | Client | Bounded IRC anonymity filter over a Yosemite stream |
 | `socks` | Client | Bounded SOCKS4a/SOCKS5 CONNECT proxy |

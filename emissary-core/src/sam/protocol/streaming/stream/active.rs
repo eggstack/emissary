@@ -560,6 +560,13 @@ pub struct Stream<R: Runtime> {
     /// Window size.
     window_size: usize,
 
+    /// Effective max window for this stream generation.
+    ///
+    /// Neutral, bounded `2..=128`, immutable after construction. Caps
+    /// congestion-window growth so different session configurations produce
+    /// observably different effective behavior.
+    max_window_size: usize,
+
     /// Write state.
     write_state: WriteState,
 }
@@ -570,10 +577,14 @@ impl<R: Runtime> Stream<R> {
         stream: R::TcpStream,
         initial_message: Option<Vec<u8>>,
         context: StreamContext,
-        _: StreamConfig,
+        stream_config: StreamConfig,
         state: StreamKind,
         mut routing_path_handle: RoutingPathHandle<R>,
     ) -> Self {
+        // Neutral effective max window, bounded to the protocol-safe
+        // `2..=128` interval. Omitted-equivalent defaults preserve the
+        // current bulk behavior.
+        let max_window_size = stream_config.max_window_size.clamp(2, MAX_WINDOW_SIZE);
         let StreamContext {
             local,
             remote,
@@ -728,7 +739,8 @@ impl<R: Runtime> Stream<R> {
             src_port,
             stream,
             unacked,
-            window_size: INITIAL_WINDOW_SIZE,
+            window_size: INITIAL_WINDOW_SIZE.min(max_window_size),
+            max_window_size,
             write_state: match initial_message {
                 None => WriteState::GetMessage,
                 Some(message) => WriteState::WriteMessage {
@@ -737,6 +749,18 @@ impl<R: Runtime> Stream<R> {
                 },
             },
         }
+    }
+
+    /// Effective max window for this stream generation.
+    #[allow(dead_code)]
+    pub fn max_window_size(&self) -> usize {
+        self.max_window_size
+    }
+
+    /// Current congestion window size.
+    #[allow(dead_code)]
+    pub fn window_size(&self) -> usize {
+        self.window_size
     }
 
     /// Handle acknowledgements.
@@ -788,9 +812,13 @@ impl<R: Runtime> Stream<R> {
             self.rtt.calculate_rtt(packet.sent.elapsed());
             self.rto.calculate_rto(&self.rtt, packet.sent.elapsed());
 
-            if self.window_size < EXP_GROWTH_STOP_THRESHOLD {
-                self.window_size *= 2;
-            } else if self.window_size < MAX_WINDOW_SIZE {
+            // Bounded congestion-window growth capped at the generation-local
+            // effective max window. Different session configurations therefore
+            // produce observably different ceiling behavior.
+            let ceiling = self.max_window_size.min(MAX_WINDOW_SIZE);
+            if self.window_size < EXP_GROWTH_STOP_THRESHOLD.min(ceiling) {
+                self.window_size = (self.window_size * 2).min(ceiling);
+            } else if self.window_size < ceiling {
                 self.window_size += 1;
             }
         }
@@ -1203,11 +1231,12 @@ impl<R: Runtime> Future for Stream<R> {
                             this.write_state = WriteState::GetMessage;
                             break;
                         }
-                        Some(message) =>
+                        Some(message) => {
                             this.write_state = WriteState::WriteMessage {
                                 offset: 0usize,
                                 message,
-                            },
+                            }
+                        }
                     },
                     Poll::Ready(None) => return Poll::Ready(this.recv_stream_id),
                     Poll::Ready(Some(StreamEvent::ShutDown)) => {
@@ -1217,8 +1246,9 @@ impl<R: Runtime> Future for Stream<R> {
                     }
                     Poll::Ready(Some(StreamEvent::Packet { packet })) => {
                         match this.on_packet(packet) {
-                            Err(StreamingError::Closed | StreamingError::SequenceNumberTooHigh) =>
-                                return Poll::Ready(this.recv_stream_id),
+                            Err(StreamingError::Closed | StreamingError::SequenceNumberTooHigh) => {
+                                return Poll::Ready(this.recv_stream_id)
+                            }
                             Err(error) => {
                                 tracing::debug!(
                                     target: LOG_TARGET,
@@ -1232,11 +1262,12 @@ impl<R: Runtime> Future for Stream<R> {
                                 this.write_state = WriteState::GetMessage;
                             }
                             Ok(()) => match this.inbound_context.pop_message() {
-                                Some(message) =>
+                                Some(message) => {
                                     this.write_state = WriteState::WriteMessage {
                                         offset: 0usize,
                                         message,
-                                    },
+                                    }
+                                }
                                 None => this.write_state = WriteState::GetMessage,
                             },
                         }
@@ -1280,8 +1311,9 @@ impl<R: Runtime> Future for Stream<R> {
                     }
                     Poll::Ready(Some(StreamEvent::Packet { packet })) => {
                         match this.on_packet(packet) {
-                            Err(StreamingError::Closed | StreamingError::SequenceNumberTooHigh) =>
-                                return Poll::Ready(this.recv_stream_id),
+                            Err(StreamingError::Closed | StreamingError::SequenceNumberTooHigh) => {
+                                return Poll::Ready(this.recv_stream_id)
+                            }
                             Err(error) => {
                                 tracing::debug!(
                                     target: LOG_TARGET,
@@ -1377,7 +1409,7 @@ impl<R: Runtime> Future for Stream<R> {
                             this.rto_timer = Some(R::timer(*this.rto));
                         }
                     }
-                    true if !core::matches!(this.read_state, SocketState::Closed) =>
+                    true if !core::matches!(this.read_state, SocketState::Closed) => {
                         match Pin::new(&mut this.stream)
                             .as_mut()
                             .poll_read(cx, &mut this.read_buffer)
@@ -1395,7 +1427,8 @@ impl<R: Runtime> Future for Stream<R> {
                             Poll::Ready(Ok(nread)) => {
                                 this.read_state = SocketState::SendMessage { offset: nread };
                             }
-                        },
+                        }
+                    }
                     true => break,
                 },
                 SocketState::SendMessage { offset } => {
@@ -1517,6 +1550,13 @@ mod tests {
 
     impl StreamBuilder {
         async fn build_stream() -> (Stream<MockRuntime>, Self) {
+            Self::build_stream_with_window(
+                crate::sam::protocol::streaming::config::DEFAULT_STREAM_MAX_WINDOW_SIZE,
+            )
+            .await
+        }
+
+        async fn build_stream_with_window(max_window_size: usize) -> (Stream<MockRuntime>, Self) {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let signing_key = SigningPrivateKey::random(MockRuntime::rng());
             let destination = Destination::new::<MockRuntime>(signing_key.public());
@@ -1553,7 +1593,10 @@ mod tests {
                         remote: DestinationId::random(),
                         signing_key,
                     },
-                    Default::default(),
+                    StreamConfig {
+                        max_window_size,
+                        ..Default::default()
+                    },
                     StreamKind::Inbound { payload: vec![] },
                     handle,
                 ),
@@ -3975,5 +4018,62 @@ mod tests {
         // poll stream manager and verify the syn reply has been acked
         assert!(tokio::time::timeout(Duration::from_millis(500), &mut stream).await.is_err());
         assert!(stream.unacked.is_empty());
+    }
+
+    #[tokio::test]
+    async fn stream_window_defaults_to_bulk() {
+        let (stream, _builder) = StreamBuilder::build_stream().await;
+        assert_eq!(stream.max_window_size(), 128);
+        assert_eq!(stream.window_size(), 1);
+    }
+
+    #[tokio::test]
+    async fn stream_window_interactive_caps_growth() {
+        let (mut interactive, _builder) = StreamBuilder::build_stream_with_window(16).await;
+        let (mut bulk, _builder) = StreamBuilder::build_stream().await;
+
+        assert_eq!(interactive.max_window_size(), 16);
+        assert_eq!(bulk.max_window_size(), 128);
+
+        // Drive congestion-window growth with synthetic acked packets while
+        // keeping `ack_through` within `next_seq_nro` so the ack path is
+        // entered. Each acked packet grows the window; the interactive stream
+        // must cap at 16 while the bulk stream grows beyond it, proving
+        // observably different effective behavior from the same start.
+        for stream in [&mut interactive, &mut bulk] {
+            stream.next_seq_nro = 1000;
+        }
+        for seq in 1..=10u32 {
+            for stream in [&mut interactive, &mut bulk] {
+                let now = MockRuntime::now();
+                stream.unacked.insert(
+                    seq,
+                    PendingPacket {
+                        sent: now,
+                        seq_nro: seq,
+                        packet: vec![0u8],
+                    },
+                );
+            }
+            interactive.handle_acks(seq, &[]);
+            bulk.handle_acks(seq, &[]);
+        }
+
+        assert_eq!(interactive.window_size(), 16);
+        assert!(
+            bulk.window_size() > 16,
+            "bulk window {} must exceed interactive ceiling",
+            bulk.window_size()
+        );
+        assert!(bulk.window_size() <= 128);
+    }
+
+    #[tokio::test]
+    async fn stream_window_is_immutable_and_bounded() {
+        let (stream, _builder) = StreamBuilder::build_stream_with_window(9999).await;
+        assert_eq!(stream.max_window_size(), 128);
+
+        let (stream, _builder) = StreamBuilder::build_stream_with_window(0).await;
+        assert_eq!(stream.max_window_size(), 2);
     }
 }

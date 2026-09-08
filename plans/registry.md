@@ -28,8 +28,8 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
-| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | M142 closed; no registered successor (M143 deferred pending amendment); M139 remains current runtime/security qualification authority; M140 closed as residual streaming applicability authority |
-| Proposal 170 residual primitive completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md` | **M142 closed as complete**; M143-M152 deferred/unregistered |
+| Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | M143 closed; no registered successor (M144 deferred); M139 remains current runtime/security qualification authority; M140 closed as residual streaming applicability authority |
+| Proposal 170 residual primitive completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md` | **M143 closed as complete**; M144-M152 deferred/unregistered |
 | Proposal 170 session-lifecycle completion | **closed as complete** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | M134 closed as complete |
 | Post-M114 shared-control-plane corrective line | **closed / historical qualification lineage** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | M130 historical; superseded by M139 for current-head qualification |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
@@ -48,10 +48,10 @@ Current qualified baseline:
 
 - lifecycle implementation head `e4f217cb1459e26bf011da46b67fc2c83cd192b5`;
 - M134/M135/M136/M137 closed as complete;
-- M095 matrix `329 apply / 36 blocked_primitive / 475 not_applicable` (M142 completion; M141 was `327/38/475`; M140 re-freeze was `325/40/475`; M139-qualified head was `325/47/468`);
-- M139 remains the current runtime/security qualification authority; M140 is closed as complete as the current residual streaming applicability authority with zero promotions; M141 is closed as complete as the HTTP unique-local source-address completion with 2 promotions; M142 is closed as complete as the HTTP SSLProxies + JumpList completion with 2 promotions;
+- M095 matrix `330 apply / 35 blocked_primitive / 475 not_applicable` (M143 completion; M142 was `329/36/475`; M141 was `327/38/475`; M140 re-freeze was `325/40/475`; M139-qualified head was `325/47/468`);
+- M139 remains the current runtime/security qualification authority; M140 is closed as complete as the current residual streaming applicability authority with zero promotions; M141 is closed as complete as the HTTP unique-local source-address completion with 2 promotions; M142 is closed as complete as the HTTP SSLProxies + JumpList completion with 2 promotions; M143 is closed as complete as the retained streaming Profile completion with 1 promotion;
 - M130 remains historical runtime/security qualification evidence;
-- M131 remains historical residual applicability/primitive authority and is superseded where M140 explicitly reclassifies seven cells to `not_applicable` and where M141/M142 promote four cells to `apply`.
+- M131 remains historical residual applicability/primitive authority and is superseded where M140 explicitly reclassifies seven cells to `not_applicable` and where M141/M142/M143 promote five cells to `apply`.
 
 M139 had zero Proposal promotion budget and changed no production Rust/dependency behavior.
 
@@ -90,18 +90,37 @@ Scope was exactly two blocked cells, both promoted:
 - `SSLProxies` × `httpclient`;
 - `JumpList` × `httpclient`.
 
-No registered successor exists. M143 remains deferred until its required
-amendment (exact neutral streaming files) lands; M142 closure does not satisfy
-that amendment.
+### M143 — retained streaming Profile completion
+
+Plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/143-streaming-profile-runtime-completion.md`.
+
+Status: **closed as complete**.
+
+Closure: `plans/closure/i2pcontrol-proposal-170/143-closure.md` (1 promotion; `330/35/475`).
+
+Class: infrastructure + capability / streaming runtime semantics.
+
+Scope was exactly one retained cell, promoted:
+
+- `Profile` × `client` (plain client only; six other Profile families stay
+  `not_applicable` by M140).
+
+No registered successor exists. M144-M152 remain deferred/unregistered;
+M143 closure unblocks no future plan for execution (M144 hard dependency
+satisfied but still requires its own semantic freeze/registration decision;
+file presence alone never authorizes production work).
 
 ## Deferred residual handoff chain
 
-These plans exist for implementation handoff but are **unregistered and non-executable** until their hard dependencies close and the registry explicitly promotes the next plan (M142 closed; M143-M152 remain deferred):
+These plans exist for implementation handoff but are **unregistered and non-executable** until their hard dependencies close and the registry explicitly promotes the next plan (M143 closed; M144-M152 remain deferred):
 
 | Milestone | Target | Registration constraint |
 |---|---|---|
 | M142 | HTTP `SSLProxies` + `JumpList` × 2 | **closed as complete** (`329/36/475`); I2P-only HTTP proxy routing/presentation |
-| M143 | M140-retained `Profile` cells (`Profile:client` × 1, frozen by M140) | still deferred; must be amended with exact neutral streaming files (retained set already frozen; amendment still required for exact files before registration) |
+| M143 | M140-retained `Profile` × 1 (`Profile:client`) | **closed as complete** (`330/35/475`); neutral streaming-window primitive with pinned interactive→16 mapping |
+| M144 | application `UseSSL` × 4 | after M143 (hard dep satisfied); still deferred — requires its own semantic freeze/registration decision before execution; application TLS only, distinct from management/SAM TLS |
 | M144 | application `UseSSL` × 4 | after M143; application TLS only, distinct from management/SAM TLS |
 | M145 | `MultiHoming` / `shouldBundleReplyInfo` × 2 | after M144; must be amended with exact outbound-message/LeaseSet owner files before registration |
 | M146 | `UseOutproxyPlugin` × 4 | after M145; requires a real bounded I2P-routed provider, not an empty registry |
@@ -131,10 +150,10 @@ The presence of these files in M062 is planning-only bookkeeping and does not pr
 
 ## Current production/support state
 
-Current M095 authority after M142 closure:
+Current M095 authority after M143 closure:
 
-- `329 apply`;
-- `36 blocked_primitive`;
+- `330 apply`;
+- `35 blocked_primitive`;
 - `475 not_applicable`;
 - `840` TunnelManager option/family cells total.
 
@@ -152,7 +171,8 @@ Current qualified/implemented surface includes:
 - M137 all 14 applicable `Close`/`CloseTime` client cells;
 - M134 six applicable non-Streamr TCP `NewDest` cells;
 - M141 two applicable `UniqueLocalAddressPerClient` HTTP server cells;
-- M142 two applicable HTTP-client `SSLProxies`/`JumpList` cells.
+- M142 two applicable HTTP-client `SSLProxies`/`JumpList` cells;
+- M143 one applicable `Profile:client` streaming-profile cell.
 
 Full Proposal 170 status remains **partial**.
 
@@ -192,24 +212,26 @@ M141 HTTP unique local source address          [CLOSED AS COMPLETE — 327/38/47
 M142 HTTP SSLProxies + JumpList                [CLOSED AS COMPLETE — 329/36/475, 2 PROMOTIONS]
   |
   v
-M143 -> M144 -> M145 -> M146 -> M147 -> M148 -> M149 -> M150 -> M151 -> M152
-[ALL DEFERRED / UNREGISTERED — M143 still needs its exact-file amendment]
+M143 retained streaming Profile                 [CLOSED AS COMPLETE — 330/35/475, 1 PROMOTION]
+  |
+  v
+M144 -> M145 -> M146 -> M147 -> M148 -> M149 -> M150 -> M151 -> M152
+[ALL DEFERRED / UNREGISTERED — M144 hard dep satisfied but still needs its own registration decision]
 ```
 
 Numbering note: historical M137/M134 planning used “M138” as a possible NewDest corrective and recorded that it was not needed. No M138 plan was registered.
 
-## Remaining residual clusters after M142
+## Remaining residual clusters after M143
 
-Machine-derived current residual total is 36:
+Machine-derived current residual total is 35:
 
 - `SigType` destination signing — 10;
 - encrypted/authenticated LeaseSet cluster — 15;
-- streaming `Profile` (retained `client` only) — 1;
 - presentation `UseSSL` — 4;
 - `UseOutproxyPlugin` — 4;
 - `MultiHoming` / `shouldBundleReplyInfo` — 2.
 
-M140 reclassified six `Profile` cells and Streamr `ConnectDelay` to `not_applicable` with affirmative evidence. M141 promotes the two `UniqueLocalAddressPerClient` cells to `apply`. M142 promotes the two HTTP-client `SSLProxies`/`JumpList` cells to `apply`. Full support remains partial.
+M140 reclassified six `Profile` cells and Streamr `ConnectDelay` to `not_applicable` with affirmative evidence. M141 promotes the two `UniqueLocalAddressPerClient` cells to `apply`. M142 promotes the two HTTP-client `SSLProxies`/`JumpList` cells to `apply`. M143 promotes the retained `Profile:client` cell to `apply`. Full support remains partial.
 
 ## Canonical containment rules
 
@@ -217,7 +239,7 @@ M140 reclassified six `Profile` cells and Streamr `ConnectDelay` to `not_applica
 2. Existing neutral lower-layer seams remain limited to accepted exact owners and Proposal-free.
 3. M140 authorizes no production-source/dependency change.
 4. M141 authorizes only `emissary-cli/src/i2pcontrol/backends/http_server.rs` and `emissary-cli/src/i2pcontrol/backends/http_bidir.rs` production changes (shared accepted-handler source bind); no core/Cargo/Yosemite/NetDB/transport/crypto/frontend/startup change.
-5. Deferred M142-M152 candidate path budgets are not executable authority (M142 is now registered; its file budget becomes executable only through its own implementation).
+5. Deferred M144-M152 candidate path budgets are not executable authority.
 5. Any future non-I2PControl change requires the relevant plan to be amended/registered with exact-file M061/M062 authority before implementation; no broad crypto/NetDB/I2NP glob/prefix waiver.
 6. Yosemite remains the sole accepted SAM implementation; exact Y005 remains optional behind `yosemite-i2pcontrol` unless separately superseded under ADR-0005.
 7. No global patch/path/vendor/floating Yosemite dependency.
@@ -227,9 +249,9 @@ M140 reclassified six `Profile` cells and Streamr `ConnectDelay` to `not_applica
 
 ## Registration rules
 
-1. M139 remains current runtime/security qualification authority; M140 is closed as the current residual streaming applicability authority; M141 is closed as the HTTP unique-local source-address completion; M142 is closed as the HTTP SSLProxies + JumpList completion.
-2. No Proposal residual handoff is currently registered; M143-M152 are deferred/unregistered.
-3. M143-M152 are deferred/unregistered and may not be executed from their file presence alone.
+1. M139 remains current runtime/security qualification authority; M140 is closed as the current residual streaming applicability authority; M141 is closed as the HTTP unique-local source-address completion; M142 is closed as the HTTP SSLProxies + JumpList completion; M143 is closed as the retained streaming Profile completion.
+2. No Proposal residual handoff is currently registered; M144-M152 are deferred/unregistered.
+3. M144-M152 are deferred/unregistered and may not be executed from their file presence alone.
 4. After each closure, register at most the next dependency-ready plan; amend deferred exact-path/security assumptions first where the plan requires it.
 5. Material path/architecture deviations require plan amendment before implementation.
 6. Closure evidence, not implementation assertions, determines support and qualification.
@@ -254,5 +276,6 @@ M140 reclassified six `Profile` cells and Streamr `ConnectDelay` to `not_applica
 | M140 | **closed as complete**; residual streaming applicability re-freeze; zero promotions; matrix `325/40/475`; retained `Profile:client` frozen for M143 |
 | M141 | **closed as complete**; HTTP unique-local source-address completion; 2 promotions; matrix `327/38/475` |
 | M142 | **closed as complete**; HTTP `SSLProxies` + `JumpList` completion; 2 promotions; matrix `329/36/475` |
+| M143 | **closed as complete**; retained streaming Profile completion; 1 promotion; matrix `330/35/475` |
 
 Historical closure files remain unchanged.

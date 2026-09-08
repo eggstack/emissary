@@ -392,11 +392,11 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
             );
             continue;
         } else if matches!(key, "Profile") {
-            // M140 retains only Profile:client as blocked with affirmative
-            // no-override evidence; HTTP/IRC/SOCKS/SOCKS-IRC/CONNECT remove
-            // maxWindowSize to force bulk and Streamr never creates a streaming
-            // socket, so those six cells are not_applicable.
-            assert_eq!(cells[0].as_str(), Some("blocked_primitive"), "{key} cell 0");
+            // M143 promotes Profile:client to apply with the neutral
+            // streaming-window primitive; HTTP/IRC/SOCKS/SOCKS-IRC/CONNECT
+            // remove maxWindowSize to force bulk and Streamr never creates a
+            // streaming socket, so those six cells stay not_applicable.
+            assert_eq!(cells[0].as_str(), Some("apply"), "{key} cell 0");
             for (index, cell) in cells.iter().enumerate().skip(1).take(6) {
                 assert_eq!(cell.as_str(), Some("not_applicable"), "{key} cell {index}");
             }
@@ -407,13 +407,13 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
                     "{key} server cell {index}"
                 );
             }
-            assert_eq!(string_field(row, "completion_owner"), "M112");
-            assert_eq!(string_field(row, "blocking_milestone"), "M097");
-            assert!(!string_field(row, "blocked_primitive").is_empty());
+            assert_eq!(string_field(row, "completion_owner"), "M143");
             assert_eq!(
                 string_field(row, "current_or_planned_disposition"),
-                "blocked_primitive_or_not_applicable"
+                "apply_or_not_applicable"
             );
+            assert!(row.get("blocking_milestone").is_none());
+            assert!(row.get("blocked_primitive").is_none());
             // Affirmative M140 cell notes must be present for the re-frozen cells.
             for family in [
                 "httpclient",
@@ -434,6 +434,7 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
                     "{key} cell {family} must carry affirmative M140 N/A evidence"
                 );
             }
+            continue;
         } else {
             for (index, cell) in cells.iter().enumerate().take(7) {
                 assert_eq!(
@@ -639,13 +640,13 @@ fn current_matrix_counts_are_explicit_and_exact() {
             counts
         },
     );
-    assert_eq!(counts, (329, 36, 475));
+    assert_eq!(counts, (330, 35, 475));
     let declared = root
         .get("current_matrix_counts")
         .and_then(Value::as_table)
         .expect("current matrix counts are declared");
-    assert_eq!(declared["apply"].as_integer(), Some(329));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(36));
+    assert_eq!(declared["apply"].as_integer(), Some(330));
+    assert_eq!(declared["blocked_primitive"].as_integer(), Some(35));
     assert_eq!(declared["not_applicable"].as_integer(), Some(475));
 }
 

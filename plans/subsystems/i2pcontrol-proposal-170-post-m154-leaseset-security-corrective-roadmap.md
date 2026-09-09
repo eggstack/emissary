@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M154 LeaseSet-Security Corrective Roadmap
 
-Status: **active / partial; M155-M162 closed, M152 hard dependency satisfied, registration pending**
+Status: **active / partial; M155-M162 closed, M152 registered**
 
 This roadmap supersedes the LeaseSet-security execution ordering in the older residual and post-M146 roadmaps while preserving M146/M147/M154 closures as historical evidence.
 
@@ -159,10 +159,10 @@ M161 legacy AES/LS1 feasibility                [CLOSED; OUTCOME B]
 M162 Proposal field integration                [CLOSED; BLOCKED INTEGRATION]
   |
   v
-M152 final whole-surface requalification       [DEFERRED; HARD DEP SATISFIED; ZERO PROMOTIONS]
+M152 final whole-surface requalification       [REGISTERED; ZERO-PRODUCTION REQUALIFICATION]
 ```
 
-No registered successor; only M152 may be registered next.
+M152 is the sole registered handoff.
 
 ## 7. Promotion ceilings
 

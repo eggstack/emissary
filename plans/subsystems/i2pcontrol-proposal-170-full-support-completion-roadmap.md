@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M155-M162 closed, M152 hard dependency satisfied, registration pending**
+Status: **active / partial; M155-M162 closed, M152 registered**
 
 Pinned Proposal authority: revision `2026-05-20`, status Open.
 
@@ -51,7 +51,7 @@ M155 semantic/owner refreeze                   [CLOSED]
   -> M160 DH/X25519 authorization              [CLOSED]
   -> M161 legacy AES/LS1 feasibility           [CLOSED; OUTCOME B]
   -> M162 Proposal field integration           [CLOSED; BLOCKED INTEGRATION]
-  -> M152 final requalification                [DEFERRED; HARD DEP SATISFIED]
+  -> M152 final requalification                [REGISTERED; ZERO-PRODUCTION REQUALIFICATION]
 ```
 
 M149-M151 are superseded historical drafts and must not be executed.
@@ -83,7 +83,7 @@ M161 closed outcome B (valid legacy-LS1 contract but blocked; zero production). 
 
 M162 is closed blocked on the M160+M161-closed head as a nine-file I2PControl subset (closure: `plans/closure/i2pcontrol-proposal-170/162-closure.md`; strict subset of the frozen ten — `server_secret_store.rs` intentionally unchanged), realizing the exact Proposal PR mappings, PSK/DH base-key semantics, per-user `Base64(UTF8(name)):Key` validation, typed/redacted I2PControl fields, the executable ten-mode table, five-family fail-closed gates, and redaction hardening with zero promotions. Persistent custody was deferred (would be inert without a Yosemite base-key path) with the design frozen for a future Yosemite-amended successor; Yosemite base/duplicate/bound gaps plus M161-B legacy block keep all fifteen cells blocked.
 
-M152 has been rebased to requalify the closed M156-M159 lineage plus authenticated M159/M160 bounds, M161 disposition and M162 blocked-integration evidence (typed domain, ten-mode table, fail-closed gates, redaction, Yosemite gaps, zero promotions). Hard dependency satisfied by M162 closure; registration pending.
+M152 has been rebased to requalify the closed M156-M159 lineage plus authenticated M159/M160 bounds, M161 disposition and M162 blocked-integration evidence (typed domain, ten-mode table, fail-closed gates, redaction, Yosemite gaps, zero promotions). Hard dependency satisfied by M162 closure; registered for final requalification.
 
 ## 6. Field-completeness rules
 
@@ -120,6 +120,6 @@ M152 may declare full support only when the mechanically recomputed matrix has z
 
 ## 10. Current handoff
 
-No registered successor; only M152 may be registered next (hard dependency satisfied by M162 closure).
+M152 is the sole registered handoff.
 
 M162 closed blocked on its frozen envelope as a nine-file subset with zero promotions (closure: plans/closure/i2pcontrol-proposal-170/162-closure.md).

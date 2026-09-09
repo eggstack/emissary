@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M162 closed blocked; M152 hard dependency satisfied, registration pending**.
+Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M152 registered**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -98,12 +98,12 @@ M159 PSK authorization             [CLOSED]
   -> M160 DH/X25519 authorization  [CLOSED]
   -> M161 legacy AES/LS1 gate      [CLOSED; OUTCOME B]
   -> M162 Proposal integration     [CLOSED; BLOCKED INTEGRATION]
-  -> M152 final requalification    [DEFERRED; HARD DEP SATISFIED]
+  -> M152 final requalification    [REGISTERED; ZERO-PRODUCTION REQUALIFICATION]
 ```
 
 M161 closed outcome B. It did not implement LS1; no successor is created and EncryptLeaseSet stays blocked.
 
-M162 closed blocked with zero promotions: typed/redacted domain, ten-mode table, five-family fail-closed gates, and redaction hardening over a nine-file I2PControl subset (server_secret_store.rs intentionally unchanged). Yosemite base/duplicate/bound gaps plus M161-B legacy block keep all fifteen cells blocked; M095 remains `336/29/475`. Only M152 may be registered next.
+M162 closed blocked with zero promotions: typed/redacted domain, ten-mode table, five-family fail-closed gates, and redaction hardening over a nine-file I2PControl subset (server_secret_store.rs intentionally unchanged). Yosemite base/duplicate/bound gaps plus M161-B legacy block keep all fifteen cells blocked; M095 remains `336/29/475`. M152 is now registered for final requalification.
 
 M162 has been corrected to require the exact direct-source mappings:
 

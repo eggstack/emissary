@@ -1,6 +1,27 @@
 # M152 — Final Residual Proposal-170 Requalification
 
-Status: **deferred / unregistered; hard-depends on M162 closure and any M161 outcome-A implementation successor**
+Status: **registered / dependency-ready; M162 closed blocked**
+
+> Registration baseline: `babf9fa6` (M162 blocked-integration
+> implementation/closure head; clean worktree before M152 work). Current M095
+> matrix `336/29/475`. Current whole-surface qualification authority M153.
+>
+> Entry gate (all satisfied): M153 remains accepted ancestry; M146 still
+> explicitly blocked; M147/M148 still explicitly blocked (M154 disposition C);
+> M155, M156, M157, M158 closed; M159/M160 closed with zero promotions and
+> exact M061/M062 outcomes; M161 has explicit outcome-B disposition with no
+> successor (so no M161-A successor blocks `EncryptLeaseSet` consideration);
+> M162 closed blocked with exact final promotions/blockers (zero promotions,
+> all fifteen LeaseSet-security cells remain blocked_primitive); no other
+> Proposal capability plan is registered.
+>
+> Production budget: **zero production Rust/dependency/Yosemite changes**
+> (planning/test/evidence only). Promotion budget: **zero Proposal cells**.
+>
+> External-interaction authority (§11 of `plans/003-planning-process.md`):
+> internal-only; all reference/specification access read-only; no upstream
+> issue/PR/discussion/contact/submission activity is authorized by this
+> registration.
 
 Class: invariant / qualification / final support authority
 

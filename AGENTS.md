@@ -44,14 +44,15 @@ Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` whe
 - M160 DH/X25519 neutral lineage: closed, zero Proposal promotions;
 - M161 legacy AES/LS1 gate: closed outcome B (valid but blocked), zero production/promotions;
 - **M162 Proposal LeaseSet-security blocked integration: closed, zero promotions (nine-file I2PControl subset; all 15 cells remain blocked)**.
+- **M152 final requalification: registered / dependency-ready (zero-production, zero-promotion)**.
 
 Roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-Registered plan: `plans/implementation/i2pcontrol-proposal-170/162-proposal-leaseset-security-field-integration.md`
-(closed blocked; zero promotions; closure: `plans/closure/i2pcontrol-proposal-170/162-closure.md`).
+Registered plan: `plans/implementation/i2pcontrol-proposal-170/152-final-residual-proposal-170-requalification.md`
+(registered / dependency-ready; M162 closed blocked).
 
-Closed plan: `plans/implementation/i2pcontrol-proposal-170/161-legacy-aes-ls1-feasibility-and-contract-gate.md`
-(closure: `plans/closure/i2pcontrol-proposal-170/161-closure.md`; outcome B).
+Closed plan: `plans/implementation/i2pcontrol-proposal-170/162-proposal-leaseset-security-field-integration.md`
+(closure: `plans/closure/i2pcontrol-proposal-170/162-closure.md`; blocked integration, zero promotions).
 
 ## M160 exact production budget (realized)
 
@@ -132,7 +133,7 @@ M159 PSK authorization             [CLOSED]
   -> M160 DH/X25519 authorization  [CLOSED]
   -> M161 legacy AES/LS1 gate      [CLOSED; OUTCOME B]
   -> M162 Proposal field integration [CLOSED; BLOCKED INTEGRATION]
-  -> M152 final requalification    [DEFERRED; HARD DEP SATISFIED]
+  -> M152 final requalification    [REGISTERED; ZERO-PRODUCTION REQUALIFICATION]
 ```
 
 M160 reused the exact four M159 owners with the existing `x25519-dalek` dependency sufficient and no manifest/lock change. M160 must use the same 4096-byte O(N) bound, preserve duplicates, and explicitly reject all-zero X25519 shared secrets.

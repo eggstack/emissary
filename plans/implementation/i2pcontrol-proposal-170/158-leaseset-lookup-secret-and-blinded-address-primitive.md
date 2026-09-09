@@ -19,7 +19,7 @@ Baseline:
 
 Extend the closed M156/M157 modern Encrypted LeaseSet2 path with the standard optional lookup/blinding secret and the standard encrypted-service extended `.b32.i2p` address format.
 
-M158 is still neutral infrastructure. It proves that a real standard type-5 SAM session can:
+M158 is neutral runtime infrastructure. It proves that a real standard type-5 SAM session can:
 
 - accept a standard `i2cp.leaseSetSecret` value without leaking it through generic option/debug surfaces;
 - derive daily blinded key/storage-key material from that secret;
@@ -29,7 +29,7 @@ M158 is still neutral infrastructure. It proves that a real standard type-5 SAM 
 
 M158 MUST NOT:
 
-- promote Proposal `OptionalLookup` yet;
+- promote Proposal `OptionalLookup`;
 - modify I2PControl production source or its secret stores;
 - persist the secret in core;
 - add a NetDB client lookup/decryption subsystem;
@@ -37,7 +37,7 @@ M158 MUST NOT:
 - implement legacy AES/LS1;
 - reopen configurable Destination `SigType`.
 
-Field-level Proposal persistence/edit/restart semantics remain M162 work. M158 establishes the runtime primitive M162 will consume.
+Field-level Proposal persistence/edit/restart semantics remain M162 work. M158 establishes the standard runtime primitive M162 will consume.
 
 ## 2. Pinned standard/reference contract
 
@@ -52,16 +52,16 @@ i2cp.leaseSetSecret = Base64(UTF8(secret))
 Direct Java evidence:
 
 - I2PTunnel `TunnelConfig.setBlindedPassword()` writes `Base64.encode(DataHelper.getUTF8(secret.trim()))`;
-- `RequestLeaseSetMessageHandler` reads `i2cp.leaseSetSecret`, Base64-decodes it, converts the result to UTF-8, and passes the resulting string into `EncryptedLeaseSet.setSecret()` **before** destination assignment;
+- `RequestLeaseSetMessageHandler` reads `i2cp.leaseSetSecret`, Base64-decodes it, converts the result to UTF-8, and passes the resulting string into `EncryptedLeaseSet.setSecret()` before destination assignment;
 - `ClientMessageEventListener` performs the same Base64 -> UTF-8 decode for encrypted-LS2 lookup/decryption.
 
-M158 therefore consumes the **standard SAM/I2CP property representation** above. It does not consume the Proposal JSON plaintext field directly. M162 later maps Proposal `OptionalLookup` plaintext to this exact standard property.
+M158 consumes this **standard SAM/I2CP property representation**. It does not consume the Proposal JSON plaintext field directly. M162 later maps Proposal `OptionalLookup` plaintext to this exact standard property.
 
 Invalid Base64 or invalid UTF-8 MUST fail before session allocation/activation.
 
 An absent or empty decoded secret means no secret and preserves the M157 unsecreted type-5 path.
 
-Do not invent a new semantic secret-length limit. The existing bounded SAM command/input framing remains the allocation/work bound; M158 must not silently truncate otherwise-valid UTF-8 secret bytes.
+Do not invent a new semantic secret-length limit. Existing bounded SAM command/input framing remains the allocation/work bound; M158 must not silently truncate otherwise-valid UTF-8 secret bytes.
 
 ### 2.2 Blinding contribution
 
@@ -102,7 +102,7 @@ bytes 3..34: unblinded Ed25519 public key (32 bytes)
 Checksum/post-processing:
 
 ```text
-crc = CRC-32(data[3..35])          # IEEE CRC-32, Java java.util.zip.CRC32 behavior
+crc = CRC-32(data[3..35])          # IEEE CRC-32 / java.util.zip.CRC32
 wire[0] = flags ^ low8(crc)
 wire[1] = 7     ^ low8(crc >> 8)
 wire[2] = 11    ^ low8(crc >> 16)
@@ -110,7 +110,7 @@ wire[3..] = public key
 hostname = I2P-Base32(wire) + ".b32.i2p"
 ```
 
-For the current 35-byte supported form the encoded label is exactly 56 characters, followed by `.b32.i2p`.
+For the supported 35-byte form the encoded label is exactly 56 characters, followed by `.b32.i2p`.
 
 Decoder requirements:
 
@@ -121,7 +121,7 @@ Decoder requirements:
 - reject reserved flag bits;
 - reject two-byte sigtype flag for this milestone;
 - require unblinded sigtype 7 and blinded sigtype 11;
-- validate the 32-byte Ed25519 point with the existing M156/public-key validation path before treating it as an address identity;
+- validate the 32-byte Ed25519 point through the existing M156 validation path before treating it as an address identity;
 - no trailing bytes, embedded secret, or embedded private key;
 - expose `secret_required` and `auth_required` only as public address metadata.
 
@@ -162,9 +162,9 @@ Authorized additions only:
 - canonical 35-byte/56-character type7->type11 extended-B32 encode/decode;
 - exact IEEE CRC-32 helper local to the codec;
 - public metadata structure for decoded `{unblinded_public_key, secret_required, auth_required}`;
-- deterministic test helpers/vectors.
+- deterministic test vectors.
 
-Existing M157 layer encryption, credential/subcredential, UTC-day conversion, and signing-seed behavior must remain unchanged except for threading the secret into the existing blinded-day call.
+Existing M157 layer encryption, credential/subcredential, UTC-day conversion, and signing-seed behavior remain unchanged except for threading the secret into the existing blinded-day call.
 
 No new generic CRC API, generic naming subsystem, generic signature registry, or client-auth crypto is authorized.
 
@@ -176,7 +176,7 @@ Authorized additions only:
 
 - `EncryptedPublicationConfig` owns the optional zeroizing lookup secret for exactly one destination generation;
 - current-day and rollover derivation call the secret-aware ELS2 helper;
-- changing/recreating configuration from a different secret produces a clean independent key generation;
+- recreating configuration with a different secret produces a clean independent key generation;
 - no fallback from secret-required publication to empty-secret publication on error;
 - no new timer/task/state machine beyond the M157 owner-local rollover mechanism.
 
@@ -209,7 +209,7 @@ Authorized additions only:
 - ordinary/non-type5 event address behavior remains byte-for-byte unchanged;
 - canonical ordinary inner LS2 generation remains unchanged.
 
-`events.rs` is not authorized: the existing event API already carries an opaque address `String` and does not need a semantic change.
+`events.rs` is not authorized: the existing event API already carries an opaque address `String` and needs no semantic change.
 
 ## 5. Explicitly unauthorized production paths
 
@@ -237,10 +237,9 @@ M158 adds **no dependency**.
 
 Reuse:
 
-- existing I2P Base32 codec in `crypto/mod.rs`;
+- existing I2P Base32/Base64 codecs in `crypto/mod.rs`;
 - M156 Red25519/blinding;
 - M157 ELS2 helper and rollover owner;
-- existing Base64 codec;
 - existing zeroize;
 - core/alloc only for CRC and address parsing.
 
@@ -261,7 +260,7 @@ i2cp.leaseSetType=5
   -> extended B32 with secret_required=false, auth_required=false
 ```
 
-This corrects the user-facing encrypted-service address from ordinary 52-char hash form to the required 56-char extended form without changing publication crypto.
+This corrects the user-facing encrypted-service address from ordinary hash form to the required extended form without changing publication crypto.
 
 ### 7.2 Secret type-5 session
 
@@ -303,7 +302,7 @@ Required vectors:
 
 Decoder adversarial cases:
 
-- old 52-char B32 rejected as extended form;
+- old ordinary B32 rejected as extended form;
 - missing/wrong suffix;
 - invalid Base32;
 - wrong decoded length;
@@ -342,23 +341,30 @@ Reason:
 - those are intentionally kept inside `emissary-cli/src/i2pcontrol/**` and belong to M162;
 - promoting here would conflate a neutral standard runtime primitive with completed administrative semantics.
 
-M095 therefore must remain exactly `336/29/475`.
+M095 therefore remains exactly `336/29/475`.
 
-## 11. M061/M062 registration amendment
+## 11. M061/M062 registration disposition
 
-The registration commit MUST:
+No M061 source-boundary expansion is required for M158.
 
-- add M158 `[registered_pending]` authority for exactly the four production paths in §4;
-- record zero new files;
-- record exact owner evidence for each path;
-- keep all four paths in the already-realized ordinary M061 allowlist from M157/M060 ancestry;
-- update the M061 pending guard from its closed M157-specific assertion to exact M158 / zero-new-file assertions;
-- add M062 registered-pending bookkeeping for the same four paths;
-- record `new_direct_dependencies=[]`, `manifest_changes=[]`, `lockfile_change=false`, `yosemite_change=false`, `i2pcontrol_source_change=false`;
-- add/adjust M062 guard logic so the registered M158 zero-dependency budget is machine-checked;
-- leave M159-M162/M152 unregistered.
+All four M158 production files are already individually named in M061's realized exact `[allowed]` ledger and have owner evidence from M060/M157. M158 is a strict subset of that accepted production boundary. Adding a second `[registered_pending]` source list for already-realized paths would not strengthen containment and would duplicate authority.
 
-No historical closure file is modified.
+Registration therefore freezes the milestone-specific subset in **this plan and `plans/registry.md`**, while M061 remains the binding exact source boundary. Implementation MUST still touch no production file outside §4, and M061's exact upstream-diff test must remain green.
+
+M062 receives a small current-registration bookkeeping block recording:
+
+- milestone `M158`;
+- exact four production paths;
+- zero new files;
+- `new_direct_dependencies=[]`;
+- `manifest_changes=[]`;
+- `lockfile_change=false`;
+- `yosemite_change=false`;
+- `i2pcontrol_source_change=false`.
+
+This is a dependency-budget record only; it does not broaden M061 or any prohibited prefix. M159-M162 and M152 remain unregistered.
+
+Historical closure files remain immutable.
 
 ## 12. Verification baseline
 
@@ -390,7 +396,7 @@ M158 closes complete only when:
 - no-secret M157 behavior remains unchanged except for canonical extended B32 address emission;
 - secret-required sessions emit canonical extended B32 with the correct public flag and never embed the secret;
 - Java/reference extended-B32 vectors interoperate byte-for-byte;
-- M061/M062 guards pass with exact M158 authority;
+- M061/M062 guards pass with the registered exact M158 budget;
 - M095 remains `336/29/475`;
 - no medium/high secret-leak, crypto, publication, or address-codec finding remains.
 
@@ -413,7 +419,7 @@ Record:
 
 - implementation/closure heads;
 - exact four production paths and all test/planning paths;
-- M061/M062 registration/reconciliation diff;
+- M061 unchanged-boundary evidence plus M062 current-registration bookkeeping;
 - zero dependency/Cargo/lock/Yosemite/I2PControl-source proof;
 - Java standard-property Base64/UTF-8 evidence;
 - lookup-secret alpha/blinded/store-key known answers;

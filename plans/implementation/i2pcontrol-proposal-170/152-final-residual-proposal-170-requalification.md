@@ -30,7 +30,8 @@ Before registration:
 - M153 remains accepted current-head qualification ancestry;
 - M146 `UseOutproxyPlugin` is either still explicitly blocked or superseded by a separately accepted provider plan;
 - M147/M148 configurable `SigType` is either still explicitly blocked or superseded by a separately accepted architecture/security plan;
-- M155-M160 have closed with recorded dispositions;
+- M155, M156, M157 and M158 are closed;
+- M159 PSK and M160 DH primitives are closed with zero Proposal promotions and exact M061/M062 outcomes;
 - M161 has an explicit legacy-AES disposition;
 - if M161 outcome A created a legacy-LS1 implementation successor, that successor has closed before M162 could promote `EncryptLeaseSet`;
 - M162 has closed with the exact final LeaseSet-field promotions/blockers;
@@ -46,7 +47,8 @@ Parse all 840 M095 TunnelManager cells and independently verify:
 - exact blocked cell identities;
 - every `apply` row has real runtime/interoperability evidence rather than parser/persistence/serializer reachability;
 - every N/A row has affirmative family/spec evidence;
-- `SigType`, `UseOutproxyPlugin`, `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` dispositions match their actual closed milestones.
+- `SigType`, `UseOutproxyPlugin`, `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` dispositions match their actual closed milestones;
+- any M162 promotion is tied to a complete field contract across all valid values, not merely the subset implemented by a neutral primitive.
 
 Full support requires `blocked_primitive == 0`.
 
@@ -67,12 +69,13 @@ Re-run and cross-compose:
 - M144 application TLS separation;
 - M145 reply-LeaseSet bundling privacy/liveness;
 - M146 blocked provider behavior if still blocked;
-- M156 Red25519/blinding and M157 encrypted-LS2 publication if implemented;
-- M158 lookup-secret/addressing;
-- M159 PSK auth;
-- M160 DH auth;
+- M156 Red25519/blinding;
+- M157 modern type-5 encrypted-LS2 publication/storage verification/UTC rollover;
+- M158 lookup-secret/blinded-address behavior and secret-redaction boundary;
+- M159 PSK client authorization and 4096-byte bounded-work contract;
+- M160 DH/X25519 client authorization and low-order/all-zero/bounded-work contract;
 - M161 legacy AES disposition/implementation result;
-- M162 Proposal field validation, secret transactionality and no-downgrade semantics.
+- M162 Proposal field validation, ten-mode mapping, secret transactionality and no-downgrade semantics.
 
 Blocked predecessors are tested for exact fail-before-allocation behavior, not treated as support.
 
@@ -82,12 +85,14 @@ Independently prove:
 
 - Proposal/admin policy remains under `emissary-cli/src/i2pcontrol/**` wherever possible;
 - every non-I2PControl production path introduced by the line is exact in M061/M062 with a neutral owner/rationale;
+- M159/M160 stayed inside their registered exact neutral owner sets or have truthful amendment evidence;
 - no broad crypto/netdb/i2np/destination waiver exists;
 - no Proposal terminology leaked into core neutral APIs;
 - I2PControl-only direct dependencies remain optional/feature-owned;
 - Yosemite remains exact optional authority unless separately superseded;
 - no plaintext/unsecreted/unauthenticated downgrade exists in LeaseSet security modes;
-- Red25519/PSK/DH/private lookup material is not logged or response-facing;
+- Red25519/lookup-secret/PSK/DH/private-key material is not logged or response-facing;
+- M162 definition + LeaseSet-security secret generations are transactionally consistent across create/edit/restart/delete and cancellation;
 - no direct-clearnet fallback was introduced for M146;
 - no high/medium security finding is waived to improve completion status.
 
@@ -121,7 +126,7 @@ cargo fmt --all -- --check
 git diff --check
 ```
 
-Also run all durable security/interoperability tests created by M156-M162.
+Also run all durable security/interoperability tests created by M156-M162, including authenticated ELS2 wrong-key/tamper/size-bound tests and M162 persistence rollback/redaction tests.
 
 ## 8. Stop conditions
 
@@ -132,7 +137,8 @@ Stop and create a corrective implementation plan if:
 - interoperability contradicts local tests;
 - a late feature weakens earlier containment/security;
 - exact path accounting requires a broad waiver;
-- any blocker lacks an accepted disposition.
+- any blocker lacks an accepted disposition;
+- M162 promoted a field whose valid mode/list domain is only partially operational.
 
 ## 9. Closure transition
 

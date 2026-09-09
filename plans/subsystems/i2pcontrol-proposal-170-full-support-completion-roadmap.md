@@ -1,42 +1,42 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M140 closed as complete; M141 closed; M142 closed as complete (329/36/475); M143 closed as complete (330/35/475); M144 closed as complete (334/31/475); M145 closed as complete (336/29/475); M146 closed as blocked (336/29/475 unchanged); no registered successor**
-
-Current runtime/security qualification authority:
-
-- M139 closure: `plans/closure/i2pcontrol-proposal-170/139-closure.md`.
-
-Current residual applicability authority:
-
-- M140 closure: `plans/closure/i2pcontrol-proposal-170/140-closure.md` (zero promotions; `325/40/475`).
-
-Current registered handoff:
-
-- none (M146 closed as blocked; M147-M152 deferred). Last closed: M146 `plans/implementation/i2pcontrol-proposal-170/146-outproxy-provider-useoutproxyplugin-completion.md`.
-
-Focused residual execution roadmap:
-
-- `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`.
-
-Current machine authority after M146 closure (unchanged from M145):
-
-- M095 matrix: `336 apply / 29 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells.
+Status: **active / partial; M153 is the sole registered corrective handoff**
 
 Pinned Proposal authority:
 
 - I2P Proposal 170 revision `2026-05-20`, status Open.
 
-All external specification/reference activity is read-only. Repository writes remain internal to `eggstack/emissary`; Yosemite writes require separate ADR-0005/Yosemite planning authority.
+Current machine authority:
+
+- M095 matrix: `336 apply / 29 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells.
+
+Current execution authority:
+
+- `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md`.
+
+Historical residual roadmap through M146:
+
+- `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`.
+
+Current qualification state:
+
+- M139 is the last whole-surface integrated runtime/security qualification, but it predates M141-M145 production changes and is therefore historical for current-head purposes;
+- M153 is registered to establish a new current-head qualification authority before any cryptographic residual work;
+- M140 remains the accepted residual streaming applicability authority;
+- M141-M145 are accepted capability closures;
+- M146 is accepted blocked evidence for `UseOutproxyPlugin`.
+
+All external specification/reference activity remains read-only. Repository writes remain internal to `eggstack/emissary`; Yosemite writes require separate ADR-0005/Yosemite planning authority.
 
 ## 1. Purpose
 
-Move the internal fork from truthful partial Proposal-170 support toward exact support while keeping Proposal-specific business/admin/application policy under `emissary-cli/src/i2pcontrol/**` wherever possible and preserving reviewed core/router boundaries.
+Move the internal fork as far toward exact Proposal-170 support as can be done truthfully while keeping Proposal-specific policy under `emissary-cli/src/i2pcontrol/**` wherever possible and preserving the security-reviewed Emissary core boundary.
 
-Full support means real externally observable behavior. Parser acceptance, persistence, serializer reachability, dormant fields, fabricated defaults or approximate semantics do not count.
+Full support means real externally observable behavior. Parser acceptance, persistence, serializer reachability, dormant fields, defaults, aliases or approximate semantics do not count.
 
-This top-level roadmap defines the completion standard and accepted authority chain. The detailed dependency/path/security plan for the remaining 47 blockers is now delegated to `i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`.
+This is not a general base-I2PControl parity program, router redesign, frontend project or upstream contribution program.
 
-## 2. Canonical/internal authority
+## 2. Canonical authority
 
 Read in order:
 
@@ -50,272 +50,293 @@ Read in order:
 8. M095 full-support matrix;
 9. M105 residual audit;
 10. M110 completion ledger;
-11. M121 truthfulness correction;
-12. M130/M131 historical qualification/residual authority;
-13. M135/M136/M137/M134 lifecycle closures;
-14. M139 current integrated qualification closure;
-15. residual primitive completion roadmap;
-16. `plans/registry.md` and the single registered plan.
+11. accepted historical closures;
+12. the current subsystem/corrective roadmap;
+13. `plans/registry.md`;
+14. the one registered implementation plan.
 
-Historical closures remain immutable evidence. Later closures supersede only explicitly affected current claims.
+Historical closure records remain immutable. Later corrective milestones supersede only explicit current-head authority/metadata.
 
-## 3. Current support state
+## 3. Current implemented surface
 
-Current implemented/qualified subset includes:
+Current accepted Proposal-170 support includes:
 
 - RouterInfo: 43 additions / 42 available / 1 protocol-permitted neutral / 0 unavailable;
 - AddressBook CRUD, subscriptions, all 13 SetConfig keys and deterministic precedence;
 - all 12 canonical TunnelManager data planes and seven canonical actions for the claimed subset;
 - all six ClientServicesInfo selectors;
-- finite token lifetime (M127), bounded JSON-RPC batches (M128), fail-closed non-loopback management TLS (M129);
-- shared-session/destination ownership from M110/M116;
-- neutral variance/backup behavior from M118/M119;
-- neutral live tunnel quantity + LeaseSet desired-count control from M135;
-- Proposal `Reduce`/`ReduceCount`/`ReduceTime` for all seven client families from M136;
-- Proposal `Close`/`CloseTime` for all seven client families plus authoritative idle termination cause from M137;
-- Proposal `NewDest` for the six non-Streamr TCP client families from M134.
+- API-1 auth/version/token behavior required by the extension surface;
+- M127 finite token lifetime;
+- M128 bounded JSON-RPC batch conformance;
+- M129 fail-closed non-loopback management TLS;
+- shared-session/destination ownership and exact optional Yosemite boundary;
+- neutral variance/backup and live tunnel-quantity/LeaseSet desired-count behavior;
+- M136 all 21 applicable `Reduce*` cells;
+- M137 all 14 applicable `Close`/`CloseTime` cells plus authoritative idle termination cause;
+- M134 six applicable non-Streamr TCP `NewDest` cells;
+- M141 two `UniqueLocalAddressPerClient` HTTP-server cells;
+- M142 HTTP-client `SSLProxies` and `JumpList`;
+- M143 retained `Profile:client` runtime behavior;
+- M144 four application `UseSSL` cells;
+- M145 two `MultiHoming` / `shouldBundleReplyInfo` cells.
 
-Current matrix after M140 closure:
+M140 additionally established seven affirmative N/A corrections without promotions.
 
-- `325 apply`;
-- `40 blocked_primitive`;
+M146 promoted nothing and correctly left four `UseOutproxyPlugin` cells blocked.
+
+Current matrix:
+
+- `336 apply`;
+- `29 blocked_primitive`;
 - `475 not_applicable`.
-
-M140 made seven evidence-backed `blocked_primitive -> not_applicable` reclassifications with zero `apply` promotions (`325/40/475` is now current authority).
 
 Full Proposal 170 support is **not** claimed.
 
-## 4. Ownership and containment
+## 4. Current residual inventory
 
-Proposal policy belongs under `emissary-cli/src/i2pcontrol/**` wherever truthful implementation permits.
+| Cluster | Blocked cells | Current disposition |
+|---|---:|---|
+| `SigType` | 10 | neutral destination signature-suite infrastructure missing |
+| `EncryptLeaseSet` | 5 | encrypted LeaseSet publication/runtime missing |
+| `OptionalLookup` | 5 | blinded/secret lookup missing |
+| `LeaseSetClientAuths` | 5 | authenticated client access missing |
+| `UseOutproxyPlugin` | 4 | M146 terminal blocked under current provider/security architecture |
+| **Total** | **29** | |
 
-A production change outside that boundary is permitted only when:
+M095 machine authority wins over prose summaries.
+
+## 5. Ownership and containment
+
+Proposal/admin/application policy belongs under `emissary-cli/src/i2pcontrol/**` wherever a truthful implementation can live there.
+
+A non-I2PControl production change is permitted only when:
 
 1. behavior belongs to an existing canonical lower-layer owner;
 2. no truthful I2PControl-local implementation exists;
 3. exact files are named before implementation;
-4. the seam is neutral, not Proposal-shaped;
+4. the seam is neutral and Proposal-free;
 5. unrelated router behavior is unchanged;
-6. M061/M062 exact-path evidence is amended;
-7. a registered plan explicitly authorizes the change.
+6. M061/M062 are amended explicitly;
+7. a registered plan authorizes the change.
 
-M140 authorized no production code and made none. The deferred residual plans deliberately distinguish:
+Accepted lower-layer exceptions remain narrow and historical:
 
-- I2PControl-local targets: M141, M142, M144, preferred M146;
-- conditional small neutral core seams: M143, M145;
-- security-sensitive exact-file infrastructure gates: M147, M149, M150, M151.
+- M135 neutral tunnel-pool/destination/LeaseSet desired-target primitive;
+- M136-M137 neutral SAM idle lifecycle owner;
+- M143 neutral streaming max-window owner;
+- M145 neutral destination/session reply LeaseSet bundling owner.
 
-The existence of a deferred plan or its listing in M062 is planning-only bookkeeping. It does not authorize candidate production paths.
+No broad `crypto/`, `netdb/`, `i2np/`, `destination/`, `primitives/` or transport prefix waiver is permitted for future residual work.
 
-Yosemite remains the sole accepted SAM client for I2PControl. Exact Y005 stays isolated behind optional `yosemite-i2pcontrol`. No global patch, vendoring, path override, floating fork or parallel raw SAM implementation is authorized.
+Yosemite remains the sole accepted SAM implementation and exact optional Y005 pin unless separately superseded.
 
-## 5. Cross-cutting invariants
+## 6. Cross-cutting security invariants
 
 All remaining work preserves:
 
 - exact pinned names/types/actions/presence semantics;
-- no fabricated/accept-inert support;
-- every `apply` cell changes real runtime behavior;
-- every `not_applicable` cell has affirmative Proposal/reference family evidence;
 - unsupported supplied values fail before allocation/effect;
-- no direct-I2P-to-clearnet DNS/network fallback;
-- trusted peer identity and Streamr producer isolation;
-- local-target confinement unless an explicitly accepted neutral primitive proves equivalent safety;
-- bounded admission/tasks/timers/state and generation-local cancellation;
-- transactional edit/start/restart and last-known-good preservation;
-- no lock across unrelated network/filesystem I/O, sleeps, joins or timer waits;
-- secret/key/path redaction and confinement;
-- no LeaseSet security downgrade or fabricated leases;
-- feature-disabled/runtime-disabled isolation;
-- no unrelated base method parity;
-- no frontend coupling;
+- no accept-inert or fabricated support;
+- no direct-I2P-to-clearnet DNS/TCP fallback;
+- literal-loopback/local-target confinement where already required;
+- trusted peer identity boundaries;
+- bounded state/tasks/queues/timers/retries;
+- generation-local cancellation and transactional edit/restart;
+- no lock across unrelated network/filesystem/crypto work;
+- secret/private-key/password/auth redaction;
+- no signature-suite fallback;
+- no encrypted/authenticated LeaseSet downgrade to plaintext/public/unauthenticated behavior;
+- feature-disabled dependency isolation;
+- no unrelated frontend/base-method/deferred-tunnel work;
 - external interaction read-only/internal-only.
 
-## 6. Completed lifecycle / qualification line
+## 7. Historical residual execution through M146
 
 ```text
-M131 residual primitive re-freeze                     [CLOSED AS BLOCKED — 284/88/468]
-  |
-  +--> M132 combined reduction attempt                [CLOSED AS BLOCKED]
-  +--> M133 combined close attempt                    [CLOSED AS BLOCKED]
+M139 integrated lifecycle-head requalification     [CLOSED — historical current-head authority]
   |
   v
-M135 neutral live quantity + LeaseSet desired count   [CLOSED AS COMPLETE — 284/88/468]
+M140 residual applicability re-freeze               [CLOSED — 325/40/475]
   |
   v
-M136 SAM activity + Reduce*                           [CLOSED AS COMPLETE — 305/67/468]
+M141 UniqueLocalAddressPerClient                    [CLOSED — 327/38/475]
   |
   v
-M137 Close* + reasoned termination                    [CLOSED AS COMPLETE — 319/53/468]
+M142 SSLProxies + JumpList                          [CLOSED — 329/36/475]
   |
   v
-M134 NewDest on proven idle resume                    [CLOSED AS COMPLETE — 325/47/468 at M134 head]
+M143 Profile:client                                 [CLOSED — 330/35/475]
   |
   v
-M139 integrated current-head requalification          [CLOSED AS COMPLETE — ZERO PROMOTION]
+M144 application UseSSL                             [CLOSED — 334/31/475]
   |
   v
-M140 streaming applicability re-freeze               [CLOSED AS COMPLETE — 325/40/475, ZERO PROMOTION]
+M145 MultiHoming / reply LeaseSet bundling          [CLOSED — 336/29/475]
+  |
+  +--> 7cbd80a no-std/format follow-up              [accepted production follow-up]
   |
   v
-M141 HTTP unique local source address                [CLOSED AS COMPLETE — 327/38/475, 2 PROMOTIONS]
-  |
-  v
-M142 HTTP SSLProxies + JumpList                      [CLOSED AS COMPLETE — 329/36/475, 2 PROMOTIONS]
-  |
-  v
-M143 retained streaming Profile                     [CLOSED AS COMPLETE — 330/35/475, 1 PROMOTION]
-  |
-  v
-M144 presentation UseSSL                             [CLOSED AS COMPLETE — 334/31/475, 4 PROMOTIONS]
+M146 UseOutproxyPlugin feasibility                  [CLOSED AS BLOCKED — 336/29/475]
 ```
 
-M139 supersedes M130 for current-head runtime/security qualification only. M130 remains historical evidence. M131 remains historical residual authority except where M140 explicitly reclassifies seven cells to current-head `not_applicable` and where M141 promotes two cells to `apply`.
+The historical residual roadmap is closed/superseded for execution after M146.
 
-Historical planning mentioned a possible NewDest-corrective “M138”; M134 proved it unnecessary and no M138 implementation plan was registered.
+## 8. Current corrective execution
 
-## 7. Current residual completion line
+Current roadmap:
 
-The residual roadmap registers only the next dependency-ready plan:
+- `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md`.
+
+Dependency graph:
 
 ```text
-M139 current integrated qualification                  [CLOSED]
+M153 post-M146 current-head requalification         [REGISTERED — zero promotion]
   |
   v
-M140 streaming applicability re-freeze                 [CLOSED AS COMPLETE — 325/40/475, ZERO PROMOTION]
+M154 M147 signature-domain/security owner re-freeze [DEFERRED — zero promotion]
   |
   v
-M141 UniqueLocalAddressPerClient                       [CLOSED AS COMPLETE — 327/38/475, 2 PROMOTIONS]
+M147 neutral destination signature primitive        [DEFERRED — zero promotion]
   |
   v
-M142 HTTP SSLProxies + JumpList                       [CLOSED AS COMPLETE — 329/36/475, 2 PROMOTIONS]
+M148 Proposal SigType                               [DEFERRED — up to 10]
   |
   v
-M143 retained streaming Profile                       [CLOSED AS COMPLETE — 330/35/475, 1 PROMOTION]
+M149 EncryptLeaseSet                                [DEFERRED — up to 5]
   |
   v
-M144 presentation UseSSL                               [CLOSED AS COMPLETE — 334/31/475, 4 PROMOTIONS]
-  -> M145 reply LeaseSet bundling / MultiHoming        [CLOSED AS COMPLETE — 336/29/475, 2 PROMOTIONS]
-  -> M146 real outproxy provider / UseOutproxyPlugin   [CLOSED AS BLOCKED — 336/29/475, ZERO PROMOTIONS]
-  -> M147 neutral destination signature suites         [DEFERRED / ZERO PROMOTION]
-  -> M148 Proposal SigType                             [DEFERRED]
-  -> M149 encrypted LeaseSet / EncryptLeaseSet         [DEFERRED]
-  -> M150 OptionalLookup                               [DEFERRED]
-  -> M151 LeaseSetClientAuths                          [DEFERRED]
-  -> M152 final whole-surface requalification          [DEFERRED / ZERO PROMOTION]
+M150 OptionalLookup                                 [DEFERRED — up to 5]
+  |
+  v
+M151 LeaseSetClientAuths                            [DEFERRED — up to 5]
+  |
+  v
+M152 final whole-surface requalification            [DEFERRED — zero promotion]
 ```
 
-M142-M152 are committed handoff documents but are not executable authority until the registry promotes them after their hard dependencies close (M146 closed as blocked; M147-M152 remain deferred). M147/M149-M151 require explicit pre-registration amendments to freeze exact cells/files/spec/security decisions. M145 was amended via M145-AMEND-01 before registration.
+Only M153 is registered.
 
-## 8. Remaining 38 residual cells after M141 closure
+## 9. M153 corrective qualification
 
-| Primitive cluster | Blocked cells |
-|---|---:|
-| `SigType` destination signing | 10 |
-| encrypted/authenticated LeaseSet cluster | 15 |
-| streaming `Profile` (retained `client` only) | 1 |
-| presentation `UseSSL` | 4 |
-| `UseOutproxyPlugin` | 4 |
-| HTTP `SSLProxies` + `JumpList` | 2 |
-| `MultiHoming` / `shouldBundleReplyInfo` | 2 |
-| **Total** | **38** |
+M153 must establish a new current-head qualification before crypto work by:
 
-M095 machine authority wins over prose. M140 re-froze the seven Profile rows plus Streamr ConnectDelay using actual family constructor/runtime evidence and moved only affirmatively proven blockers to N/A with zero apply promotions. M141 promotes the two `UniqueLocalAddressPerClient` HTTP server cells with exact source-bind evidence.
+- mechanically preserving `336/29/475` and exact 29-cell residual identity;
+- recording the actual last production-bearing head, expected `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2` unless audit proves otherwise;
+- correcting stale M095 production-head metadata;
+- repairing historical-vs-current test authority so broad I2PControl testing is not red merely because later accepted milestones changed aggregate counts;
+- requalifying M127-M145 behavior plus M146 fail-closed blocked behavior;
+- re-proving M061/M062 containment/dependency isolation;
+- changing no production Rust/dependency/Yosemite code.
 
-## 9. Residual architecture selection
+A production defect stops M153 and requires a separate corrective plan.
 
-The detailed residual roadmap freezes the selected order and rationale:
+## 10. M154 pre-crypto gate
 
-- first correct applicability where actual Java family constructors/UDP ownership make a generic setter misleading;
-- then exhaust I2PControl-local application/data-plane work (`UniqueLocalAddressPerClient`, HTTP residuals, presentation TLS, safe outproxy provider);
-- introduce only the smallest neutral streaming/reply-bundling seams where exact runtime effects cannot live locally;
-- stage destination signing infrastructure separately from Proposal SigType mapping;
-- stage LeaseSet security confidentiality -> lookup -> client authorization;
-- finish with a zero-production final current-head requalification.
+M154 is mandatory before M147 registration. It freezes:
 
-This ordering minimizes contamination of upstream-reviewed Emissary code and prevents broad crypto/NetDB work from being used to claim several Proposal fields at once without separate runtime evidence.
+- exact Proposal/reference SigType domain;
+- per-algorithm security disposition;
+- actual current generate/sign/verify/serialize/persist support;
+- exact maintained Rust primitives/dependencies needed;
+- persistent destination/import/export compatibility;
+- exact file-by-file core owners and M061/M062 path budget.
 
-## 10. Historical/current authority table
+M154 must amend/register M147, split it, or leave SigType blocked. It performs no production work and no matrix promotion.
 
-| Milestone | Current role |
-|---|---|
-| M061/M062 | containment/dependency authority |
-| M093 | tunnel application/security boundary |
-| M095 | machine-readable support matrix |
-| M105 | residual-option audit |
-| M110/M116 | shared-session/destination ownership |
-| M117 | exact optional Yosemite dependency seam |
-| M118/M119 | neutral variance/backup behavior |
-| M121 | SigType and historical Close/NewDest truthfulness correction |
-| M123 | cancellation/commit atomicity |
-| M127 | finite token lifetime |
-| M128 | bounded JSON-RPC batch conformance |
-| M129 | fail-closed non-loopback TLS |
-| M130 | historical integrated qualification before M131/lifecycle work |
-| M131 | historical residual applicability/primitive authority |
-| M135 | neutral live quantity/LeaseSet primitive |
-| M136 | Reduce* implementation authority |
-| M137 | Close*/termination-reason implementation authority |
-| M134 | NewDest proven-resume implementation authority |
-| M139 | current post-lifecycle runtime/security qualification authority |
-| M140 | current residual streaming applicability authority (closed as complete; `325/40/475`; retained `Profile:client` frozen for M143) |
-| M141 | sole registered residual capability handoff |
+## 11. Cryptographic residual rules
 
-## 11. Successor readiness requirements
+### M147/M148 SigType
 
-No deferred residual plan becomes executable until it defines, for its then-current codebase:
+Infrastructure completion requires actual destination key generation, certificate encoding, signing, verification and persistence. M147 has zero promotion budget. M148 may promote only suites/families whose full runtime identity path exists with no fallback.
 
-- exact externally observable effect;
-- canonical owner and exact path budget;
-- validation-before-effect boundary;
-- allocation/publication point;
-- cancellation/generation/restart owner;
-- bounded state/queue/timer semantics;
-- lock/contention behavior;
-- rollback/last-known-good behavior;
-- security/secret implications;
-- deterministic focused tests;
-- reference/live interoperability requirements where applicable.
+### M149 EncryptLeaseSet
 
-Security-sensitive core work additionally requires exact algorithm/spec/dependency decisions and exact-file M061/M062 authorization before registration. Serializer acceptance alone is not capability readiness.
+Requires real encrypted LeaseSet semantics end-to-end. Serializer/type reachability alone is insufficient. Plaintext downgrade is prohibited.
 
-## 12. Verification policy
+### M150 OptionalLookup
 
-Every future implementation milestone continues to require:
+Requires actual blinded/secret lookup semantics at the canonical NetDB/destination owner with no public lookup fallback or secret leakage.
 
-- affected core/CLI checks and tests;
-- feature-disabled checks;
-- M061/M062 containment;
-- M095/M105 machine/residual guards;
-- live/adversarial/reference evidence where applicable;
-- clippy and `git diff --check`;
-- `cargo fmt --all -- --check` attempted with pre-existing stable/nightly drift recorded rather than normalized through unrelated churn.
+### M151 LeaseSetClientAuths
 
-No new hosted CI/fuzz/release orchestration is required by this roadmap.
+Requires real authorization modes and unauthorized-client rejection with bounded key/auth state and no unauthenticated downgrade.
 
-## 13. Registration discipline
+Each security-sensitive plan must be amended with exact reference semantics and exact paths before registration.
+
+## 12. M146 terminal blocker policy
+
+M146 remains closed blocked.
+
+The four `UseOutproxyPlugin` cells cannot be promoted under the current architecture because:
+
+- no genuinely distinct real local provider exists;
+- a dummy registry/provider is infrastructure with zero support value;
+- aliasing configured `ProxyList` collapses semantics;
+- direct-clearnet OS networking violates the accepted security boundary.
+
+The crypto/LeaseSet chain does not implicitly reopen M146.
+
+A future provider successor requires a separate architecture/security decision and plan. Until then, those four cells remain explicit blockers.
+
+## 13. Final completion semantics
+
+M152 decides the final truthfulness state from the then-current machine matrix.
+
+### Full Proposal completion
+
+Allowed only if:
+
+- all 840 cells are `apply` or affirmative `not_applicable`;
+- `blocked_primitive == 0`;
+- every apply cell has real runtime evidence;
+- all security/containment qualification passes;
+- no high/medium Proposal-scoped defect remains.
+
+### Safe partial terminal completion
+
+If the cryptographic tail closes but M146 remains blocked, M152 may close the current safe residual workstream as **partial / terminal under current security policy**. It must:
+
+- retain the exact four blockers;
+- explicitly refuse a full-support claim;
+- document that a future architecture/security decision is required for those cells;
+- keep all implemented applicable cells requalified.
+
+No roadmap may redefine four blocked cells as complete merely to close the workstream.
+
+## 14. Verification policy
+
+Future milestones require, as applicable:
+
+- `cargo check` for touched core/CLI configurations;
+- no-std checks for touched core modules;
+- core/CLI unit and integration suites;
+- M061/M062 containment/dependency guards;
+- M095/M105 matrix/residual guards;
+- M127-M129 security regressions;
+- lifecycle regressions;
+- milestone-specific adversarial/runtime/reference fixtures;
+- clippy and rustfmt evidence;
+- `git diff --check`.
+
+Known unrelated formatter/lint drift must be recorded, not normalized opportunistically.
+
+## 15. Registration discipline
 
 Per `plans/003-planning-process.md`:
 
-- M139 remains current runtime/security qualification authority; M140 is closed as residual streaming applicability authority;
-- M141 is the only registered residual plan;
-- M142-M152 are deferred/unregistered;
-- after each closure, register only the next hard-dependency-ready plan;
-- amend deferred path/security assumptions before registration where required;
-- material deviations require plan amendment before production code;
-- closure evidence decides qualification and support truthfulness.
+- only M153 is registered;
+- M154 remains deferred until M153 closes cleanly;
+- M147 cannot be registered without M154 disposition;
+- M148-M152 remain deferred behind hard dependencies;
+- M146 remains closed blocked;
+- file presence/M062 planning bookkeeping never grants production authority;
+- material path/dependency/architecture deviations require amendment before coding.
 
-## 14. Final completion rule
+## 16. Final success rule
 
-Full Proposal 170 completion requires M152 to prove:
+The roadmap succeeds when the repository reaches a fully requalified truthful terminal state for the pinned Proposal revision:
 
-- zero applicable residual primitive gaps against the pinned revision;
-- every applied cell backed by real runtime behavior;
-- every N/A cell backed by affirmative family/reference evidence;
-- no high/medium Proposal-scoped correctness/security defect;
-- bounded reference/live interoperability evidence;
-- minimal explained exact-file non-I2PControl production seams;
-- final M061/M062 containment/dependency isolation;
-- no production changes hidden inside the qualification milestone.
+- either zero applicable blockers and full support;
+- or a safe partial terminal state with exact unavoidable blockers explicitly preserved under current security policy.
 
-Until M152 closes complete, the official status remains **partial Proposal 170 support**.
+In neither case may containment/security be weakened or support fabricated to improve counts.

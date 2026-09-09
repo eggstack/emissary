@@ -30,10 +30,27 @@ metrics = []
 expected = "ordinary registry Yosemite plus exact optional git fork package when i2pcontrol is enabled"
 baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
-# M157 closed with zero dependency, manifest, lockfile, Yosemite, and
-# I2PControl-source change; its realized source diff is reconciled into
-# M061's ordinary [allowed]/[[evidence]] ledger. No successor is registered;
-# M158-M162 and re-gated M152 remain deferred planning only.
+# Current milestone-specific dependency budget. M158 reuses four already-realized
+# M061 exact core owners, so this record does not authorize a new source path.
+# It exists to make the zero dependency/manifest/lock/Yosemite/I2PControl-source
+# budget explicit while the M158 plan + registry freeze the exact four-file
+# implementation subset.
+[current_registration]
+milestone = "M158"
+production_paths = [
+  "emissary-core/src/crypto/els2.rs",
+  "emissary-core/src/destination/lease_set.rs",
+  "emissary-core/src/sam/parser.rs",
+  "emissary-core/src/sam/session.rs",
+]
+new_files = []
+new_direct_dependencies = []
+manifest_changes = []
+lockfile_change = false
+yosemite_change = false
+i2pcontrol_source_change = false
+rationale = "M158 is a strict subset of already-realized M061 owners and reuses existing I2P Base32/Base64, M156 Red25519, M157 ELS2/rollover, and zeroize. No new dependency or manifest/lock/Yosemite/I2PControl production change is required or authorized."
+
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its
 # named production-path helpers. Implementation-plan and subsystem-roadmap
@@ -43,10 +60,10 @@ baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 # M140-M145 are closed complete; M146 is closed blocked; M153 is closed
 # qualification authority; M154 closed disposition C and left M147/M148
 # configurable SigType blocked. M155, M156, and M157 are closed complete.
-# M157 added no dependency, manifest, lockfile, Yosemite, or I2PControl-source
-# change. No successor is registered. M158-M162 and re-gated M152 remain
-# deferred/unregistered planning only. No broad
-# crypto/netdb/i2np/destination/primitives prefix allowance is created here.
+# M158 is now the sole registered successor with a zero-dependency budget and
+# an exact four-file subset already present in M061's realized source boundary.
+# M159-M162 and re-gated M152 remain deferred/unregistered planning only. No
+# broad crypto/netdb/i2np/destination/primitives prefix allowance is created.
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",

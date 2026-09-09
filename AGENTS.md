@@ -42,21 +42,23 @@ I2PControl supports a large partial subset of Proposal 170. Keep Proposal/admin/
 - M155 closed the corrected LeaseSet-security semantic/owner re-freeze;
 - M156 closed the neutral Red25519/Ed25519 blinding primitive with zero Proposal promotions;
 - M157 closed the neutral modern type-5/no-auth Encrypted LeaseSet2 publication primitive with zero Proposal promotions;
-- **M158 is the sole registered/dependency-ready handoff**.
+- M158 closed the neutral standard lookup-secret/blinding and encrypted-service extended-B32 infrastructure with zero Proposal promotions;
+- **no Proposal-170 successor is currently registered (M159 deferred with satisfied hard dep, amendment pending)**.
 
 Current execution roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-Registered plan:
+Closed plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/158-leaseset-lookup-secret-and-blinded-address-primitive.md`.
+- `plans/implementation/i2pcontrol-proposal-170/158-leaseset-lookup-secret-and-blinded-address-primitive.md`
+  (closure: `plans/closure/i2pcontrol-proposal-170/158-closure.md`).
 
-M158 has zero Proposal-promotion budget.
+M158 had zero Proposal-promotion budget (observed; M095 remains `336/29/475`).
 
-## M158 exact production budget
+## M158 exact production budget (realized)
 
-Only these production paths may change:
+Only these production paths changed:
 
 1. `emissary-core/src/crypto/els2.rs`;
 2. `emissary-core/src/destination/lease_set.rs`;
@@ -73,9 +75,9 @@ M062 records zero:
 - Yosemite changes;
 - `emissary-cli/src/i2pcontrol/**` production changes.
 
-If implementation needs any production path or dependency outside this budget, stop before editing and amend M158/M061/M062.
+If follow-up work needs any production path or dependency outside this budget, stop before editing and amend the owning milestone/M061/M062.
 
-## M158 implementation constraints
+## M158 implementation constraints (realized)
 
 ### Standard lookup secret
 
@@ -154,8 +156,8 @@ M158 promotes **zero Proposal cells**. M095 must remain `336/29/475`. `OptionalL
 M155 semantic/owner refreeze            [CLOSED]
   -> M156 Red25519/blinding              [CLOSED]
   -> M157 modern Encrypted LS2           [CLOSED]
-  -> M158 lookup-secret/blinded address  [REGISTERED]
-  -> M159 PSK auth                       [DEFERRED]
+  -> M158 lookup-secret/blinded address  [CLOSED]
+  -> M159 PSK auth                       [DEFERRED; HARD DEP SATISFIED, AMENDMENT PENDING]
   -> M160 DH auth                        [DEFERRED]
   -> M161 legacy AES/LS1 feasibility     [DEFERRED]
   -> M162 Proposal field integration     [DEFERRED]

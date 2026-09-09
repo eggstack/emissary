@@ -18,19 +18,22 @@
 
 //! Neutral modern type-5 encrypted LeaseSet2 crypto helper.
 //!
-//! Implements the no-client-auth, no-lookup-secret subset of the current
-//! encrypted LeaseSet construction on top of the closed blinding primitive:
+//! Implements the no-client-auth subset of the current encrypted LeaseSet
+//! construction on top of the closed blinding primitive:
 //! credential/subcredential derivation, exact 44-byte schedules for the two
 //! nested layers, no-auth layer encryption/decryption for deterministic
 //! self-validation, secure salts through caller-provided randomness, UTC
-//! epoch-day conversion, and a zeroizing type-7 seed handoff.
+//! epoch-day conversion, a zeroizing type-7 seed handoff, the optional
+//! standard lookup-secret contribution to daily blinding, and the canonical
+//! encrypted-service extended `.b32.i2p` address codec for the type-7 to
+//! type-11 domain.
 //!
-//! No lookup-secret contribution, no per-client authorization, no persistent
-//! signature-type registry, and no generic key-derivation API are provided
-//! here. Successor work extends this module through its exact owner.
+//! No per-client authorization, no persistent signature-type registry, and
+//! no generic key-derivation API are provided here. Successor work extends
+//! this module through its exact owner.
 
 use crate::{
-    crypto::{chachapoly::ChaCha, red25519},
+    crypto::{base32_decode, base32_encode, chachapoly::ChaCha, red25519},
     error::Error,
 };
 
@@ -39,7 +42,7 @@ use rand::rand_core::{CryptoRng, RngCore};
 use sha2::Digest;
 use zeroize::{Zeroize, Zeroizing};
 
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 /// Unblinded type-7 code consumed as derivation input.
 pub const UNBLINDED_SIGTYPE: u16 = 7;
@@ -100,6 +103,50 @@ impl SigningSeed {
     /// Return the seed bytes for one-shot derivation.
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0
+    }
+}
+
+/// Standard lookup secret for daily blinded publication.
+///
+/// Carries the decoded UTF-8 bytes of the standard Base64 session property
+/// for exactly one destination generation. Empty means no secret and
+/// preserves the unsecreted derivation. Secret material: never `Debug`- or
+/// display-formattable and zeroized on drop. Construction validates UTF-8
+/// and fails closed; overlong inputs are not truncated here and instead
+/// fail closed at blinding derivation through the frozen primitive bound.
+#[derive(Clone, PartialEq, Eq)]
+pub struct LookupSecret(Zeroizing<Vec<u8>>);
+
+impl LookupSecret {
+    /// Empty secret (unsecreted derivation).
+    pub fn empty() -> Self {
+        Self(Zeroizing::new(Vec::new()))
+    }
+
+    /// Wrap decoded secret bytes, failing closed on invalid UTF-8.
+    ///
+    /// The input is scrubbed before the error is returned.
+    pub fn from_bytes(mut bytes: Vec<u8>) -> Result<Self, Error> {
+        if core::str::from_utf8(&bytes).is_err() {
+            bytes.zeroize();
+            return Err(Error::InvalidData);
+        }
+        Ok(Self(Zeroizing::new(bytes)))
+    }
+
+    /// Return the secret bytes for one-shot derivation.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    /// Whether no secret is carried.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Length of the secret in bytes.
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -418,12 +465,37 @@ pub fn blinded_day_material(
     ),
     Error,
 > {
+    blinded_day_material_with_secret(seed, unblinded_pubkey, day, &LookupSecret::empty())
+}
+
+/// Derive the current-day blinded publication material with a lookup secret.
+///
+/// An empty secret reproduces [`blinded_day_material`] exactly. A nonempty
+/// secret feeds the frozen daily alpha derivation; the same
+/// destination/day/secret triple is deterministic while different secrets
+/// yield different blinded public and storage keys. Overlong secrets fail
+/// closed through the frozen primitive bound without truncation and without
+/// falling back to the empty-secret derivation.
+pub fn blinded_day_material_with_secret(
+    seed: &SigningSeed,
+    unblinded_pubkey: &[u8; 32],
+    day: &[u8; 8],
+    secret: &LookupSecret,
+) -> Result<
+    (
+        red25519::Alpha,
+        red25519::BlindedPublicKey,
+        red25519::BlindedPrivateKey,
+        [u8; 32],
+    ),
+    Error,
+> {
     let alpha = red25519::generate_alpha(
         unblinded_pubkey,
         UNBLINDED_SIGTYPE,
         BLINDED_SIGTYPE,
         day,
-        b"",
+        secret.as_bytes(),
     )?;
     let blinded_public = red25519::blind_public_key(unblinded_pubkey, &alpha)?;
     let blinded_private = red25519::blind_private_key_ed25519(seed.as_bytes(), &alpha);
@@ -432,6 +504,155 @@ pub fn blinded_day_material(
     }
     let storage_key = red25519::blinded_storage_key(&blinded_public);
     Ok((alpha, blinded_public, blinded_private, storage_key))
+}
+
+/// Decoded wire length of the extended encrypted-service address payload.
+pub const EXTENDED_B32_DECODED_LEN: usize = 35;
+
+/// Label length (without suffix) of the extended encrypted-service address.
+pub const EXTENDED_B32_LABEL_LEN: usize = 56;
+
+/// Suffix of the extended encrypted-service address.
+pub const EXTENDED_B32_SUFFIX: &str = ".b32.i2p";
+
+/// Header flag: two-byte sigtype form (rejected in this milestone).
+const B32_FLAG_TWO_BYTE_SIGTYPES: u8 = 0x01;
+
+/// Header flag: a lookup secret is required to resolve the service.
+const B32_FLAG_SECRET_REQUIRED: u8 = 0x02;
+
+/// Header flag: per-client authorization is required to resolve the service.
+const B32_FLAG_AUTH_REQUIRED: u8 = 0x04;
+
+/// Decoded public metadata of an extended encrypted-service address.
+///
+/// Carries only the unblinded type-7 public key and the two public
+/// requirement flags. It never embeds secret, private, or blinded key
+/// material.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EncryptedServiceAddress {
+    /// Unblinded type-7 Ed25519 public key.
+    pub unblinded_public_key: [u8; 32],
+
+    /// Whether a lookup secret is required.
+    pub secret_required: bool,
+
+    /// Whether per-client authorization is required.
+    pub auth_required: bool,
+}
+
+/// Compute the IEEE CRC-32 (`java.util.zip.CRC32` polynomial) of `data`.
+///
+/// Small exact local helper; no CRC dependency is introduced. Pinned
+/// against the standard check value (`"123456789"` -> `0xCBF43926`).
+fn crc32_ieee(data: &[u8]) -> u32 {
+    let mut crc = 0xffff_ffffu32;
+    for &byte in data {
+        crc ^= byte as u32;
+        for _ in 0..8 {
+            if crc & 1 == 1 {
+                crc = (crc >> 1) ^ 0xedb8_8320;
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+    crc ^ 0xffff_ffff
+}
+
+/// Encode the canonical extended encrypted-service address.
+///
+/// Covers only the current type-7 to type-11 one-byte-sigtype domain:
+/// 35-byte payload (`flags || 0x07 || 0x0b || public key`) with the IEEE
+/// CRC-32 of the public key XORed into the first three header bytes before
+/// I2P Base32 encoding, plus the `.b32.i2p` suffix. The encoded label is
+/// always exactly 56 characters. The secret itself is never encoded; only
+/// the public requirement flags travel in the address. The caller must
+/// supply a valid type-7 public key.
+pub fn encode_encrypted_service_b32(
+    unblinded_pubkey: &[u8; 32],
+    secret_required: bool,
+    auth_required: bool,
+) -> String {
+    let mut flags = 0u8;
+    if secret_required {
+        flags |= B32_FLAG_SECRET_REQUIRED;
+    }
+    if auth_required {
+        flags |= B32_FLAG_AUTH_REQUIRED;
+    }
+
+    let crc = crc32_ieee(unblinded_pubkey);
+    let mut wire = [0u8; EXTENDED_B32_DECODED_LEN];
+    wire[0] = flags ^ (crc & 0xff) as u8;
+    wire[1] = UNBLINDED_SIGTYPE as u8 ^ ((crc >> 8) & 0xff) as u8;
+    wire[2] = BLINDED_SIGTYPE as u8 ^ ((crc >> 16) & 0xff) as u8;
+    wire[3..].copy_from_slice(unblinded_pubkey);
+
+    let mut out = base32_encode(wire);
+    out.push_str(EXTENDED_B32_SUFFIX);
+    out
+}
+
+/// Decode and strictly validate an extended encrypted-service address.
+///
+/// Accepts ASCII case-insensitive input with the exact `.b32.i2p` suffix
+/// and exactly 56 label characters decoding to the 35-byte current-domain
+/// payload. Reverses the CRC XOR before interpreting flags and sigtypes,
+/// rejects reserved flag bits and the two-byte-sigtype form, requires
+/// sigtypes exactly 7 and 11, re-verifies the checksum shape through the
+/// header values, and validates the 32-byte public key through the frozen
+/// blinding-input gate before treating it as an address identity. Ordinary
+/// 52-character destination-hash addresses are rejected as this form.
+pub fn decode_encrypted_service_b32(host: &str) -> Result<EncryptedServiceAddress, Error> {
+    if !host.is_ascii() {
+        return Err(Error::InvalidData);
+    }
+    let lower = host.to_ascii_lowercase();
+    let label = lower.strip_suffix(EXTENDED_B32_SUFFIX).ok_or(Error::InvalidData)?;
+    if label.len() != EXTENDED_B32_LABEL_LEN {
+        return Err(Error::InvalidData);
+    }
+    let wire = base32_decode(label).ok_or(Error::InvalidData)?;
+    if wire.len() != EXTENDED_B32_DECODED_LEN {
+        return Err(Error::InvalidData);
+    }
+
+    let mut public_key = [0u8; 32];
+    public_key.copy_from_slice(&wire[3..]);
+
+    let crc = crc32_ieee(&public_key);
+    let flags = wire[0] ^ (crc & 0xff) as u8;
+    let unblinded_sigtype = wire[1] ^ ((crc >> 8) & 0xff) as u8;
+    let blinded_sigtype = wire[2] ^ ((crc >> 16) & 0xff) as u8;
+
+    if flags & B32_FLAG_TWO_BYTE_SIGTYPES != 0 {
+        return Err(Error::InvalidData);
+    }
+    if flags & 0xf8 != 0 {
+        return Err(Error::InvalidData);
+    }
+    if unblinded_sigtype != UNBLINDED_SIGTYPE as u8 || blinded_sigtype != BLINDED_SIGTYPE as u8 {
+        return Err(Error::InvalidData);
+    }
+
+    // Validate the public key through the frozen blinding-input gate
+    // (torsion-free, non-identity) with a fixed valid day/empty secret so
+    // only the key itself can fail here.
+    red25519::generate_alpha(
+        &public_key,
+        UNBLINDED_SIGTYPE,
+        BLINDED_SIGTYPE,
+        b"20200101",
+        b"",
+    )
+    .map_err(|_| Error::InvalidData)?;
+
+    Ok(EncryptedServiceAddress {
+        unblinded_public_key: public_key,
+        secret_required: flags & B32_FLAG_SECRET_REQUIRED != 0,
+        auth_required: flags & B32_FLAG_AUTH_REQUIRED != 0,
+    })
 }
 
 #[cfg(test)]
@@ -610,5 +831,237 @@ mod tests {
         let next = blinded_day_material(&seed, &UNBLINDED, b"20260910").expect("next day derives");
         assert_ne!(blinded.as_bytes(), next.1.as_bytes());
         assert_ne!(storage, next.3);
+    }
+
+    #[test]
+    fn lookup_secret_gates_utf8_and_reports_emptiness() {
+        let empty = LookupSecret::empty();
+        assert!(empty.is_empty());
+        assert_eq!(empty.len(), 0);
+        assert_eq!(empty.as_bytes(), b"");
+
+        let secret = LookupSecret::from_bytes(b"lookup-secret".to_vec()).expect("valid secret");
+        assert!(!secret.is_empty());
+        assert_eq!(secret.len(), 13);
+        assert_eq!(secret.as_bytes(), b"lookup-secret");
+
+        let empty_bytes = LookupSecret::from_bytes(Vec::new()).expect("empty bytes valid");
+        assert!(empty_bytes.is_empty());
+
+        assert!(LookupSecret::from_bytes(vec![0xff, 0xfe]).is_err());
+        assert!(LookupSecret::from_bytes(vec![0x80]).is_err());
+    }
+
+    #[test]
+    fn secret_aware_day_material_matches_direct_alpha() {
+        let seed = SigningSeed::from_bytes(SEED);
+
+        // Empty secret reproduces the unsecreted derivation exactly.
+        let secret = LookupSecret::empty();
+        let (alpha, blinded, _, storage) =
+            blinded_day_material_with_secret(&seed, &UNBLINDED, &DAY, &secret)
+                .expect("empty-secret derives");
+        let legacy = blinded_day_material(&seed, &UNBLINDED, &DAY).expect("legacy derives");
+        assert_eq!(alpha.as_bytes(), legacy.0.as_bytes());
+        assert_eq!(blinded.as_bytes(), legacy.1.as_bytes());
+        assert_eq!(storage, legacy.3);
+
+        // Nonempty secret matches the direct primitive known answer.
+        let secret = LookupSecret::from_bytes(b"lookup-secret".to_vec()).expect("valid secret");
+        let (secret_alpha, secret_blinded, secret_private, secret_storage) =
+            blinded_day_material_with_secret(&seed, &UNBLINDED, &DAY, &secret)
+                .expect("secret derives");
+        let direct = red25519::generate_alpha(&UNBLINDED, 7, 11, &DAY, b"lookup-secret")
+            .expect("direct secret alpha derives");
+        assert_eq!(secret_alpha.as_bytes(), direct.as_bytes());
+        assert_eq!(
+            red25519::derive_public(&secret_private),
+            secret_blinded,
+            "secret private/public agreement holds"
+        );
+        assert_eq!(
+            secret_storage,
+            red25519::blinded_storage_key(&secret_blinded)
+        );
+
+        // The secret changes the blinded identity deterministically.
+        assert_ne!(secret_blinded.as_bytes(), blinded.as_bytes());
+        assert_ne!(secret_storage, storage);
+        let again =
+            blinded_day_material_with_secret(&seed, &UNBLINDED, &DAY, &secret).expect("re-derives");
+        assert_eq!(secret_blinded.as_bytes(), again.1.as_bytes());
+        assert_eq!(secret_storage, again.3);
+
+        // A different secret yields a different blinded identity.
+        let other = LookupSecret::from_bytes(b"other-secret".to_vec()).expect("valid secret");
+        let (_, other_blinded, _, other_storage) =
+            blinded_day_material_with_secret(&seed, &UNBLINDED, &DAY, &other)
+                .expect("other secret derives");
+        assert_ne!(secret_blinded.as_bytes(), other_blinded.as_bytes());
+        assert_ne!(secret_storage, other_storage);
+
+        // Overlong secrets fail closed without truncation or fallback.
+        let long = LookupSecret::from_bytes(vec![b'x'; 65]).expect("stored without truncation");
+        assert_eq!(long.len(), 65);
+        assert!(blinded_day_material_with_secret(&seed, &UNBLINDED, &DAY, &long).is_err());
+    }
+
+    #[test]
+    fn crc32_ieee_matches_standard_check_value() {
+        assert_eq!(crc32_ieee(b""), 0x0000_0000);
+        assert_eq!(crc32_ieee(b"123456789"), 0xcbf4_3926);
+        assert_eq!(crc32_ieee(b"hello"), 0x3610_a686);
+    }
+
+    #[test]
+    fn extended_b32_vectors_pin_flags_crc_and_shape() {
+        // CRC over the fixture public key, pinned through the local helper
+        // and cross-checked against the `crc32_ieee` standard check above.
+        let crc = crc32_ieee(&UNBLINDED);
+        assert_eq!(crc, 0xe116_47f0);
+
+        // Byte-exact labels independently recomputed with `binascii.crc32`
+        // and RFC-4648 Base32 (lowercased I2P alphabet) over
+        // `flags || 0x07 || 0x0b || public key` with the CRC XOR applied.
+        let expected = [
+            (
+                false,
+                false,
+                "6bab3cui4poxicprsx6vfwznhs5f24wkm4e36hmucin7g5eiag2a6324.b32.i2p",
+            ),
+            (
+                true,
+                false,
+                "6jab3cui4poxicprsx6vfwznhs5f24wkm4e36hmucin7g5eiag2a6324.b32.i2p",
+            ),
+            (
+                false,
+                true,
+                "6rab3cui4poxicprsx6vfwznhs5f24wkm4e36hmucin7g5eiag2a6324.b32.i2p",
+            ),
+        ];
+
+        for (secret_required, auth_required, flags) in [
+            (false, false, 0x00u8),
+            (true, false, 0x02u8),
+            (false, true, 0x04u8),
+        ] {
+            let host = encode_encrypted_service_b32(&UNBLINDED, secret_required, auth_required);
+            assert!(
+                host.ends_with(EXTENDED_B32_SUFFIX),
+                "missing suffix: {host}"
+            );
+            let label = host.strip_suffix(EXTENDED_B32_SUFFIX).expect("suffix present");
+            assert_eq!(label.len(), EXTENDED_B32_LABEL_LEN);
+
+            let wire = base32_decode(label).expect("label decodes");
+            assert_eq!(wire.len(), EXTENDED_B32_DECODED_LEN);
+            assert_eq!(wire[0], flags ^ (crc & 0xff) as u8);
+            assert_eq!(wire[1], 7u8 ^ ((crc >> 8) & 0xff) as u8);
+            assert_eq!(wire[2], 11u8 ^ ((crc >> 16) & 0xff) as u8);
+            assert_eq!(&wire[3..], &UNBLINDED);
+
+            let decoded = decode_encrypted_service_b32(&host).expect("round-trips");
+            assert_eq!(decoded.unblinded_public_key, UNBLINDED);
+            assert_eq!(decoded.secret_required, secret_required);
+            assert_eq!(decoded.auth_required, auth_required);
+
+            let pinned = expected
+                .iter()
+                .find(|(s, a, _)| *s == secret_required && *a == auth_required)
+                .expect("pinned vector present");
+            assert_eq!(host, pinned.2);
+        }
+
+        // Combined flags round-trip for future authorization reuse.
+        let host = encode_encrypted_service_b32(&UNBLINDED, true, true);
+        let decoded = decode_encrypted_service_b32(&host).expect("round-trips");
+        assert!(decoded.secret_required);
+        assert!(decoded.auth_required);
+
+        // Decoding is ASCII case-insensitive.
+        let upper = encode_encrypted_service_b32(&UNBLINDED, true, false).to_ascii_uppercase();
+        let decoded = decode_encrypted_service_b32(&upper).expect("upper decodes");
+        assert_eq!(decoded.unblinded_public_key, UNBLINDED);
+        assert!(decoded.secret_required);
+        assert!(!decoded.auth_required);
+    }
+
+    #[test]
+    fn extended_b32_decoder_rejects_adversarial_inputs() {
+        let host = encode_encrypted_service_b32(&UNBLINDED, false, false);
+
+        // Ordinary destination-hash addresses are not the extended form.
+        assert!(decode_encrypted_service_b32(&base32_encode(UNBLINDED)).is_err());
+        assert!(decode_encrypted_service_b32(
+            "udhdrtrcetjm5sxzskjyr5ztpeszydbh4dpl3pl4utgqqw2v4jna.b32.i2p"
+        )
+        .is_err());
+
+        // Missing or wrong suffix.
+        let label = host.strip_suffix(EXTENDED_B32_SUFFIX).expect("suffix present");
+        assert!(decode_encrypted_service_b32(label).is_err());
+        assert!(decode_encrypted_service_b32(&format!("{label}.b32.i3p")).is_err());
+        assert!(decode_encrypted_service_b32("").is_err());
+
+        // Invalid Base32 and wrong decoded length.
+        assert!(decode_encrypted_service_b32(&format!("!{}.b32.i2p", &label[1..])).is_err());
+        assert!(decode_encrypted_service_b32(&format!("{}a.b32.i2p", &label[..55])).is_err());
+        assert!(decode_encrypted_service_b32(&format!("{label}aa.b32.i2p")).is_err());
+
+        // Reserved flag bits and two-byte-sigtype form.
+        let wire = base32_decode(label).expect("label decodes");
+        let crc = crc32_ieee(&UNBLINDED);
+        for bad_flags in [0x01u8, 0x08, 0x10, 0x80, 0xf8, 0xff] {
+            let mut bad = wire.clone();
+            bad[0] = bad_flags ^ (crc & 0xff) as u8;
+            let bad_host = format!("{}.b32.i2p", base32_encode(&bad));
+            assert!(
+                decode_encrypted_service_b32(&bad_host).is_err(),
+                "flags {bad_flags:#04x} were accepted"
+            );
+        }
+
+        // Wrong unblinded/blinded sigtype.
+        for (b1, b2) in [(7u8, 10u8), (6u8, 11u8), (11u8, 11u8), (7u8, 7u8)] {
+            let mut bad = wire.clone();
+            bad[1] = b1 ^ ((crc >> 8) & 0xff) as u8;
+            bad[2] = b2 ^ ((crc >> 16) & 0xff) as u8;
+            let bad_host = format!("{}.b32.i2p", base32_encode(&bad));
+            assert!(
+                decode_encrypted_service_b32(&bad_host).is_err(),
+                "sigtypes {b1}/{b2} were accepted"
+            );
+        }
+
+        // Invalid public keys never become address identities.
+        let zero_host = encode_encrypted_service_b32(&[0u8; 32], false, false);
+        assert!(decode_encrypted_service_b32(&zero_host).is_err());
+
+        // Checksum corruption in any header byte fails closed.
+        for index in 0..3 {
+            let mut bad = wire.clone();
+            bad[index] ^= 0x01;
+            assert!(
+                decode_encrypted_service_b32(&format!("{}.b32.i2p", base32_encode(&bad))).is_err(),
+                "corrupted header byte {index} was accepted"
+            );
+        }
+        let mut tampered = wire.clone();
+        tampered[0] ^= 0x08;
+        assert!(
+            decode_encrypted_service_b32(&format!("{}.b32.i2p", base32_encode(&tampered))).is_err()
+        );
+
+        // Corrupted public-key bytes fail through the checksum/point gates.
+        let mut bad_key = wire.clone();
+        bad_key[10] ^= 0x40;
+        assert!(
+            decode_encrypted_service_b32(&format!("{}.b32.i2p", base32_encode(&bad_key))).is_err()
+        );
+
+        // Trailing bytes after the hostname are not part of the codec.
+        assert!(decode_encrypted_service_b32(&format!("{host} ")).is_err());
+        assert!(decode_encrypted_service_b32(&format!("{host}x")).is_err());
     }
 }

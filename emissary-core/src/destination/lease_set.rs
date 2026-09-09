@@ -85,10 +85,10 @@ const STORAGE_VERIFICATION_TOTAL_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// Narrow generation-local publication configuration for modern type-5 mode.
 ///
-/// Carries the type-7 seed and unblinded public key from session
-/// construction into the publication owner. Secret material is never
-/// `Debug`-formattable. Ordinary mode uses `None` and retains exact
-/// prior behavior.
+/// Carries the type-7 seed, unblinded public key, and optional lookup
+/// secret from session construction into the publication owner. Secret
+/// material is never `Debug`-formattable. Ordinary mode uses `None` and
+/// retains exact prior behavior.
 #[derive(Clone)]
 pub struct EncryptedPublicationConfig {
     /// Type-7 signing seed.
@@ -96,14 +96,36 @@ pub struct EncryptedPublicationConfig {
 
     /// Unblinded type-7 signing public key.
     unblinded_public_key: [u8; 32],
+
+    /// Generation-local lookup secret (empty means unsecreted).
+    lookup_secret: els2::LookupSecret,
 }
 
 impl EncryptedPublicationConfig {
-    /// Create a new publication configuration.
+    /// Create a new unsecreted publication configuration.
     pub fn new(seed_bytes: [u8; 32], unblinded_public_key: [u8; 32]) -> Self {
         Self {
             seed: SigningSeed::from_bytes(seed_bytes),
             unblinded_public_key,
+            lookup_secret: els2::LookupSecret::empty(),
+        }
+    }
+
+    /// Create a new publication configuration with a lookup secret.
+    ///
+    /// The secret is owned for exactly one destination generation and is
+    /// used on every current-day and rollover blinding derivation. Core
+    /// keeps no persistent copy; a replacement generation carries only the
+    /// secret it is constructed with.
+    pub fn with_secret(
+        seed_bytes: [u8; 32],
+        unblinded_public_key: [u8; 32],
+        lookup_secret: els2::LookupSecret,
+    ) -> Self {
+        Self {
+            seed: SigningSeed::from_bytes(seed_bytes),
+            unblinded_public_key,
+            lookup_secret,
         }
     }
 }
@@ -431,8 +453,13 @@ impl<R: Runtime> LeaseSetManager<R> {
         let now_secs = R::time_since_epoch().as_secs();
         let day = els2::day_string_from_epoch_secs(now_secs);
         let (_, blinded_public, blinded_private, storage_key) =
-            els2::blinded_day_material(&config.seed, &config.unblinded_public_key, &day)
-                .map_err(|_| ())?;
+            els2::blinded_day_material_with_secret(
+                &config.seed,
+                &config.unblinded_public_key,
+                &day,
+                &config.lookup_secret,
+            )
+            .map_err(|_| ())?;
 
         let inner = LeaseSet2::parse::<R>(&self.lease_set).map_err(|_| ())?;
         if inner.is_expired::<R>() {
@@ -547,9 +574,13 @@ impl<R: Runtime> LeaseSetManager<R> {
         let config = self.encrypted_config.as_ref().ok_or(())?;
         let now_secs = R::time_since_epoch().as_secs();
         let day = els2::day_string_from_epoch_secs(now_secs);
-        let (_, blinded_public, _, storage_key) =
-            els2::blinded_day_material(&config.seed, &config.unblinded_public_key, &day)
-                .map_err(|_| ())?;
+        let (_, blinded_public, _, storage_key) = els2::blinded_day_material_with_secret(
+            &config.seed,
+            &config.unblinded_public_key,
+            &day,
+            &config.lookup_secret,
+        )
+        .map_err(|_| ())?;
         let boundary = els2::next_day_boundary_secs(now_secs);
         let delay = Duration::from_secs(boundary.saturating_sub(now_secs).max(1));
         self.key = Bytes::from(storage_key.to_vec());
@@ -3845,6 +3876,156 @@ mod tests {
         manager.register_lease_set(Bytes::from(vec![0u8; 10]));
         assert!(manager.encrypted_outer.is_none());
         assert!(matches!(manager.state, PublishState::Retry { .. }));
+
+        MockRuntime::set_time(None);
+    }
+
+    fn encrypted_test_manager_with_secret(
+        published_secs: u64,
+        seed_bytes: [u8; 32],
+        secret: &[u8],
+    ) -> (LeaseSetManager<MockRuntime>, [u8; 32], DestinationId) {
+        use crate::crypto::els2;
+        let (inner, signing_key, destination_id) = encrypted_test_inner(published_secs, seed_bytes);
+        let unblinded: [u8; 32] = AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap();
+        let (tp_handle, _tm_rx, _tp_tx, _srx) = TunnelPoolHandle::create();
+        let (netdb_handle, _netdb_rx) = NetDbHandle::create();
+        let noise_ctx = NoiseContext::new(
+            crate::crypto::StaticPrivateKey::random(MockRuntime::rng()),
+            Bytes::from(RouterId::random().to_vec()),
+        );
+        let mut manager = LeaseSetManager::<MockRuntime>::new(
+            Vec::new(),
+            destination_id.clone(),
+            tp_handle.sender(),
+            1usize,
+            netdb_handle,
+            noise_ctx,
+            ProfileStorage::new(&[], &[], None),
+            false,
+            inner,
+        );
+        let lookup_secret = els2::LookupSecret::from_bytes(secret.to_vec()).unwrap();
+        manager.enable_encrypted_publication(EncryptedPublicationConfig::with_secret(
+            seed_bytes,
+            unblinded,
+            lookup_secret,
+        ));
+        let _ = signing_key;
+        (manager, unblinded, destination_id)
+    }
+
+    #[tokio::test]
+    async fn encrypted_secret_publication_uses_secret_derived_key() {
+        use crate::{
+            crypto::els2,
+            primitives::{EncryptedLeaseSet2, LeaseSet2},
+        };
+
+        MockRuntime::set_time(Some(Duration::from_secs(1_788_000_000)));
+        let seed = [0x46u8; 32];
+        let (manager, unblinded, _) =
+            encrypted_test_manager_with_secret(1_788_000_000, seed, b"lookup-secret");
+        assert!(manager.is_encrypted());
+        assert!(manager.encrypted_outer.is_some());
+
+        let day = els2::day_string_from_epoch_secs(1_788_000_000);
+        let secret = els2::LookupSecret::from_bytes(b"lookup-secret".to_vec()).unwrap();
+        let (_, blinded, _, storage) = els2::blinded_day_material_with_secret(
+            &els2::SigningSeed::from_bytes(seed),
+            &unblinded,
+            &day,
+            &secret,
+        )
+        .unwrap();
+        assert_eq!(manager.key.to_vec(), storage.to_vec());
+        assert_eq!(manager.encrypted_blinded.unwrap(), *blinded.as_bytes());
+
+        // The secret-derived key differs from the unsecreted key.
+        let (_, plain_blinded, _, plain_storage) =
+            els2::blinded_day_material(&els2::SigningSeed::from_bytes(seed), &unblinded, &day)
+                .unwrap();
+        assert_ne!(blinded.as_bytes(), plain_blinded.as_bytes());
+        assert_ne!(storage, plain_storage);
+        assert_ne!(manager.key.to_vec(), plain_storage.to_vec());
+
+        // The outer object decrypts under the secret-derived subcredential.
+        let outer_bytes = manager.encrypted_outer.clone().unwrap();
+        let outer = EncryptedLeaseSet2::parse(&outer_bytes).unwrap();
+        assert_eq!(outer.blinded_public_key(), blinded.as_bytes());
+        let sub = els2::subcredential(&unblinded, blinded.as_bytes());
+        let recovered =
+            els2::decrypt_no_auth(&sub, outer.published(), outer.outer_ciphertext()).unwrap();
+        assert_eq!(recovered, manager.lease_set.to_vec());
+        assert!(LeaseSet2::parse::<MockRuntime>(&recovered).is_ok());
+
+        MockRuntime::set_time(None);
+    }
+
+    #[tokio::test]
+    async fn encrypted_rollover_retains_secret_contribution() {
+        use crate::crypto::els2;
+
+        let before = 1_788_000_000u64;
+        let after = els2::next_day_boundary_secs(before) + 10;
+        MockRuntime::set_time(Some(Duration::from_secs(before)));
+        let seed = [0x47u8; 32];
+        let (mut manager, unblinded, _) =
+            encrypted_test_manager_with_secret(before, seed, b"lookup-secret");
+        let old_key = manager.key.clone();
+
+        MockRuntime::set_time(Some(Duration::from_secs(after)));
+        manager.handle_rollover();
+        let new_key = manager.key.clone();
+        assert_ne!(old_key.to_vec(), new_key.to_vec());
+
+        // Rollover kept the generation-local secret: the new key matches a
+        // direct secret derivation for the new day, not the unsecreted one.
+        let day = els2::day_string_from_epoch_secs(after);
+        let secret = els2::LookupSecret::from_bytes(b"lookup-secret".to_vec()).unwrap();
+        let (_, blinded, _, storage) = els2::blinded_day_material_with_secret(
+            &els2::SigningSeed::from_bytes(seed),
+            &unblinded,
+            &day,
+            &secret,
+        )
+        .unwrap();
+        assert_eq!(new_key.to_vec(), storage.to_vec());
+        assert_eq!(manager.encrypted_blinded.unwrap(), *blinded.as_bytes());
+        let (_, _, _, plain_storage) =
+            els2::blinded_day_material(&els2::SigningSeed::from_bytes(seed), &unblinded, &day)
+                .unwrap();
+        assert_ne!(storage, plain_storage);
+
+        MockRuntime::set_time(None);
+    }
+
+    #[tokio::test]
+    async fn encrypted_secret_failure_never_falls_back_to_plain_key() {
+        use crate::crypto::els2;
+
+        MockRuntime::set_time(Some(Duration::from_secs(1_788_000_000)));
+        let seed = [0x48u8; 32];
+        // 65-byte valid UTF-8 secret exceeds the frozen derivation bound and
+        // fails closed at blinding derivation.
+        let (manager, _, destination_id) =
+            encrypted_test_manager_with_secret(1_788_000_000, seed, &[b'x'; 65]);
+        assert!(manager.is_encrypted());
+        assert!(manager.encrypted_outer.is_none());
+        assert!(matches!(manager.state, PublishState::Retry { .. }));
+        // No downgrade: the publication key was never switched to a
+        // secret-derived key nor left publishable as an empty-secret store.
+        assert_eq!(manager.key.to_vec(), destination_id.to_vec());
+
+        // Same seed without a secret still derives the unsecreted key, so a
+        // replacement generation never inherits the failed secret.
+        let (plain_manager, unblinded, _) = encrypted_test_manager(1_788_000_000, seed);
+        assert!(plain_manager.encrypted_outer.is_some());
+        let day = els2::day_string_from_epoch_secs(1_788_000_000);
+        let (_, _, _, plain_storage) =
+            els2::blinded_day_material(&els2::SigningSeed::from_bytes(seed), &unblinded, &day)
+                .unwrap();
+        assert_eq!(plain_manager.key.to_vec(), plain_storage.to_vec());
 
         MockRuntime::set_time(None);
     }

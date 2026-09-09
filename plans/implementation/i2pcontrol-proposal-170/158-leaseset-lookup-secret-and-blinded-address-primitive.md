@@ -1,6 +1,8 @@
 # M158 — LeaseSet Lookup-Secret and Blinded-Address Primitive
 
-Status: **registered / dependency-ready; M157 closed complete**
+Status: **closed as complete** (closure:
+`plans/closure/i2pcontrol-proposal-170/158-closure.md`; zero Proposal cells
+promoted; M095 remains `336/29/475`)
 
 Class: neutral/application LeaseSet privacy infrastructure
 

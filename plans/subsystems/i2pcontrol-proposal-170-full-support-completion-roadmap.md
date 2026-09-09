@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M158 registered**
+Status: **active / partial; M158 closed, no registered successor**
 
 Pinned Proposal authority:
 
@@ -13,7 +13,8 @@ Current machine authority:
 Current execution authority:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`;
-- sole registered implementation handoff: M158.
+- sole registered implementation handoff: none (M158 closed; M159 deferred
+  with satisfied hard dep, amendment pending).
 
 Current whole-surface qualification authority:
 
@@ -46,7 +47,9 @@ Full support means real externally observable behavior. Parser acceptance, persi
 - M155 re-froze the LeaseSet-security line and separated modern ELS2 from configurable Destination SigType.
 - M156 implemented the narrow neutral Red25519/blinding primitive with zero promotions.
 - M157 implemented and closed neutral type-5/no-auth Encrypted LeaseSet2 publication/storage verification/UTC rollover with zero promotions.
-- M158 has now been exact-path amended and registered.
+- M158 implemented and closed the neutral lookup-secret/blinding and
+  encrypted-service extended-B32 infrastructure with zero promotions
+  (`plans/closure/i2pcontrol-proposal-170/158-closure.md`).
 
 Historical closures remain immutable.
 
@@ -62,10 +65,10 @@ M156 narrow Red25519 + Ed25519 blinding              [CLOSED; ZERO PROMOTION]
 M157 modern type-5 Encrypted LeaseSet2 publication   [CLOSED; ZERO PROMOTION]
   |
   v
-M158 lookup-secret + blinded-address primitive       [REGISTERED; ZERO PROMOTION]
+M158 lookup-secret + blinded-address primitive       [CLOSED; ZERO PROMOTION]
   |
   v
-M159 PSK client-authorization primitive              [DEFERRED; ZERO PROMOTION]
+M159 PSK client-authorization primitive              [DEFERRED; HARD DEP SATISFIED, AMENDMENT PENDING]
   |
   v
 M160 DH/X25519 client-authorization primitive        [DEFERRED; ZERO PROMOTION]
@@ -81,9 +84,9 @@ M152 final whole-surface requalification             [DEFERRED; ZERO PROMOTION]
 
 M149-M151 are superseded historical drafts and must not be executed directly.
 
-## 5. M158 containment boundary
+## 5. M158 containment boundary (realized)
 
-M158 is a neutral zero-promotion infrastructure milestone using a **strict subset of already-realized M061 exact paths**:
+M158 was a neutral zero-promotion infrastructure milestone using a **strict subset of already-realized M061 exact paths**:
 
 1. `emissary-core/src/crypto/els2.rs`;
 2. `emissary-core/src/destination/lease_set.rs`;

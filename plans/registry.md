@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | subordinate to current corrective roadmap |
-| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **M158 registered / dependency-ready** |
+| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **no registered successor; M159 deferred (hard dep satisfied, amendment pending)** |
 | Post-M146 corrective | **historical through M154 / superseded** | `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` | M153 complete; M154 disposition C; M147 path blocked |
 | Residual primitive completion | **historical through M146 / superseded** | `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md` | M140-M145 complete; M146 blocked |
 | Session-lifecycle completion | **closed complete** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | M134 complete |
@@ -77,40 +77,56 @@ This does not block the narrower type-7 Ed25519 -> type-11 Red25519 blinded key 
 - M155: LeaseSet-security semantic/owner re-freeze; zero production/promotions.
 - M156: neutral Red25519/blinding primitive; zero promotions.
 - M157: neutral modern type-5/no-auth Encrypted LeaseSet2 publication/storage-verification/UTC-rollover primitive; zero promotions; exact ten-file production budget realized and reconciled in M061/M062.
+- M158: neutral standard lookup-secret/blinding and encrypted-service extended-B32 infrastructure; zero promotions; exact four-file production subset realized with M062 closure bookkeeping.
 
-M157 closure: `plans/closure/i2pcontrol-proposal-170/157-closure.md`.
+M158 closure: `plans/closure/i2pcontrol-proposal-170/158-closure.md`.
 
-## Registered handoff — M158
+## No registered handoff — M159 deferred
+
+Plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/159-leaseset-psk-client-authorization-primitive.md`.
+
+Status: **deferred / unregistered; M158 hard dependency satisfied, amendment pending**.
+
+M158 closed complete at `336/29/475` with zero promotions. Only M159 may
+be registered next, with exact M061/M062 authorization in that registration
+commit; its registration gate additionally requires an exact-path
+amendment (PSK format/ownership, work limits, custody boundaries,
+integration seams, exact files/dependencies, interop vectors) that M158
+does not write.
+
+## Closed handoff — M158 (realized record)
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/158-leaseset-lookup-secret-and-blinded-address-primitive.md`.
 
-Status: **registered / dependency-ready**.
+Status: **closed as complete** (`plans/closure/i2pcontrol-proposal-170/158-closure.md`).
 
-Hard dependency:
+Hard dependency (satisfied):
 
 - M157 closed complete at `a18fba7fa307d195f2a6e7c2cae57c554b07eba8`.
 
 Class:
 
 - neutral standard lookup-secret/blinding and encrypted-service extended-B32 infrastructure;
-- Proposal promotion budget **zero**.
+- Proposal promotion budget **zero** (observed; M095 remains `336/29/475`).
 
-### Exact production budget
+### Exact production budget (realized)
 
-M158 may modify exactly four existing production files:
+M158 modified exactly four existing production files:
 
 1. `emissary-core/src/crypto/els2.rs`;
 2. `emissary-core/src/destination/lease_set.rs`;
 3. `emissary-core/src/sam/parser.rs`;
 4. `emissary-core/src/sam/session.rs`.
 
-No new production file is authorized.
+No new production file was authorized or added.
 
-These four paths are already individually present in M061's realized exact allowlist from M060/M157. M158 therefore creates **no new M061 source-boundary waiver**. The milestone-specific four-file subset is frozen by the M158 plan and this registry; implementation outside the subset requires amendment before editing.
+These four paths are already individually present in M061's realized exact allowlist from M060/M157. M158 therefore creates **no new M061 source-boundary waiver**. The milestone-specific four-file subset was frozen by the M158 plan and this registry; implementation outside the subset would have required amendment before editing.
 
-M062 records the current M158 dependency budget:
+M062 records the realized M158 dependency budget:
 
 - no new direct dependency;
 - no Cargo manifest change;
@@ -168,11 +184,11 @@ It also does not add client-side blinded lookup/decryption, PSK/DH authorization
 
 M158 promotes **zero** Proposal cells. `OptionalLookup` remains blocked until M162 supplies the I2PControl mapping, persistent secret custody, redacted Get/rawConfig behavior, edit/restart transactionality, and all five server-family integrations.
 
-M095 must remain exactly `336/29/475` through M158.
+M095 remains exactly `336/29/475` after M158.
 
-### Hard stops
+### Hard stops (none triggered)
 
-Stop and amend before an edit if M158 requires:
+M158 closed without requiring:
 
 - any production file outside the exact four-file set;
 - any new dependency/manifest/lockfile/Yosemite change;
@@ -188,8 +204,8 @@ Only the next dependency-ready plan is registered at a time.
 | Milestone | Purpose | Status / budget |
 |---|---|---|
 | M157 | modern type-5 Encrypted LeaseSet2 publication/storage verification/UTC rollover | closed; 0 promotions |
-| M158 | lookup-secret + extended blinded-address primitive | **registered**; 0 promotions |
-| M159 | PSK client authorization | deferred; 0 promotions |
+| M158 | lookup-secret + extended blinded-address primitive | closed; 0 promotions |
+| M159 | PSK client authorization | deferred (hard dep satisfied, amendment pending); 0 promotions |
 | M160 | DH/X25519 client authorization | deferred; 0 promotions |
 | M161 | legacy AES/LS1 feasibility and contract gate | deferred; 0 production/promotions |
 | M162 | Proposal LeaseSet-field integration | deferred; conditional up to 15 |
@@ -234,10 +250,10 @@ M156 narrow Red25519/blinding                  [CLOSED]
 M157 modern Encrypted LS2 publication          [CLOSED]
   |
   v
-M158 lookup-secret + blinded address           [REGISTERED]
+M158 lookup-secret + blinded address           [CLOSED]
   |
   v
-M159 -> M160                                   [DEFERRED]
+M159 -> M160                                   [DEFERRED; M159 hard dep satisfied, amendment pending]
   |
   +--> M161 legacy AES/LS1 feasibility         [DEFERRED]
   |
@@ -261,9 +277,13 @@ M152 final requalification                     [DEFERRED]
 
 ## Registration rules
 
-1. M158 is the **only registered** Proposal-170 successor.
-2. Do not begin M159 until M158 closes and the registry explicitly advances it.
-3. M158 implementation must remain inside its exact four-file subset even though those files are already present in the broader historical M061 allowlist.
+1. No Proposal-170 successor is currently registered; only M159 may be
+   registered next, with exact M061/M062 authorization in that registration
+   commit.
+2. Do not begin M159 implementation until the registry explicitly registers
+   it (hard dependency satisfied by M158 closure; exact-path amendment
+   still pending).
+3. M158 implementation remained inside its exact four-file subset even though those files are already present in the broader historical M061 allowlist.
 4. No M159-M162/M152 candidate path is executable authority.
 5. Material architecture/path/dependency deviation requires an amendment before implementation.
 6. Closure evidence, not parser/serializer reachability, determines support.

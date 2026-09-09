@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M158 registered**.
+Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M158 closed, no registered successor**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -15,11 +15,11 @@ Roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-Sole registered handoff:
+Sole registered handoff: none (M158 closed complete; only M159 may be
+registered next, with exact M061/M062 authorization in that registration
+commit).
 
-- **M158** `158-leaseset-lookup-secret-and-blinded-address-primitive.md`.
-
-M158 has zero Proposal promotion budget and uses four already-realized M061 exact core owners. It authorizes no new source file, dependency, Cargo/lockfile change, Yosemite change, or I2PControl production source change.
+M158 had zero Proposal promotion budget and used four already-realized M061 exact core owners. It authorized no new source file, dependency, Cargo/lockfile change, Yosemite change, or I2PControl production source change.
 
 ## Immediate lineage
 
@@ -28,7 +28,7 @@ M158 has zero Proposal promotion budget and uses four already-realized M061 exac
 - M155 — closed complete; LeaseSet-security semantic/owner re-freeze.
 - M156 — closed complete; neutral Red25519/Ed25519 blinding primitive; zero promotions.
 - M157 — closed complete; modern type-5/no-auth Encrypted LeaseSet2 publication/storage verification/UTC rollover; zero promotions.
-- **M158 — registered**; standard lookup-secret contribution + encrypted-service extended B32; zero promotions.
+- **M158 — closed complete**; standard lookup-secret contribution + encrypted-service extended B32; zero promotions (`plans/closure/i2pcontrol-proposal-170/158-closure.md`).
 
 M146 `UseOutproxyPlugin` remains closed blocked ×4. M147/M148 configurable Destination `SigType` remains blocked ×10. Neither line is reopened.
 
@@ -117,10 +117,10 @@ M156 narrow Red25519 + Ed25519 blinding              [CLOSED]
 M157 modern Encrypted LeaseSet2 publication          [CLOSED]
   |
   v
-M158 lookup-secret + blinded-address primitive       [REGISTERED]
+M158 lookup-secret + blinded-address primitive       [CLOSED]
   |
   v
-M159 PSK client-authorization primitive              [DEFERRED]
+M159 PSK client-authorization primitive              [DEFERRED; HARD DEP SATISFIED, AMENDMENT PENDING]
   |
   v
 M160 DH client-authorization primitive               [DEFERRED]
@@ -147,4 +147,4 @@ Accepted authority remains ADR-0001 through ADR-0005, M061/M062 and M093.
 - No direct-clearnet fallback and no plaintext/unsecreted/unauthenticated LeaseSet downgrade.
 - External/upstream access remains read-only.
 
-Do not begin M159 until M158 closes and the registry explicitly advances it.
+Do not begin M159 implementation until the registry explicitly registers it (hard dependency satisfied by M158 closure; exact-path amendment still pending).

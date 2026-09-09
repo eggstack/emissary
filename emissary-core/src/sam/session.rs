@@ -17,7 +17,9 @@
 // DEALINGS IN THE SOFTWARE.
 
 use crate::{
-    crypto::{base32_decode, base32_encode, base64_encode, sha256::Sha256, SigningPrivateKey},
+    crypto::{
+        base32_decode, base32_encode, base64_encode, els2, sha256::Sha256, SigningPrivateKey,
+    },
     destination::{
         session::parse_bundle_reply_lease_set, DeliveryStyle, Destination, DestinationEvent,
         EncryptedPublicationConfig, LeaseSetStatus,
@@ -240,6 +242,24 @@ impl IdlePolicy {
     }
 }
 
+/// Select the opaque server-destination event address.
+///
+/// Published type-5 generations expose the canonical extended
+/// encrypted-service address for the unblinded type-7 public key with the
+/// public secret-required flag and no client-auth flag. All other
+/// destinations keep the ordinary destination-hash address byte-for-byte.
+fn server_destination_address(
+    destination_id: &DestinationId,
+    type5_public_key: Option<([u8; 32], bool)>,
+) -> String {
+    match type5_public_key {
+        Some((public_key, secret_required)) => {
+            els2::encode_encrypted_service_b32(&public_key, secret_required, false)
+        }
+        None => base32_encode(destination_id.to_vec()),
+    }
+}
+
 /// Next generation-local idle owner identifier.
 ///
 /// Each `SamSession` captures one value at activation. The timer is
@@ -415,6 +435,7 @@ impl<R: Runtime> SamSession<R> {
                 destination,
                 private_key,
                 signing_key,
+                lookup_secret,
             } = destination;
             let destination_id = destination.id();
 
@@ -458,12 +479,32 @@ impl<R: Runtime> SamSession<R> {
             );
 
             // publish the new destination to the event system
+            //
+            // Published type-5 destinations expose the canonical extended
+            // encrypted-service address through the existing opaque address
+            // string. The secret itself is never encoded; only the public
+            // requirement flag reflects the generation-local secret.
+            // Ordinary destinations keep the exact prior address behavior.
             if is_unpublished {
                 event_handle.client_destination_started(session_id.to_string());
             } else {
+                let type5_public_key = match is_type5_requested(&options)
+                    && is_valid_type5_no_auth(&options)
+                {
+                    false => None,
+                    true => {
+                        let public_bytes: [u8; 32] = AsRef::<[u8]>::as_ref(&signing_key.public())
+                            .try_into()
+                            .unwrap_or([0u8; 32]);
+                        match public_bytes != [0u8; 32] {
+                            false => None,
+                            true => Some((public_bytes, !lookup_secret.is_empty())),
+                        }
+                    }
+                };
                 event_handle.server_destination_started(
                     session_id.to_string(),
-                    base32_encode(destination_id.to_vec()),
+                    server_destination_address(&destination_id, type5_public_key),
                 );
             }
 
@@ -483,22 +524,35 @@ impl<R: Runtime> SamSession<R> {
             // fail-safe to enabled (preserves current behavior). Disabled suppresses
             // `ExistingSession` update bundling; `NewSession` retains mandatory bundling.
             session_destination.set_bundle_reply_lease_set(parse_bundle_reply_lease_set(&options));
-            // Modern type-5 no-auth publication: validated before allocation in
+            // Modern type-5 publication: validated before allocation in
             // the parser gate and re-validated here. The canonical ordinary
             // inner object remains the signing source; the publication owner
             // wraps it for floodfill use while session use stays ordinary.
             // Invalid companion combinations never reach this owner through
             // the socket path; direct construction enables only the exact
-            // valid subset and otherwise retains ordinary behavior.
+            // valid subset and otherwise retains ordinary behavior. The
+            // generation-local secret moves once into the publication
+            // configuration; crypto or build failure never falls back to
+            // unsecreted or ordinary publication.
             if is_type5_requested(&options) && is_valid_type5_no_auth(&options) {
                 let seed_bytes: [u8; 32] =
                     AsRef::<[u8]>::as_ref(&*signing_key).try_into().unwrap_or([0u8; 32]);
                 let public_bytes: [u8; 32] =
                     AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap_or([0u8; 32]);
                 if seed_bytes != [0u8; 32] && public_bytes != [0u8; 32] {
-                    session_destination.enable_encrypted_publication(
-                        EncryptedPublicationConfig::new(seed_bytes, public_bytes),
-                    );
+                    if lookup_secret.is_empty() {
+                        session_destination.enable_encrypted_publication(
+                            EncryptedPublicationConfig::new(seed_bytes, public_bytes),
+                        );
+                    } else {
+                        session_destination.enable_encrypted_publication(
+                            EncryptedPublicationConfig::with_secret(
+                                seed_bytes,
+                                public_bytes,
+                                lookup_secret,
+                            ),
+                        );
+                    }
                 }
             }
             // TODO: not needed anymore?
@@ -2144,6 +2198,7 @@ mod tests {
                     destination,
                     private_key: Vec::new(),
                     signing_key: Box::new(signing_key),
+                    lookup_secret: els2::LookupSecret::empty(),
                 },
                 event_handle,
                 inbound: Default::default(),
@@ -2777,6 +2832,7 @@ mod tests {
                     destination,
                     private_key: Vec::new(),
                     signing_key: Box::new(signing_key),
+                    lookup_secret: els2::LookupSecret::empty(),
                 },
                 event_handle,
                 inbound: Default::default(),
@@ -2870,6 +2926,38 @@ mod tests {
                 !debug.contains(forbidden),
                 "diagnostic contains forbidden term {forbidden}: {debug}"
             );
+        }
+    }
+
+    #[test]
+    fn server_destination_address_keeps_ordinary_form_without_type5() {
+        let signing_key = SigningPrivateKey::random(MockRuntime::rng());
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+        let destination_id = destination.id();
+
+        let address = server_destination_address(&destination_id, None);
+        assert_eq!(address, base32_encode(destination_id.to_vec()));
+        assert_eq!(address.len(), 52);
+    }
+
+    #[test]
+    fn server_destination_address_emits_extended_form_for_type5() {
+        let signing_key = SigningPrivateKey::random(MockRuntime::rng());
+        let public_bytes: [u8; 32] =
+            AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap();
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+        let destination_id = destination.id();
+
+        for secret_required in [false, true] {
+            let address =
+                server_destination_address(&destination_id, Some((public_bytes, secret_required)));
+            assert!(address.ends_with(".b32.i2p"));
+            assert_ne!(address, base32_encode(destination_id.to_vec()));
+
+            let decoded = els2::decode_encrypted_service_b32(&address).expect("address decodes");
+            assert_eq!(decoded.unblinded_public_key, public_bytes);
+            assert_eq!(decoded.secret_required, secret_required);
+            assert!(!decoded.auth_required);
         }
     }
 

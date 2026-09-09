@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M154 LeaseSet-Security Corrective Roadmap
 
-Status: **active / partial; M155-M157 closed, M158 registered**
+Status: **active / partial; M155-M158 closed, no registered successor**
 
 This roadmap supersedes the LeaseSet-security execution ordering in the older residual and post-M146 roadmaps while preserving M146/M147/M154 closures as historical evidence.
 
@@ -13,7 +13,8 @@ Current authority:
 - M155 closed semantic/owner re-freeze;
 - M156 closed neutral Red25519/blinding primitive;
 - M157 closed modern Encrypted LeaseSet2 publication with zero promotions;
-- **M158 is the sole registered successor**.
+- **no registered successor (M158 closed; M159 deferred with satisfied hard
+  dep, amendment pending)**.
 
 ## 1. Corrective architecture
 
@@ -87,10 +88,10 @@ M156 narrow Red25519/blinding primitive             [CLOSED; ZERO PROMOTION]
 M157 modern Encrypted LeaseSet2 publication         [CLOSED; ZERO PROMOTION]
   |
   v
-M158 lookup-secret + blinded-address primitive      [REGISTERED; ZERO PROMOTION]
+M158 lookup-secret + blinded-address primitive      [CLOSED; ZERO PROMOTION]
   |
   v
-M159 PSK client-authorization primitive             [DEFERRED; ZERO PROMOTION]
+M159 PSK client-authorization primitive             [DEFERRED; HARD DEP SATISFIED, AMENDMENT PENDING]
   |
   v
 M160 DH client-authorization primitive              [DEFERRED; ZERO PROMOTION]
@@ -104,7 +105,7 @@ M162 Proposal LeaseSet-field integration            [DEFERRED; CONDITIONAL PROMO
 M152 final residual requalification                 [DEFERRED; ZERO PROMOTION]
 ```
 
-Only M158 is executable now.
+Only M159 may be registered next (exact-path amendment pending).
 
 ## 5. Milestone intents
 
@@ -114,9 +115,11 @@ Closed complete. Type-5 outer framing, nested no-auth encryption, blinded storag
 
 ### M158 — lookup secret and blinded address
 
-Registered. Add the standard Base64(UTF8) lookup-secret contribution to the existing daily blinding/publication path and implement the canonical encrypted-service extended `.b32.i2p` format.
-
-M158 does not persist I2PControl secrets, add client-side NetDB lookup/decryption, or promote `OptionalLookup`. Those administrative/runtime-integration semantics remain M162 work.
+Closed complete. Standard Base64(UTF8) lookup-secret contribution to the
+existing daily blinding/publication path plus the canonical
+encrypted-service extended `.b32.i2p` codec. Zero Proposal promotions;
+`OptionalLookup` administrative/runtime-integration semantics remain M162
+work.
 
 ### M159 — PSK client authorization
 

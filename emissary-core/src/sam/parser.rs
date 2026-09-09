@@ -17,7 +17,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 use crate::{
-    crypto::{base32_decode, base64_decode, SigningPrivateKey},
+    crypto::{base32_decode, base64_decode, els2::LookupSecret, SigningPrivateKey},
     primitives::{Destination, DestinationId, Str},
     runtime::Runtime,
 };
@@ -59,13 +59,41 @@ pub fn is_type5_requested(options: &HashMap<String, String>) -> bool {
     options.get("i2cp.leaseSetType").is_some_and(|value| value.trim() == "5")
 }
 
+/// Decode a standard lookup-secret property value.
+///
+/// The standard representation is Base64 of the UTF-8 secret bytes. An
+/// absent or blank value means no secret. Invalid Base64 or invalid UTF-8
+/// fails closed before session allocation. No length limit beyond the
+/// surrounding command framing is imposed here and valid input is never
+/// truncated; overlong secrets fail closed at blinding derivation without
+/// falling back to unsecreted publication.
+fn parse_lookup_secret_value(value: &str) -> Result<LookupSecret, ()> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(LookupSecret::empty());
+    }
+    let decoded = base64_decode(trimmed).ok_or_else(|| {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed lookup secret",
+        );
+    })?;
+    LookupSecret::from_bytes(decoded).map_err(|_| {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with non-UTF8 lookup secret",
+        );
+    })
+}
+
 /// Validate standard type-5 no-auth companion state before allocation.
 ///
-/// Returns true only when type 5 is requested with the exact no-auth,
-/// no-secret subset: legacy AES flag absent/false, secret/auth companions
-/// absent, per-client entries absent, and publication enabled. Any other
-/// type-5 combination fails closed for successor work. Absent type 5
-/// preserves ordinary behavior and returns false without further checks.
+/// Returns true only when type 5 is requested with the exact no-auth
+/// subset: legacy AES flag absent/false, secret companion absent/empty or a
+/// valid standard Base64-encoded UTF-8 lookup secret, per-client entries
+/// absent, and publication enabled. Any other type-5 combination fails
+/// closed for successor work. Absent type 5 preserves ordinary behavior
+/// and returns false without further checks.
 ///
 /// This gate consumes only standard session properties and never
 /// interprets administrative strings.
@@ -79,8 +107,10 @@ pub fn is_valid_type5_no_auth(options: &HashMap<String, String>) -> bool {
     {
         return false;
     }
-    if options.get("i2cp.leaseSetSecret").is_some_and(|value| !value.trim().is_empty()) {
-        return false;
+    if let Some(value) = options.get("i2cp.leaseSetSecret") {
+        if !value.trim().is_empty() && parse_lookup_secret_value(value.trim()).is_err() {
+            return false;
+        }
     }
     if options.get("i2cp.leaseSetAuthType").is_some_and(|value| {
         let trimmed = value.trim();
@@ -237,6 +267,12 @@ pub struct DestinationContext {
 
     /// Signing key of the destination.
     pub signing_key: Box<SigningPrivateKey>,
+
+    /// Generation-local lookup secret for type-5 publication.
+    ///
+    /// Empty means unsecreted. Secret material: never `Debug`- or
+    /// display-formattable; the custom `Debug` below omits all fields.
+    pub lookup_secret: LookupSecret,
 }
 
 impl fmt::Debug for DestinationContext {
@@ -251,6 +287,7 @@ impl PartialEq for DestinationContext {
             && AsRef::<[u8]>::as_ref(&self.private_key) == AsRef::<[u8]>::as_ref(&other.private_key)
             && AsRef::<[u8]>::as_ref(&*self.signing_key)
                 == AsRef::<[u8]>::as_ref(&*other.signing_key)
+            && self.lookup_secret == other.lookup_secret
     }
 }
 
@@ -598,6 +635,16 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                     }
                 };
 
+                // Extract the standard lookup secret before allocation and
+                // remove it from generic option state so neither its Base64
+                // form nor its decoded bytes survive in `SamCommand` options
+                // or later debug-capable surfaces. Malformed values fail
+                // before the session is constructed.
+                let lookup_secret = match parsed_cmd.key_value_pairs.remove("i2cp.leaseSetSecret") {
+                    None => LookupSecret::empty(),
+                    Some(value) => parse_lookup_secret_value(value)?,
+                };
+
                 let destination = match parsed_cmd.key_value_pairs.remove("DESTINATION") {
                     Some("TRANSIENT") => {
                         let signing_key = SigningPrivateKey::random(R::rng());
@@ -612,6 +659,7 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                                 bytes
                             },
                             signing_key: Box::new(signing_key),
+                            lookup_secret,
                         }
                     }
                     Some(destination) => {
@@ -655,6 +703,7 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                             signing_key: Box::new(
                                 SigningPrivateKey::from_bytes(signing_key).expect("to succeed"),
                             ),
+                            lookup_secret,
                         }
                     }
                     None => {
@@ -2298,11 +2347,37 @@ mod tests {
         )
         .is_none());
 
-        // Secret companion rejected until successor work.
-        assert!(SamCommand::parse::<MockRuntime>(
+        // Standard lookup secret companion is accepted: Base64(UTF-8).
+        match SamCommand::parse::<MockRuntime>(
             "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
              i2cp.leaseSetType=5 i2cp.leaseSetSecret=c2VjcmV0",
+        ) {
+            Some(SamCommand::CreateSession {
+                options,
+                destination,
+                ..
+            }) => {
+                assert!(is_type5_requested(&options));
+                assert!(is_valid_type5_no_auth(&options));
+                // The source property is removed from generic option state.
+                assert!(!options.contains_key("i2cp.leaseSetSecret"));
+                assert!(!options.values().any(|value| value.contains("c2VjcmV0")));
+                assert_eq!(destination.lookup_secret.as_bytes(), b"secret");
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+
+        // Malformed lookup secrets fail before allocation.
+        assert!(SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetSecret=!!!not-base64!!!",
         )
+        .is_none());
+        let non_utf8 = base64_encode(vec![0xffu8, 0xfe]);
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetSecret={non_utf8}",
+        ))
         .is_none());
 
         // Auth-type companions rejected.
@@ -2359,5 +2434,74 @@ mod tests {
             "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT i2cp.leaseSetType=7",
         )
         .is_none());
+    }
+
+    #[test]
+    fn type5_lookup_secret_absent_and_empty_preserve_unsecreted_path() {
+        // Absent secret: empty secret travels in the context, options stay clean.
+        match SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT i2cp.leaseSetType=5",
+        ) {
+            Some(SamCommand::CreateSession {
+                options,
+                destination,
+                ..
+            }) => {
+                assert!(is_valid_type5_no_auth(&options));
+                assert!(!options.contains_key("i2cp.leaseSetSecret"));
+                assert!(destination.lookup_secret.is_empty());
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+
+        // Empty and blank values mean no secret. The generic SAM value
+        // grammar cannot express an empty value on the wire, so an empty
+        // secret arrives as an absent property; the unit-level helper
+        // proves blank input maps to the empty secret.
+        assert!(parse_lookup_secret_value("").unwrap().is_empty());
+        assert!(parse_lookup_secret_value("   ").unwrap().is_empty());
+    }
+
+    #[test]
+    fn type5_lookup_secret_never_leaks_through_debug_surfaces() {
+        let secret_b64 = base64_encode(b"top-secret-lookup");
+        let command = format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetSecret={secret_b64}",
+        );
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(cmd @ SamCommand::CreateSession { .. }) => {
+                let debug = format!("{cmd:?}");
+                assert!(
+                    !debug.contains(&secret_b64),
+                    "generic command debug leaks the secret"
+                );
+                assert!(
+                    !debug.contains("top-secret-lookup"),
+                    "generic command debug leaks decoded bytes"
+                );
+                if let SamCommand::CreateSession { destination, .. } = &cmd {
+                    let context_debug = format!("{destination:?}");
+                    assert!(
+                        !context_debug.contains(&secret_b64),
+                        "context debug leaks the secret"
+                    );
+                    assert!(
+                        !context_debug.contains("top-secret-lookup"),
+                        "context debug leaks decoded bytes"
+                    );
+                    assert_eq!(destination.lookup_secret.as_bytes(), b"top-secret-lookup");
+                }
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+
+        // Same destination and secret reproduce the same context secret.
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(SamCommand::CreateSession { destination, .. }) => {
+                assert_eq!(destination.lookup_secret.as_bytes(), b"top-secret-lookup");
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
     }
 }

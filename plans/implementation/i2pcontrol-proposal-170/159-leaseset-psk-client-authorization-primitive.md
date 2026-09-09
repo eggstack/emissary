@@ -1,6 +1,13 @@
 # M159 — Encrypted LeaseSet PSK Client-Authorization Primitive
 
-Status: **deferred / unregistered; hard-depends on M158 closure**
+Status: **deferred / unregistered; M158 hard dependency satisfied, amendment pending**
+
+> M158 closed complete (`plans/closure/i2pcontrol-proposal-170/158-closure.md`),
+> satisfying this milestone's hard dependency. Registration additionally
+> requires an exact-path amendment (PSK format/ownership, work limits,
+> custody boundaries, integration seams, exact files/dependencies, interop
+> vectors) authored at M159 registration. This file is otherwise unchanged;
+> no production work is authorized by this note.
 
 Class: neutral cryptographic authorization infrastructure
 

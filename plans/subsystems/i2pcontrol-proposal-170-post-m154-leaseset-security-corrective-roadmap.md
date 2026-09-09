@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M154 LeaseSet-Security Corrective Roadmap
 
-Status: **active / partial; M155-M159 closed, M160 deferred (hard dep satisfied, registration pending)**
+Status: **active / partial; M155-M159 closed, M160 registered**
 
 This roadmap supersedes the LeaseSet-security execution ordering in the older residual and post-M146 roadmaps while preserving M146/M147/M154 closures as historical evidence.
 
@@ -11,7 +11,7 @@ Current authority:
 - M146 `UseOutproxyPlugin` ×4 closed blocked;
 - M154 configurable Destination `SigType` ×10 closed blocked;
 - M155-M159 closed with zero Proposal promotions;
-- **no registered successor; M160 deferred with satisfied hard dep, registration pending**.
+- **M160 is the sole registered successor**.
 
 ## 1. Corrective architecture
 
@@ -59,40 +59,38 @@ Non-per-user PSK/DH modes still use the persistent base key; indexed entries are
 - No secret/PSK/DH/private key material in logs/debug/Get/rawConfig outside exact safe Proposal semantics.
 - M147/M148 and M146 remain separate blocked lines.
 
-## 4. Closed handoff — M159 (realized record)
+## 4. Current exact handoff — M160
 
-M159 exact production set (realized):
+M160 exact production set:
 
 1. `emissary-core/src/crypto/els2.rs`;
 2. `emissary-core/src/destination/lease_set.rs`;
 3. `emissary-core/src/sam/parser.rs`;
 4. `emissary-core/src/sam/session.rs`.
 
-All four are already realized M061 owners. M159 added no file/dependency/Cargo/lock/Yosemite/I2PControl production change.
+All four are already realized M061 owners. M160 adds no file/dependency/Cargo/lock/Yosemite/I2PControl production change.
 
-M159 added standard PSK layer-1 authorization only, with:
+M159 closed record: standard PSK layer-1 authorization with flags `0x03`, fresh auth cookie/salt, `ELS2PSKA` schedule, duplicate-preserving records, and zero promotions (closure: `plans/closure/i2pcontrol-proposal-170/159-closure.md`).
 
-- auth flags `0x03`;
-- fresh auth cookie/auth salt per regenerated object;
-- `ELS2PSKA` 52-byte HKDF schedule;
+M160 adds standard DH layer-1 authorization only, with:
+
+- auth flags `0x01`;
+- fresh ephemeral X25519 keypair + fresh auth cookie per regenerated object;
+- `ELS2_XCA` 52-byte HKDF schedule with explicit all-zero shared-secret rejection;
 - client ID + encrypted-cookie records (duplicates preserved);
 - auth-cookie-bound L2 (L1 unchanged);
 - randomized multi-client order;
 - pinned Java 4096-byte encrypted-data ceiling as the allocation/O(N) work bound;
-- standard parser extraction/redaction of `leaseSetPrivKey` and indexed PSK properties;
+- standard parser extraction/redaction of `leaseSetPrivKey` and indexed DH properties;
 - zero Proposal promotions.
-
-Closure: `plans/closure/i2pcontrol-proposal-170/159-closure.md`.
 
 ## 5. Deferred plans reviewed/pre-corrected
 
 ### M160 — DH/X25519
 
-Deferred with satisfied hard dep (M159 closed); registration pending. Its owner/dependency envelope revalidates cleanly to the same four exact files and zero new dependencies.
+Registered with the same four exact files and zero new dependencies (revalidated at registration against the M159 closure).
 
 It must use existing X25519 support, standard DH flags/ephemeral-key construction, explicit all-zero shared-secret rejection, the same 4096-byte O(N) bound, randomized records, duplicate preservation, and no persistent core secret state.
-
-M159 closure preserves these owners, so M160 may be registered directly with exact M061/M062 authorization; no generic exact-path research milestone is required.
 
 ### M161 — legacy AES/LS1 gate
 
@@ -140,7 +138,7 @@ M158 lookup-secret + blinded address           [CLOSED]
 M159 PSK client authorization                  [CLOSED]
   |
   v
-M160 DH/X25519 client authorization            [DEFERRED; HARD DEP SATISFIED, REGISTRATION PENDING]
+M160 DH/X25519 client authorization            [REGISTERED]
   |
   v
 M161 legacy AES/LS1 feasibility                [DEFERRED; ZERO PRODUCTION]
@@ -152,7 +150,7 @@ M162 Proposal field integration                [DEFERRED; CONDITIONAL PROMOTIONS
 M152 final whole-surface requalification       [DEFERRED; ZERO PROMOTIONS]
 ```
 
-No milestone is executable now; only M160 may be registered next.
+Only M160 is executable now.
 
 ## 7. Promotion ceilings
 

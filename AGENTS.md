@@ -31,48 +31,35 @@ cargo test -p emissary-cli --no-default-features --features i2pcontrol
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 ```
 
-I2PControl supports the Proposal 170 contract. Its I2PControl-owned runtime primitives and
-specialized backends provide bounded local-listener, accepted-stream, and Streamr datagram
-lifecycle ownership plus fail-before-allocation option validation. Tunnel data-plane backends
-and inspection sources without a canonical Emissary owner remain explicit unsupported/unavailable
-responses. Keep changes within `emissary-cli/src/i2pcontrol/` and its composition seams; do not
-turn the administrative API into a router lifecycle or protocol implementation.
+I2PControl supports a large partial subset of Proposal 170. Its I2PControl-owned runtime primitives and specialized backends provide bounded local-listener, accepted-stream, and Streamr datagram lifecycle ownership plus fail-before-allocation option validation. Tunnel data-plane backends and options without a canonical Emissary owner remain explicit unsupported/unavailable responses. Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` wherever possible; do not turn the administrative API into a router lifecycle or protocol implementation.
 
-The current implemented-subset runtime/security qualification authority is M139
-(`plans/closure/i2pcontrol-proposal-170/139-closure.md`); M130 remains historical evidence.
-M140 (`plans/closure/i2pcontrol-proposal-170/140-closure.md`) is closed as complete
-as the residual streaming applicability re-freeze with zero promotions.
-M141 (`plans/closure/i2pcontrol-proposal-170/141-closure.md`) is closed as complete
-as the HTTP unique-local source-address completion with 2 promotions.
-M142 (`plans/closure/i2pcontrol-proposal-170/142-closure.md`) is closed as complete
-as the HTTP SSLProxies + JumpList completion with 2 promotions.
-M143 (`plans/closure/i2pcontrol-proposal-170/143-closure.md`) is closed as complete
-as the retained streaming Profile completion with 1 promotion.
-M144 (`plans/closure/i2pcontrol-proposal-170/144-closure.md`) is closed as complete
-as the presentation UseSSL completion with 4 promotions.
-M145 (`plans/closure/i2pcontrol-proposal-170/145-closure.md`) is closed as complete
-as the LeaseSet reply-bundling completion with 2 promotions.
-M146 (`plans/closure/i2pcontrol-proposal-170/146-closure.md`) is closed as blocked
-as the outproxy-provider feasibility gate with zero promotions (four
-`UseOutproxyPlugin` cells remain blocked; no safe I2P-routed provider in budget).
+Current Proposal-170 planning authority:
 
-The current Proposal 170 baseline remains partial: RouterInfo is 43 additions with
-42 available, 1 protocol-permitted neutral, and 0 unavailable; AddressBook all 13
-SetConfig keys are operational; and unapplied runtime options (including
-10 SigType, 4 UseOutproxyPlugin client proxy/lifecycle (with Streamr ConnectDelay
-re-frozen as not_applicable by M140, HTTP SSLProxies/JumpList applied by M142,
-retained Profile:client applied by M143, presentation UseSSL applied by M144,
-and reply LeaseSet bundling applied by M145),
-and 15 server LeaseSet/presentation cells (M141 applies 2 UniqueLocalAddressPerClient cells),
-with client idle `Reduce*` applied by M136, `Close`/`CloseTime` applied by M137,
-and `NewDest` proven-resume applied by M134)
-fail before allocation. The authoritative completion inventory is
-`plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (336
-apply / 29 blocked_primitive / 475 not_applicable after M145, unchanged by M146 blocked).
+- M139 remains historical whole-surface qualification evidence but predates M141-M145 production changes;
+- M140 closed as the residual streaming applicability re-freeze;
+- M141 closed with 2 `UniqueLocalAddressPerClient` promotions;
+- M142 closed with 2 HTTP `SSLProxies`/`JumpList` promotions;
+- M143 closed with 1 retained `Profile:client` promotion through neutral streaming owners;
+- M144 closed with 4 application `UseSSL` promotions;
+- M145 closed with 2 `MultiHoming`/reply-LeaseSet-bundling promotions; accepted production evidence includes no-std/format follow-up `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2`;
+- M146 closed as blocked with zero promotions: four `UseOutproxyPlugin` cells remain blocked because no real safe provider exists in current architecture;
+- **M153 is the sole registered handoff**: `plans/implementation/i2pcontrol-proposal-170/153-post-m146-current-head-requalification-and-authority-rebase.md`;
+- M154 is deferred as the mandatory pre-registration SigType/security/exact-owner audit before M147;
+- M147-M152 remain deferred/unregistered.
 
-Streamr is intentionally separate from TCP tunnel helpers. Preserve its documented
-16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh,
-and bounded shutdown limits. Remote datagrams must never choose a local UDP destination.
+Current execution roadmap:
+
+- `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md`.
+
+The authoritative matrix is `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` at `336 apply / 29 blocked_primitive / 475 not_applicable` after M145, unchanged by blocked M146. Remaining blockers are exactly 10 `SigType`, 15 LeaseSet-security (`EncryptLeaseSet`/`OptionalLookup`/`LeaseSetClientAuths`), and 4 `UseOutproxyPlugin`.
+
+M153 has zero Proposal-promotion and zero production-code/dependency budget. It exists to restore a truthful current-head integrated qualification, reconcile stale historical aggregate test assertions, correct M095 production-head metadata, and requalify M140-M146 plus earlier security/lifecycle invariants. Any production fix required during M153 is a stop condition requiring a separate corrective plan.
+
+Do not register M147 directly after M153. M154 must first freeze the exact signature-type domain, algorithm security disposition, current generate/sign/verify/serialize/persist capability, persistence/migration implications, maintained dependencies, and exact-file M061/M062 ownership. Broad `crypto/`, `netdb/`, `i2np/`, `destination/` or `primitives/` waivers are prohibited.
+
+M146 remains terminal blocked under the current security architecture. Do not create a dummy provider, alias `ProxyList`, or add direct-clearnet DNS/TCP egress merely to promote `UseOutproxyPlugin`. A future provider successor requires a separate explicit architecture/security decision and plan.
+
+Streamr is intentionally separate from TCP tunnel helpers. Preserve its documented 16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh, and bounded shutdown limits. Remote datagrams must never choose a local UDP destination.
 
 Fuzz targets (requires nightly):
 ```bash

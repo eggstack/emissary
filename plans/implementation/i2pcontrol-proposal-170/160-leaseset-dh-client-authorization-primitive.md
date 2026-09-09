@@ -27,6 +27,8 @@ i2cp.leaseSetClient.dh.N = [Base64(UTF8(name)) ":"] Base64(32B X25519 public key
 
 Java includes the public key derived from `leaseSetPrivKey` in the authorized client set and then appends indexed DH client public keys. Therefore a DH generation requires the base private key but need not require an indexed per-user entry.
 
+Pinned Java appends configured client entries without deduplicating equal public-key bytes. M160 must preserve duplicate configured entries, each consuming one record and the bounded 4096-byte work budget; do not silently deduplicate.
+
 Core consumes the standard property representation only; Proposal-layer names, key generation/persistence and edit/restart transactions remain M162.
 
 ## Exact DH wire/crypto contract
@@ -52,7 +54,7 @@ Fresh auth cookie and ephemeral keypair are generated for every regenerated auth
 
 Reuse M159's pinned Java 4096-byte authenticated encrypted-data ceiling. Before any per-client X25519 operation, use checked arithmetic to ensure the complete encrypted-data object can fit within 4096 bytes.
 
-The 40-byte/client record size plus fixed framing therefore gives a strict finite upper bound on DH operations; no arbitrary independent count limit is needed. Never truncate clients to fit.
+The 40-byte/client record size plus fixed framing gives a strict finite upper bound on DH operations; no arbitrary independent count limit is needed. Never truncate or deduplicate clients to fit.
 
 ## Pre-frozen exact production envelope
 
@@ -84,10 +86,10 @@ If that is false, amend before registration rather than silently adding dependen
 - parser extracts and removes `leaseSetPrivKey` and all DH client-key values from generic debug-capable options before activation;
 - base private key and ephemeral private key use zeroizing/non-`Debug` wrappers;
 - indexed client names are not retained by core;
-- public authorized client keys may be retained generation-locally but never become response-facing via this primitive;
+- public authorized client-key entries, including duplicates, may be retained generation-locally but never become response-facing via this primitive;
 - core persists nothing; M162 owns persistent key generation/custody and transactionality.
 
-Sparse indexed keys, malformed Base64, wrong lengths, duplicate public keys, mixed PSK/DH properties and unsupported auth types fail before activation.
+Sparse indexed keys, malformed Base64, wrong lengths, mixed PSK/DH properties and unsupported auth types fail before activation. Duplicate public-key entries are preserved as the reference does and tested explicitly.
 
 ## Publication/session behavior
 
@@ -101,6 +103,7 @@ Require:
 
 - deterministic X25519/HKDF/client-ID/cookie KATs with fixed ephemeral key/auth cookie/salts;
 - one/multiple clients and both absent/present lookup secret;
+- duplicate-entry preservation;
 - all-zero shared-secret rejection and maintained-library malformed/low-order cases;
 - wrong-client/tamper/no-match failures;
 - 4096-byte boundary/overflow checked before O(N) X25519 work;
@@ -123,7 +126,7 @@ After M159 closes, M160 may be registered directly if and only if:
 3. M062 is updated from M159 to M160 with the same zero-dependency envelope;
 4. registry/roadmap/AGENTS advance only M160.
 
-No additional generic “exact-path research” milestone is required if those four facts hold.
+No additional generic exact-path research milestone is required if those four facts hold.
 
 ## Stop conditions
 
@@ -131,4 +134,4 @@ Stop/amend if M160 needs a fifth production file, new dependency, I2PControl cha
 
 ## Closure evidence
 
-Record exact realized paths/dependencies, 4096-byte/O(N) bound proof, X25519 low-order/all-zero handling, KAT/reference interoperability, secret custody/redaction, zero matrix delta, implementation SHA, M061/M062 evidence, and M161/M162 readiness.
+Record exact realized paths/dependencies, duplicate-preservation behavior, 4096-byte/O(N) bound proof, X25519 low-order/all-zero handling, KAT/reference interoperability, secret custody/redaction, zero matrix delta, implementation SHA, M061/M062 evidence, and M161/M162 readiness.

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M153 is the sole registered corrective handoff**
+Status: **active / partial; M153 closed; M154 registered**
 
 Pinned Proposal authority:
 
@@ -20,8 +20,8 @@ Historical residual roadmap through M146:
 
 Current qualification state:
 
-- M139 is the last whole-surface integrated runtime/security qualification, but it predates M141-M145 production changes and is therefore historical for current-head purposes;
-- M153 is registered to establish a new current-head qualification authority before any cryptographic residual work;
+- M139 is the historical whole-surface integrated runtime/security qualification, superseded by M153 for current-head purposes because it predates M141-M145 production changes;
+- M153 is closed as the current current-head qualification authority before any cryptographic residual work;
 - M140 remains the accepted residual streaming applicability authority;
 - M141-M145 are accepted capability closures;
 - M146 is accepted blocked evidence for `UseOutproxyPlugin`.
@@ -190,10 +190,10 @@ Current roadmap:
 Dependency graph:
 
 ```text
-M153 post-M146 current-head requalification         [REGISTERED — zero promotion]
+M153 post-M146 current-head requalification         [CLOSED — zero promotion]
   |
   v
-M154 M147 signature-domain/security owner re-freeze [DEFERRED — zero promotion]
+M154 M147 signature-domain/security owner re-freeze [REGISTERED — zero promotion]
   |
   v
 M147 neutral destination signature primitive        [DEFERRED — zero promotion]
@@ -214,11 +214,11 @@ M151 LeaseSetClientAuths                            [DEFERRED — up to 5]
 M152 final whole-surface requalification            [DEFERRED — zero promotion]
 ```
 
-Only M153 is registered.
+Only M154 is registered.
 
-## 9. M153 corrective qualification
+## 9. M153 corrective qualification (closed)
 
-M153 must establish a new current-head qualification before crypto work by:
+M153 closed as complete (`plans/closure/i2pcontrol-proposal-170/153-closure.md`) and is the current runtime/security qualification authority. It established the new current-head qualification before crypto work by:
 
 - mechanically preserving `336/29/475` and exact 29-cell residual identity;
 - recording the actual last production-bearing head, expected `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2` unless audit proves otherwise;

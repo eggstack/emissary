@@ -35,18 +35,24 @@ fn string_field<'a>(row: &'a Value, key: &str) -> &'a str {
 
 #[test]
 fn m143_matrix_promotes_exactly_one_client_cell() {
+    // M153 rebase: M143 closed at `330/35/475`. Its closure remains the
+    // immutable milestone-local authority; the current head has since advanced
+    // through M144-M145. Pin closure evidence plus durable M143 cell facts
+    // (exact current aggregates live in the M153 guard).
+    let closure = std::fs::read_to_string(
+        workspace_root().join("plans/closure/i2pcontrol-proposal-170/143-closure.md"),
+    )
+    .expect("M143 closure must exist");
+    assert!(
+        closure.contains("330/35/475"),
+        "M143 closure must retain its historical 330/35/475 authority"
+    );
     let matrix = planning_toml("095-full-support-matrix.toml");
-    let declared = matrix["current_matrix_counts"].as_table().expect("counts");
-    assert_eq!(declared["total"].as_integer(), Some(840));
-    assert_eq!(declared["apply"].as_integer(), Some(330));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(35));
-    assert_eq!(declared["not_applicable"].as_integer(), Some(475));
 
     let tunnel_types = matrix["contract_names"]["canonical_tunnel_types"]
         .as_array()
         .expect("canonical tunnel types");
     assert_eq!(tunnel_types.len(), 12);
-    let mut counts = [0usize; 3];
     let mut blocked = BTreeSet::new();
     let mut applied = BTreeSet::new();
     for row in matrix["tunnel_manager"]["options"].as_array().expect("options") {
@@ -57,19 +63,16 @@ fn m143_matrix_promotes_exactly_one_client_cell() {
             let family = tunnel_types[index].as_str().expect("family").to_owned();
             match cell.as_str().expect("cell disposition") {
                 "apply" => {
-                    counts[0] += 1;
                     applied.insert((option.to_owned(), family));
                 }
                 "blocked_primitive" => {
-                    counts[1] += 1;
                     blocked.insert((option.to_owned(), family));
                 }
-                "not_applicable" => counts[2] += 1,
+                "not_applicable" => {}
                 other => panic!("unexpected cell disposition {other}"),
             }
         }
     }
-    assert_eq!(counts, [330, 35, 475]);
     assert!(
         applied.contains(&("Profile".to_owned(), "client".to_owned())),
         "M143 cell Profile:client must be apply"
@@ -109,6 +112,8 @@ fn m143_matrix_promotes_exactly_one_client_cell() {
 
 #[test]
 fn m143_residual_inventory_subtracts_one_cell() {
+    // M153 rebase: pin durable M143 cell facts without the superseded
+    // `35`-cell aggregate (exact current counts live in M153).
     let matrix = planning_toml("095-full-support-matrix.toml");
     let tunnel_types = matrix["contract_names"]["canonical_tunnel_types"].as_array().unwrap();
     let current_blocked: BTreeSet<(String, String)> = matrix["tunnel_manager"]["options"]
@@ -131,12 +136,19 @@ fn m143_residual_inventory_subtracts_one_cell() {
                 })
         })
         .collect();
-    assert_eq!(current_blocked.len(), 35);
-    assert!(!current_blocked.contains(&("Profile".to_owned(), "client".to_owned())));
+    assert!(
+        !current_blocked.contains(&("Profile".to_owned(), "client".to_owned())),
+        "M143 Profile:client must not remain blocked"
+    );
+    // M143 must not disturb unrelated residuals. Spot-check cells that were
+    // blocked at M143 time and remain blocked at the current head (later
+    // milestones legitimately promoted MultiHoming/UseSSL).
     for cell in [
-        ("MultiHoming", "httpserver"),
         ("SigType", "client"),
-        ("UseSSL", "httpserver"),
+        ("SigType", "httpserver"),
+        ("EncryptLeaseSet", "server"),
+        ("OptionalLookup", "httpserver"),
+        ("LeaseSetClientAuths", "ircserver"),
         ("UseOutproxyPlugin", "httpclient"),
     ] {
         assert!(
@@ -216,8 +228,10 @@ fn m143_bulk_and_interactive_map_to_pinned_window() {
 
 #[test]
 fn m143_invalid_profile_fails_before_allocation_without_echo() {
-    use emissary_cli::i2pcontrol::backends::{client::ClientTunnelBackend, TunnelBackend};
-    use emissary_cli::i2pcontrol::domain::tunnel::TunnelRuntimeState;
+    use emissary_cli::i2pcontrol::{
+        backends::{client::ClientTunnelBackend, TunnelBackend},
+        domain::tunnel::TunnelRuntimeState,
+    };
 
     let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
     for (key, value) in [
@@ -370,8 +384,10 @@ fn m143_shared_sessions_distinguish_effective_windows() {
 
 #[test]
 fn m143_restart_applies_new_profile_to_successor_only() {
-    use emissary_cli::i2pcontrol::backends::{client::ClientTunnelBackend, TunnelBackend};
-    use emissary_cli::i2pcontrol::domain::tunnel::TunnelRuntimeState;
+    use emissary_cli::i2pcontrol::{
+        backends::{client::ClientTunnelBackend, TunnelBackend},
+        domain::tunnel::TunnelRuntimeState,
+    };
 
     async fn fake_sam() -> (u16, tokio::task::JoinHandle<()>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -467,8 +483,10 @@ fn m143_restart_applies_new_profile_to_successor_only() {
 
 #[test]
 fn m143_cancellation_leaves_no_partial_state() {
-    use emissary_cli::i2pcontrol::backends::{client::ClientTunnelBackend, TunnelBackend};
-    use emissary_cli::i2pcontrol::domain::tunnel::TunnelRuntimeState;
+    use emissary_cli::i2pcontrol::{
+        backends::{client::ClientTunnelBackend, TunnelBackend},
+        domain::tunnel::TunnelRuntimeState,
+    };
 
     let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
     rt.block_on(async {
@@ -613,15 +631,17 @@ fn m143_containment_is_exact() {
 
 #[test]
 fn m143_docs_agree_on_counts() {
-    let matrix = planning_toml("095-full-support-matrix.toml");
-    let declared = matrix["current_matrix_counts"].as_table().unwrap();
-    let summary = format!(
-        "{}/{}/{}",
-        declared["apply"].as_integer().unwrap(),
-        declared["blocked_primitive"].as_integer().unwrap(),
-        declared["not_applicable"].as_integer().unwrap()
+    // M153 rebase: M143's `330/35/475` authority lives in its immutable
+    // closure; active docs track the current head (owned in aggregate by
+    // M153) while retaining the M143 promotion lineage.
+    let closure = std::fs::read_to_string(
+        workspace_root().join("plans/closure/i2pcontrol-proposal-170/143-closure.md"),
+    )
+    .expect("M143 closure must exist");
+    assert!(
+        closure.contains("330/35/475"),
+        "M143 closure must retain its historical 330/35/475 authority"
     );
-    assert_eq!(summary, "330/35/475");
 
     for path in [
         "AGENTS.md",
@@ -634,8 +654,8 @@ fn m143_docs_agree_on_counts() {
     ] {
         let text = std::fs::read_to_string(workspace_root().join(path)).unwrap();
         assert!(
-            text.contains("330") && text.contains("35") && text.contains("475"),
-            "{path} must state 330/35/475"
+            text.contains("M143") || text.contains("Profile"),
+            "{path} must retain the M143 promotion lineage"
         );
         assert!(
             !text.contains("Status: **full Proposal 170 support"),

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M146 Corrective Roadmap
 
-Status: **active / partial; M153 is the only registered successor**
+Status: **active / partial; M153 closed; M154 registered**
 
 This roadmap supersedes the post-M146 execution ordering in:
 
@@ -114,24 +114,25 @@ M146's four blocked `UseOutproxyPlugin` cells are a parallel terminal constraint
 
 A future M146 successor requires an explicit architecture/security decision that introduces a genuinely distinct safe provider. This roadmap does not fabricate such a provider or relax the no-direct-clearnet invariant merely to achieve zero blockers.
 
-## 5. M153 — immediate registered corrective
+## 5. M153 — closed corrective
 
-Plan:
+Plan/closure:
 
-- `plans/implementation/i2pcontrol-proposal-170/153-post-m146-current-head-requalification-and-authority-rebase.md`.
+- `plans/implementation/i2pcontrol-proposal-170/153-post-m146-current-head-requalification-and-authority-rebase.md`;
+- `plans/closure/i2pcontrol-proposal-170/153-closure.md`.
 
-Purpose:
+Status: **closed as complete**.
 
-- make the current post-M145 production source the new integrated runtime/security baseline;
-- repair historical-vs-current test authority so the ordinary suite does not remain red from stale aggregate assertions;
-- requalify M140-M146 composition plus M127-M139 security/lifecycle invariants;
-- update M095 production-head metadata;
-- explicitly absorb the M145 `7cbd80a...` no-std follow-up into accepted production evidence;
-- preserve `336/29/475` with zero promotions and zero production changes.
+M153:
 
-M153 is the only registered plan.
+- made the post-M145 production source (`7cbd80a...`) the integrated runtime/security baseline;
+- repaired historical-vs-current test authority so the ordinary suite does not remain red from stale aggregate assertions;
+- requalified M140-M146 composition plus M127-M139 security/lifecycle invariants;
+- updated M095 production-head metadata;
+- explicitly absorbed the M145 `7cbd80a...` no-std follow-up into accepted production evidence;
+- preserved `336/29/475` with zero promotions and zero production changes.
 
-## 6. M154 — signature pre-registration gate
+## 6. M154 — registered signature pre-registration gate
 
 Plan:
 
@@ -145,7 +146,7 @@ M154 has zero production and zero promotion budget. Its closure chooses:
 - split M147 into smaller infrastructure slices;
 - or leave SigType blocked if required algorithms are unsafe/unmaintainable/incompatible.
 
-Only after M153 closes may M154 be registered.
+Status: **registered / dependency-ready; hard dependency on M153 closure satisfied by `plans/closure/i2pcontrol-proposal-170/153-closure.md`**.
 
 ## 7. M147-M151 security-sensitive tail
 
@@ -216,8 +217,8 @@ M153 specifically owns repair of stale historical aggregate tests so future broa
 
 Per `plans/003-planning-process.md`:
 
-1. M153 is the only registered plan.
-2. M154 remains deferred until M153 closes.
+1. M154 is the only registered plan; M153 is closed complete.
+2. M154 is executable after M153 closes complete and the registry explicitly registers M154.
 3. M147 remains deferred until M154 closes and explicitly amends/registers it or a split successor.
 4. M148-M152 remain unregistered behind their hard dependencies.
 5. M146 remains closed blocked and is not an active plan.

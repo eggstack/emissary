@@ -35,7 +35,7 @@ I2PControl supports a large partial subset of Proposal 170. Its I2PControl-owned
 
 Current Proposal-170 planning authority:
 
-- M139 remains historical whole-surface qualification evidence but predates M141-M145 production changes;
+- M139 closed as the historical whole-surface qualification at `325/47/468`; superseded by M153 for current-head purposes after M141-M145 production changes;
 - M140 closed as the residual streaming applicability re-freeze;
 - M141 closed with 2 `UniqueLocalAddressPerClient` promotions;
 - M142 closed with 2 HTTP `SSLProxies`/`JumpList` promotions;
@@ -43,8 +43,8 @@ Current Proposal-170 planning authority:
 - M144 closed with 4 application `UseSSL` promotions;
 - M145 closed with 2 `MultiHoming`/reply-LeaseSet-bundling promotions; accepted production evidence includes no-std/format follow-up `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2`;
 - M146 closed as blocked with zero promotions: four `UseOutproxyPlugin` cells remain blocked because no real safe provider exists in current architecture;
-- **M153 is the sole registered handoff**: `plans/implementation/i2pcontrol-proposal-170/153-post-m146-current-head-requalification-and-authority-rebase.md`;
-- M154 is deferred as the mandatory pre-registration SigType/security/exact-owner audit before M147;
+- **M153 closed as the current runtime/security qualification authority** (`336/29/475`, zero promotions, zero production changes): `plans/closure/i2pcontrol-proposal-170/153-closure.md`;
+- M154 is registered as the mandatory pre-registration SigType/security/exact-owner audit before M147;
 - M147-M152 remain deferred/unregistered.
 
 Current execution roadmap:

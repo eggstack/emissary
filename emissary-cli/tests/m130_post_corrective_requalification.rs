@@ -537,6 +537,17 @@ fn secret_safety_no_password_token_key_echo() {
 
 #[test]
 fn proposal_matrix_is_mechanically_recomputed() {
+    // M153 rebase: M130 closed at `284/96/460`. Current-head aggregates are
+    // owned by the M153 guard; this historical suite pins M130 closure
+    // evidence plus mechanical self-consistency of the current matrix.
+    let closure = std::fs::read_to_string(
+        workspace_root().join("plans/closure/i2pcontrol-proposal-170/130-closure.md"),
+    )
+    .expect("M130 closure must exist");
+    assert!(
+        closure.contains("284 apply / 96 blocked_primitive / 460"),
+        "M130 closure must retain its historical 284/96/460 authority"
+    );
     let matrix: toml::Value = std::fs::read_to_string(
         workspace_root()
             .join("plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"),
@@ -568,14 +579,17 @@ fn proposal_matrix_is_mechanically_recomputed() {
             *counts.entry(cell.as_str().expect("cell").to_owned()).or_insert(0usize) += 1;
         }
     }
-    assert_eq!(counts.get("apply"), Some(&325));
-    assert_eq!(counts.get("blocked_primitive"), Some(&47));
-    assert_eq!(counts.get("not_applicable"), Some(&468));
-
     let declared = matrix["current_matrix_counts"].as_table().expect("declared counts");
-    assert_eq!(declared["apply"].as_integer(), Some(325));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(47));
-    assert_eq!(declared["not_applicable"].as_integer(), Some(468));
+    assert_eq!(declared["total"].as_integer(), Some(840));
+    for key in ["apply", "blocked_primitive", "not_applicable"] {
+        assert_eq!(
+            counts.get(key).copied().unwrap_or_default() as i64,
+            declared[key].as_integer().expect("declared count"),
+            "current matrix must be mechanically self-consistent (M153 owns exact counts)"
+        );
+    }
+    let total: usize = counts.values().sum();
+    assert_eq!(total, 840);
 }
 
 #[test]
@@ -686,19 +700,19 @@ fn yosemite_alias_remains_optional_exact_and_isolated() {
 #[test]
 fn active_authority_retains_partial_support_and_m130_lineage() {
     let root = workspace_root();
-    let planning = [
+    // M130 lineage lives in the registry and the post-M114 roadmap (the
+    // implementation README indexes the residual line and never named M130,
+    // even before M153, so it is checked for current authority instead).
+    let lineage = [
         root.join("plans/registry.md"),
         root.join("plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md"),
-        root.join("plans/implementation/i2pcontrol-proposal-170/README.md"),
     ];
-    for path in planning {
+    for path in lineage {
         let text = std::fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
-        assert!(
-            text.contains("325") && text.contains("47") && text.contains("468"),
-            "{} does not state the current 325/47/468 authority",
-            path.display()
-        );
+        // M153 owns current-head counts; historical suites pin lineage plus the
+        // durable partial-support claim, with M130-era counts in immutable
+        // closure evidence.
         assert!(
             text.to_ascii_lowercase().contains("partial"),
             "{} must retain partial-support status",
@@ -710,7 +724,9 @@ fn active_authority_retains_partial_support_and_m130_lineage() {
             path.display()
         );
         assert!(
-            text.contains("M127") && text.contains("M128") && text.contains("M129"),
+            text.contains("M127") && text.contains("M128") && text.contains("M129")
+                || text.contains("M127-M129")
+                || text.contains("M127–M129"),
             "{} must retain the M127–M129 corrective lineage",
             path.display()
         );
@@ -722,6 +738,35 @@ fn active_authority_retains_partial_support_and_m130_lineage() {
             path.display()
         );
     }
+    // The implementation README carries current-handoff authority, not the
+    // post-M114 lineage.
+    let readme = std::fs::read_to_string(
+        root.join("plans/implementation/i2pcontrol-proposal-170/README.md"),
+    )
+    .expect("implementation README");
+    assert!(
+        readme.to_ascii_lowercase().contains("partial"),
+        "implementation README must retain partial-support status"
+    );
+    assert!(
+        readme.contains("M153"),
+        "implementation README must name the M153 authority"
+    );
+    // M130-era `284/96/460` authority lives in the immutable M130 closure.
+    let closure =
+        std::fs::read_to_string(root.join("plans/closure/i2pcontrol-proposal-170/130-closure.md"))
+            .expect("M130 closure must exist");
+    assert!(
+        closure.contains("284") && closure.contains("96") && closure.contains("460"),
+        "M130 closure must retain its historical 284/96/460 evidence"
+    );
+    // Current-head counts are owned by M153; active planning docs must agree
+    // with them there.
+    let registry = std::fs::read_to_string(root.join("plans/registry.md")).expect("registry");
+    assert!(
+        registry.contains("336") && registry.contains("M153"),
+        "registry must state the current M153 authority"
+    );
 
     // Active user-facing docs retain partial wording and never present a
     // standalone full-support status while residuals remain blocked.

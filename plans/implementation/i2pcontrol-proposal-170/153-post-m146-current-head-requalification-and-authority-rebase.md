@@ -1,6 +1,6 @@
 # M153 — Post-M146 Current-Head Requalification and Authority Rebase
 
-Status: **registered / dependency-ready**
+Status: **closed as complete** (closure: `plans/closure/i2pcontrol-proposal-170/153-closure.md`)
 
 Class: invariant / qualification / corrective
 

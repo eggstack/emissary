@@ -32,18 +32,24 @@ fn string_field<'a>(row: &'a Value, key: &str) -> &'a str {
 
 #[test]
 fn m141_matrix_promotes_exactly_two_unique_local_cells() {
+    // M153 rebase: M141 closed at `327/38/475`. Its closure remains the
+    // immutable milestone-local authority; the current head has since advanced
+    // through M142-M145. Pin closure evidence plus the durable M141 cell facts
+    // (exact current aggregates live in the M153 guard).
+    let closure = std::fs::read_to_string(
+        workspace_root().join("plans/closure/i2pcontrol-proposal-170/141-closure.md"),
+    )
+    .expect("M141 closure must exist");
+    assert!(
+        closure.contains("327/38/475"),
+        "M141 closure must retain its historical 327/38/475 authority"
+    );
     let matrix = planning_toml("095-full-support-matrix.toml");
-    let declared = matrix["current_matrix_counts"].as_table().expect("counts");
-    assert_eq!(declared["total"].as_integer(), Some(840));
-    assert_eq!(declared["apply"].as_integer(), Some(327));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(38));
-    assert_eq!(declared["not_applicable"].as_integer(), Some(475));
 
     let tunnel_types = matrix["contract_names"]["canonical_tunnel_types"]
         .as_array()
         .expect("canonical tunnel types");
     assert_eq!(tunnel_types.len(), 12);
-    let mut counts = [0usize; 3];
     let mut blocked = BTreeSet::new();
     let mut applied = BTreeSet::new();
     for row in matrix["tunnel_manager"]["options"].as_array().expect("options") {
@@ -54,20 +60,17 @@ fn m141_matrix_promotes_exactly_two_unique_local_cells() {
             let family = tunnel_types[index].as_str().expect("family").to_owned();
             match cell.as_str().expect("cell disposition") {
                 "apply" => {
-                    counts[0] += 1;
                     applied.insert((option.to_owned(), family));
                 }
                 "blocked_primitive" => {
-                    counts[1] += 1;
                     blocked.insert((option.to_owned(), family));
                 }
-                "not_applicable" => counts[2] += 1,
+                "not_applicable" => {}
                 other => panic!("unexpected cell disposition {other}"),
             }
         }
     }
-    assert_eq!(counts, [327, 38, 475]);
-    // Exactly the two M141 target cells move to apply.
+    // Exactly the two M141 target cells are apply at the current head.
     for cell in [
         ("UniqueLocalAddressPerClient", "httpserver"),
         ("UniqueLocalAddressPerClient", "httpbidirserver"),
@@ -120,9 +123,9 @@ fn m141_matrix_promotes_exactly_two_unique_local_cells() {
 
 #[test]
 fn m141_residual_inventory_subtracts_two_cells() {
-    // Current blocked set must equal the M140 post set (40 cells) minus the
-    // two M141 promotions. M140's eight-record map remains the historical
-    // applicability authority; this guard owns the current-head delta.
+    // M153 rebase: pin the durable M141 cell facts (the two promoted cells are
+    // gone from the blocked set; unrelated residuals remain) without pinning
+    // the superseded `38`-cell aggregate. Exact current counts live in M153.
     let matrix = planning_toml("095-full-support-matrix.toml");
     let tunnel_types = matrix["contract_names"]["canonical_tunnel_types"].as_array().unwrap();
     let current_blocked: BTreeSet<(String, String)> = matrix["tunnel_manager"]["options"]
@@ -145,22 +148,31 @@ fn m141_residual_inventory_subtracts_two_cells() {
                 })
         })
         .collect();
-    assert_eq!(current_blocked.len(), 38);
-    assert!(!current_blocked.contains(&(
-        "UniqueLocalAddressPerClient".to_owned(),
-        "httpserver".to_owned()
-    )));
-    assert!(!current_blocked.contains(&(
-        "UniqueLocalAddressPerClient".to_owned(),
-        "httpbidirserver".to_owned()
-    )));
-    // All other M140 blocked cells remain.
+    assert!(
+        !current_blocked.contains(&(
+            "UniqueLocalAddressPerClient".to_owned(),
+            "httpserver".to_owned()
+        )),
+        "M141 httpserver cell must not remain blocked"
+    );
+    assert!(
+        !current_blocked.contains(&(
+            "UniqueLocalAddressPerClient".to_owned(),
+            "httpbidirserver".to_owned()
+        )),
+        "M141 httpbidirserver cell must not remain blocked"
+    );
+    // M141 must not disturb unrelated residuals. Spot-check cells that were
+    // blocked at M141 time and remain blocked at the current head (later
+    // milestones legitimately promoted MultiHoming/Profile/UseSSL, so those
+    // are not durable spot-checks here).
     for cell in [
-        ("MultiHoming", "httpserver"),
-        ("MultiHoming", "httpbidirserver"),
-        ("Profile", "client"),
         ("SigType", "client"),
-        ("UseSSL", "httpserver"),
+        ("SigType", "httpserver"),
+        ("EncryptLeaseSet", "server"),
+        ("OptionalLookup", "httpserver"),
+        ("LeaseSetClientAuths", "ircserver"),
+        ("UseOutproxyPlugin", "httpclient"),
     ] {
         assert!(
             current_blocked.contains(&(cell.0.to_owned(), cell.1.to_owned())),

@@ -5,15 +5,14 @@
 //! `httpbidirserver`) mechanically tied to the M095 machine authority and
 //! proves the pinned I2PTunnel presentation-TLS contract:
 //!
-//! - client families terminate TLS at the local listener immediately after
-//!   accept (reference `I2PTunnelClientBase` SSL listener) with
-//!   generation-local ephemeral identities;
-//! - server families originate TLS to the validated literal-loopback target
-//!   after I2P admission (reference `I2PTunnelServer.getSocket` SSL path)
-//!   with strict verification and no plaintext fallback;
+//! - client families terminate TLS at the local listener immediately after accept (reference
+//!   `I2PTunnelClientBase` SSL listener) with generation-local ephemeral identities;
+//! - server families originate TLS to the validated literal-loopback target after I2P admission
+//!   (reference `I2PTunnelServer.getSocket` SSL path) with strict verification and no plaintext
+//!   fallback;
 //! - `httpbidirserver` reuses the server target-TLS owner;
-//! - `UseSSL=false` preserves plaintext; malformed values fail before
-//!   allocation with no echo; secrets never enter diagnostics.
+//! - `UseSSL=false` preserves plaintext; malformed values fail before allocation with no echo;
+//!   secrets never enter diagnostics.
 
 #![cfg(feature = "i2pcontrol")]
 
@@ -43,18 +42,24 @@ fn string_field<'a>(row: &'a Value, key: &str) -> &'a str {
 
 #[test]
 fn m144_matrix_promotes_exactly_four_usessl_cells() {
+    // M153 rebase: M144 closed at `334/31/475`. Its closure remains the
+    // immutable milestone-local authority; the current head has since advanced
+    // through M145. Pin closure evidence plus durable M144 cell facts (exact
+    // current aggregates live in the M153 guard).
+    let closure = std::fs::read_to_string(
+        workspace_root().join("plans/closure/i2pcontrol-proposal-170/144-closure.md"),
+    )
+    .expect("M144 closure must exist");
+    assert!(
+        closure.contains("334/31/475"),
+        "M144 closure must retain its historical 334/31/475 authority"
+    );
     let matrix = planning_toml("095-full-support-matrix.toml");
-    let declared = matrix["current_matrix_counts"].as_table().expect("counts");
-    assert_eq!(declared["total"].as_integer(), Some(840));
-    assert_eq!(declared["apply"].as_integer(), Some(334));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(31));
-    assert_eq!(declared["not_applicable"].as_integer(), Some(475));
 
     let tunnel_types = matrix["contract_names"]["canonical_tunnel_types"]
         .as_array()
         .expect("canonical tunnel types");
     assert_eq!(tunnel_types.len(), 12);
-    let mut counts = [0usize; 3];
     let mut blocked = BTreeSet::new();
     let mut applied = BTreeSet::new();
     for row in matrix["tunnel_manager"]["options"].as_array().expect("options") {
@@ -65,19 +70,16 @@ fn m144_matrix_promotes_exactly_four_usessl_cells() {
             let family = tunnel_types[index].as_str().expect("family").to_owned();
             match cell.as_str().expect("cell disposition") {
                 "apply" => {
-                    counts[0] += 1;
                     applied.insert((option.to_owned(), family));
                 }
                 "blocked_primitive" => {
-                    counts[1] += 1;
                     blocked.insert((option.to_owned(), family));
                 }
-                "not_applicable" => counts[2] += 1,
+                "not_applicable" => {}
                 other => panic!("unexpected cell disposition {other}"),
             }
         }
     }
-    assert_eq!(counts, [334, 31, 475]);
     for cell in [
         ("UseSSL", "httpclient"),
         ("UseSSL", "connectclient"),
@@ -100,7 +102,11 @@ fn m144_matrix_promotes_exactly_four_usessl_cells() {
         .iter()
         .find(|row| string_field(row, "canonical_key") == "UseSSL")
         .expect("UseSSL row must exist");
-    assert_eq!(string_field(row, "completion_owner"), "M144", "UseSSL owner");
+    assert_eq!(
+        string_field(row, "completion_owner"),
+        "M144",
+        "UseSSL owner"
+    );
     assert_eq!(
         string_field(row, "current_or_planned_disposition"),
         "apply_or_not_applicable",
@@ -123,6 +129,8 @@ fn m144_matrix_promotes_exactly_four_usessl_cells() {
 
 #[test]
 fn m144_residual_inventory_subtracts_four_cells() {
+    // M153 rebase: pin durable M144 cell facts without the superseded
+    // `31`-cell aggregate (exact current counts live in M153).
     let matrix = planning_toml("095-full-support-matrix.toml");
     let tunnel_types = matrix["contract_names"]["canonical_tunnel_types"].as_array().unwrap();
     let current_blocked: BTreeSet<(String, String)> = matrix["tunnel_manager"]["options"]
@@ -145,7 +153,8 @@ fn m144_residual_inventory_subtracts_four_cells() {
                 })
         })
         .collect();
-    assert_eq!(current_blocked.len(), 31);
+    // Exact current aggregates are owned by the M153 guard; this historical
+    // suite pins only the durable M144 cell facts below.
     for cell in [
         ("UseSSL", "httpclient"),
         ("UseSSL", "connectclient"),
@@ -159,11 +168,16 @@ fn m144_residual_inventory_subtracts_four_cells() {
             cell.1
         );
     }
+    // M144 must not disturb unrelated residuals. Spot-check cells that were
+    // blocked at M144 time and remain blocked at the current head (M145
+    // legitimately promoted MultiHoming).
     for cell in [
         ("SigType", "client"),
+        ("SigType", "httpserver"),
         ("UseOutproxyPlugin", "httpclient"),
-        ("MultiHoming", "httpserver"),
         ("EncryptLeaseSet", "httpserver"),
+        ("OptionalLookup", "server"),
+        ("LeaseSetClientAuths", "httpserver"),
     ] {
         assert!(
             current_blocked.contains(&(cell.0.to_owned(), cell.1.to_owned())),
@@ -214,10 +228,10 @@ fn tunnel_definition(
 
 #[test]
 fn m144_usessl_false_preserves_plaintext_validation() {
-    use emissary_cli::i2pcontrol::backends::{
-        http_client::HttpClientTunnelBackend, TunnelBackend,
+    use emissary_cli::i2pcontrol::{
+        backends::{http_client::HttpClientTunnelBackend, TunnelBackend},
+        domain::tunnel::TunnelType,
     };
-    use emissary_cli::i2pcontrol::domain::tunnel::TunnelType;
     // Omitted and explicit false validate without TLS material for the two
     // client families (server families covered by their own preflight).
     for tunnel_type in [TunnelType::HttpClient, TunnelType::ConnectClient] {
@@ -277,10 +291,12 @@ fn m144_usessl_false_preserves_plaintext_validation() {
 
 #[test]
 fn m144_malformed_usessl_fails_before_allocation_without_echo() {
-    use emissary_cli::i2pcontrol::backends::http_client::HttpClientTunnelBackend;
-    use emissary_cli::i2pcontrol::backends::TunnelBackend;
-    use emissary_cli::i2pcontrol::backends::runtime::presentation_tls as tls;
-    use emissary_cli::i2pcontrol::domain::tunnel::TunnelType;
+    use emissary_cli::i2pcontrol::{
+        backends::{
+            http_client::HttpClientTunnelBackend, runtime::presentation_tls as tls, TunnelBackend,
+        },
+        domain::tunnel::TunnelType,
+    };
     for tunnel_type in [
         TunnelType::HttpClient,
         TunnelType::ConnectClient,
@@ -292,8 +308,7 @@ fn m144_malformed_usessl_fails_before_allocation_without_echo() {
             serde_json::json!(1),
             serde_json::json!(serde_json::Value::Null),
         ] {
-            let definition =
-                tunnel_definition(tunnel_type, vec![("UseSSL".to_owned(), raw)], None);
+            let definition = tunnel_definition(tunnel_type, vec![("UseSSL".to_owned(), raw)], None);
             let error = tls::parse_use_ssl(&definition).unwrap_err();
             assert!(
                 error.to_string().contains("UseSSL"),
@@ -318,17 +333,16 @@ fn m144_malformed_usessl_fails_before_allocation_without_echo() {
         vec![("UseSSL".to_owned(), serde_json::json!("yes"))],
         None,
     );
-    let error = HttpClientTunnelBackend::new(1)
-        .validate_start(&bad)
-        .unwrap_err();
+    let error = HttpClientTunnelBackend::new(1).validate_start(&bad).unwrap_err();
     assert!(error.to_string().contains("UseSSL"));
     assert!(!error.to_string().contains("yes"));
 }
 
 #[test]
 fn m144_non_target_families_keep_exact_rejection() {
-    use emissary_cli::i2pcontrol::backends::runtime::presentation_tls as tls;
-    use emissary_cli::i2pcontrol::domain::tunnel::TunnelType;
+    use emissary_cli::i2pcontrol::{
+        backends::runtime::presentation_tls as tls, domain::tunnel::TunnelType,
+    };
     for tunnel_type in [
         TunnelType::Client,
         TunnelType::IrcClient,
@@ -367,8 +381,9 @@ fn m144_non_target_families_keep_exact_rejection() {
 
 #[test]
 fn m144_secret_material_absent_from_debug_and_errors() {
-    use emissary_cli::i2pcontrol::backends::runtime::presentation_tls as tls;
-    use emissary_cli::i2pcontrol::domain::tunnel::TunnelType;
+    use emissary_cli::i2pcontrol::{
+        backends::runtime::presentation_tls as tls, domain::tunnel::TunnelType,
+    };
     let definition = tunnel_definition(
         TunnelType::HttpClient,
         vec![("UseSSL".to_owned(), serde_json::json!(true))],
@@ -414,9 +429,7 @@ async fn m144_client_tls_listener_completes_handshake_before_parsing() {
     let connector = tls::build_target_tls_connector_with_cert(&cert).unwrap();
     let stream = tokio::net::TcpStream::connect(address).await.unwrap();
     let name = tokio_rustls::rustls::pki_types::ServerName::try_from("localhost").unwrap();
-    let mut tls_stream = tls::connect_tls_with_timeout(&connector, stream, name)
-        .await
-        .unwrap();
+    let mut tls_stream = tls::connect_tls_with_timeout(&connector, stream, name).await.unwrap();
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
     tls_stream
         .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
@@ -437,18 +450,11 @@ async fn m144_plaintext_on_tls_listener_is_rejected_without_dispatch() {
     let address = listener.local_addr().unwrap();
     let server = tokio::spawn(async move {
         let (stream, _) = listener.accept().await.unwrap();
-        assert!(
-            tls::accept_tls_with_timeout(&acceptor, stream)
-                .await
-                .is_err()
-        );
+        assert!(tls::accept_tls_with_timeout(&acceptor, stream).await.is_err());
     });
     let mut plain = tokio::net::TcpStream::connect(address).await.unwrap();
     use tokio::io::AsyncWriteExt;
-    plain
-        .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n")
-        .await
-        .unwrap();
+    plain.write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n").await.unwrap();
     use tokio::io::AsyncReadExt;
     let mut buf = Vec::new();
     let _ = tokio::time::timeout(Duration::from_secs(3), plain.read_to_end(&mut buf)).await;
@@ -505,9 +511,7 @@ async fn m144_server_tls_target_verifies_and_never_falls_back() {
     let tcp2 = tokio::net::TcpStream::connect(target2_address).await.unwrap();
     let name2 = tokio_rustls::rustls::pki_types::ServerName::try_from("127.0.0.1").unwrap();
     assert!(
-        tls::connect_tls_with_timeout(&untrusted, tcp2, name2)
-            .await
-            .is_err(),
+        tls::connect_tls_with_timeout(&untrusted, tcp2, name2).await.is_err(),
         "untrusted target cert must fail closed"
     );
     server2.abort();
@@ -522,27 +526,21 @@ async fn m144_handshake_timeout_and_cancellation_are_bounded() {
     let server = tokio::spawn(async move {
         let (stream, _) = listener.accept().await.unwrap();
         let started = tokio::time::Instant::now();
-        assert!(
-            tls::accept_tls_with_timeout(&acceptor, stream)
-                .await
-                .is_err()
-        );
+        assert!(tls::accept_tls_with_timeout(&acceptor, stream).await.is_err());
         assert!(
             started.elapsed() < Duration::from_secs(10),
             "handshake must be bounded"
         );
     });
     let _stalled = tokio::net::TcpStream::connect(address).await.unwrap();
-    tokio::time::timeout(Duration::from_secs(8), server)
-        .await
-        .unwrap()
-        .unwrap();
+    tokio::time::timeout(Duration::from_secs(8), server).await.unwrap().unwrap();
 }
 
 #[test]
 fn m144_successor_gets_new_tls_state_and_failed_edit_keeps_last_known_good() {
-    use emissary_cli::i2pcontrol::backends::runtime::presentation_tls as tls;
-    use emissary_cli::i2pcontrol::domain::tunnel::TunnelType;
+    use emissary_cli::i2pcontrol::{
+        backends::runtime::presentation_tls as tls, domain::tunnel::TunnelType,
+    };
     let (_first, first_cert) = tls::generate_listener_identity().unwrap();
     let (_second, second_cert) = tls::generate_listener_identity().unwrap();
     assert_ne!(first_cert.as_ref(), second_cert.as_ref());
@@ -570,8 +568,7 @@ fn m144_httpbidirserver_reuses_the_server_tls_owner() {
     .unwrap();
     assert!(server.contains("connect_tls_with_timeout"));
     let helper = std::fs::read_to_string(
-        workspace_root()
-            .join("emissary-cli/src/i2pcontrol/backends/runtime/presentation_tls.rs"),
+        workspace_root().join("emissary-cli/src/i2pcontrol/backends/runtime/presentation_tls.rs"),
     )
     .unwrap();
     assert!(helper.contains("accept_tls_with_timeout"));
@@ -595,14 +592,13 @@ fn m144_management_and_sam_tls_remain_independent() {
             vec![("UseSSL".to_owned(), serde_json::json!(true))],
             Some(true),
         );
-        let options =
-            emissary_cli::i2pcontrol::backends::runtime::session::build_session_options(
-                &definition,
-                7656,
-                false,
-                DestinationKind::Transient,
-            )
-            .unwrap();
+        let options = emissary_cli::i2pcontrol::backends::runtime::session::build_session_options(
+            &definition,
+            7656,
+            false,
+            DestinationKind::Transient,
+        )
+        .unwrap();
         assert!(
             !options.ssl,
             "{tunnel_type} UseSSL must not set SAM-control TLS"
@@ -612,19 +608,30 @@ fn m144_management_and_sam_tls_remain_independent() {
 
 #[test]
 fn m144_containment_docs_and_registry_agree() {
-    let matrix = planning_toml("095-full-support-matrix.toml");
-    let declared = matrix["current_matrix_counts"].as_table().unwrap();
-    assert_eq!(declared["apply"].as_integer(), Some(334));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(31));
+    // M153 rebase: M144's `334/31/475` authority lives in its immutable
+    // closure; active docs track the current head (owned in aggregate by
+    // M153) while retaining the M144 lineage. This suite keeps the durable
+    // dependency-containment facts.
+    let closure = std::fs::read_to_string(
+        workspace_root().join("plans/closure/i2pcontrol-proposal-170/144-closure.md"),
+    )
+    .expect("M144 closure must exist");
+    assert!(
+        closure.contains("334/31/475"),
+        "M144 closure must retain its historical 334/31/475 authority"
+    );
     let manifest =
         std::fs::read_to_string(workspace_root().join("emissary-cli/Cargo.toml")).unwrap();
     assert!(manifest.contains("tokio-rustls"));
     assert!(manifest.contains("rcgen"));
     assert!(!manifest.contains("webpki-roots"));
     assert!(!manifest.contains("rustls-native-certs"));
-    let support = std::fs::read_to_string(
-        workspace_root().join("docs/i2pcontrol/proposal-170-support.md"),
-    )
-    .unwrap();
+    let support =
+        std::fs::read_to_string(workspace_root().join("docs/i2pcontrol/proposal-170-support.md"))
+            .unwrap();
     assert!(support.contains("partial"));
+    assert!(
+        support.contains("M144") || support.contains("UseSSL"),
+        "support doc must retain the M144 promotion lineage"
+    );
 }

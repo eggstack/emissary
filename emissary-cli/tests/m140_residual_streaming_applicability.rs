@@ -202,61 +202,72 @@ fn m140_map_has_exactly_eight_source_backed_records() {
 
 #[test]
 fn m140_matrix_reconciliation_is_exact_and_contained() {
+    // M153 rebase: M140 closed at `325/40/475`. Its map remains the immutable
+    // milestone-local authority (pinned by the sibling test above); the
+    // current head has since advanced through M141-M145 promotions. Pin the
+    // M140 closure evidence plus the durable M140 cell facts against the
+    // current matrix instead of the superseded aggregate.
     let matrix = planning_toml("095-full-support-matrix.toml");
     let map = planning_toml("140-residual-streaming-applicability-map.toml");
 
-    // Declared M095 counts must match the M140 post counts and recomputation.
-    let declared = matrix["current_matrix_counts"].as_table().expect("counts");
-    assert_eq!(declared["apply"].as_integer(), Some(325));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(40));
-    assert_eq!(declared["not_applicable"].as_integer(), Some(475));
-    assert_eq!(
-        declared["blocked_primitive"].as_integer(),
-        map["counts"]["post_blocked"].as_integer()
+    let closure = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../plans/closure/i2pcontrol-proposal-170/140-closure.md"),
+    )
+    .expect("M140 closure must exist");
+    assert!(
+        closure.contains("325/40/475"),
+        "M140 closure must retain its historical 325/40/475 authority"
     );
-    assert_eq!(
-        declared["not_applicable"].as_integer(),
-        map["counts"]["post_not_applicable"].as_integer()
-    );
+    // The M140 map's own post counts remain the milestone-local authority.
+    assert_eq!(map["counts"]["post_blocked"].as_integer(), Some(40));
+    assert_eq!(map["counts"]["post_not_applicable"].as_integer(), Some(475));
 
     let tunnel_types = matrix["contract_names"]["canonical_tunnel_types"]
         .as_array()
         .expect("canonical tunnel types");
-    let mut counts = [0usize; 3];
     let mut blocked = BTreeSet::new();
+    let mut dispositions = std::collections::BTreeMap::new();
     for row in matrix["tunnel_manager"]["options"].as_array().expect("TunnelManager options") {
         let option = row["canonical_key"].as_str().expect("canonical option");
         let cells = row["cells"].as_array().expect("option cells");
         assert_eq!(cells.len(), tunnel_types.len());
         for (index, cell) in cells.iter().enumerate() {
-            match cell.as_str().expect("cell disposition") {
-                "apply" => counts[0] += 1,
-                "blocked_primitive" => {
-                    counts[1] += 1;
-                    blocked.insert((
-                        option.to_owned(),
-                        tunnel_types[index].as_str().expect("family").to_owned(),
-                    ));
-                }
-                "not_applicable" => counts[2] += 1,
-                other => panic!("unexpected cell disposition {other}"),
+            let family = tunnel_types[index].as_str().expect("family").to_owned();
+            let disposition = cell.as_str().expect("cell disposition");
+            dispositions.insert((option.to_owned(), family.clone()), disposition.to_owned());
+            if disposition == "blocked_primitive" {
+                blocked.insert((option.to_owned(), family));
             }
         }
     }
-    assert_eq!(counts, [325, 40, 475]);
 
-    // Every changed disposition must be among the eight M140 candidates and no
-    // cell may have been promoted to apply (apply count unchanged at 325).
-    let candidates = BTreeSet::from([
-        ("Profile".to_owned(), "client".to_owned()),
-        ("Profile".to_owned(), "httpclient".to_owned()),
-        ("Profile".to_owned(), "ircclient".to_owned()),
-        ("Profile".to_owned(), "socks".to_owned()),
-        ("Profile".to_owned(), "socksirc".to_owned()),
-        ("Profile".to_owned(), "connectclient".to_owned()),
-        ("Profile".to_owned(), "streamrclient".to_owned()),
-        ("ConnectDelay".to_owned(), "streamrclient".to_owned()),
-    ]);
+    // Durable M140 facts against the current head: the seven reclassified
+    // cells remain affirmative `not_applicable`, and the retained
+    // `Profile:client` cell left M140 blocked but was legitimately promoted to
+    // `apply` by M143 (pinned by the M143 suite; owned in aggregate by M153).
+    for cell in [
+        ("Profile", "httpclient"),
+        ("Profile", "ircclient"),
+        ("Profile", "socks"),
+        ("Profile", "socksirc"),
+        ("Profile", "connectclient"),
+        ("Profile", "streamrclient"),
+        ("ConnectDelay", "streamrclient"),
+    ] {
+        assert_eq!(
+            dispositions[&(cell.0.to_owned(), cell.1.to_owned())],
+            "not_applicable",
+            "M140 cell {}:{} must remain N/A",
+            cell.0,
+            cell.1
+        );
+    }
+    assert_eq!(
+        dispositions[&("Profile".to_owned(), "client".to_owned())],
+        "apply",
+        "Profile:client was retained by M140 but promoted by M143"
+    );
     let pre_blocked = BTreeSet::from([
         ("ConnectDelay".to_owned(), "streamrclient".to_owned()),
         ("EncryptLeaseSet".to_owned(), "server".to_owned()),
@@ -316,28 +327,17 @@ fn m140_matrix_reconciliation_is_exact_and_contained() {
         ("UseSSL".to_owned(), "httpbidirserver".to_owned()),
     ]);
     assert_eq!(pre_blocked.len(), 47);
-    let removed = pre_blocked.difference(&blocked).cloned().collect::<BTreeSet<_>>();
-    assert_eq!(
-        removed,
-        BTreeSet::from([
-            ("Profile".to_owned(), "httpclient".to_owned()),
-            ("Profile".to_owned(), "ircclient".to_owned()),
-            ("Profile".to_owned(), "socks".to_owned()),
-            ("Profile".to_owned(), "socksirc".to_owned()),
-            ("Profile".to_owned(), "connectclient".to_owned()),
-            ("Profile".to_owned(), "streamrclient".to_owned()),
-            ("ConnectDelay".to_owned(), "streamrclient".to_owned()),
-        ])
-    );
-    for cell in &removed {
-        assert!(
-            candidates.contains(cell),
-            "changed cell must be an M140 candidate"
-        );
-    }
+    // Current-head containment: no new blocked_primitive cell may appear
+    // outside the M140 pre-set; later milestones only promoted/reclassified.
+    // (Exact current aggregates are owned by the M153 guard.)
     assert!(
         blocked.is_subset(&pre_blocked),
         "no new blockers may appear"
     );
-    assert!(blocked.contains(&("Profile".to_owned(), "client".to_owned())));
+    for cell in &blocked {
+        assert!(
+            pre_blocked.contains(cell),
+            "current blocked cell must be an M140 pre-blocked cell"
+        );
+    }
 }

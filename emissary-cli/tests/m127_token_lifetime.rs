@@ -86,7 +86,10 @@ fn token_store_has_finite_expiry_state() {
         "token record must carry monotonic expiry state"
     );
     // Three internal outcomes, atomically distinguished.
-    assert!(auth.contains("enum TokenValidation"), "missing outcome enum");
+    assert!(
+        auth.contains("enum TokenValidation"),
+        "missing outcome enum"
+    );
     assert!(auth.contains("Expired"), "missing expired outcome");
     assert!(auth.contains("Unknown"), "missing unknown outcome");
     assert!(
@@ -140,7 +143,13 @@ fn dispatch_maps_expired_and_unknown_distinctly() {
 #[test]
 fn no_background_scanner_or_timer_task() {
     let auth = production_section("emissary-cli/src/i2pcontrol/auth.rs");
-    for forbidden in ["tokio::spawn", "spawn(", "set_interval", "interval(", "sleep("] {
+    for forbidden in [
+        "tokio::spawn",
+        "spawn(",
+        "set_interval",
+        "interval(",
+        "sleep(",
+    ] {
         assert!(
             !auth.contains(forbidden),
             "auth must not introduce a background scanner/timer: found {forbidden}"
@@ -159,7 +168,10 @@ fn no_background_scanner_or_timer_task() {
 fn error_and_log_paths_do_not_echo_token_material() {
     let server = production_section("emissary-cli/src/i2pcontrol/server.rs");
     // Static messages only; the presented token value must never be interpolated.
-    assert!(!server.contains("format!(\"{token"), "error must not echo token");
+    assert!(
+        !server.contains("format!(\"{token"),
+        "error must not echo token"
+    );
     assert!(
         !server.contains("token}"),
         "server production section must not interpolate token material"
@@ -231,8 +243,18 @@ fn production_changes_stay_under_i2pcontrol() {
 
 #[test]
 fn proposal_matrix_unchanged_by_token_lifetime() {
+    // M153 rebase: M127 closed at `284/96/460` and never owned tunnel cells.
+    // Current-head aggregates are owned by the M153 guard; this historical
+    // suite pins M127 closure evidence plus mechanical self-consistency of the
+    // current matrix (declared == recomputed, 840 cells).
+    let closure = source("plans/closure/i2pcontrol-proposal-170/127-closure.md");
+    assert!(
+        closure.contains("284 apply / 96 blocked_primitive / 460"),
+        "M127 closure must retain its historical 284/96/460 authority"
+    );
     let matrix: toml::Value = std::fs::read_to_string(
-        workspace_root().join("plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"),
+        workspace_root()
+            .join("plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"),
     )
     .expect("matrix")
     .parse()
@@ -248,7 +270,15 @@ fn proposal_matrix_unchanged_by_token_lifetime() {
             *counts.entry(cell.as_str().expect("cell").to_owned()).or_insert(0usize) += 1;
         }
     }
-    assert_eq!(counts.get("apply"), Some(&325));
-    assert_eq!(counts.get("blocked_primitive"), Some(&47));
-    assert_eq!(counts.get("not_applicable"), Some(&468));
+    let declared = matrix["current_matrix_counts"].as_table().expect("declared counts");
+    assert_eq!(declared["total"].as_integer(), Some(840));
+    for key in ["apply", "blocked_primitive", "not_applicable"] {
+        assert_eq!(
+            counts.get(key).copied().unwrap_or_default() as i64,
+            declared[key].as_integer().expect("declared count"),
+            "current matrix must be mechanically self-consistent (M153 owns exact counts)"
+        );
+    }
+    let total: usize = counts.values().sum();
+    assert_eq!(total, 840);
 }

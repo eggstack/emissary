@@ -195,3 +195,7 @@ If those four cells remain blocked through final M152, full Proposal support rem
 ## 7. Historical closure rule
 
 All M140-M146 closure files remain immutable. Later corrective qualification may supersede current-head authority/metadata, but it does not rewrite historical milestone evidence.
+
+## 8. Post-line qualification authority (M153 closed)
+
+M153 (`plans/closure/i2pcontrol-proposal-170/153-closure.md`) is closed as complete with zero promotions and zero production changes. It supersedes M139 as the current runtime/security qualification authority at `336/29/475`, corrects M095 production-head metadata to `7cbd80a...`, and repairs historical-vs-current test authority. This roadmap remains the immutable historical record of the M140-M146 execution line; current execution continues under `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` with M154 registered.

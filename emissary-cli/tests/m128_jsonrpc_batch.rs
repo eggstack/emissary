@@ -280,9 +280,19 @@ fn production_changes_stay_under_i2pcontrol() {
 
 #[test]
 fn proposal_matrix_unchanged_by_batch_conformance() {
+    // M153 rebase: M128 closed at `284/96/460` and never owned tunnel cells.
+    // Current-head aggregates are owned by the M153 guard; this historical
+    // suite pins M128 closure evidence plus mechanical self-consistency.
+    let root = workspace_root();
+    let closure =
+        std::fs::read_to_string(root.join("plans/closure/i2pcontrol-proposal-170/128-closure.md"))
+            .expect("M128 closure must exist");
+    assert!(
+        closure.contains("284 apply / 96 blocked_primitive / 460"),
+        "M128 closure must retain its historical 284/96/460 authority"
+    );
     let matrix: toml::Value = std::fs::read_to_string(
-        workspace_root()
-            .join("plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"),
+        root.join("plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml"),
     )
     .expect("matrix")
     .parse()
@@ -298,7 +308,15 @@ fn proposal_matrix_unchanged_by_batch_conformance() {
             *counts.entry(cell.as_str().expect("cell").to_owned()).or_insert(0usize) += 1;
         }
     }
-    assert_eq!(counts.get("apply"), Some(&325));
-    assert_eq!(counts.get("blocked_primitive"), Some(&47));
-    assert_eq!(counts.get("not_applicable"), Some(&468));
+    let declared = matrix["current_matrix_counts"].as_table().expect("declared counts");
+    assert_eq!(declared["total"].as_integer(), Some(840));
+    for key in ["apply", "blocked_primitive", "not_applicable"] {
+        assert_eq!(
+            counts.get(key).copied().unwrap_or_default() as i64,
+            declared[key].as_integer().expect("declared count"),
+            "current matrix must be mechanically self-consistent (M153 owns exact counts)"
+        );
+    }
+    let total: usize = counts.values().sum();
+    assert_eq!(total, 840);
 }

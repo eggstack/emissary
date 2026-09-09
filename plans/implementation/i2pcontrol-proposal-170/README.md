@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M153 is the sole registered corrective handoff**.
+Status: **partial Proposal 170 support; M153 closed as the current qualification authority; M154 registered**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -9,8 +9,8 @@ Current machine state:
 - M095: `336 apply / 29 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells;
 - remaining blockers: 10 `SigType`, 15 LeaseSet-security (`EncryptLeaseSet`/`OptionalLookup`/`LeaseSetClientAuths`), 4 `UseOutproxyPlugin`;
 - M146 is closed as blocked with zero promotions and zero production delta;
-- M139 is the last whole-surface qualification authority but is historical for current-head purposes because M141-M145 added production behavior afterward;
-- M153 is registered to establish a new current-head qualification authority before crypto work.
+- M139 is the historical whole-surface qualification authority, superseded by M153 for current-head purposes because M141-M145 added production behavior afterward;
+- M153 is closed as the current runtime/security qualification authority before crypto work.
 
 Current corrective roadmap:
 
@@ -51,39 +51,31 @@ Containment/support evidence remains centered on:
 
 M145's accepted production state includes follow-up commit `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2`, which corrected a no-std `String` import and formatting after the original M145 closure commit. M153 explicitly requalifies this final production state.
 
-## Registered handoff — M153
+## Registered handoff — M154 (M153 closed)
 
-Plan:
+M153 closure:
 
-- `153-post-m146-current-head-requalification-and-authority-rebase.md`.
+- `plans/closure/i2pcontrol-proposal-170/153-closure.md`.
 
-Status: **registered / dependency-ready**.
+Status: **closed as complete**.
 
-M153 is qualification/test/documentation-only with:
+M153 was qualification/test/documentation-only with:
 
-- zero Proposal promotion budget;
-- zero production Rust/dependency/Yosemite budget;
-- expected incoming matrix `336/29/475`;
-- expected last production-bearing head `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2`.
+- zero Proposal promotions (matrix unchanged at `336/29/475`);
+- zero production Rust/dependency/Yosemite changes;
+- corrected M095 `current_production_head` to `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2`;
+- historical-vs-current test authority repair with the aggregate owned by the new `m153_post_m146_requalification` guard;
+- M127-M145 plus blocked M146 behavior requalified as one current-head surface;
+- exact M061/M062 containment and feature-owned dependency isolation re-proved;
+- current runtime/security qualification authority rebased from M139 to M153.
 
-It must:
-
-- mechanically preserve the exact matrix/residual set;
-- correct stale M095 production-head metadata;
-- repair historical-vs-current test authority so the broad I2PControl suite is not red from obsolete aggregate assertions;
-- requalify M127-M145 plus blocked M146 behavior as one current-head surface;
-- re-prove exact M061/M062 containment and feature-owned dependency isolation;
-- become current runtime/security qualification authority only after clean closure.
-
-Any production change is a stop condition requiring a separate corrective implementation plan.
-
-## Deferred pre-crypto gate — M154
+## Registered handoff — M154
 
 Plan:
 
 - `154-m147-signature-domain-security-and-owner-refreeze.md`.
 
-Status: **deferred / unregistered; hard-depends on M153 closure**.
+Status: **registered / dependency-ready; hard dependency on M153 closure satisfied**.
 
 M154 exists because M147 explicitly cannot be registered until a dedicated audit freezes:
 
@@ -147,10 +139,10 @@ In the latter case active docs must remain explicitly partial and name the exact
 M146 UseOutproxyPlugin feasibility              [CLOSED AS BLOCKED]
   |
   v
-M153 current-head integrated requalification    [REGISTERED]
+M153 current-head integrated requalification    [CLOSED]
   |
   v
-M154 signature-domain/security owner re-freeze  [DEFERRED]
+M154 signature-domain/security owner re-freeze  [REGISTERED]
   |
   v
 M147 -> M148 -> M149 -> M150 -> M151 -> M152    [DEFERRED / UNREGISTERED]

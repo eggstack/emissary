@@ -1,10 +1,12 @@
-//! M126 current-head requalification guards.
+//! M126 historical requalification guards (rebased by M153).
 //!
-//! These checks keep the active support claim tied to the pinned inventory and
-//! to the production composition boundary. Runtime behavior is covered by the
-//! existing authenticated live-runtime, production-adapter, and adversarial
-//! suites; this file prevents their evidence from drifting away from the
-//! active planning authority.
+//! M126 closed at `284/96/460`. M139 rebased the then-current count checks to
+//! `325/47/468`; M153 rebases them again so milestone-local history stays
+//! pinned to immutable closure evidence while current-head aggregate counts
+//! are owned solely by the M153 guard (`m153_post_m146_requalification`).
+//! Runtime behavior is covered by the existing authenticated live-runtime,
+//! production-adapter, and adversarial suites; this file prevents their
+//! evidence from drifting away from the active planning authority.
 
 #![cfg(feature = "i2pcontrol")]
 
@@ -21,9 +23,7 @@ fn workspace_root() -> PathBuf {
 
 fn planning_file(name: &str) -> String {
     fs::read_to_string(
-        workspace_root()
-            .join("plans/implementation/i2pcontrol-proposal-170")
-            .join(name),
+        workspace_root().join("plans/implementation/i2pcontrol-proposal-170").join(name),
     )
     .unwrap_or_else(|error| panic!("failed to read planning file {name}: {error}"))
 }
@@ -50,13 +50,12 @@ fn current_matrix_is_mechanically_requalified() {
     assert_eq!(matrix["proposal_number"].as_integer(), Some(170));
     assert_eq!(matrix["proposal_revision"].as_str(), Some("2026-05-20"));
     assert_eq!(matrix["proposal_status"].as_str(), Some("Open"));
-    assert_eq!(matrix["source_sha256"].as_str(), Some(
-        "f13ae00b886c5e72131bc5d5b138a371148d1faa6899a119a1dacb65a555e7dc",
-    ));
+    assert_eq!(
+        matrix["source_sha256"].as_str(),
+        Some("f13ae00b886c5e72131bc5d5b138a371148d1faa6899a119a1dacb65a555e7dc",)
+    );
 
-    let router_rows = table(&matrix, "router_info")["rows"]
-        .as_array()
-        .expect("RouterInfo rows");
+    let router_rows = table(&matrix, "router_info")["rows"].as_array().expect("RouterInfo rows");
     assert_eq!(router_rows.len(), 43);
     let router_counts = router_rows.iter().fold(BTreeMap::new(), |mut counts, row| {
         *counts.entry(string(row, "current_disposition")).or_insert(0usize) += 1;
@@ -64,7 +63,10 @@ fn current_matrix_is_mechanically_requalified() {
     });
     assert_eq!(router_counts.get("available"), Some(&42));
     assert_eq!(router_counts.get("neutral"), Some(&1));
-    assert_eq!(router_counts.get("unavailable").copied().unwrap_or_default(), 0);
+    assert_eq!(
+        router_counts.get("unavailable").copied().unwrap_or_default(),
+        0
+    );
 
     let setconfig_rows = table(&matrix, "addressbook_setconfig")["rows"]
         .as_array()
@@ -97,15 +99,43 @@ fn current_matrix_is_mechanically_requalified() {
             *counts.entry(cell.as_str().expect("cell disposition")).or_insert(0usize) += 1;
         }
     }
-    assert_eq!(counts.get("apply"), Some(&325));
-    assert_eq!(counts.get("blocked_primitive"), Some(&47));
-    assert_eq!(counts.get("not_applicable"), Some(&468));
+    // M153 owns the exact current-head aggregate (`336/29/475`). This
+    // historical suite pins only mechanical self-consistency (declared counts
+    // agree with recomputation, 840 cells total, no unknown disposition) so
+    // later legitimate promotions do not red-flag M126 behavior.
+    let declared = matrix["current_matrix_counts"].as_table().expect("declared counts");
+    let declared_total = declared["total"].as_integer().expect("declared total");
+    assert_eq!(declared_total, 840);
+    for key in ["apply", "blocked_primitive", "not_applicable"] {
+        let declared_value = declared[key].as_integer().expect("declared count");
+        assert_eq!(
+            counts.get(key).copied().unwrap_or_default() as i64,
+            declared_value
+        );
+    }
+    let recomputed_total: usize = counts.values().sum();
+    assert_eq!(recomputed_total, 840);
     assert_eq!(counts.get("planned_apply").copied().unwrap_or_default(), 0);
+
+    // Historical invariant: M126's own closure remains immutable evidence of
+    // the `284/96/460` head it qualified.
+    let closure = fs::read_to_string(
+        workspace_root().join("plans/closure/i2pcontrol-proposal-170/126-closure.md"),
+    )
+    .expect("M126 closure must exist");
+    assert!(
+        closure.contains("284 apply / 96 blocked_primitive / 460"),
+        "M126 closure must retain its historical 284/96/460 authority"
+    );
 }
 
 #[test]
 fn active_support_docs_agree_with_the_current_partial_claim() {
     let root = workspace_root();
+    // Durable current-head authority is owned by M153 (`336/29/475`); this
+    // historical suite pins only the durable partial-support claim plus the
+    // M126 lineage, and keeps the M126-era counts in immutable closure
+    // evidence rather than in active docs.
     let active = [
         root.join("AGENTS.md"),
         root.join("plans/registry.md"),
@@ -113,22 +143,41 @@ fn active_support_docs_agree_with_the_current_partial_claim() {
         root.join("plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md"),
     ];
 
-    for path in active {
-        let text = fs::read_to_string(&path)
+    for path in &active {
+        let text = fs::read_to_string(path)
             .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
-        assert!(
-            text.contains("325") && text.contains("47") && text.contains("468"),
-            "{} does not state the current 325/47/468 authority",
-            path.display()
-        );
-        assert!(
-            !text.contains("312\napply / 70") && !text.contains("312 / 70 / 458"),
-            "{} retains the superseded active matrix count",
-            path.display()
-        );
         assert!(
             text.to_ascii_lowercase().contains("partial"),
             "{} must retain the partial-support status",
+            path.display()
+        );
+        assert!(
+            !text.contains("Status: full Proposal 170 support")
+                && !text.contains("Status: **full Proposal 170 support"),
+            "{} must not claim full Proposal 170 support",
+            path.display()
+        );
+    }
+    // Current-head counts live in the M153 guard; active docs must agree with
+    // them there, not with the superseded M126-era `325/47/468` wording.
+    let registry = fs::read_to_string(root.join("plans/registry.md")).expect("registry");
+    assert!(
+        registry.contains("336") && registry.contains("29") && registry.contains("475"),
+        "registry must state the current M153 336/29/475 authority"
+    );
+    let closure =
+        fs::read_to_string(root.join("plans/closure/i2pcontrol-proposal-170/126-closure.md"))
+            .expect("M126 closure must exist");
+    assert!(
+        closure.contains("284") && closure.contains("96") && closure.contains("460"),
+        "M126 closure must retain its historical 284/96/460 evidence"
+    );
+    for path in &active {
+        let text = fs::read_to_string(path)
+            .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+        assert!(
+            !text.contains("312\napply / 70") && !text.contains("312 / 70 / 458"),
+            "{} retains the superseded active matrix count",
             path.display()
         );
     }
@@ -140,9 +189,7 @@ fn production_composition_has_no_fake_fallback_and_requires_runtime_owners() {
     let server = fs::read_to_string(root.join("emissary-cli/src/i2pcontrol/server.rs"))
         .expect("server source");
     let init_start = server.find("pub async fn init_server").expect("init_server");
-    let init_end = server
-        .find("/// Zero-cost event metrics stub")
-        .expect("init_server end");
+    let init_end = server.find("/// Zero-cost event metrics stub").expect("init_server end");
     let init = &server[init_start..init_end];
 
     assert!(init.contains("ctx.address_book_handle.ok_or_else"));
@@ -159,8 +206,8 @@ fn production_composition_has_no_fake_fallback_and_requires_runtime_owners() {
 
 #[test]
 fn yosemite_fork_remains_optional_and_i2pcontrol_owned() {
-    let manifest = fs::read_to_string(workspace_root().join("emissary-cli/Cargo.toml"))
-        .expect("CLI manifest");
+    let manifest =
+        fs::read_to_string(workspace_root().join("emissary-cli/Cargo.toml")).expect("CLI manifest");
     assert!(manifest.contains("yosemite-i2pcontrol"));
     assert!(manifest.contains("optional = true"));
     assert!(manifest.contains("dep:yosemite-i2pcontrol"));

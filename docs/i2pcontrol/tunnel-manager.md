@@ -404,7 +404,7 @@ M124) adds cross-field auth/type consistency validation. The dependency now
 serializes corrected generic fields, proven reachable by I2PControl adapter
 tests, but that is transport reachability only; no Proposal runtime path maps
 them and no downgrade is permitted, so the remaining 17 cells fail before
-allocation. M139 closes the current runtime/security qualification at `325 apply / 47 blocked /
+allocation. M139 closed the historical runtime/security qualification at `325 apply / 47 blocked /
 468 not_applicable`; M140 re-freezes the streaming applicability to `325 apply / 40 blocked /
 475 not_applicable` with zero promotions; M141 applies the HTTP unique-local
 source-address completion to `327 apply / 38 blocked / 475 not_applicable`
@@ -416,8 +416,10 @@ completion to `334 apply / 31 blocked / 475 not_applicable` with 4 promotions;
 M145 applies the LeaseSet reply-bundling completion to `336 apply / 29 blocked /
 475 not_applicable` with 2 promotions; M146 closes as blocked as the
 outproxy-provider feasibility gate with zero promotions (`336/29/475`
-unchanged); no successor is
-registered, M147-M152 remain deferred.
+unchanged); M153 closes as the current runtime/security qualification authority
+with zero promotions and zero production changes (`336/29/475` unchanged,
+M139 superseded); M154 is registered as the signature-domain/security
+pre-registration audit, M147-M152 remain deferred.
 
 | Disposition | Proposal 170 fields |
 |---|---|

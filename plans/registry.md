@@ -30,7 +30,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 |---|---|---|---|
 | Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | execution after M146 is superseded by the post-M146 corrective roadmap |
 | Proposal 170 residual primitive completion | **historical through M146 / superseded for next execution** | `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md` | M140-M145 complete; M146 closed blocked |
-| Proposal 170 post-M146 corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` | **M153 registered / dependency-ready**; M154 and M147-M152 deferred |
+| Proposal 170 post-M146 corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` | **M153 closed complete**; **M154 registered / dependency-ready**; M147-M152 deferred |
 | Proposal 170 session-lifecycle completion | **closed as complete** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | M134 closed as complete |
 | Post-M114 shared-control-plane corrective line | **closed / historical qualification lineage** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | M130 historical; M139 later requalified lifecycle head |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
@@ -58,37 +58,65 @@ Full Proposal 170 status remains **partial**.
 
 ## Current qualification authority
 
+### Current-head authority — M153
+
+M153 is closed as complete and is the current whole-surface integrated runtime/security qualification at `336/29/475` with zero promotions and zero production changes.
+
+Plan/closure:
+
+- `plans/implementation/i2pcontrol-proposal-170/153-post-m146-current-head-requalification-and-authority-rebase.md`;
+- `plans/closure/i2pcontrol-proposal-170/153-closure.md`.
+
 ### Historical current-head authority — M139
 
-M139 is closed as complete and remains the last whole-surface integrated runtime/security qualification, but it predates M141-M145 production work. It must not be described as a current-head qualification after those changes.
+M139 is closed as complete and was the last whole-surface integrated runtime/security qualification before M141-M145 production work. It is superseded by M153 for current-head purposes and must not be described as a current-head qualification after those changes.
 
 Plan/closure:
 
 - `plans/implementation/i2pcontrol-proposal-170/139-post-lifecycle-integrated-requalification-and-authority-rebase.md`;
 - `plans/closure/i2pcontrol-proposal-170/139-closure.md`.
 
-M153 is registered specifically to supersede M139 for current-head runtime/security qualification if its zero-production requalification closes cleanly.
-
 ## Registered implementation/qualification handoff
 
-### M153 — post-M146 current-head requalification and authority rebase
+### M153 — post-M146 current-head requalification and authority rebase (closed)
 
-Plan:
+Plan/closure:
 
-- `plans/implementation/i2pcontrol-proposal-170/153-post-m146-current-head-requalification-and-authority-rebase.md`.
+- `plans/implementation/i2pcontrol-proposal-170/153-post-m146-current-head-requalification-and-authority-rebase.md`;
+- `plans/closure/i2pcontrol-proposal-170/153-closure.md`.
 
-Status: **registered / dependency-ready**.
+Status: **closed as complete**.
 
 Class: invariant / qualification / corrective.
 
 Baseline:
 
 - repository registration baseline `a0c4a791a6a7a974d34eaf93c45330aafd11116f`;
-- expected last production-bearing head `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2`;
+- accepted last production-bearing head `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2`;
 - M095 `336/29/475`;
 - M146 closed blocked with no production delta.
 
-M153 has **zero Proposal promotion budget** and **zero production Rust/dependency/Yosemite budget**.
+M153 had **zero Proposal promotion budget** and **zero production Rust/dependency/Yosemite budget**.
+
+It:
+
+- mechanically preserved `336/29/475` and the exact 29-cell residual identity;
+- corrected M095 `current_production_head` metadata to `7cbd80a...`;
+- separated historical milestone assertions from durable current-head test assertions;
+- requalified M127-M129, lifecycle behavior, and M140-M146 composition on the actual post-M145 production source;
+- explicitly absorbed the M145 `7cbd80a...` no-std/format follow-up into accepted current production evidence;
+- re-proved M061/M062 containment/dependency isolation without widening it;
+- superseded M139 as the current runtime/security qualification authority.
+
+## Deferred corrective/implementation chain
+
+### M154 — M147 signature-domain/security/exact-owner re-freeze
+
+Plan:
+
+- `plans/implementation/i2pcontrol-proposal-170/154-m147-signature-domain-security-and-owner-refreeze.md`.
+
+Status: **registered / dependency-ready; hard dependency on M153 closure satisfied by `plans/closure/i2pcontrol-proposal-170/153-closure.md`**.
 
 It must:
 
@@ -110,7 +138,7 @@ Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/154-m147-signature-domain-security-and-owner-refreeze.md`.
 
-Status: **deferred / unregistered; hard-depends on M153 closure**.
+Status: **registered / dependency-ready; hard dependency on M153 closure satisfied by `plans/closure/i2pcontrol-proposal-170/153-closure.md`**.
 
 M154 has zero production and zero promotion budget. It exists because M147 itself forbids registration until a dedicated audit freezes:
 
@@ -187,10 +215,10 @@ M145 MultiHoming / reply LeaseSet bundling      [CLOSED — 336/29/475]
 M146 UseOutproxyPlugin feasibility              [CLOSED AS BLOCKED — 336/29/475]
   |
   v
-M153 current-head requalification               [REGISTERED — ZERO PROMOTION]
+M153 current-head requalification               [CLOSED — ZERO PROMOTION]
   |
   v
-M154 signature-domain/security owner re-freeze  [DEFERRED — ZERO PROMOTION]
+M154 signature-domain/security owner re-freeze  [REGISTERED — ZERO PROMOTION]
   |
   v
 M147 -> M148 -> M149 -> M150 -> M151 -> M152    [DEFERRED / UNREGISTERED]
@@ -210,8 +238,8 @@ M147 -> M148 -> M149 -> M150 -> M151 -> M152    [DEFERRED / UNREGISTERED]
 
 ## Registration rules
 
-1. M153 is the only registered plan.
-2. M154 is not executable until M153 closes complete and the registry explicitly registers M154.
+1. M154 is the only registered plan; M153 is closed complete.
+2. M154 is executable after M153 closes complete and this registry explicitly registers M154.
 3. M147 cannot be registered directly after M153; M154 must first satisfy its pre-registration audit gate.
 4. M148-M152 remain unregistered behind hard dependencies.
 5. M146 remains closed blocked and has no implicit successor.
@@ -230,5 +258,6 @@ M147 -> M148 -> M149 -> M150 -> M151 -> M152    [DEFERRED / UNREGISTERED]
 | M144 | closed complete; 4 promotions |
 | M145 | closed complete; 2 promotions; later no-std/format follow-up `7cbd80a...` |
 | M146 | closed blocked; zero promotions; four UseOutproxyPlugin cells remain blocked |
+| M153 | closed complete; zero promotions; current runtime/security qualification authority at `336/29/475` |
 
 Historical closure files remain unchanged.

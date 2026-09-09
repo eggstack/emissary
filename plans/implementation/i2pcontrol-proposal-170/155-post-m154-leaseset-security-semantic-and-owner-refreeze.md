@@ -1,6 +1,7 @@
 # M155 — Post-M154 LeaseSet-Security Semantic and Exact-Owner Re-freeze
 
-Status: **registered / dependency-ready**
+Status: **closed as complete**
+(see `plans/closure/i2pcontrol-proposal-170/155-closure.md`)
 
 Class: invariant / architecture-security qualification
 

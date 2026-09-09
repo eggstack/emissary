@@ -421,7 +421,10 @@ with zero promotions and zero production changes (`336/29/475` unchanged,
 M139 superseded); M154 closes the signature-domain/security pre-registration
 audit with disposition C and zero promotions/production changes (`336/29/475`
 unchanged, M147 path blocked — the ten `SigType` cells are terminal blockers
-under current security/dependency policy); M148-M152 remain deferred.
+under current security/dependency policy); M155 closes the LeaseSet-security
+semantic/owner re-freeze with zero promotions/production changes (`336/29/475`
+unchanged, legacy AES disposition C delegated to M161, narrow type-7 -> type-11
+blinding frozen without reopening M147/M148, M156 registered); M148-M152 remain deferred.
 
 | Disposition | Proposal 170 fields |
 |---|---|

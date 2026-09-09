@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M155 is the sole registered successor**.
+Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M155 closed, M156 is the sole registered successor**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -21,15 +21,16 @@ Roadmap:
 
 Registered handoff:
 
-- **M155** `155-post-m154-leaseset-security-semantic-and-owner-refreeze.md` — registered/dependency-ready; zero production and zero promotion budget.
+- **M156** `156-neutral-red25519-blinding-primitive.md` — registered/dependency-ready on the M155 closure (`plans/closure/i2pcontrol-proposal-170/155-closure.md`); neutral primitive, zero promotion budget; exact M061/M062 authorization required at registration before coding.
 
-M155 exists because M154 correctly blocked general configurable Destination `SigType`, but that block does not automatically block modern Encrypted LeaseSet2. M155 must freeze the narrower type-7 Ed25519 -> type-11 Red25519 blinding path, the ten-value `EncryptLeaseSet` mode table, the legacy AES/LS1 contradiction, field coupling, exact owners and dependency policy before implementation resumes.
+M155 closed complete (`plans/closure/i2pcontrol-proposal-170/155-closure.md`): ten-value `EncryptLeaseSet` table frozen, legacy AES disposition C delegated to M161, narrow type-7 Ed25519 -> type-11 Red25519 blinding path frozen without reopening M147/M148, field coupling and exact M156 files frozen.
 
 ## Historical/blocked authority
 
 - M146 `UseOutproxyPlugin`: closed blocked; four cells remain unsupported under current egress/security architecture.
 - M153: closed complete; current whole-surface runtime/security qualification authority at `336/29/475`.
 - M154: closed complete, disposition C; general signature-domain audit.
+- M155: closed complete; LeaseSet-security semantic/owner re-freeze (legacy AES disposition C, narrow blinding frozen, M156 unblocked).
 - M147/M148 configurable Destination `SigType`: closed/deferred behind the M154 blocked disposition; ten cells remain unsupported. This line is **not reopened** by encrypted-LS2 work.
 
 Historical closure files remain immutable.
@@ -37,10 +38,10 @@ Historical closure files remain immutable.
 ## Corrected LeaseSet-security chain
 
 ```text
-M155 LeaseSet semantic/owner refreeze               [REGISTERED; ZERO PRODUCTION]
+M155 LeaseSet semantic/owner refreeze               [CLOSED; ZERO PRODUCTION]
   |
   v
-M156 narrow Red25519 + Ed25519 blinding              [DEFERRED; ZERO PROMOTION]
+M156 narrow Red25519 + Ed25519 blinding              [REGISTERED; ZERO PROMOTION]
   |
   v
 M157 modern Encrypted LeaseSet2 publication          [DEFERRED; ZERO PROMOTION]

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M155 is the sole registered successor**
+Status: **active / partial; M155 closed, M156 is the sole registered successor**
 
 Pinned Proposal authority:
 
@@ -42,6 +42,7 @@ Full support means real externally observable behavior. Parser acceptance, persi
 - M146 correctly closed `UseOutproxyPlugin` blocked with zero promotions.
 - M153 requalified the current production head and is the current whole-surface authority.
 - M154 froze the full destination-capable SigType domain and correctly closed the general M147 path blocked; M148 remains blocked behind it.
+- M155 closed the LeaseSet-security semantic/owner re-freeze (ten-value table, legacy AES disposition C, narrow blinding frozen) and registered M156.
 
 Those closures remain immutable historical evidence.
 
@@ -52,10 +53,10 @@ M154's SigType block does not itself block modern Encrypted LeaseSet2. The curre
 Execution order:
 
 ```text
-M155 LeaseSet semantic/owner refreeze               [REGISTERED; ZERO PRODUCTION]
+M155 LeaseSet semantic/owner refreeze               [CLOSED; ZERO PRODUCTION]
   |
   v
-M156 narrow Red25519 + Ed25519 blinding              [DEFERRED; ZERO PROMOTION]
+M156 narrow Red25519 + Ed25519 blinding              [REGISTERED; ZERO PROMOTION]
   |
   v
 M157 modern type-5 Encrypted LeaseSet2 publication   [DEFERRED; ZERO PROMOTION]
@@ -121,4 +122,4 @@ If one or more accepted architecture/security blockers remain after all safe wor
 
 ## 9. Current handoff
 
-Only M155 is registered. Do not begin M156 until M155 closes complete and the registry plus M061/M062 explicitly advance it with exact production/dependency authority.
+Only M156 is registered. Do not begin M156 implementation until M061/M062 explicitly authorize its exact files/dependency in the registration commit.

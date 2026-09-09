@@ -1,6 +1,8 @@
 # M156 — Neutral Red25519 and Ed25519-Blinding Primitive
 
-Status: **deferred / unregistered; hard-depends on M155 closure**
+Status: **registered / dependency-ready; hard dependency on M155 closure satisfied by `plans/closure/i2pcontrol-proposal-170/155-closure.md`**
+
+At registration, M061/M062 must authorize only the exact production files in the M155 closure §8 (new `emissary-core/src/crypto/red25519.rs`, `emissary-core/src/crypto/mod.rs` declaration only, plus the direct `curve25519-dalek` edge) before coding begins.
 
 Class: neutral cryptographic infrastructure
 

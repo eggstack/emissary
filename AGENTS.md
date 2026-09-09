@@ -36,7 +36,7 @@ I2PControl supports a large partial subset of Proposal 170. Keep Proposal/admin/
 ## Current Proposal-170 authority
 
 - authoritative matrix: `336 apply / 29 blocked_primitive / 475 not_applicable`;
-- M153 is the current whole-surface runtime/security qualification authority;
+- M153 is the current whole-surface runtime/security qualification authority (M139 remains historical qualification ancestry, superseded by M153);
 - M146 `UseOutproxyPlugin` remains closed blocked (4 cells);
 - M154 closed disposition C and left the general M147/M148 configurable Destination `SigType` path blocked (10 cells);
 - the M147 block does **not** imply modern Encrypted LeaseSet2 is blocked: the current corrective line separately evaluates the narrower type-7 Ed25519 -> type-11 Red25519 blinded-key primitive.
@@ -47,15 +47,15 @@ Current execution roadmap:
 
 Sole registered handoff:
 
-- **M155** `plans/implementation/i2pcontrol-proposal-170/155-post-m154-leaseset-security-semantic-and-owner-refreeze.md`.
+- **M156** `plans/implementation/i2pcontrol-proposal-170/156-neutral-red25519-blinding-primitive.md` (registered/dependency-ready on the M155 closure `plans/closure/i2pcontrol-proposal-170/155-closure.md`; neutral primitive, zero promotion budget; exact M061/M062 authorization required before coding).
 
-M155 has zero production/dependency and zero Proposal-promotion budget. It must freeze the ten-value `EncryptLeaseSet` contract, the legacy AES/LS1 disposition, narrow Red25519/blinding formulas/dependency posture, Proposal field coupling, and exact future owners before M156 may be registered.
+M155 closed complete with `336/29/475` unchanged: ten-value `EncryptLeaseSet` table frozen, legacy AES disposition C delegated to M161, narrow type-7 Ed25519 -> type-11 Red25519 blinding formulas/dependency posture frozen without reopening M147/M148, field coupling and exact M156 files frozen.
 
 Deferred corrected line:
 
 ```text
-M155 semantic/owner refreeze            [REGISTERED; ZERO PRODUCTION]
-  -> M156 Red25519/blinding              [DEFERRED]
+M155 semantic/owner refreeze            [CLOSED; ZERO PRODUCTION]
+  -> M156 Red25519/blinding              [REGISTERED]
   -> M157 modern Encrypted LS2           [DEFERRED]
   -> M158 lookup-secret/blinded address  [DEFERRED]
   -> M159 PSK auth                       [DEFERRED]

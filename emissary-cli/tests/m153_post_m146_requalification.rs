@@ -224,11 +224,14 @@ fn m153_authority_docs_name_m153_and_retain_partial_support() {
     // Active planning/docs authority: M153 is the current runtime/security
     // qualification; M139 is historical; support remains partial at
     // `336/29/475`; no full-support claim.
+    // M155: the post-M146 roadmap was superseded for execution after M154
+    // (historical through M154); the active corrective authority is now the
+    // post-M154 roadmap, so the active list tracks the post-M154 file.
     for name in [
         "AGENTS.md",
         "plans/registry.md",
         "plans/implementation/i2pcontrol-proposal-170/README.md",
-        "plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md",
+        "plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md",
         "docs/i2pcontrol/README.md",
         "docs/i2pcontrol/proposal-170-support.md",
     ] {

@@ -614,6 +614,8 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m145 = is_authorized_m145_path(path);
         let authorized_m146 = is_authorized_m146_path(path);
         let authorized_m153 = is_authorized_m153_path(path);
+        let authorized_m154 = is_authorized_m154_path(path);
+        let authorized_m155 = is_authorized_m155_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -654,6 +656,8 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m145
                 || authorized_m146
                 || authorized_m153
+                || authorized_m154
+                || authorized_m155
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -696,6 +700,8 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m145
                     || authorized_m146
                     || authorized_m153
+                    || authorized_m154
+                    || authorized_m155
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -1361,6 +1367,28 @@ fn is_authorized_m153_path(path: &str) -> bool {
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
             | "plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md"
             | "plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md"
+    )
+}
+
+fn is_authorized_m154_path(path: &str) -> bool {
+    matches!(path, "plans/closure/i2pcontrol-proposal-170/154-closure.md")
+}
+
+fn is_authorized_m155_path(path: &str) -> bool {
+    matches!(
+        path,
+        "AGENTS.md"
+            | "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/tunnel-manager.md"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/155-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/155-post-m154-leaseset-security-semantic-and-owner-refreeze.md"
+            | "plans/implementation/i2pcontrol-proposal-170/156-neutral-red25519-blinding-primitive.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md"
     )
 }
 

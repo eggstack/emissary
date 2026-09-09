@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M154 LeaseSet-Security Corrective Roadmap
 
-Status: **active / partial; M155 is the only registered successor**
+Status: **active / partial; M155 closed, M156 is the only registered successor**
 
 This roadmap supersedes the LeaseSet-security execution ordering in the older residual and post-M146 roadmaps while preserving M146/M147/M154 closures as historical evidence.
 
@@ -43,10 +43,10 @@ M153 current-head requalification                   [CLOSED]
 M154 SigType domain/security refreeze               [CLOSED; M147 PATH BLOCKED]
   |
   v
-M155 LeaseSet semantic/owner refreeze               [REGISTERED; ZERO PRODUCTION]
+M155 LeaseSet semantic/owner refreeze               [CLOSED; ZERO PRODUCTION]
   |
   v
-M156 narrow Red25519/blinding primitive             [DEFERRED; ZERO PROMOTION]
+M156 narrow Red25519/blinding primitive             [REGISTERED; ZERO PROMOTION]
   |
   v
 M157 modern Encrypted LeaseSet2 publication         [DEFERRED; ZERO PROMOTION]
@@ -75,7 +75,7 @@ Only the next dependency-ready milestone may be registered.
 
 ### M155 — semantics and owner re-freeze
 
-Freeze the ten-value Proposal mapping, legacy AES disposition, type-7 -> type-11 blinding requirement, field coupling, exact owners and dependency policy. Zero production and zero matrix change.
+Closed complete by `plans/closure/i2pcontrol-proposal-170/155-closure.md`: ten-value Proposal mapping, legacy AES disposition C (delegated to M161), type-7 -> type-11 blinding requirement, field coupling, exact owners and dependency policy. Zero production and zero matrix change. Unblocked M156.
 
 ### M156 — narrow Red25519/blinding
 

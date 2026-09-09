@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M157 closed, no registered successor**
+Status: **active / partial; M158 registered**
 
 Pinned Proposal authority:
 
@@ -13,7 +13,7 @@ Current machine authority:
 Current execution authority:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`;
-- registered handoff: none (M157 closed; M158 deferred pending amendment).
+- sole registered implementation handoff: M158.
 
 Current whole-surface qualification authority:
 
@@ -45,7 +45,8 @@ Full support means real externally observable behavior. Parser acceptance, persi
 - M154 closed the general configurable SigType path blocked; M147/M148 remain blocked.
 - M155 re-froze the LeaseSet-security line and separated modern ELS2 from configurable Destination SigType.
 - M156 implemented the narrow neutral Red25519/blinding primitive with zero promotions.
-- M157 has now been implemented and closed with its exact ten-file budget reconciled into M061/M062.
+- M157 implemented and closed neutral type-5/no-auth Encrypted LeaseSet2 publication/storage verification/UTC rollover with zero promotions.
+- M158 has now been exact-path amended and registered.
 
 Historical closures remain immutable.
 
@@ -61,7 +62,7 @@ M156 narrow Red25519 + Ed25519 blinding              [CLOSED; ZERO PROMOTION]
 M157 modern type-5 Encrypted LeaseSet2 publication   [CLOSED; ZERO PROMOTION]
   |
   v
-M158 lookup-secret + blinded-address primitive       [DEFERRED]
+M158 lookup-secret + blinded-address primitive       [REGISTERED; ZERO PROMOTION]
   |
   v
 M159 PSK client-authorization primitive              [DEFERRED; ZERO PROMOTION]
@@ -80,34 +81,57 @@ M152 final whole-surface requalification             [DEFERRED; ZERO PROMOTION]
 
 M149-M151 are superseded historical drafts and must not be executed directly.
 
-## 5. M157 containment boundary
+## 5. M158 containment boundary
 
-M157 is a neutral zero-promotion infrastructure milestone. It had an exact ten-file core budget, now realized and reconciled into M061/M062 ordinary ledgers. No broad path permission exists.
+M158 is a neutral zero-promotion infrastructure milestone using a **strict subset of already-realized M061 exact paths**:
 
-It authorizes no:
+1. `emissary-core/src/crypto/els2.rs`;
+2. `emissary-core/src/destination/lease_set.rs`;
+3. `emissary-core/src/sam/parser.rs`;
+4. `emissary-core/src/sam/session.rs`.
 
-- Cargo/dependency/lockfile change;
-- Yosemite change;
-- `emissary-cli/src/i2pcontrol/**` production change;
-- transport/tunnel/router/frontend change;
-- generic signature-suite migration.
+No new M061 source path is introduced. The plan and registry freeze the milestone-specific subset; any production edit outside it requires amendment first.
 
-The first production commit must reconcile any newly realized source path from M061's `registered_pending` ledger into the ordinary exact upstream-diff allowlist atomically with the code change.
+M062 records:
 
-## 6. Reference correction for the modern line
+- zero new production files;
+- zero new dependencies;
+- zero Cargo/lockfile change;
+- zero Yosemite change;
+- zero I2PControl production source change.
+
+No broad path permission exists.
+
+## 6. M158 semantic boundary
+
+Direct Java I2P/I2PTunnel source stores the lookup secret in the standard session property as:
+
+```text
+i2cp.leaseSetSecret = Base64(UTF8(secret))
+```
+
+M158 consumes only that standard representation. The secret is decoded/UTF-8 validated and removed from generic debug-capable SAM options before activation, then carried generation-locally in a dedicated zeroizing/non-`Debug` type.
+
+The existing M156 blinding primitive already accepts secret bytes; M158 threads those bytes through M157 publication and UTC rollover without modifying `red25519.rs` or NetDB.
+
+M158 also implements the canonical current encrypted-service extended B32 form for type-7 -> type-11 blinding: 35 decoded bytes / 56 Base32 characters plus `.b32.i2p`, secret/auth public flags, exact one-byte sigtypes, and Java-compatible CRC-32/XOR header processing.
+
+Core persists no lookup secret. I2PControl Proposal `OptionalLookup` mapping, secret custody, edit/restart transactionality and five-family integration remain M162 work. Therefore M158 has zero Proposal promotions and M095 remains `336/29/475`.
+
+## 7. Reference correction for the modern line
 
 Direct Proposal-170 PR source sets `i2cp.encryptLeaseSet=true` only for legacy AES. Modern blinded/PSK/DH modes are selected by `i2cp.leaseSetType=5`.
 
-M157 therefore implements the neutral standard type-5/no-auth publication primitive and does not alias the legacy AES flag to modern ELS2. M161 retains legacy-AES authority; M162 must use the corrected mapping.
+M157/M158 therefore operate on the neutral standard type-5 path. M161 retains legacy-AES authority; M162 must use the corrected mapping.
 
-## 7. Field-completeness rules
+## 8. Field-completeness rules
 
 - Infrastructure has zero Proposal support value by itself.
-- `OptionalLookup` promotes only when its entire valid lookup-secret/blinding contract is operational and interoperable.
+- `OptionalLookup` promotes only when its entire valid lookup-secret/blinding **administrative and runtime** contract is operational and interoperable.
 - `LeaseSetClientAuths` promotes only when all valid PSK/DH uses are bounded, restart-safe and interoperable.
 - `EncryptLeaseSet` promotes only when every valid Proposal enum value is operational for the family. Partial enum-domain support remains blocked.
 
-## 8. Planning ceilings
+## 9. Planning ceilings
 
 From `336/29/475`:
 
@@ -117,12 +141,13 @@ From `336/29/475`:
 
 These are ceilings, not current claims.
 
-## 9. Containment/security rules
+## 10. Containment/security rules
 
 Accepted authority remains ADR-0001 through ADR-0005, M061/M062 and M093.
 
 - Proposal/admin/application policy stays under `emissary-cli/src/i2pcontrol/**` wherever possible.
 - Neutral core primitives require exact-file authority and Proposal-free APIs.
+- A registered successor may use a stricter subset of already-realized exact paths without a redundant source-boundary expansion; that subset must be frozen in the active plan/registry.
 - No broad `crypto/**`, `netdb/**`, `i2np/**`, `destination/**`, `primitives/**` or transport waiver.
 - No direct-clearnet fallback.
 - No signing-suite fallback or plaintext/unsecreted/unauthenticated LeaseSet downgrade.
@@ -130,14 +155,14 @@ Accepted authority remains ADR-0001 through ADR-0005, M061/M062 and M093.
 - Yosemite remains the exact accepted optional pin unless separately superseded.
 - External/upstream activity remains read-only.
 
-## 10. Final-state rule
+## 11. Final-state rule
 
 M152 may close the workstream as **full** only when the mechanically recomputed matrix has zero applicable blockers.
 
 If accepted architecture/security blockers remain after all safe work is exhausted, M152 may close the current line as **safe partial / terminal under current policy**, but active documentation must remain explicitly partial and enumerate every remaining blocker plus the future decision needed to resume.
 
-## 11. Current handoff
+## 12. Current handoff
 
-M157 is closed. Only M158 may be registered next, with exact M061/M062 authorization in that registration commit.
+Execute **M158 only**.
 
-Do not begin M158 until the registry explicitly advances it.
+Do not begin M159 until M158 closes and the registry explicitly advances it. Any M158 need outside its exact four-file/zero-dependency budget requires a plan/M061/M062 amendment before the edit.

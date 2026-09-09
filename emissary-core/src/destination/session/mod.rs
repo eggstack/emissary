@@ -51,7 +51,7 @@ use parking_lot::RwLock;
 #[cfg(feature = "no_std")]
 use spin::rwlock::RwLock;
 
-use alloc::{collections::VecDeque, sync::Arc, vec, vec::Vec};
+use alloc::{collections::VecDeque, string::String, sync::Arc, vec, vec::Vec};
 use core::{
     mem,
     pin::Pin,
@@ -5154,10 +5154,12 @@ mod tests {
         let (inbound_ls, inbound_signing) = LeaseSet2::random();
         let inbound_id = inbound_ls.header.destination.id();
         let inbound_ls = Bytes::from(inbound_ls.serialize(&inbound_signing));
-        let mut inbound =
-            SessionManager::<MockRuntime>::new(inbound_id.clone(), inbound_private, vec![
-                inbound_public.clone()
-            ], inbound_ls);
+        let mut inbound = SessionManager::<MockRuntime>::new(
+            inbound_id.clone(),
+            inbound_private,
+            vec![inbound_public.clone()],
+            inbound_ls,
+        );
 
         let outbound_private = crate::crypto::StaticPrivateKey::random(MockRuntime::rng());
         let (outbound_ls, outbound_signing) = LeaseSet2::random();
@@ -5261,12 +5263,7 @@ mod tests {
 
         // Disabled encrypt succeeds without bundling an ack request.
         let update = outbound.encrypt(&inbound_id, vec![7, 7, 7, 7]).unwrap();
-        assert!(outbound
-            .active
-            .get(&inbound_id)
-            .unwrap()
-            .outbound_ack_requests
-            .is_empty());
+        assert!(outbound.active.get(&inbound_id).unwrap().outbound_ack_requests.is_empty());
         let mut cloves = inbound
             .decrypt(Message {
                 payload: update,
@@ -5281,9 +5278,6 @@ mod tests {
                 ..Default::default()
             })
             .unwrap();
-        assert!(cloves.all(|clove| !std::matches!(
-            clove.message_type,
-            MessageType::DatabaseStore
-        )));
+        assert!(cloves.all(|clove| !std::matches!(clove.message_type, MessageType::DatabaseStore)));
     }
 }

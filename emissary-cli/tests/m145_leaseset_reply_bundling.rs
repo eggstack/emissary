@@ -6,9 +6,8 @@
 //! `shouldBundleReplyInfo` contract:
 //!
 //! - omitted/`true` preserves the default bundle behavior (no wire option);
-//! - `false` maps to neutral `shouldBundleReplyInfo = "false"` and suppresses
-//!   `ExistingSession` update bundling (`NewSession` retains mandatory
-//!   handshake bundling for liveness);
+//! - `false` maps to neutral `shouldBundleReplyInfo = "false"` and suppresses `ExistingSession`
+//!   update bundling (`NewSession` retains mandatory handshake bundling for liveness);
 //! - malformed values fail before allocation with no echo;
 //! - non-target families keep exact rejection;
 //! - shared sessions distinguish effective policies.
@@ -95,17 +94,35 @@ fn m145_matrix_promotes_exactly_two_multihoming_cells() {
         .iter()
         .find(|row| string_field(row, "canonical_key") == "MultiHoming")
         .expect("MultiHoming row must exist");
-    assert_eq!(string_field(row, "completion_owner"), "M145", "MultiHoming owner");
+    assert_eq!(
+        string_field(row, "completion_owner"),
+        "M145",
+        "MultiHoming owner"
+    );
     assert_eq!(
         string_field(row, "current_or_planned_disposition"),
         "apply_or_not_applicable",
         "MultiHoming disposition"
     );
-    assert!(row.get("blocking_milestone").is_none(), "MultiHoming milestone");
-    assert!(row.get("blocked_primitive").is_none(), "MultiHoming primitive");
+    assert!(
+        row.get("blocking_milestone").is_none(),
+        "MultiHoming milestone"
+    );
+    assert!(
+        row.get("blocked_primitive").is_none(),
+        "MultiHoming primitive"
+    );
     let cells = row["cells"].as_array().unwrap();
-    assert_eq!(cells[8].as_str(), Some("apply"), "MultiHoming httpserver cell");
-    assert_eq!(cells[9].as_str(), Some("apply"), "MultiHoming httpbidir cell");
+    assert_eq!(
+        cells[8].as_str(),
+        Some("apply"),
+        "MultiHoming httpserver cell"
+    );
+    assert_eq!(
+        cells[9].as_str(),
+        Some("apply"),
+        "MultiHoming httpbidir cell"
+    );
     for (index, cell) in cells.iter().enumerate() {
         if index != 8 && index != 9 {
             assert_eq!(
@@ -263,17 +280,22 @@ fn m145_true_and_false_map_to_pinned_policy() {
     );
     let bidir_options = session_options_for(&bidir_disabled);
     assert_eq!(bidir_options.additional_options.len(), 1);
-    assert_eq!(bidir_options.additional_options[0].key(), "shouldBundleReplyInfo");
+    assert_eq!(
+        bidir_options.additional_options[0].key(),
+        "shouldBundleReplyInfo"
+    );
     assert_eq!(bidir_options.additional_options[0].value(), "false");
 }
 
 #[test]
 fn m145_invalid_fails_before_allocation_without_echo() {
-    use emissary_cli::i2pcontrol::backends::{
-        http_bidir::HttpBidirServerTunnelBackend, http_server::HttpServerTunnelBackend,
-        TunnelBackend,
+    use emissary_cli::i2pcontrol::{
+        backends::{
+            http_bidir::HttpBidirServerTunnelBackend, http_server::HttpServerTunnelBackend,
+            TunnelBackend,
+        },
+        domain::tunnel::TunnelType,
     };
-    use emissary_cli::i2pcontrol::domain::tunnel::TunnelType;
     for bad in [
         serde_json::json!("yes"),
         serde_json::json!("true"),
@@ -282,10 +304,7 @@ fn m145_invalid_fails_before_allocation_without_echo() {
         serde_json::json!(null),
     ] {
         for tunnel_type in [TunnelType::HttpServer, TunnelType::HttpBidirServer] {
-            let def = server_definition(
-                tunnel_type,
-                vec![("MultiHoming".to_owned(), bad.clone())],
-            );
+            let def = server_definition(tunnel_type, vec![("MultiHoming".to_owned(), bad.clone())]);
             // Backend preflight must fail naming only MultiHoming.
             let result = match tunnel_type {
                 TunnelType::HttpServer => {
@@ -334,10 +353,12 @@ fn m145_invalid_fails_before_allocation_without_echo() {
 
 #[test]
 fn m145_non_server_families_keep_exact_rejection() {
-    use emissary_cli::i2pcontrol::backends::runtime::session::build_session_options;
-    use emissary_cli::i2pcontrol::domain::tunnel::{
-        StartIntent, TunnelDefinition, TunnelName, TunnelOptions, TunnelOwnership,
-        TunnelRuntimeState, TunnelType,
+    use emissary_cli::i2pcontrol::{
+        backends::runtime::session::build_session_options,
+        domain::tunnel::{
+            StartIntent, TunnelDefinition, TunnelName, TunnelOptions, TunnelOwnership,
+            TunnelRuntimeState, TunnelType,
+        },
     };
     use yosemite_i2pcontrol::DestinationKind;
     let rejected = [
@@ -361,9 +382,7 @@ fn m145_non_server_families_keep_exact_rejection() {
             runtime_state: TunnelRuntimeState::Stopped,
             start_intent: StartIntent::DoNotStart,
             options: TunnelOptions::default(),
-            raw_config: [("MultiHoming".to_owned(), serde_json::json!(true))]
-                .into_iter()
-                .collect(),
+            raw_config: [("MultiHoming".to_owned(), serde_json::json!(true))].into_iter().collect(),
         };
         match build_session_options(&def, 7656, true, DestinationKind::Transient) {
             Err(emissary_cli::i2pcontrol::backends::BackendError::UnsupportedOption {
@@ -444,10 +463,15 @@ fn m145_wire_reaches_neutral_owner_without_proposal_vocabulary() {
 #[test]
 fn m145_exact_containment_holds_for_touched_owners() {
     // Static guards: core stays Proposal-free; I2PControl owns the mapping.
-    let core_path = workspace_root()
-        .join("emissary-core/src/destination/session/mod.rs");
+    let core_path = workspace_root().join("emissary-core/src/destination/session/mod.rs");
     let core = std::fs::read_to_string(&core_path).expect("core owner must exist");
-    for term in ["Proposal 170", "I2PControl", "TunnelManager", "JsonRpc", "MultiHoming"] {
+    for term in [
+        "Proposal 170",
+        "I2PControl",
+        "TunnelManager",
+        "JsonRpc",
+        "MultiHoming",
+    ] {
         assert!(
             !core.contains(term),
             "neutral core owner must not contain Proposal term {term:?}"
@@ -461,8 +485,8 @@ fn m145_exact_containment_holds_for_touched_owners() {
         core.contains("bundle_reply_lease_set"),
         "neutral owner must expose the Proposal-free policy"
     );
-    let session_path = workspace_root()
-        .join("emissary-cli/src/i2pcontrol/backends/runtime/session.rs");
+    let session_path =
+        workspace_root().join("emissary-cli/src/i2pcontrol/backends/runtime/session.rs");
     let session = std::fs::read_to_string(&session_path).expect("session owner must exist");
     assert!(session.contains("MultiHoming"));
     assert!(session.contains("shouldBundleReplyInfo"));
@@ -470,10 +494,9 @@ fn m145_exact_containment_holds_for_touched_owners() {
 
 #[test]
 fn m145_docs_agree_on_partial_support_and_counts() {
-    let support = std::fs::read_to_string(
-        workspace_root().join("docs/i2pcontrol/proposal-170-support.md"),
-    )
-    .expect("support doc must exist");
+    let support =
+        std::fs::read_to_string(workspace_root().join("docs/i2pcontrol/proposal-170-support.md"))
+            .expect("support doc must exist");
     assert!(
         support.contains("336") || support.contains("partial"),
         "support doc must reflect M145 counts/partial support"

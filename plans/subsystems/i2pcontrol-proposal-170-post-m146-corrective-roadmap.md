@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M146 Corrective Roadmap
 
-Status: **active / partial; M153 closed; M154 registered**
+Status: **active / partial; M153 closed; M154 closed (disposition C, M147 path blocked)**
 
 This roadmap supersedes the post-M146 execution ordering in:
 
@@ -86,19 +86,19 @@ The fork remains governed by M061/M062 and M093.
 M146 UseOutproxyPlugin feasibility              [CLOSED AS BLOCKED — 336/29/475]
   |
   v
-M153 post-M146 current-head requalification     [REGISTERED — ZERO PROMOTION]
+M153 post-M146 current-head requalification     [CLOSED — ZERO PROMOTION]
   |
   v
-M154 M147 signature-domain/owner re-freeze      [DEFERRED — ZERO PROMOTION]
+M154 M147 signature-domain/owner re-freeze      [CLOSED — DISPOSITION C, ZERO PROMOTION]
   |
   v
-M147 neutral destination signature primitive    [DEFERRED — ZERO PROMOTION]
+M147 neutral destination signature primitive    [CLOSED AS BLOCKED (PATH)]
   |
   v
-M148 Proposal SigType completion                [DEFERRED — up to 10 promotions]
+M148 Proposal SigType completion                [DEFERRED — BLOCKED BEHIND M147]
   |
   v
-M149 encrypted LeaseSet runtime                 [DEFERRED — up to 5 promotions]
+M149 encrypted LeaseSet runtime                 [DEFERRED — needs re-gating, see §7]
   |
   v
 M150 OptionalLookup runtime                     [DEFERRED — up to 5 promotions]
@@ -132,34 +132,41 @@ M153:
 - explicitly absorbed the M145 `7cbd80a...` no-std follow-up into accepted production evidence;
 - preserved `336/29/475` with zero promotions and zero production changes.
 
-## 6. M154 — registered signature pre-registration gate
+## 6. M154 — closed signature pre-registration gate (disposition C)
 
-Plan:
+Plan/closure:
 
-- `plans/implementation/i2pcontrol-proposal-170/154-m147-signature-domain-security-and-owner-refreeze.md`.
+- `plans/implementation/i2pcontrol-proposal-170/154-m147-signature-domain-security-and-owner-refreeze.md`;
+- `plans/closure/i2pcontrol-proposal-170/154-closure.md`.
 
-M154 is required because M147's own plan forbids registration until the exact signature suite/domain, security disposition, persistence implications, dependencies and exact core owners are frozen.
+M154 was required because M147's own plan forbids registration until the exact signature suite/domain, security disposition, persistence implications, dependencies and exact core owners are frozen.
 
-M154 has zero production and zero promotion budget. Its closure chooses:
+Status: **closed as complete; disposition C — M147 path closed as blocked**.
 
-- amend/register one bounded M147;
-- split M147 into smaller infrastructure slices;
-- or leave SigType blocked if required algorithms are unsafe/unmaintainable/incompatible.
-
-Status: **registered / dependency-ready; hard dependency on M153 closure satisfied by `plans/closure/i2pcontrol-proposal-170/153-closure.md`**.
+M154 (zero production, zero promotion) froze the destination-capable domain as
+`{0, 1, 2, 3, 7, 11}` with type-0 generation rejected by security policy, types 1–3
+legacy-only, type 11 missing a maintained primitive, and Ed25519-only end-to-end
+capability. Neither one bounded M147 (A) nor a split (B) can satisfy the configurable
+field, so M154 registered nothing and advanced no crypto implementation.
 
 ## 7. M147-M151 security-sensitive tail
 
-Existing plans remain deferred:
+M147 is **closed as blocked (path)** via M154 disposition C; M148 is **deferred
+behind the unsatisfiable M147 gate** (blocked-behind-M147, not closed). The remaining
+plans stay deferred:
 
-- M147 neutral destination signature-suite primitive — infrastructure only, zero promotions;
-- M148 Proposal `SigType` — up to ten promotions only after real generated identity/signing/persistence support;
+- M147 neutral destination signature-suite primitive — **closed as blocked (path)**; no budget authorised; re-opening needs a separate architecture/security decision and plan;
+- M148 Proposal `SigType` — up to ten promotions only after real generated identity/signing/persistence support (unreachable on this path);
 - M149 `EncryptLeaseSet` — up to five promotions only after actual encrypted LeaseSet publication/consumption;
 - M150 `OptionalLookup` — up to five promotions only after exact blinded/secret lookup with no public downgrade;
 - M151 `LeaseSetClientAuths` — up to five promotions only after real PSK/DH/required client-auth semantics and unauthorized-client rejection;
 - M152 final whole-surface qualification — zero promotions and no production changes.
 
 The listed maximums are budgets, not promises. Closure evidence determines actual deltas.
+M149–M151 gates chain through M148 closure, which is unsatisfiable on this path;
+their LeaseSet-security targets may still be conceptually possible for the Ed25519
+suite, but they need explicit re-gating by a future planning action before any of
+them can register. M154 creates no such gate.
 
 ## 8. M146 terminal blocker policy
 
@@ -217,20 +224,19 @@ M153 specifically owns repair of stale historical aggregate tests so future broa
 
 Per `plans/003-planning-process.md`:
 
-1. M154 is the only registered plan; M153 is closed complete.
-2. M154 is executable after M153 closes complete and the registry explicitly registers M154.
-3. M147 remains deferred until M154 closes and explicitly amends/registers it or a split successor.
-4. M148-M152 remain unregistered behind their hard dependencies.
-5. M146 remains closed blocked and is not an active plan.
-6. No plan file presence or M062 planning entry authorizes production work.
-7. Material architecture/path/dependency changes require plan amendment before coding.
+1. No plan is currently registered; M154 is closed complete (disposition C) and M147 is closed as blocked (path).
+2. M147 cannot be re-registered without a separate explicit architecture/security decision and plan superseding M154 disposition C.
+3. M148 remains deferred behind the unsatisfiable M147 gate; M149-M152 remain unregistered behind hard dependencies (M149-M151 need explicit re-gating).
+4. M146 remains closed blocked and is not an active plan.
+5. No plan file presence or M062 planning entry authorizes production work.
+6. Material architecture/path/dependency changes require plan amendment before coding.
 
 ## 12. Exit criteria
 
 This corrective roadmap closes when:
 
 - M153 establishes a current integrated qualification authority;
-- M154 resolves M147 readiness truthfully;
+- M154 resolves M147 readiness truthfully (closed with disposition C; M147 path blocked);
 - the safe crypto/LeaseSet chain reaches its truthful terminal state;
 - M152 performs final whole-surface qualification;
 - active planning/docs identify either zero blockers/full support or exact terminal blockers/partial support;

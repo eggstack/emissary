@@ -44,8 +44,9 @@ Current Proposal-170 planning authority:
 - M145 closed with 2 `MultiHoming`/reply-LeaseSet-bundling promotions; accepted production evidence includes no-std/format follow-up `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2`;
 - M146 closed as blocked with zero promotions: four `UseOutproxyPlugin` cells remain blocked because no real safe provider exists in current architecture;
 - **M153 closed as the current runtime/security qualification authority** (`336/29/475`, zero promotions, zero production changes): `plans/closure/i2pcontrol-proposal-170/153-closure.md`;
-- M154 is registered as the mandatory pre-registration SigType/security/exact-owner audit before M147;
-- M147-M152 remain deferred/unregistered.
+- **M154 closed (disposition C: M147 path blocked)** (`336/29/475`, zero promotions, zero production changes): `plans/closure/i2pcontrol-proposal-170/154-closure.md`. Destination-capable SigType domain frozen as `{0, 1, 2, 3, 7, 11}`; type-0 generation rejected by policy; types 1–3 legacy-only; type 11 missing a maintained primitive; Ed25519-only end-to-end capability. Neither a bounded single primitive nor an honest split can satisfy the configurable field;
+- M147 closed as blocked (path via M154 disposition C): ten `SigType` cells are terminal blockers under current security/dependency policy; no production/dependency budget authorised;
+- M148 remains deferred behind the unsatisfiable M147 gate; M149-M152 remain deferred/unregistered (M149-M151 need explicit re-gating).
 
 Current execution roadmap:
 
@@ -55,7 +56,7 @@ The authoritative matrix is `plans/implementation/i2pcontrol-proposal-170/095-fu
 
 M153 has zero Proposal-promotion and zero production-code/dependency budget. It exists to restore a truthful current-head integrated qualification, reconcile stale historical aggregate test assertions, correct M095 production-head metadata, and requalify M140-M146 plus earlier security/lifecycle invariants. Any production fix required during M153 is a stop condition requiring a separate corrective plan.
 
-Do not register M147 directly after M153. M154 must first freeze the exact signature-type domain, algorithm security disposition, current generate/sign/verify/serialize/persist capability, persistence/migration implications, maintained dependencies, and exact-file M061/M062 ownership. Broad `crypto/`, `netdb/`, `i2np/`, `destination/` or `primitives/` waivers are prohibited.
+Do not register M147 (closed as blocked via M154 disposition C) without a separate explicit architecture/security decision and plan superseding that disposition. Broad `crypto/`, `netdb/`, `i2np/`, `destination/` or `primitives/` waivers are prohibited.
 
 M146 remains terminal blocked under the current security architecture. Do not create a dummy provider, alias `ProxyList`, or add direct-clearnet DNS/TCP egress merely to promote `UseOutproxyPlugin`. A future provider successor requires a separate explicit architecture/security decision and plan.
 

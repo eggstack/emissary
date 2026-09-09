@@ -1,6 +1,8 @@
 # M147 — Neutral Destination Signature-Suite Primitive
 
-Status: **deferred / unregistered; hard-depends on M154 closure/readiness disposition**
+Status: **closed as blocked (path blocked by M154 disposition C; see `plans/closure/i2pcontrol-proposal-170/154-closure.md`). No production, dependency, or M061/M062 budget is authorised. Re-opening requires a separate explicit architecture/security decision and plan.**
+
+Former gate (superseded): ~~deferred / unregistered; hard-depends on M154 closure/readiness disposition~~
 
 Class: infrastructure / cryptographic identity security
 

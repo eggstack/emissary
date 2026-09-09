@@ -1,6 +1,7 @@
 # M154 — M147 Signature Domain, Security, and Exact-Owner Re-freeze
 
-Status: **registered / dependency-ready; hard dependency on M153 closure satisfied by `plans/closure/i2pcontrol-proposal-170/153-closure.md`**
+Status: **closed as complete; disposition C — M147 path closed as blocked**
+(see `plans/closure/i2pcontrol-proposal-170/154-closure.md`)
 
 Class: invariant / architecture-security qualification
 

@@ -418,8 +418,10 @@ M145 applies the LeaseSet reply-bundling completion to `336 apply / 29 blocked /
 outproxy-provider feasibility gate with zero promotions (`336/29/475`
 unchanged); M153 closes as the current runtime/security qualification authority
 with zero promotions and zero production changes (`336/29/475` unchanged,
-M139 superseded); M154 is registered as the signature-domain/security
-pre-registration audit, M147-M152 remain deferred.
+M139 superseded); M154 closes the signature-domain/security pre-registration
+audit with disposition C and zero promotions/production changes (`336/29/475`
+unchanged, M147 path blocked — the ten `SigType` cells are terminal blockers
+under current security/dependency policy); M148-M152 remain deferred.
 
 | Disposition | Proposal 170 fields |
 |---|---|
@@ -429,7 +431,7 @@ pre-registration audit, M147-M152 remain deferred.
 | Applied by seven client idle owners (M136) | `Reduce` (boolean master switch), `ReduceCount` (1–6, default 1), `ReduceTime` (ms, minimum 300000, default 1200000) via standard `i2cp.reduce*` and the live-quantity primitive; `ReduceTime`/`ReduceCount` without `Reduce=true` fail before allocation |
 | Applied by seven client idle owners (M137) | `Close` (boolean master switch), `CloseTime` (ms, minimum 300000, default 1800000) via standard `i2cp.close*` with close-before-reduce ordering and canonical teardown; `CloseTime` without `Close=true` fails before allocation |
 | Applied by six TCP proven-resume owners (M134) | `NewDest` only on a proven `IdlePolicy` resume (requires `Close=true`, conflicts with `PersistentClientKey`/`PrivKeyFile`, Streamr/servers not applicable); ordinary/manual/restart/failure paths reuse without rotation |
-| Rejected before allocation as residual client blockers | `UseOutproxyPlugin` and `SigType` for all applicable families (M140 re-freezes six constructor-overridden/UDP `Profile` cells and Streamr `ConnectDelay` as not_applicable; M143 applies retained `Profile:client`; M144 applies `UseSSL` for HTTP/CONNECT clients; M146 retains all four `UseOutproxyPlugin` cells as blocked with zero promotions) |
+| Rejected before allocation as residual client blockers | `UseOutproxyPlugin` and `SigType` for all applicable families (M140 re-freezes six constructor-overridden/UDP `Profile` cells and Streamr `ConnectDelay` as not_applicable; M143 applies retained `Profile:client`; M144 applies `UseSSL` for HTTP/CONNECT clients; M146 retains all four `UseOutproxyPlugin` cells as blocked with zero promotions; M154 closes the M147 path blocked with zero promotions, retaining all ten `SigType` cells as terminal blockers) |
 | Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `UniqueLocalAddressPerClient` (M141 HTTP servers only, per-client loopback source bind), `UseSSL` (M144 HTTP servers only, TLS to loopback target), `MultiHoming` (M145 HTTP servers only, reply LeaseSet bundling via `shouldBundleReplyInfo`) |
 | Rejected before allocation as residual server blockers | `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
 | Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |

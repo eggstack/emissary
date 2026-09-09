@@ -30,7 +30,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 |---|---|---|---|
 | Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | execution after M146 is superseded by the post-M146 corrective roadmap |
 | Proposal 170 residual primitive completion | **historical through M146 / superseded for next execution** | `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md` | M140-M145 complete; M146 closed blocked |
-| Proposal 170 post-M146 corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` | **M153 closed complete**; **M154 registered / dependency-ready**; M147-M152 deferred |
+| Proposal 170 post-M146 corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` | **M154 closed complete (disposition C, M147 path blocked)**; M148-M152 deferred |
 | Proposal 170 session-lifecycle completion | **closed as complete** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | M134 closed as complete |
 | Post-M114 shared-control-plane corrective line | **closed / historical qualification lineage** | `plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md` | M130 historical; M139 later requalified lifecycle head |
 | I2PControl containment | accepted authority | `plans/subsystems/i2pcontrol-proposal-170-containment-roadmap.md` | M061/M062 regression authority |
@@ -110,60 +110,46 @@ It:
 
 ## Deferred corrective/implementation chain
 
-### M154 — M147 signature-domain/security/exact-owner re-freeze
+### M154 — M147 signature-domain/security/exact-owner re-freeze (closed)
 
-Plan:
+Plan/closure:
 
-- `plans/implementation/i2pcontrol-proposal-170/154-m147-signature-domain-security-and-owner-refreeze.md`.
+- `plans/implementation/i2pcontrol-proposal-170/154-m147-signature-domain-security-and-owner-refreeze.md`;
+- `plans/closure/i2pcontrol-proposal-170/154-closure.md`.
 
-Status: **registered / dependency-ready; hard dependency on M153 closure satisfied by `plans/closure/i2pcontrol-proposal-170/153-closure.md`**.
+Status: **closed as complete; disposition C — M147 path closed as blocked**.
 
-It must:
+M154 had zero production and zero promotion budget. It froze:
 
-- mechanically preserve `336/29/475` and exact 29-cell residual identity;
-- correct M095 `current_production_head` metadata;
-- separate historical milestone assertions from durable current-head test assertions so broad I2PControl testing no longer fails merely from later legitimate matrix deltas;
-- requalify M127-M129, lifecycle behavior, and M140-M146 composition on the actual post-M145 production source;
-- explicitly absorb the M145 `7cbd80a...` no-std/format follow-up into accepted current production evidence;
-- re-prove M061/M062 containment/dependency isolation without widening it;
-- become the new current runtime/security qualification authority only if no behavioral or medium/high security defect remains.
+- exact Proposal/reference SigType domain (destination-capable `{0, 1, 2, 3, 7, 11}`);
+- algorithm security dispositions (type-0 generation rejected by policy; types 1–3 legacy-only; type 11 missing a maintained primitive);
+- generate/sign/verify/serialize/persist support per suite (only type 7 complete);
+- exact file owners (planning metadata only — no executable M061/M062 authorisation);
+- persistence/migration implications (versioned storage would be required; none designed or authorised);
+- exact dependencies and no-std posture (none added).
 
-Any required production change is a stop condition and requires a separate corrective implementation plan.
+M154 closure left SigType blocked: no bounded single primitive (A) and no honest split (B) can satisfy the configurable field.
 
-## Deferred corrective/implementation chain
+### M147 — neutral destination signature-suite primitive (closed as blocked)
 
-### M154 — M147 signature-domain/security/exact-owner re-freeze
+Plan/closure:
 
-Plan:
+- `plans/implementation/i2pcontrol-proposal-170/147-neutral-destination-signature-suite-primitive.md`;
+- `plans/closure/i2pcontrol-proposal-170/154-closure.md` (disposition C authority).
 
-- `plans/implementation/i2pcontrol-proposal-170/154-m147-signature-domain-security-and-owner-refreeze.md`.
+Status: **closed as blocked (path)**. No production, dependency, or M061/M062 budget is authorised. Re-opening the path requires a separate explicit architecture/security decision and plan.
 
-Status: **registered / dependency-ready; hard dependency on M153 closure satisfied by `plans/closure/i2pcontrol-proposal-170/153-closure.md`**.
-
-M154 has zero production and zero promotion budget. It exists because M147 itself forbids registration until a dedicated audit freezes:
-
-- exact Proposal/reference SigType domain;
-- algorithm security dispositions;
-- generate/sign/verify/serialize/persist support per suite;
-- exact file owners;
-- persistence/migration implications;
-- exact dependencies and no-std posture;
-- exact-file M061/M062 budget.
-
-M154 closure must amend/register M147, split it, or leave SigType blocked.
-
-### M147-M152
+### M148-M152
 
 All remain **deferred / unregistered**:
 
 | Milestone | Target | Hard gate |
 |---|---|---|
-| M147 | neutral destination signature-suite primitive; zero promotions | M154 closure/readiness disposition |
-| M148 | `SigType` × 10 | M147 or all required split primitives close |
-| M149 | `EncryptLeaseSet` × 5 | M148 closes and exact encrypted-LS owner/security freeze is satisfied |
+| M148 | `SigType` × 10 | M147 closure-complete — unsatisfiable on this path (blocked-behind-M147; not closed, audit never executes) |
+| M149 | `EncryptLeaseSet` × 5 | M148 closes and exact encrypted-LS owner/security freeze is satisfied (re-gating debt recorded in M154 closure §11 — M154 creates no gate) |
 | M150 | `OptionalLookup` × 5 | M149 closes and exact blinded/secret lookup owner is frozen |
 | M151 | `LeaseSetClientAuths` × 5 | M150 closes and auth mode/crypto/interoperability is frozen |
-| M152 | final whole-surface requalification; zero promotions | M151 closes; all residuals mechanically recomputed |
+| M152 | final whole-surface requalification; zero promotions | M151 closes; all residuals mechanically recomputed; terminal state is at best safe-partial (10 SigType + 4 UseOutproxyPlugin blockers) |
 
 File presence and M062 planning bookkeeping do not authorize production work.
 
@@ -218,10 +204,16 @@ M146 UseOutproxyPlugin feasibility              [CLOSED AS BLOCKED — 336/29/47
 M153 current-head requalification               [CLOSED — ZERO PROMOTION]
   |
   v
-M154 signature-domain/security owner re-freeze  [REGISTERED — ZERO PROMOTION]
+M154 signature-domain/security owner re-freeze  [CLOSED — DISPOSITION C, ZERO PROMOTION]
   |
   v
-M147 -> M148 -> M149 -> M150 -> M151 -> M152    [DEFERRED / UNREGISTERED]
+M147 neutral destination signature primitive    [CLOSED AS BLOCKED (PATH)]
+  |
+  v
+M148 Proposal SigType                            [DEFERRED — BLOCKED BEHIND M147]
+  |
+  v
+M149 -> M150 -> M151 -> M152                     [DEFERRED / UNREGISTERED]
 ```
 
 ## Canonical containment rules
@@ -238,11 +230,10 @@ M147 -> M148 -> M149 -> M150 -> M151 -> M152    [DEFERRED / UNREGISTERED]
 
 ## Registration rules
 
-1. M154 is the only registered plan; M153 is closed complete.
-2. M154 is executable after M153 closes complete and this registry explicitly registers M154.
-3. M147 cannot be registered directly after M153; M154 must first satisfy its pre-registration audit gate.
-4. M148-M152 remain unregistered behind hard dependencies.
-5. M146 remains closed blocked and has no implicit successor.
+1. No plan is currently registered; M154 is closed complete and M147 is closed as blocked (path).
+2. M147 cannot be re-registered without a separate explicit architecture/security decision and plan superseding M154 disposition C.
+3. M148 remains deferred behind the unsatisfiable M147 gate; M149-M152 remain unregistered behind hard dependencies (M149-M151 need explicit re-gating before any registration).
+4. M146 remains closed blocked and has no implicit successor.
 6. Material architecture/path/dependency deviations require a plan amendment before implementation.
 7. Closure evidence, not implementation assertions or parser reachability, determines support.
 
@@ -259,5 +250,7 @@ M147 -> M148 -> M149 -> M150 -> M151 -> M152    [DEFERRED / UNREGISTERED]
 | M145 | closed complete; 2 promotions; later no-std/format follow-up `7cbd80a...` |
 | M146 | closed blocked; zero promotions; four UseOutproxyPlugin cells remain blocked |
 | M153 | closed complete; zero promotions; current runtime/security qualification authority at `336/29/475` |
+| M154 | closed complete; zero promotions; disposition C — M147 path blocked, ten SigType cells terminal under current policy |
+| M147 | closed as blocked (path, via M154 disposition C); no production/dependency budget authorised |
 
 Historical closure files remain unchanged.

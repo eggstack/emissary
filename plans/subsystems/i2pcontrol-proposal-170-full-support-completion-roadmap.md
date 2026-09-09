@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M153 closed; M154 registered**
+Status: **active / partial; M153 closed; M154 closed (disposition C, M147 path blocked)**
 
 Pinned Proposal authority:
 
@@ -193,16 +193,16 @@ Dependency graph:
 M153 post-M146 current-head requalification         [CLOSED — zero promotion]
   |
   v
-M154 M147 signature-domain/security owner re-freeze [REGISTERED — zero promotion]
+M154 M147 signature-domain/security owner re-freeze [CLOSED — DISPOSITION C, zero promotion]
   |
   v
-M147 neutral destination signature primitive        [DEFERRED — zero promotion]
+M147 neutral destination signature primitive        [CLOSED AS BLOCKED (PATH)]
   |
   v
-M148 Proposal SigType                               [DEFERRED — up to 10]
+M148 Proposal SigType                               [DEFERRED — BLOCKED BEHIND M147]
   |
   v
-M149 EncryptLeaseSet                                [DEFERRED — up to 5]
+M149 EncryptLeaseSet                                [DEFERRED — needs re-gating]
   |
   v
 M150 OptionalLookup                                 [DEFERRED — up to 5]
@@ -214,7 +214,7 @@ M151 LeaseSetClientAuths                            [DEFERRED — up to 5]
 M152 final whole-surface requalification            [DEFERRED — zero promotion]
 ```
 
-Only M154 is registered.
+No plan is currently registered. Only M154 is closed; M147 path blocked.
 
 ## 9. M153 corrective qualification (closed)
 
@@ -230,9 +230,9 @@ M153 closed as complete (`plans/closure/i2pcontrol-proposal-170/153-closure.md`)
 
 A production defect stops M153 and requires a separate corrective plan.
 
-## 10. M154 pre-crypto gate
+## 10. M154 pre-crypto gate (closed, disposition C)
 
-M154 is mandatory before M147 registration. It freezes:
+M154 was mandatory before M147 registration. It froze:
 
 - exact Proposal/reference SigType domain;
 - per-algorithm security disposition;
@@ -242,6 +242,13 @@ M154 is mandatory before M147 registration. It freezes:
 - exact file-by-file core owners and M061/M062 path budget.
 
 M154 must amend/register M147, split it, or leave SigType blocked. It performs no production work and no matrix promotion.
+
+M154 closed with disposition C (`plans/closure/i2pcontrol-proposal-170/154-closure.md`):
+destination-capable domain `{0, 1, 2, 3, 7, 11}`, type-0 generation rejected by
+policy, types 1–3 legacy-only, type 11 missing a maintained primitive, Ed25519-only
+end-to-end capability. Neither a bounded single primitive (A) nor an honest split (B)
+can satisfy the configurable field. M147 is therefore closed as blocked (path) and the
+ten `SigType` cells are terminal blockers under current security/dependency policy.
 
 ## 11. Cryptographic residual rules
 
@@ -294,14 +301,14 @@ Allowed only if:
 
 ### Safe partial terminal completion
 
-If the cryptographic tail closes but M146 remains blocked, M152 may close the current safe residual workstream as **partial / terminal under current security policy**. It must:
+If the cryptographic tail closes but M146 remains blocked, M152 may close the current safe residual workstream as **partial / terminal under current security policy**. Following M154 disposition C, the ten `SigType` cells join M146's four as terminal blockers under current policy. M152 must:
 
-- retain the exact four blockers;
+- retain the exact blockers (at minimum the 10 `SigType` plus the 4 `UseOutproxyPlugin` cells, plus any LeaseSet-security cells still blocked);
 - explicitly refuse a full-support claim;
 - document that a future architecture/security decision is required for those cells;
 - keep all implemented applicable cells requalified.
 
-No roadmap may redefine four blocked cells as complete merely to close the workstream.
+No roadmap may redefine blocked cells as complete merely to close the workstream.
 
 ## 14. Verification policy
 
@@ -324,10 +331,9 @@ Known unrelated formatter/lint drift must be recorded, not normalized opportunis
 
 Per `plans/003-planning-process.md`:
 
-- only M153 is registered;
-- M154 remains deferred until M153 closes cleanly;
-- M147 cannot be registered without M154 disposition;
-- M148-M152 remain deferred behind hard dependencies;
+- no plan is currently registered; M154 is closed complete (disposition C) and M147 is closed as blocked (path);
+- M147 cannot be re-registered without a separate explicit architecture/security decision and plan superseding M154 disposition C;
+- M148 remains deferred behind the unsatisfiable M147 gate; M149-M152 remain deferred behind hard dependencies (M149-M151 need explicit re-gating);
 - M146 remains closed blocked;
 - file presence/M062 planning bookkeeping never grants production authority;
 - material path/dependency/architecture deviations require amendment before coding.

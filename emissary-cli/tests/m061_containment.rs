@@ -173,16 +173,25 @@ fn high_sensitivity_core_paths_are_individually_named() {
         assert!(
             allowed
                 .iter()
-                .all(|path| !path.starts_with(prefix) || is_authorized_m156_crypto_exception(path)),
+                .all(|path| !path.starts_with(prefix) || is_authorized_sensitive_core_exception(path)),
             "prohibited production prefix was allowed: {prefix}"
         );
     }
 }
 
-fn is_authorized_m156_crypto_exception(path: &str) -> bool {
+/// Exact high-sensitivity exceptions accepted by closed M156 and registered M157.
+///
+/// This is deliberately an enumeration rather than a prefix. Adding another
+/// crypto/I2NP/NetDB path must fail until M061 and this guard are amended by a
+/// registered plan.
+fn is_authorized_sensitive_core_exception(path: &str) -> bool {
     matches!(
         path,
-        "emissary-core/src/crypto/mod.rs" | "emissary-core/src/crypto/red25519.rs"
+        "emissary-core/src/crypto/mod.rs"
+            | "emissary-core/src/crypto/red25519.rs"
+            | "emissary-core/src/crypto/els2.rs"
+            | "emissary-core/src/i2np/database/store.rs"
+            | "emissary-core/src/netdb/mod.rs"
     )
 }
 

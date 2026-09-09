@@ -171,10 +171,19 @@ fn high_sensitivity_core_paths_are_individually_named() {
     }
     for prefix in &manifest.prohibited.production_prefixes {
         assert!(
-            allowed.iter().all(|path| !path.starts_with(prefix)),
+            allowed
+                .iter()
+                .all(|path| !path.starts_with(prefix) || is_authorized_m156_crypto_exception(path)),
             "prohibited production prefix was allowed: {prefix}"
         );
     }
+}
+
+fn is_authorized_m156_crypto_exception(path: &str) -> bool {
+    matches!(
+        path,
+        "emissary-core/src/crypto/mod.rs" | "emissary-core/src/crypto/red25519.rs"
+    )
 }
 
 #[test]

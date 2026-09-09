@@ -1,6 +1,6 @@
 # M157 — Modern Encrypted LeaseSet2 Publication Primitive
 
-Status: **deferred / unregistered; hard-depends on M156 closure**
+Status: **deferred / unregistered; hard dependency on M156 closure satisfied by `plans/closure/i2pcontrol-proposal-170/156-closure.md`, exact-path amendment still required at registration**
 
 Class: neutral LeaseSet/NetDB infrastructure
 

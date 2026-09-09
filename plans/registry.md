@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | subordinate to current corrective roadmap |
-| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **M155 closed; M156 registered / dependency-ready** |
+| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **M155 closed; M156 closed; M157 deferred (hard dep satisfied)** |
 | Post-M146 corrective | **historical through M154 / superseded for next execution** | `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` | M153 complete; M154 disposition C; M147 path blocked |
 | Residual primitive completion | **historical through M146 / superseded** | `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md` | M140-M145 complete; M146 blocked |
 | Session-lifecycle completion | **closed complete** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | M134 complete |
@@ -77,31 +77,12 @@ This blocked disposition is **not** reopened by the LeaseSet-security line. Mode
 
 ## Registered handoff
 
-### M156 — Narrow Red25519 and Ed25519-blinding primitive
-
-Plan:
-
-- `plans/implementation/i2pcontrol-proposal-170/156-neutral-red25519-blinding-primitive.md`.
-
-Status: **registered / dependency-ready** (hard dependency on M155 closure
-satisfied by `plans/closure/i2pcontrol-proposal-170/155-closure.md`).
-
-Class: neutral cryptographic infrastructure.
-
-Budgets:
-
-- Proposal promotions: **zero**;
-- production Rust changes: exact M155 §8 files only with M061/M062
-  authorization at registration (new `emissary-core/src/crypto/red25519.rs`,
-  `emissary-core/src/crypto/mod.rs` declaration only, direct
-  `curve25519-dalek` edge);
-- dependency changes: direct `curve25519-dalek 5.0.0-pre.6` edge only if
-  registration confirms the M155 review.
-
-M155 closed complete with `336/29/475` unchanged, ten-value table and legacy
-AES disposition C frozen, narrow blinding formulas/vectors frozen, and exact
-M156 files proposed. M156 must not make type 11 a persistent Destination
-`SigType` and must not reopen M147/M148.
+No Proposal-170 successor is currently registered. M156 closed complete
+(`plans/closure/i2pcontrol-proposal-170/156-closure.md`; `336/29/475`
+unchanged; zero promotions; exact neutral Red25519/blinding primitive).
+M157 remains deferred pending its exact-path amendment; only M157 may be
+registered next, with exact M061/M062 authorization in that registration
+commit.
 
 ## Deferred corrected LeaseSet-security chain
 
@@ -119,6 +100,9 @@ All successors below M156 are **deferred / unregistered** until their hard depen
 
 M155 is closed complete (`plans/closure/i2pcontrol-proposal-170/155-closure.md`;
 `336/29/475` unchanged; legacy AES disposition C; narrow blinding frozen).
+M156 is closed complete (`plans/closure/i2pcontrol-proposal-170/156-closure.md`;
+`336/29/475` unchanged; neutral Red25519/blinding primitive; M157 hard
+dependency satisfied, amendment pending).
 M149-M151 remain in-tree as historical drafts but are **superseded for execution** by M155-M162. Their old dependency ordering through M148 is no longer current authority.
 
 M152 is re-gated on M162 closure plus any implementation successor created by M161 outcome A.
@@ -154,10 +138,10 @@ M154 SigType domain/security re-freeze         [CLOSED; DISPOSITION C]
 M155 LeaseSet semantic/owner re-freeze         [CLOSED]
   |
   v
-M156 narrow Red25519/blinding                  [REGISTERED]
+M156 narrow Red25519/blinding                  [CLOSED]
   |
   v
-M157 -> M158 -> M159 -> M160                   [DEFERRED]
+M157 -> M158 -> M159 -> M160                   [DEFERRED; M157 hard dep satisfied]
   |
   +--> M161 legacy AES/LS1 feasibility         [DEFERRED]
   |
@@ -181,8 +165,8 @@ M152 final requalification                     [DEFERRED]
 
 ## Registration rules
 
-1. M156 is the **only registered** Proposal-170 successor.
-2. Do not begin M156 implementation until M061/M062 explicitly authorize its exact files/dependency in the registration commit.
+1. No Proposal-170 successor is currently registered; only M157 may be registered next.
+2. Do not begin M157 implementation until M061/M062 explicitly authorize its exact files/dependency in the registration commit, with the exact-path amendment required by the M156 closure.
 3. No M157-M162 candidate core path in a draft is executable authority.
 4. Material architecture/path/dependency deviation requires plan amendment before implementation.
 5. Closure evidence, not parser/serializer reachability, determines support.

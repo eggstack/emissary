@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M155 closed, M156 is the sole registered successor**.
+Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M155/M156 closed, M157 deferred pending amendment**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -21,9 +21,12 @@ Roadmap:
 
 Registered handoff:
 
-- **M156** `156-neutral-red25519-blinding-primitive.md` — registered/dependency-ready on the M155 closure (`plans/closure/i2pcontrol-proposal-170/155-closure.md`); neutral primitive, zero promotion budget; exact M061/M062 authorization required at registration before coding.
+- None currently registered. M157 may be registered next once its exact-path
+  amendment is frozen with M061/M062 authorization.
 
 M155 closed complete (`plans/closure/i2pcontrol-proposal-170/155-closure.md`): ten-value `EncryptLeaseSet` table frozen, legacy AES disposition C delegated to M161, narrow type-7 Ed25519 -> type-11 Red25519 blinding path frozen without reopening M147/M148, field coupling and exact M156 files frozen.
+
+M156 closed complete (`plans/closure/i2pcontrol-proposal-170/156-closure.md`): neutral Red25519/blinding primitive implemented with spec vectors 1–2, no-std/security review, exact M061/M062 authorization, zero promotions, `336/29/475` unchanged; M157 hard dependency satisfied, amendment pending.
 
 ## Historical/blocked authority
 
@@ -41,7 +44,7 @@ Historical closure files remain immutable.
 M155 LeaseSet semantic/owner refreeze               [CLOSED; ZERO PRODUCTION]
   |
   v
-M156 narrow Red25519 + Ed25519 blinding              [REGISTERED; ZERO PROMOTION]
+M156 narrow Red25519 + Ed25519 blinding              [CLOSED; ZERO PROMOTION]
   |
   v
 M157 modern Encrypted LeaseSet2 publication          [DEFERRED; ZERO PROMOTION]
@@ -64,7 +67,7 @@ M162 Proposal LeaseSet-field integration             [DEFERRED; CONDITIONAL PROM
 M152 final whole-surface requalification             [DEFERRED; ZERO PROMOTION]
 ```
 
-Only one next dependency-ready plan is registered at a time.
+No successor is currently registered. Only M157 may be registered next.
 
 ## Superseded drafts
 

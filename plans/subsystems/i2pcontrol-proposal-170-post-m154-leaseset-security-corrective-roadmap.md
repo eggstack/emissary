@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M154 LeaseSet-Security Corrective Roadmap
 
-Status: **active / partial; M155 closed, M156 is the only registered successor**
+Status: **active / partial; M155/M156 closed, M157 deferred pending amendment**
 
 This roadmap supersedes the LeaseSet-security execution ordering in the older residual and post-M146 roadmaps while preserving M146/M147/M154 closures as historical evidence.
 
@@ -46,7 +46,7 @@ M154 SigType domain/security refreeze               [CLOSED; M147 PATH BLOCKED]
 M155 LeaseSet semantic/owner refreeze               [CLOSED; ZERO PRODUCTION]
   |
   v
-M156 narrow Red25519/blinding primitive             [REGISTERED; ZERO PROMOTION]
+M156 narrow Red25519/blinding primitive             [CLOSED; ZERO PROMOTION]
   |
   v
 M157 modern Encrypted LeaseSet2 publication         [DEFERRED; ZERO PROMOTION]
@@ -69,7 +69,8 @@ M162 Proposal LeaseSet-field integration            [DEFERRED; CONDITIONAL PROMO
 M152 final residual requalification                 [DEFERRED; ZERO PROMOTION]
 ```
 
-Only the next dependency-ready milestone may be registered.
+No successor is currently registered. Only M157 may be registered next, with
+its exact-path amendment and exact M061/M062 authorization.
 
 ## 4. Milestone intents
 
@@ -79,7 +80,7 @@ Closed complete by `plans/closure/i2pcontrol-proposal-170/155-closure.md`: ten-v
 
 ### M156 — narrow Red25519/blinding
 
-Implement only the standard Ed25519-to-Red25519 blinding/signing operations needed by encrypted LS2. This is not a generic signature-suite framework and does not make type 11 a persistent Destination type. Zero Proposal promotions.
+Closed complete by `plans/closure/i2pcontrol-proposal-170/156-closure.md`: standard Ed25519-to-Red25519 blinding/signing with spec vectors 1–2, no-std/security review, exact M061/M062 authorization, zero promotions, `336/29/475` unchanged. This is not a generic signature-suite framework and does not make type 11 a persistent Destination type. M157 hard dependency satisfied; amendment pending.
 
 ### M157 — modern encrypted-LS2 publication
 

@@ -47,15 +47,20 @@ Current execution roadmap:
 
 Sole registered handoff:
 
-- **M156** `plans/implementation/i2pcontrol-proposal-170/156-neutral-red25519-blinding-primitive.md` (registered/dependency-ready on the M155 closure `plans/closure/i2pcontrol-proposal-170/155-closure.md`; neutral primitive, zero promotion budget; exact M061/M062 authorization required before coding).
+- None currently registered. M157 may be registered next once its exact-path
+  amendment is frozen with M061/M062 authorization (M156 closure
+  `plans/closure/i2pcontrol-proposal-170/156-closure.md` satisfies its hard
+  dependency).
 
 M155 closed complete with `336/29/475` unchanged: ten-value `EncryptLeaseSet` table frozen, legacy AES disposition C delegated to M161, narrow type-7 Ed25519 -> type-11 Red25519 blinding formulas/dependency posture frozen without reopening M147/M148, field coupling and exact M156 files frozen.
+
+M156 closed complete with `336/29/475` unchanged: neutral Red25519/blinding primitive (`emissary-core/src/crypto/red25519.rs` + declaration-only `mod.rs` + direct `curve25519-dalek 5.0.0-pre.6` edge) with spec vectors 1–2, no-std/security review, exact M061/M062 authorization, zero promotions.
 
 Deferred corrected line:
 
 ```text
 M155 semantic/owner refreeze            [CLOSED; ZERO PRODUCTION]
-  -> M156 Red25519/blinding              [REGISTERED]
+  -> M156 Red25519/blinding              [CLOSED; ZERO PROMOTION]
   -> M157 modern Encrypted LS2           [DEFERRED]
   -> M158 lookup-secret/blinded address  [DEFERRED]
   -> M159 PSK auth                       [DEFERRED]

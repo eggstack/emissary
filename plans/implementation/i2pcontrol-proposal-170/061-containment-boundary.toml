@@ -37,6 +37,8 @@ core_inspection = [
 ]
 core_owner_hooks = [
   "emissary-core/src/config.rs",
+  "emissary-core/src/crypto/mod.rs",
+  "emissary-core/src/crypto/red25519.rs",
   "emissary-core/src/destination/lease_set.rs",
   "emissary-core/src/destination/mod.rs",
   "emissary-core/src/destination/session/mod.rs",
@@ -477,3 +479,23 @@ why_upstream_insufficient = "Only the outbound client-message owner observes the
 sensitivity = "bounded owner-local policy"
 seam = "generation-local immutable-after-set flag"
 reference = "M145 neutral reply-bundling primitive; zero administrative vocabulary"
+
+[[evidence]]
+path = "emissary-core/src/crypto/red25519.rs"
+owner = "Neutral Red25519/Ed25519-blinding primitive owner"
+purpose = "Derives daily blinding scalar alpha, blinds Ed25519 keys to Red25519, signs/verifies with Red25519, and derives blinded storage-key inputs with typed 32/64-byte values and zeroization."
+consumer = "Future modern Encrypted LeaseSet2 publication (M157); no Proposal policy in core."
+why_upstream_insufficient = "No existing core owner exposes Edwards-point addition, scalar mod-L addition, HKDF-based alpha derivation, or randomized Red25519 signing from maintained constant-time primitives."
+sensitivity = "secret scalar/key material"
+seam = "Proposal-free neutral crypto module"
+reference = "M156 neutral Red25519/blinding primitive; zero administrative vocabulary"
+
+[[evidence]]
+path = "emissary-core/src/crypto/mod.rs"
+owner = "Core crypto module declaration boundary"
+purpose = "Declares the neutral red25519 module and re-exports its Proposal-free API only; no other crypto-file behavior change."
+consumer = "Core crypto consumers via crate::crypto::red25519."
+why_upstream_insufficient = "Only the crypto module root can declare the new neutral submodule without broadening any crypto prefix allowance."
+sensitivity = "module declaration seam"
+seam = "declaration-only change"
+reference = "M156 neutral Red25519/blinding primitive; zero administrative vocabulary"

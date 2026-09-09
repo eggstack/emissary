@@ -36,6 +36,7 @@ pub mod chachapoly;
 pub mod dsa;
 pub mod hmac;
 pub mod noise;
+pub mod red25519;
 pub mod sha256;
 pub mod siphash;
 

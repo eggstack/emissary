@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M155 closed, M156 is the sole registered successor**
+Status: **active / partial; M155/M156 closed, M157 deferred pending amendment**
 
 Pinned Proposal authority:
 
@@ -43,6 +43,7 @@ Full support means real externally observable behavior. Parser acceptance, persi
 - M153 requalified the current production head and is the current whole-surface authority.
 - M154 froze the full destination-capable SigType domain and correctly closed the general M147 path blocked; M148 remains blocked behind it.
 - M155 closed the LeaseSet-security semantic/owner re-freeze (ten-value table, legacy AES disposition C, narrow blinding frozen) and registered M156.
+- M156 closed the neutral Red25519/blinding primitive (spec vectors 1–2, no-std/security review, exact M061/M062 authorization, zero promotions, `336/29/475` unchanged); M157 hard dependency satisfied, amendment pending.
 
 Those closures remain immutable historical evidence.
 
@@ -56,7 +57,7 @@ Execution order:
 M155 LeaseSet semantic/owner refreeze               [CLOSED; ZERO PRODUCTION]
   |
   v
-M156 narrow Red25519 + Ed25519 blinding              [REGISTERED; ZERO PROMOTION]
+M156 narrow Red25519 + Ed25519 blinding              [CLOSED; ZERO PROMOTION]
   |
   v
 M157 modern type-5 Encrypted LeaseSet2 publication   [DEFERRED; ZERO PROMOTION]
@@ -122,4 +123,4 @@ If one or more accepted architecture/security blockers remain after all safe wor
 
 ## 9. Current handoff
 
-Only M156 is registered. Do not begin M156 implementation until M061/M062 explicitly authorize its exact files/dependency in the registration commit.
+No successor is currently registered. Only M157 may be registered next, with its exact-path amendment and exact M061/M062 authorization. Do not begin M157 implementation until that registration lands.

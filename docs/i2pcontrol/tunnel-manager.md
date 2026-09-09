@@ -424,7 +424,10 @@ unchanged, M147 path blocked — the ten `SigType` cells are terminal blockers
 under current security/dependency policy); M155 closes the LeaseSet-security
 semantic/owner re-freeze with zero promotions/production changes (`336/29/475`
 unchanged, legacy AES disposition C delegated to M161, narrow type-7 -> type-11
-blinding frozen without reopening M147/M148, M156 registered); M148-M152 remain deferred.
+blinding frozen without reopening M147/M148); M156 closes the neutral
+Red25519/blinding primitive with zero promotions (`336/29/475` unchanged,
+spec vectors 1–2, no-std/security review, exact M061/M062 authorization);
+M148-M152 remain deferred (M157 hard dependency satisfied, amendment pending).
 
 | Disposition | Proposal 170 fields |
 |---|---|

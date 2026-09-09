@@ -38,14 +38,17 @@ baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 #
 # M140-M145 are closed complete; M146 is closed blocked; M153 is closed
 # qualification authority; M154 closed disposition C and left M147/M148
-# configurable SigType blocked. M155 is the sole registered successor and has
-# ZERO production/dependency authority. M156-M162 and re-gated M152 are
-# deferred/unregistered planning only. Candidate Red25519/curve25519,
-# LeaseSet2, DatabaseStore, destination publication, NetDB, secret-store and
-# I2PControl paths named in those drafts are NOT executable authority. Any
-# future security-sensitive milestone must be amended and explicitly
-# registered with exact-file M061/M062 authorization before coding. No broad
-# crypto/netdb/i2np/destination/primitives prefix allowance is created here.
+# configurable SigType blocked. M155 closed complete with zero production.
+# M156 is the sole registered successor with exact-file authorization only
+# (emissary-core/src/crypto/red25519.rs, emissary-core/src/crypto/mod.rs
+# declaration-only, emissary-core/Cargo.toml direct curve25519-dalek edge,
+# Cargo.lock). M157-M162 and re-gated M152 are deferred/unregistered planning
+# only. Candidate LeaseSet2, DatabaseStore, destination publication, NetDB,
+# secret-store and I2PControl paths named in those drafts are NOT executable
+# authority. Any future security-sensitive milestone must be amended and
+# explicitly registered with exact-file M061/M062 authorization before coding.
+# No broad crypto/netdb/i2np/destination/primitives prefix allowance is created
+# here.
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",
@@ -133,3 +136,12 @@ non_i2pcontrol_workspace_consumer = false
 non_i2pcontrol_literal_consumer = "emissary-core (literal version, NOT a workspace reference)"
 rationale = "emissary-core declares subtle = { version = \"2.6.1\", default-features = false } with a literal version in emissary-core/Cargo.toml and uses it directly in emissary-core/src/crypto/dsa.rs. That declaration does not require a [workspace.dependencies] entry and is unchanged by M062."
 reference = "M062 plan §4.1 and §7 Step A"
+
+[[evidence]]
+crate = "curve25519-dalek"
+direct_consumer = "emissary-core/src/crypto/red25519.rs"
+feature_gated_consumer = false
+feature = "none (unconditional core neutral primitive)"
+constant_time_primitive = "curve25519_dalek::Scalar / EdwardsPoint constant-time ops"
+rationale = "M156 neutral Red25519/blinding requires Edwards-point addition, scalar mod-L addition/reduction, and basepoint multiplication not exposed by ed25519-dalek/x25519-dalek. Direct curve25519-dalek 5.0.0-pre.6 with default-features=false, features=[alloc,precomputed-tables,zeroize] reuses the exact transitive version (no new version), is no_std compatible (#![no_std] + alloc), and is unconditional core-owned per dependency_rule (consumer is not i2pcontrol-gated)."
+reference = "M155 §6 dependency freeze; M156 registration"

@@ -1,6 +1,8 @@
 # M146 — Outproxy Provider / UseOutproxyPlugin Completion
 
-Status: **deferred / unregistered; hard-depends on M145 closure**
+Status: **closed as blocked**
+
+Closure authority: `plans/closure/i2pcontrol-proposal-170/146-closure.md`
 
 Class: infrastructure + capability / proxy routing
 

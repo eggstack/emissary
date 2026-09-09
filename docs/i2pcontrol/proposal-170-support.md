@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 historical requalification, M131 residual re-freeze, M135 neutral live-quantity primitive, M136 Reduce completion, M137 Close completion, M134 NewDest proven-resume completion, M139 current-head post-lifecycle requalification, M140 residual streaming applicability re-freeze, and M141 HTTP unique-local source-address completion and M142 HTTP SSLProxies + JumpList completion and M143 retained streaming Profile completion and M144 presentation UseSSL completion and M145 LeaseSet reply-bundling completion recorded; residual option cells remain (29 blocked: 10 SigType + 4 client proxy/lifecycle + 15 server LeaseSet/presentation, with 2 UniqueLocalAddressPerClient applied by M141 and 2 SSLProxies/JumpList applied by M142 and 1 Profile applied by M143 and 4 UseSSL applied by M144 and 2 MultiHoming applied by M145)
+Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 historical requalification, M131 residual re-freeze, M135 neutral live-quantity primitive, M136 Reduce completion, M137 Close completion, M134 NewDest proven-resume completion, M139 current-head post-lifecycle requalification, M140 residual streaming applicability re-freeze, and M141 HTTP unique-local source-address completion and M142 HTTP SSLProxies + JumpList completion and M143 retained streaming Profile completion and M144 presentation UseSSL completion and M145 LeaseSet reply-bundling completion and M146 outproxy-provider feasibility gate (blocked, zero promotions) recorded; residual option cells remain (29 blocked: 10 SigType + 4 client proxy/lifecycle + 15 server LeaseSet/presentation, with 2 UniqueLocalAddressPerClient applied by M141 and 2 SSLProxies/JumpList applied by M142 and 1 Profile applied by M143 and 4 UseSSL applied by M144 and 2 MultiHoming applied by M145 and zero UseOutproxyPlugin applied by M146)
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -14,7 +14,7 @@ Current roadmap:
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 - tunnel-runtime completion: `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`
 - full-support completion: `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`
-- authoritative aggregate matrix: `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (`336/29/475`); current runtime/security qualification: `plans/closure/i2pcontrol-proposal-170/139-closure.md`; residual streaming applicability: `plans/closure/i2pcontrol-proposal-170/140-closure.md`; HTTP unique-local source-address completion: `plans/closure/i2pcontrol-proposal-170/141-closure.md`; HTTP SSLProxies + JumpList completion: `plans/closure/i2pcontrol-proposal-170/142-closure.md`; retained streaming Profile completion: `plans/closure/i2pcontrol-proposal-170/143-closure.md`; presentation UseSSL completion: `plans/closure/i2pcontrol-proposal-170/144-closure.md`; LeaseSet reply-bundling completion: `plans/closure/i2pcontrol-proposal-170/145-closure.md`
+- authoritative aggregate matrix: `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (`336/29/475`); current runtime/security qualification: `plans/closure/i2pcontrol-proposal-170/139-closure.md`; residual streaming applicability: `plans/closure/i2pcontrol-proposal-170/140-closure.md`; HTTP unique-local source-address completion: `plans/closure/i2pcontrol-proposal-170/141-closure.md`; HTTP SSLProxies + JumpList completion: `plans/closure/i2pcontrol-proposal-170/142-closure.md`; retained streaming Profile completion: `plans/closure/i2pcontrol-proposal-170/143-closure.md`; presentation UseSSL completion: `plans/closure/i2pcontrol-proposal-170/144-closure.md`; LeaseSet reply-bundling completion: `plans/closure/i2pcontrol-proposal-170/145-closure.md`; outproxy-provider feasibility gate: `plans/closure/i2pcontrol-proposal-170/146-closure.md` (blocked)
 
 Tunnel-runtime reclosure:
 
@@ -364,6 +364,9 @@ interactive → 16; six other Profile families stay not applicable by M140). M14
 two `MultiHoming` HTTP server cells (neutral reply LeaseSet bundling via
 `shouldBundleReplyInfo`: omitted/`true` bundles, `false` suppresses `ExistingSession`
 updates with `NewSession` handshake retained; ten other families stay not applicable).
+M146 closes as blocked with zero promotions: the four `UseOutproxyPlugin`
+client/proxy cells remain blocked (no safe I2P-routed local provider in
+budget; direct-clearnet provider prohibited).
 No server-side per-client address allocator beyond M141, neutral LeaseSet bundling owner
 beyond M145, or end-to-end encrypted/authenticated LeaseSet runtime exists in this checkout;
 the remaining options fail before allocation and never silently downgrade.

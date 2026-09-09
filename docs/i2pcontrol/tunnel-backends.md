@@ -236,7 +236,10 @@ literal-loopback targets only, canonical peer hash only, no DNS/fallback,
 per-connection state, bounded 502 on bind/connect failure). `MultiHoming` is
 applied by M145 for the same two families through the neutral reply-bundling
 policy (`shouldBundleReplyInfo`: omitted/`true` bundles, `false` suppresses
-`ExistingSession` updates with `NewSession` handshake retained).
+`ExistingSession` updates with `NewSession` handshake retained). `UseOutproxyPlugin`
+remains blocked by M146 for all four client proxy families (no safe I2P-routed
+local provider in budget; direct-clearnet provider prohibited; ordinary
+`ProxyList` path unchanged).
 
 ## Design rationale
 

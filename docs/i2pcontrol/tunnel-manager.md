@@ -414,8 +414,10 @@ retained streaming Profile completion to `330 apply / 35 blocked /
 475 not_applicable` with 1 promotion; M144 applies the presentation UseSSL
 completion to `334 apply / 31 blocked / 475 not_applicable` with 4 promotions;
 M145 applies the LeaseSet reply-bundling completion to `336 apply / 29 blocked /
-475 not_applicable` with 2 promotions; no successor is
-registered, M146-M152 remain deferred.
+475 not_applicable` with 2 promotions; M146 closes as blocked as the
+outproxy-provider feasibility gate with zero promotions (`336/29/475`
+unchanged); no successor is
+registered, M147-M152 remain deferred.
 
 | Disposition | Proposal 170 fields |
 |---|---|
@@ -425,7 +427,7 @@ registered, M146-M152 remain deferred.
 | Applied by seven client idle owners (M136) | `Reduce` (boolean master switch), `ReduceCount` (1–6, default 1), `ReduceTime` (ms, minimum 300000, default 1200000) via standard `i2cp.reduce*` and the live-quantity primitive; `ReduceTime`/`ReduceCount` without `Reduce=true` fail before allocation |
 | Applied by seven client idle owners (M137) | `Close` (boolean master switch), `CloseTime` (ms, minimum 300000, default 1800000) via standard `i2cp.close*` with close-before-reduce ordering and canonical teardown; `CloseTime` without `Close=true` fails before allocation |
 | Applied by six TCP proven-resume owners (M134) | `NewDest` only on a proven `IdlePolicy` resume (requires `Close=true`, conflicts with `PersistentClientKey`/`PrivKeyFile`, Streamr/servers not applicable); ordinary/manual/restart/failure paths reuse without rotation |
-| Rejected before allocation as residual client blockers | `UseOutproxyPlugin` and `SigType` for all applicable families (M140 re-freezes six constructor-overridden/UDP `Profile` cells and Streamr `ConnectDelay` as not_applicable; M143 applies retained `Profile:client`; M144 applies `UseSSL` for HTTP/CONNECT clients) |
+| Rejected before allocation as residual client blockers | `UseOutproxyPlugin` and `SigType` for all applicable families (M140 re-freezes six constructor-overridden/UDP `Profile` cells and Streamr `ConnectDelay` as not_applicable; M143 applies retained `Profile:client`; M144 applies `UseSSL` for HTTP/CONNECT clients; M146 retains all four `UseOutproxyPlugin` cells as blocked with zero promotions) |
 | Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `UniqueLocalAddressPerClient` (M141 HTTP servers only, per-client loopback source bind), `UseSSL` (M144 HTTP servers only, TLS to loopback target), `MultiHoming` (M145 HTTP servers only, reply LeaseSet bundling via `shouldBundleReplyInfo`) |
 | Rejected before allocation as residual server blockers | `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
 | Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
@@ -437,7 +439,7 @@ are held in the same typed redacted boundary as `ProxyPassword`; legacy raw
 compatibility values remain response-redacted. Proxy credentials are bounded, separated between the local
 listener and the configured I2P outproxy, and never serialized in canonical
 `get` output. `UseOutproxyPlugin` fails before listener/session allocation because no exact Emissary-owned
-primitive exists for it. `Profile:client` is applied by M143 (neutral streaming max window: `bulk`/omitted → 128 default, `interactive` → 16; invalid values fail before allocation; six other families stay not applicable). HTTP `SSLProxies`/`JumpList` are applied by M142 (bounded I2P-only selection/address-helper response). Constructor-overridden/UDP `Profile` cells (HTTP, IRC, SOCKS, SOCKS-IRC, CONNECT, Streamr) and Streamr `ConnectDelay` are not applicable by affirmative M140 reference gates (forced-bulk removals and UDP/datagram ownership). The Reduce family is applied by M136: idle SAM
+primitive exists for it (M146 blocked: no safe I2P-routed local provider in budget; direct-clearnet prohibited). `Profile:client` is applied by M143 (neutral streaming max window: `bulk`/omitted → 128 default, `interactive` → 16; invalid values fail before allocation; six other families stay not applicable). HTTP `SSLProxies`/`JumpList` are applied by M142 (bounded I2P-only selection/address-helper response). Constructor-overridden/UDP `Profile` cells (HTTP, IRC, SOCKS, SOCKS-IRC, CONNECT, Streamr) and Streamr `ConnectDelay` are not applicable by affirmative M140 reference gates (forced-bulk removals and UDP/datagram ownership). The Reduce family is applied by M136: idle SAM
 sessions decrease to the configured quantity through the live-quantity
 primitive and restore on activity; malformed or server-family values fail
 before allocation. The Close family is applied by M137: idle SAM sessions

@@ -52,6 +52,9 @@ M144 (`plans/closure/i2pcontrol-proposal-170/144-closure.md`) is closed as compl
 as the presentation UseSSL completion with 4 promotions.
 M145 (`plans/closure/i2pcontrol-proposal-170/145-closure.md`) is closed as complete
 as the LeaseSet reply-bundling completion with 2 promotions.
+M146 (`plans/closure/i2pcontrol-proposal-170/146-closure.md`) is closed as blocked
+as the outproxy-provider feasibility gate with zero promotions (four
+`UseOutproxyPlugin` cells remain blocked; no safe I2P-routed provider in budget).
 
 The current Proposal 170 baseline remains partial: RouterInfo is 43 additions with
 42 available, 1 protocol-permitted neutral, and 0 unavailable; AddressBook all 13
@@ -65,7 +68,7 @@ with client idle `Reduce*` applied by M136, `Close`/`CloseTime` applied by M137,
 and `NewDest` proven-resume applied by M134)
 fail before allocation. The authoritative completion inventory is
 `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (336
-apply / 29 blocked_primitive / 475 not_applicable after M145).
+apply / 29 blocked_primitive / 475 not_applicable after M145, unchanged by M146 blocked).
 
 Streamr is intentionally separate from TCP tunnel helpers. Preserve its documented
 16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh,

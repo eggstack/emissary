@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M139 is current runtime/security qualification authority; M140 closed as residual streaming applicability authority; M141 closed as HTTP unique-local source-address completion; M142 closed as HTTP SSLProxies + JumpList completion; M143 closed as retained streaming Profile completion; M144 closed as presentation UseSSL completion; M145 closed as LeaseSet reply-bundling completion; no registered successor**.
+Status: **partial Proposal 170 support; M139 is current runtime/security qualification authority; M140 closed as residual streaming applicability authority; M141 closed as HTTP unique-local source-address completion; M142 closed as HTTP SSLProxies + JumpList completion; M143 closed as retained streaming Profile completion; M144 closed as presentation UseSSL completion; M145 closed as LeaseSet reply-bundling completion; M146 closed as blocked as the outproxy-provider feasibility gate; no registered successor**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -13,14 +13,15 @@ Current authorities:
 - retained streaming Profile completion: M143 closure `plans/closure/i2pcontrol-proposal-170/143-closure.md` (`330/35/475`, 1 promotion);
 - presentation UseSSL completion: M144 closure `plans/closure/i2pcontrol-proposal-170/144-closure.md` (`334/31/475`, 4 promotions);
 - LeaseSet reply-bundling completion: M145 closure `plans/closure/i2pcontrol-proposal-170/145-closure.md` (`336/29/475`, 2 promotions);
+- outproxy-provider feasibility gate: M146 closure `plans/closure/i2pcontrol-proposal-170/146-closure.md` (`336/29/475` unchanged, zero promotions, four `UseOutproxyPlugin` cells remain blocked);
 - historical runtime/security qualification: M130 closure `plans/closure/i2pcontrol-proposal-170/130-closure.md`;
 - historical residual applicability/primitive authority: M131 closure and `131-residual-primitive-map.toml`, superseded where M140 reclassifies seven cells and where M141/M142/M143/M144/M145 promote eleven cells;
 - lifecycle implementation authority: M135/M136/M137/M134 closures;
-- current M095 matrix after M145: `336 apply / 29 blocked_primitive / 475 not_applicable`;
+- current M095 matrix after M146 (unchanged from M145): `336 apply / 29 blocked_primitive / 475 not_applicable`;
 - active residual roadmap: `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`;
-- registered plan: none (M145 closed; M146-M152 deferred).
+- registered plan: none (M146 closed as blocked; M147-M152 deferred).
 
-M140 has zero Proposal promotion budget and authorizes no production code/dependency change. The matrix was `325/40/475` after M140 closure. M141 promotes 2 cells to `327/38/475` with I2PControl-local accepted-handler changes only. M142 promotes 2 cells to `329/36/475` with I2PControl-local HTTP-client changes only. M143 promotes 1 cell to `330/35/475` with the neutral streaming-window primitive (core streaming owners + I2PControl Profile mapping). M144 promotes 4 cells to `334/31/475` with I2PControl-local presentation TLS (listener/target owners + shared helper). M145 promotes 2 cells to `336/29/475` with the neutral reply-bundling primitive (core SessionManager owner + I2PControl MultiHoming mapping).
+M140 has zero Proposal promotion budget and authorizes no production code/dependency change. The matrix was `325/40/475` after M140 closure. M141 promotes 2 cells to `327/38/475` with I2PControl-local accepted-handler changes only. M142 promotes 2 cells to `329/36/475` with I2PControl-local HTTP-client changes only. M143 promotes 1 cell to `330/35/475` with the neutral streaming-window primitive (core streaming owners + I2PControl Profile mapping). M144 promotes 4 cells to `334/31/475` with I2PControl-local presentation TLS (listener/target owners + shared helper). M145 promotes 2 cells to `336/29/475` with the neutral reply-bundling primitive (core SessionManager owner + I2PControl MultiHoming mapping). M146 promotes zero cells (`336/29/475` unchanged) as the blocked outproxy-provider feasibility gate with planning/test/docs-only changes.
 
 ## Authority order
 
@@ -41,19 +42,19 @@ Containment/support evidence remains centered on:
 - `105-residual-option-audit.toml`;
 - `110-completion-ledger.toml`.
 
-## Current registered handoff — none (M145 closed)
+## Current registered handoff — none (M146 closed as blocked)
 
 Last closed plan:
 
-- `145-leaseset-reply-bundling-multihoming-completion.md`.
+- `146-outproxy-provider-useoutproxyplugin-completion.md`.
 
-Status: **closed as complete**.
+Status: **closed as blocked**.
 
-Scope was exactly two cells, both promoted — `MultiHoming` × `httpserver`, `httpbidirserver`.
+Scope was the four `UseOutproxyPlugin` cells, all retained as blocked — `UseOutproxyPlugin` × `httpclient`, `socks`, `socksirc`, `connectclient` (no safe I2P-routed provider in budget).
 
-Purpose: neutral reply LeaseSet bundling via `shouldBundleReplyInfo` with handshake retained.
+Purpose: outproxy-provider feasibility gate with pinned reference freeze and blocked-behavior guards; matrix `336/29/475` unchanged.
 
-M141 is closed as complete (`plans/closure/i2pcontrol-proposal-170/141-closure.md`): two `UniqueLocalAddressPerClient` cells promoted to `apply` with reference-compatible source-bind evidence, matrix `327/38/475`. M142 is closed as complete (`plans/closure/i2pcontrol-proposal-170/142-closure.md`): two HTTP-client cells promoted to `apply` with bounded I2P-only routing/presentation evidence, matrix `329/36/475`. M143 is closed as complete (`plans/closure/i2pcontrol-proposal-170/143-closure.md`): one retained `Profile:client` cell promoted to `apply` with the neutral streaming-window primitive, matrix `330/35/475`. M144 is closed as complete (`plans/closure/i2pcontrol-proposal-170/144-closure.md`): four `UseSSL` cells promoted to `apply` with I2PControl-local presentation TLS, matrix `334/31/475`. M145 is closed as complete (`plans/closure/i2pcontrol-proposal-170/145-closure.md`): two `MultiHoming` cells promoted to `apply` with the neutral reply-bundling primitive, matrix `336/29/475`. No successor is registered; M146-M152 remain deferred.
+M141 is closed as complete (`plans/closure/i2pcontrol-proposal-170/141-closure.md`): two `UniqueLocalAddressPerClient` cells promoted to `apply` with reference-compatible source-bind evidence, matrix `327/38/475`. M142 is closed as complete (`plans/closure/i2pcontrol-proposal-170/142-closure.md`): two HTTP-client cells promoted to `apply` with bounded I2P-only routing/presentation evidence, matrix `329/36/475`. M143 is closed as complete (`plans/closure/i2pcontrol-proposal-170/143-closure.md`): one retained `Profile:client` cell promoted to `apply` with the neutral streaming-window primitive, matrix `330/35/475`. M144 is closed as complete (`plans/closure/i2pcontrol-proposal-170/144-closure.md`): four `UseSSL` cells promoted to `apply` with I2PControl-local presentation TLS, matrix `334/31/475`. M145 is closed as complete (`plans/closure/i2pcontrol-proposal-170/145-closure.md`): two `MultiHoming` cells promoted to `apply` with the neutral reply-bundling primitive, matrix `336/29/475`. M146 is closed as blocked (`plans/closure/i2pcontrol-proposal-170/146-closure.md`): zero `UseOutproxyPlugin` promotions, matrix `336/29/475` unchanged. No successor is registered; M147-M152 remain deferred.
 
 ## Deferred residual implementation chain
 
@@ -66,7 +67,7 @@ All files below are committed for handoff but are **unregistered / non-executabl
 | M143 | `143-streaming-profile-runtime-completion.md` | only M140-retained `Profile:client`; real neutral streaming-window consumer — **closed as complete** |
 | M144 | `144-presentation-usessl-runtime-completion.md` | application/presentation `UseSSL` ×4, separate from management/SAM TLS — **closed as complete** |
 | M145 | `145-leaseset-reply-bundling-multihoming-completion.md` | `MultiHoming`/`shouldBundleReplyInfo` ×2 via real outbound reply-LeaseSet bundling — **closed as complete** |
-| M146 | `146-outproxy-provider-useoutproxyplugin-completion.md` | `UseOutproxyPlugin` ×4 with a real bounded I2P-routed provider |
+| M146 | `146-outproxy-provider-useoutproxyplugin-completion.md` | `UseOutproxyPlugin` ×4 feasibility gate (no safe provider; direct-clearnet prohibited) — **closed as blocked** |
 | M147 | `147-neutral-destination-signature-suite-primitive.md` | zero-promotion neutral signing/key-generation infrastructure |
 | M148 | `148-proposal-sigtype-completion.md` | `SigType` ×10 using actual selected destination/signature suites |
 | M149 | `149-encrypted-leaseset-runtime-and-encryptleaseset-completion.md` | encrypted LeaseSet runtime + `EncryptLeaseSet` ×5 |

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Residual Primitive Completion Roadmap
 
-Status: **active / partial; M145 closed as complete; no registered successor (M146-M152 deferred)**
+Status: **active / partial; M146 closed as blocked; no registered successor (M147-M152 deferred)**
 
 Source roadmap:
 
@@ -12,9 +12,9 @@ Current qualification authority:
 
 Planning baseline:
 
-- repository head at M145 closure: implementation plus closure in a single commit (see `145-closure.md` for SHA);
-- current M095 matrix after M145: `336 apply / 29 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells;
-- M131 remains the historical residual applicability/primitive authority, superseded for seven cells by M140 and for eleven cells by M141/M142/M143/M144/M145;
+- repository head at M146 closure: planning/test/docs-only blocked gate (see `146-closure.md` for SHA);
+- current M095 matrix after M146 (unchanged from M145): `336 apply / 29 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells;
+- M131 remains the historical residual applicability/primitive authority, superseded for seven cells by M140 and for eleven cells by M141/M142/M143/M144/M145 (M146 promotes zero cells);
 - M135/M136/M137/M134 session-lifecycle line is closed as complete;
 - M139 is the current whole-implemented-subset runtime/security qualification authority;
 - M140 is closed as complete as the residual streaming applicability authority with zero promotions;
@@ -22,7 +22,8 @@ Planning baseline:
 - M142 is closed as complete as the HTTP SSLProxies + JumpList completion with 2 promotions;
 - M143 is closed as complete as the retained streaming Profile completion with 1 promotion;
 - M144 is closed as complete as the presentation UseSSL completion with 4 promotions;
-- M145 is closed as complete as the LeaseSet reply-bundling completion with 2 promotions.
+- M145 is closed as complete as the LeaseSet reply-bundling completion with 2 promotions;
+- M146 is closed as blocked as the outproxy-provider feasibility gate with zero promotions.
 
 Pinned external authority:
 
@@ -161,7 +162,7 @@ M144 application/presentation UseSSL (4 cells) [CLOSED AS COMPLETE — 334/31/47
 M145 reply LeaseSet bundling / MultiHoming                 [CLOSED AS COMPLETE — 336/29/475, 2 PROMOTIONS]
   |
   v
-M146 local outproxy provider / UseOutproxyPlugin           [DEFERRED]
+M146 local outproxy provider / UseOutproxyPlugin           [CLOSED AS BLOCKED — 336/29/475, ZERO PROMOTIONS]
   |
   v
 M147 neutral destination signature-suite primitive         [DEFERRED / ZERO PROMOTION]
@@ -262,11 +263,13 @@ I2PControl only maps the Proposal field after the neutral primitive is real.
 
 ### M146 — `UseOutproxyPlugin`
 
+Status: **closed as blocked** (closure `plans/closure/i2pcontrol-proposal-170/146-closure.md`; `336/29/475` unchanged, zero promotions).
+
 Class: infrastructure + capability.
 
-Target: four client/proxy cells.
+Target: four client/proxy cells, all retained as blocked.
 
-Owner: I2PControl-local bounded provider registry and an actual I2P-routed local outproxy provider boundary. A registry with no usable provider is infrastructure only and cannot promote cells.
+Owner: I2PControl-local bounded provider registry and an actual I2P-routed local outproxy provider boundary would have been required. No safe provider exists in budget; direct-clearnet provider prohibited; registry-only provider has zero support value. A registry with no usable provider is infrastructure only and cannot promote cells.
 
 No provider may perform direct clearnet fallback from the router/control process.
 
@@ -373,8 +376,8 @@ Pre-existing rustfmt stable/nightly drift must be recorded rather than normalize
 
 ## 10. Registration discipline
 
-- M140 is closed as complete; M141 is closed as complete with 2 promotions; M142 is closed as complete with 2 promotions; M143 is closed as complete with 1 promotion; M144 is closed as complete with 4 promotions; M145 is closed as complete with 2 promotions; no successor is registered (M146 deferred pending its own registration decision).
-- M146-M152 are committed as deferred handoff documents and are not executable authority until their hard dependencies close and the registry promotes exactly one next plan.
+- M140 is closed as complete; M141 is closed as complete with 2 promotions; M142 is closed as complete with 2 promotions; M143 is closed as complete with 1 promotion; M144 is closed as complete with 4 promotions; M145 is closed as complete with 2 promotions; M146 is closed as blocked with zero promotions; no successor is registered (M147 deferred pending its own audit and registration decision).
+- M147-M152 are committed as deferred handoff documents and are not executable authority until their hard dependencies close and the registry promotes exactly one next plan (M146 closure satisfies the M147 hard dependency but does not register M147).
 - A deferred plan's path budget is design intent, not production authorization.
 - M140 froze the retained Profile cell set as `Profile:client` × 1; M143 must still be amended before registration so it names the exact neutral streaming files and M140-closure baseline counts.
 - If reference/security research materially changes a later primitive contract, amend the deferred plan and roadmap before registration; do not silently reinterpret it during implementation.

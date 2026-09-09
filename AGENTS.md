@@ -23,7 +23,8 @@ cargo run -- router-ui-dev
 cargo run -- router-ui-dev --native
 ```
 
-I2PControl (Proposal 170) tests:
+I2PControl qualification:
+
 ```bash
 cargo fmt --all -- --check
 cargo check -p emissary-cli --no-default-features --features i2pcontrol
@@ -31,174 +32,129 @@ cargo test -p emissary-cli --no-default-features --features i2pcontrol
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 ```
 
-I2PControl supports a large partial subset of Proposal 170. Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` wherever possible; neutral lower-layer behavior belongs only in exact canonical owners with Proposal-free APIs. Unsupported capabilities must fail before allocation rather than being accepted inertly.
+Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` wherever possible. Neutral lower-layer behavior belongs only in exact canonical owners with Proposal-free APIs. Unsupported capabilities must fail before allocation/effect rather than be accepted inertly.
 
 ## Current Proposal-170 authority
 
-- authoritative matrix: `336 apply / 29 blocked_primitive / 475 not_applicable`;
-- M153 is the current whole-surface runtime/security qualification authority;
-- M146 `UseOutproxyPlugin` remains closed blocked (4 cells);
-- M154/M147/M148 configurable Destination `SigType` remains blocked (10 cells);
-- M155 closed the corrected LeaseSet-security semantic/owner re-freeze;
-- M156 closed the neutral Red25519/Ed25519 blinding primitive with zero Proposal promotions;
-- M157 closed the neutral modern type-5/no-auth Encrypted LeaseSet2 publication primitive with zero Proposal promotions;
-- M158 closed the neutral standard lookup-secret/blinding and encrypted-service extended-B32 infrastructure with zero Proposal promotions;
-- **no Proposal-170 successor is currently registered (M159 deferred with satisfied hard dep, amendment pending)**.
+- M095: `336 apply / 29 blocked_primitive / 475 not_applicable`;
+- M153: current whole-surface runtime/security qualification authority;
+- M146 `UseOutproxyPlugin` ×4: closed blocked;
+- M154/M147/M148 configurable Destination `SigType` ×10: closed blocked;
+- M155-M158 LeaseSet-security neutral lineage: closed, zero Proposal promotions;
+- **M159 is the sole registered/dependency-ready handoff**.
 
-Current execution roadmap:
+Roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-- `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
+Registered plan: `plans/implementation/i2pcontrol-proposal-170/159-leaseset-psk-client-authorization-primitive.md`.
 
-Closed plan:
+## M159 exact production budget
 
-- `plans/implementation/i2pcontrol-proposal-170/158-leaseset-lookup-secret-and-blinded-address-primitive.md`
-  (closure: `plans/closure/i2pcontrol-proposal-170/158-closure.md`).
+Only these production files may change:
 
-M158 had zero Proposal-promotion budget (observed; M095 remains `336/29/475`).
+1. `emissary-core/src/crypto/els2.rs`
+2. `emissary-core/src/destination/lease_set.rs`
+3. `emissary-core/src/sam/parser.rs`
+4. `emissary-core/src/sam/session.rs`
 
-## M158 exact production budget (realized)
+All four are existing exact M061 owners. No new M061 path waiver is created.
 
-Only these production paths changed:
+M159 authorizes no:
 
-1. `emissary-core/src/crypto/els2.rs`;
-2. `emissary-core/src/destination/lease_set.rs`;
-3. `emissary-core/src/sam/parser.rs`;
-4. `emissary-core/src/sam/session.rs`.
+- new source file;
+- dependency;
+- Cargo manifest/lockfile change;
+- Yosemite change;
+- I2PControl production-source change;
+- `crypto/mod.rs`/`red25519.rs` change;
+- `destination/mod.rs`/`destination/session/mod.rs` change;
+- NetDB/I2NP/primitives/event/router/tunnel/transport change.
 
-No new source file is authorized. All four are already individually present in M061's realized exact allowlist; M158 is a stricter active subset, not a new source-boundary waiver.
+If a fifth production path or dependency is required, stop before editing and amend M159/M061/M062.
 
-M062 records zero:
+## M159 PSK contract
 
-- new dependencies;
-- Cargo manifest changes;
-- lockfile changes;
-- Yosemite changes;
-- `emissary-cli/src/i2pcontrol/**` production changes.
-
-If follow-up work needs any production path or dependency outside this budget, stop before editing and amend the owning milestone/M061/M062.
-
-## M158 implementation constraints (realized)
-
-### Standard lookup secret
-
-Direct Java I2P/I2PTunnel source uses:
+Standard SAM/I2CP inputs:
 
 ```text
-i2cp.leaseSetSecret = Base64(UTF8(secret))
+i2cp.leaseSetType=5
+i2cp.leaseSetAuthType=2
+i2cp.leaseSetPrivKey=Base64(32B)
+i2cp.leaseSetClient.psk.N=[Base64(UTF8(name)) ":"] Base64(32B)
 ```
 
-M158 consumes only this standard SAM/I2CP property. Proposal `OptionalLookup` plaintext mapping/persistence remains M162 work.
+The base `leaseSetPrivKey` is itself an authorized PSK. Indexed entries are additional; do not require them for non-per-user PSK modes.
 
-`sam/parser.rs` must:
+Parser requirements:
 
-- Base64-decode and UTF-8 validate the property before activation;
-- remove it from the generic options map before `SamCommand` is constructed;
-- move the decoded bytes into a dedicated zeroizing/non-`Debug` `LookupSecret` owned by `crypto/els2.rs` and carried inside redacted `DestinationContext`;
-- continue rejecting type-5 auth/PSK/DH/legacy-AES/legacy-key companions that belong to later milestones.
+- decode every key to exactly 32 bytes before activation;
+- reject sparse indexed entries followed by later indices, duplicate PSK bytes, mixed DH entries and unsupported auth selectors;
+- strip optional `name:` prefixes but do not retain names in core;
+- remove base/indexed PSK values from generic debug-capable options before `SamCommand`/session retention;
+- carry key material only in zeroizing/non-`Debug` neutral types;
+- M158 lookup secret may coexist and remains independently secret-required.
 
-Do not leave the source Base64 secret or decoded secret in generic `SamCommand`/`SamSession` option state: those types have debug-capable surfaces.
+Crypto/wire requirements:
 
-`destination/lease_set.rs` keeps the secret generation-locally inside `EncryptedPublicationConfig` and uses it on every current-day and rollover blinding derivation. There is no core secret persistence.
+- PSK layer-1 flags `0x03`;
+- fresh 32-byte auth cookie and auth salt for each regenerated outer object;
+- `ELS2PSKA` HKDF-SHA256 output length 52 = key32 + IV12 + clientID8;
+- one client record = clientID8 + encrypted authCookie32;
+- auth cookie participates in `ELS2_L2K`; it does not alter `ELS2_L1K` input;
+- randomized client-record order for multiple keys;
+- no-auth M157 and lookup-secret-only M158 behavior must remain compatible.
 
-`crypto/red25519.rs` is already secret-capable and must remain unchanged unless a demonstrated correctness defect forces plan amendment.
+### Work bound
 
-### Extended encrypted-service B32
+Use pinned Java `EncryptedLeaseSet.MAX_ENCRYPTED_SIZE=4096` as the authenticated encrypted-data ceiling. Checked complete-size calculation must occur before per-client crypto. Never silently drop/truncate clients to fit.
 
-Implement in `crypto/els2.rs` only for the current type-7 -> type-11 one-byte-sigtype domain:
+### Publication
 
-- exactly 35 decoded bytes / 56 I2P Base32 characters + `.b32.i2p`;
-- flag bit 1 = secret required;
-- flag bit 2 = client auth required;
-- bits 7..3 zero; two-byte sigtype flag rejected;
-- unblinded sigtype 7, blinded sigtype 11;
-- 32-byte unblinded Ed25519 public key;
-- IEEE CRC-32 over public-key bytes, XOR low three CRC bytes into header bytes 0..2 before Base32 encoding;
-- strict length/suffix/checksum/flags/sigtype/public-key validation.
+`LeaseSetManager` remains the sole publication/UTC-rollover/storage-verification owner. Do not add another scheduler or publication state machine. Authenticated build failure must never fall back to no-auth or type 3.
 
-No CRC dependency: use a small exact local helper and pin against Java `net.i2p.crypto.Blinding` vectors.
+Extended B32 sets `auth_required=true`; `secret_required` continues to reflect the independent M158 lookup secret. The existing opaque event address seam remains unchanged.
 
-M158 runtime emission sets `auth_required=false` but the codec may round-trip that public flag for M159/M160.
+Core persists no PSK material. Proposal-layer key generation/persistence/names/edit/restart/Get-redaction/five-family integration remain M162.
 
-### Address publication
+M159 promotes **zero Proposal cells**; M095 must remain exactly `336/29/475`.
 
-For published type-5 server destinations, `sam/session.rs` emits the canonical extended encrypted-service B32 through the existing opaque server-destination event string. Set `secret_required=true` iff the decoded secret is nonempty.
-
-Ordinary/non-type5 destination event behavior must remain unchanged. `events.rs` is not in scope.
-
-### Publication behavior
-
-- absent/empty secret must preserve M157 blinded publication semantics;
-- nonempty secret must feed the exact M156 daily alpha derivation;
-- same destination/day/secret is deterministic;
-- different secrets change blinded public/storage keys;
-- UTC rollover retains the same generation-local secret;
-- no failure may downgrade a secret-required generation to empty-secret or ordinary publication.
-
-## Explicit M158 exclusions
-
-Do not modify:
-
-- `emissary-core/src/crypto/red25519.rs` or `crypto/mod.rs`;
-- `destination/mod.rs`, `destination/session/mod.rs`, or `events.rs`;
-- any `i2np/**`, `netdb/**`, `primitives/**`;
-- router/tunnel/transport/frontend code;
-- `emissary-cli/src/i2pcontrol/**` or `emissary-cli/src/tunnel/**`;
-- Yosemite;
-- Cargo manifests or `Cargo.lock`.
-
-Do not add client-side blinded NetDB lookup/decryption, PSK/DH authorization, legacy AES/LS1, or configurable Destination `SigType` in M158.
-
-M158 promotes **zero Proposal cells**. M095 must remain `336/29/475`. `OptionalLookup` remains blocked until M162 supplies the administrative mapping, persistent secret custody, redaction, edit/restart transactionality, and five-family integration.
-
-## Corrected line
+## Remaining line — already corrected
 
 ```text
-M155 semantic/owner refreeze            [CLOSED]
-  -> M156 Red25519/blinding              [CLOSED]
-  -> M157 modern Encrypted LS2           [CLOSED]
-  -> M158 lookup-secret/blinded address  [CLOSED]
-  -> M159 PSK auth                       [DEFERRED; HARD DEP SATISFIED, AMENDMENT PENDING]
-  -> M160 DH auth                        [DEFERRED]
-  -> M161 legacy AES/LS1 feasibility     [DEFERRED]
-  -> M162 Proposal field integration     [DEFERRED]
-  -> M152 final requalification          [DEFERRED]
+M159 PSK authorization             [REGISTERED]
+  -> M160 DH/X25519 authorization  [DEFERRED; SAME FOUR-FILE/ZERO-DEP ENVELOPE PRE-FROZEN]
+  -> M161 legacy AES/LS1 gate      [DEFERRED; HARD-DEPENDS M160; ZERO PRODUCTION]
+  -> M162 Proposal field integration [DEFERRED]
+  -> M152 final requalification    [DEFERRED]
 ```
 
-M149-M151 remain historical superseded drafts. Do not execute them directly.
+After a clean M159 closure, M160 may be registered directly if the exact four owners and existing X25519 dependency remain sufficient. M160 must use the same 4096-byte O(N) bound and explicitly reject all-zero X25519 shared secrets.
 
-Do not reopen M147/M148 without a separate explicit architecture/security decision superseding M154. Do not create a dummy outproxy provider, alias `ProxyList`, or add direct-clearnet DNS/TCP egress to resolve M146.
+M161 runs only after M160 and cannot implement legacy LS1 inside the gate. M162 is the first milestone allowed to promote LeaseSet fields and must implement typed/redacted I2PControl state plus transactional LeaseSet-security secret custody across all five server families.
 
-No cryptographic suite fallback or plaintext/unsecreted/unauthenticated LeaseSet downgrade may be used to manufacture Proposal support. Yosemite remains the accepted exact optional I2PControl pin unless separately superseded.
+Correct modern/legacy mappings for M162:
 
-Streamr is intentionally separate from TCP tunnel helpers. Preserve its documented 16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh, and bounded shutdown limits. Remote datagrams must never choose a local UDP destination.
+```text
+legacy AES -> i2cp.encryptLeaseSet=true
+modern -> i2cp.leaseSetType=5
+OptionalLookup -> i2cp.leaseSetSecret=Base64(UTF8(value))
+PSK -> authType=2 + base PSK + optional indexed PSK clients
+DH  -> authType=1 + base X25519 private key + optional indexed DH clients
+```
+
+Do not execute superseded M149-M151. Do not reopen M147/M148 or M146 without separate accepted plans. No cryptographic, plaintext, secret, authentication, or direct-clearnet fallback may be used to manufacture Proposal support.
+
+Streamr remains separate from TCP tunnel helpers. Preserve its documented 16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh, and bounded shutdown limits. Remote datagrams must never choose a local UDP destination.
 
 Fuzz targets (requires nightly):
+
 ```bash
 cd emissary-core/fuzz && cargo fuzz run <target>
 ```
-Available targets: `short_tunnel_build_builder`, `i2np_message_builder`, `tunnel_data_builder`, `i2np`, `primitives`, `messages`
 
-## Formatting
+Available: `short_tunnel_build_builder`, `i2np_message_builder`, `tunnel_data_builder`, `i2np`, `primitives`, `messages`.
 
-`rustfmt.toml` enforces:
-- `imports_granularity = "Crate"`
-- `max_width = 100`, `comment_width = 100`
-- `trailing_comma = "Vertical"`, `newline_style = "Unix"`
+## Formatting/testing quirks
 
-Always run `cargo fmt` before committing.
+`rustfmt.toml`: `imports_granularity="Crate"`, `max_width=100`, `comment_width=100`, `trailing_comma="Vertical"`, Unix newlines. Always run `cargo fmt` before committing.
 
-## Testing
-
-- Uses `cargo-nextest` (config at `.config/nextest.toml`)
-- Default profile: 5s slow-timeout, JUnit output to `junit.xml`
-- Slow profile (`--profile tests-slow`): 1s period, 2 retries, no fail-fast
-
-## Key quirks
-
-- Crypto crates are pre-release (`ed25519-dalek 3.0.0-pre.6`, `ml-kem 0.3.0-rc.0`, etc.)
-- Two async runtimes: tokio (default), smol (opt-in via `emissary-util`)
-- Custom cargo profile `testnet` (release + debug=1 + assertions)
-- Dioxus desktop UI requires system GTK3/WebKit libs
-- `emissary-core` supports `no_std`
-- `package.json` is docs-only
-- I2PControl feature (`i2pcontrol`) is optional and disabled by default
+The repo uses cargo-nextest; `emissary-core` supports `no_std`; crypto dependencies include pre-release crates; Yosemite I2PControl remains an exact optional fork pin.

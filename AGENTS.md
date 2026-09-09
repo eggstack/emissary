@@ -36,32 +36,66 @@ I2PControl supports a large partial subset of Proposal 170. Keep Proposal/admin/
 ## Current Proposal-170 authority
 
 - authoritative matrix: `336 apply / 29 blocked_primitive / 475 not_applicable`;
-- M153 is the current whole-surface runtime/security qualification authority (M139 remains historical qualification ancestry, superseded by M153);
+- M153 is the current whole-surface runtime/security qualification authority;
 - M146 `UseOutproxyPlugin` remains closed blocked (4 cells);
-- M154 closed disposition C and left the general M147/M148 configurable Destination `SigType` path blocked (10 cells);
-- the M147 block does **not** imply modern Encrypted LeaseSet2 is blocked: the current corrective line separately evaluates the narrower type-7 Ed25519 -> type-11 Red25519 blinded-key primitive.
+- M154/M147/M148 configurable Destination `SigType` remains blocked (10 cells);
+- M155 closed the corrected LeaseSet-security semantic/owner re-freeze;
+- M156 closed the neutral Red25519/Ed25519 blinding primitive with zero Proposal promotions;
+- **M157 is the sole registered/dependency-ready handoff**.
 
 Current execution roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-Sole registered handoff:
+Registered plan:
 
-- None currently registered. M157 may be registered next once its exact-path
-  amendment is frozen with M061/M062 authorization (M156 closure
-  `plans/closure/i2pcontrol-proposal-170/156-closure.md` satisfies its hard
-  dependency).
+- `plans/implementation/i2pcontrol-proposal-170/157-modern-encrypted-leaseset2-publication-primitive.md`.
 
-M155 closed complete with `336/29/475` unchanged: ten-value `EncryptLeaseSet` table frozen, legacy AES disposition C delegated to M161, narrow type-7 Ed25519 -> type-11 Red25519 blinding formulas/dependency posture frozen without reopening M147/M148, field coupling and exact M156 files frozen.
+M157 implements neutral modern type-5 Encrypted LeaseSet2 publication only. It has zero Proposal promotion budget.
 
-M156 closed complete with `336/29/475` unchanged: neutral Red25519/blinding primitive (`emissary-core/src/crypto/red25519.rs` + declaration-only `mod.rs` + direct `curve25519-dalek 5.0.0-pre.6` edge) with spec vectors 1–2, no-std/security review, exact M061/M062 authorization, zero promotions.
+## M157 exact production budget
 
-Deferred corrected line:
+Only these production paths may change:
+
+1. `emissary-core/src/crypto/els2.rs` — new;
+2. `emissary-core/src/crypto/mod.rs` — declaration/re-export only;
+3. `emissary-core/src/primitives/lease_set.rs`;
+4. `emissary-core/src/primitives/mod.rs` — exact type re-export only;
+5. `emissary-core/src/i2np/database/store.rs`;
+6. `emissary-core/src/netdb/mod.rs`;
+7. `emissary-core/src/destination/lease_set.rs`;
+8. `emissary-core/src/destination/mod.rs`;
+9. `emissary-core/src/sam/parser.rs`;
+10. `emissary-core/src/sam/session.rs`.
+
+No other production file is authorized. No Cargo manifest, dependency, lockfile, Yosemite, or `emissary-cli/src/i2pcontrol/**` production change is authorized.
+
+M061 contains a guarded `[registered_pending]` M157 ledger. The first M157 production commit must atomically move every newly changed path into M061's ordinary `[allowed]`/`[[evidence]]` realized-diff ledger. Existing paths already in `[allowed]` remain exact owners; do not add a broad prefix/glob.
+
+M062 records the same path set and explicitly records zero dependency/manifest/lock/Yosemite/I2PControl-source change.
+
+## M157 key implementation constraints
+
+- Standard modern activation is `i2cp.leaseSetType=5`.
+- Direct Proposal-170 PR source sets `i2cp.encryptLeaseSet=true` **only** for legacy `encrypted (aes)`; do not alias that legacy flag to modern type 5.
+- M157 implements no client auth and no lookup secret. Type-5 requests containing successor-only secret/auth/PSK/DH companions must fail before activation.
+- Reuse the ordinary signed inner LeaseSet2 produced by `SamSession`; do not create a second inner-LS builder.
+- `LeaseSetManager` owns encrypted public/floodfill publication and UTC-day blinded-key rollover through its existing bounded state machine.
+- `NetDb` must preserve type 3 vs type 5 when caching/flooding/answering. It currently always re-emits cached LeaseSets as type 3; M157 must fix exactly that owner rather than add a new NetDB subsystem.
+- Keep `destination/session/mod.rs` unchanged. The ELS2 specification permits authenticated end-to-end clients to receive ordinary inner LS2 inside wrapped garlic while floodfill publication remains encrypted.
+- Reuse M156 `crypto/red25519.rs` unchanged unless a demonstrated correctness defect forces a plan amendment.
+- Reuse existing ChaCha20/HMAC/SHA256/RNG/zeroize; no new dependency.
+- No plaintext type-3 fallback for a destination activated in type-5 mode.
+- M157 must leave M095 exactly `336/29/475`.
+
+If implementation needs any file/dependency outside the registered budget, stop before editing and amend M157/M061/M062.
+
+## Deferred corrected line
 
 ```text
-M155 semantic/owner refreeze            [CLOSED; ZERO PRODUCTION]
-  -> M156 Red25519/blinding              [CLOSED; ZERO PROMOTION]
-  -> M157 modern Encrypted LS2           [DEFERRED]
+M155 semantic/owner refreeze            [CLOSED]
+  -> M156 Red25519/blinding              [CLOSED]
+  -> M157 modern Encrypted LS2           [REGISTERED]
   -> M158 lookup-secret/blinded address  [DEFERRED]
   -> M159 PSK auth                       [DEFERRED]
   -> M160 DH auth                        [DEFERRED]
@@ -73,8 +107,6 @@ M155 semantic/owner refreeze            [CLOSED; ZERO PRODUCTION]
 M149-M151 remain historical drafts but are superseded for execution by M155-M162. Do not execute them directly.
 
 Do not reopen M147/M148 without a separate explicit architecture/security decision superseding M154. Do not create a dummy outproxy provider, alias `ProxyList`, or add direct-clearnet DNS/TCP egress to resolve M146.
-
-No draft candidate path is production authority. Broad `crypto/**`, `netdb/**`, `i2np/**`, `destination/**`, `primitives/**` or transport waivers are prohibited. Exact M061/M062 file authorization must be added only when the next milestone is explicitly registered.
 
 No cryptographic suite fallback or plaintext/unsecreted/unauthenticated LeaseSet downgrade may be used to manufacture Proposal support. Yosemite remains the accepted exact optional I2PControl pin unless separately superseded.
 

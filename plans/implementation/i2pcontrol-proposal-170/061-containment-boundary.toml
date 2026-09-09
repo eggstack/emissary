@@ -80,6 +80,129 @@ forbidden_terms_in_core_declarations = [
   "Receiver<",
 ]
 
+# Registration-time exact authority for the next implementation milestone.
+# These paths are NOT folded into [allowed] until they actually differ from the
+# pinned upstream baseline. The first M157 production commit must atomically
+# move every newly changed path into [allowed] and the ordinary [[evidence]]
+# ledger so current_changed_paths_match_the_exact_manifest remains exact.
+# Existing paths already present in [allowed] may be edited only for the M157
+# purpose below. No path outside this exact list is authorized.
+[registered_pending]
+milestone = "M157"
+paths = [
+  "emissary-core/src/crypto/els2.rs",
+  "emissary-core/src/crypto/mod.rs",
+  "emissary-core/src/primitives/lease_set.rs",
+  "emissary-core/src/primitives/mod.rs",
+  "emissary-core/src/i2np/database/store.rs",
+  "emissary-core/src/netdb/mod.rs",
+  "emissary-core/src/destination/lease_set.rs",
+  "emissary-core/src/destination/mod.rs",
+  "emissary-core/src/sam/parser.rs",
+  "emissary-core/src/sam/session.rs",
+]
+new_files = ["emissary-core/src/crypto/els2.rs"]
+
+[[registered_pending.evidence]]
+path = "emissary-core/src/crypto/els2.rs"
+owner = "neutral modern Encrypted LeaseSet2 crypto helper"
+purpose = "Credential/subcredential derivation, exact 44-byte HKDF schedules, no-auth layer encryption, UTC-day conversion, and zeroizing type-7 seed handoff."
+consumer = "M157 LeaseSet publication owner only."
+why_upstream_insufficient = "Core has M156 Red25519 and ChaCha/HMAC primitives but no modern Encrypted LS2 layer/key-schedule owner."
+sensitivity = "derived encryption keys and destination signing seed"
+seam = "new exact Proposal-free crypto module"
+reference = "M157 registered exact-path amendment §4.1"
+
+[[registered_pending.evidence]]
+path = "emissary-core/src/crypto/mod.rs"
+owner = "core crypto module declaration boundary"
+purpose = "Declare/re-export the exact neutral els2 module only."
+consumer = "M157 core publication code."
+why_upstream_insufficient = "Only the crypto module root can declare the new neutral helper."
+sensitivity = "module declaration"
+seam = "declaration-only"
+reference = "M157 registered exact-path amendment §4.1"
+
+[[registered_pending.evidence]]
+path = "emissary-core/src/primitives/lease_set.rs"
+owner = "I2P LeaseSet common-structure owner"
+purpose = "Strict type-5 outer EncryptedLeaseSet2 framing, parse/serialize facts, expiration, and outer Red25519 verification while preserving ordinary LS2."
+consumer = "DatabaseStore, NetDB floodfill, and destination publication owners."
+why_upstream_insufficient = "The existing common-structure owner only models ordinary LeaseSet2."
+sensitivity = "network wire parser/signature verification"
+seam = "exact common-structure extension"
+reference = "M157 registered exact-path amendment §4.2"
+
+[[registered_pending.evidence]]
+path = "emissary-core/src/primitives/mod.rs"
+owner = "core primitive export boundary"
+purpose = "Re-export the exact neutral EncryptedLeaseSet2 outer type."
+consumer = "Existing core DatabaseStore/NetDB/destination modules."
+why_upstream_insufficient = "The lease_set module is private and cross-owner consumers need the neutral type."
+sensitivity = "public/core type export"
+seam = "single-type re-export"
+reference = "M157 registered exact-path amendment §4.2"
+
+[[registered_pending.evidence]]
+path = "emissary-core/src/i2np/database/store.rs"
+owner = "I2NP DatabaseStore wire owner"
+purpose = "Parse/build store type 5 and preserve exact raw encrypted-LS2 payload bytes/type."
+consumer = "Destination storage verification and NetDB floodfill forwarding."
+why_upstream_insufficient = "StoreType recognizes encrypted LS2 but payload/builder paths reject it."
+sensitivity = "I2NP wire parser/builder"
+seam = "single store-type extension"
+reference = "M157 registered exact-path amendment §4.3"
+
+[[registered_pending.evidence]]
+path = "emissary-core/src/netdb/mod.rs"
+owner = "existing NetDB/floodfill cache and forwarding owner"
+purpose = "Preserve type 3 vs type 5 in the existing bounded LeaseSet cache so encrypted stores are not rewritten as ordinary LS2 when flooded or returned."
+consumer = "Existing DatabaseStore handling and lookup reply paths."
+why_upstream_insufficient = "Current cache stores raw bytes/expiry only and always re-emits DatabaseStoreKind::LeaseSet2."
+sensitivity = "network database cache/forwarding"
+seam = "exact type-preservation field and branches in existing owner"
+reference = "M157 registered exact-path amendment §4.4"
+
+[[registered_pending.evidence]]
+path = "emissary-core/src/destination/lease_set.rs"
+owner = "LeaseSetManager"
+purpose = "Own modern type-5 publication mode, current-day encrypted outer object/storage key, existing bounded publication/verification, and UTC rollover."
+consumer = "Destination owner."
+why_upstream_insufficient = "The existing owner fixes publication to ordinary LS2 under Destination hash and has no blinded-day state."
+sensitivity = "destination signing-seed-derived publication state"
+seam = "generation-local publication-mode state in existing future"
+reference = "M157 registered exact-path amendment §4.5"
+
+[[registered_pending.evidence]]
+path = "emissary-core/src/destination/mod.rs"
+owner = "Destination"
+purpose = "Carry narrow publication configuration into LeaseSetManager and route type-5 storage-verification replies while leaving SessionManager on ordinary inner LS2."
+consumer = "SAM session and LeaseSetManager composition."
+why_upstream_insufficient = "Destination is the only owner joining session bundling, LeaseSetManager, tunnel events, and direct DatabaseStore replies."
+sensitivity = "owner-local composition"
+seam = "narrow constructor/event bridge"
+reference = "M157 registered exact-path amendment §4.5"
+
+[[registered_pending.evidence]]
+path = "emissary-core/src/sam/parser.rs"
+owner = "SAM command parser"
+purpose = "Fail-before-allocation validation for standard i2cp.leaseSetType=5 no-auth mode and rejection of successor-only secret/auth companions."
+consumer = "Existing SAM session construction."
+why_upstream_insufficient = "The current parser forwards type-5/auth/secret options generically and would otherwise accept unsupported combinations inertly."
+sensitivity = "protocol option validation"
+seam = "pre-allocation neutral validation"
+reference = "M157 registered exact-path amendment §4.6"
+
+[[registered_pending.evidence]]
+path = "emissary-core/src/sam/session.rs"
+owner = "SamSession"
+purpose = "Retain canonical ordinary inner-LS2 signing and pass a narrow zeroizing type-7 seed/publication configuration into Destination when standard type 5 is validated."
+consumer = "Destination/LeaseSetManager publication owner."
+why_upstream_insufficient = "SamSession currently owns the destination signing seed and constructs every renewed ordinary LS2; LeaseSetManager cannot derive the daily blinded outer signature without a narrow handoff."
+sensitivity = "destination signing seed"
+seam = "single generation-local secret handoff; no general key migration"
+reference = "M157 registered exact-path amendment §4.6"
+
 [[evidence]]
 path = "emissary-core/src/config.rs"
 owner = "exploratory tunnel configuration conversion"

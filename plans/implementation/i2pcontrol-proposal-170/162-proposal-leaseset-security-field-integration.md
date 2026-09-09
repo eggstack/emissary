@@ -1,6 +1,17 @@
 # M162 — Proposal LeaseSet-Security Field Integration
 
-Status: **deferred / unregistered; hard-depends on M160 closure and M161 disposition; integration contract pre-frozen**
+Status: **deferred / unregistered; M160 closed and M161 closed outcome B, registration pending exact-path amendment**
+
+> M160 closed complete (`plans/closure/i2pcontrol-proposal-170/160-closure.md`)
+> and M161 closed outcome B
+> (`plans/closure/i2pcontrol-proposal-170/161-closure.md`: legacy
+> `encrypted (aes)` valid but blocked under current architecture/security
+> policy; all five `EncryptLeaseSet` cells remain blocked even when modern
+> type-5 modes work). M162 hard dependencies are therefore satisfied for
+> modern field integration, but M162 is **not** registered by the M161
+> closure: registration still requires revalidation of the exact
+> I2PControl owner set and secret-store schema against the then-current
+> head with M061/M062 authorization in that registration commit.
 
 Class: I2PControl capability integration
 

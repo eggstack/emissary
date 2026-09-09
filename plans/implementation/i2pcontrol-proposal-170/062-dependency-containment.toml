@@ -30,13 +30,13 @@ metrics = []
 expected = "ordinary registry Yosemite plus exact optional git fork package when i2pcontrol is enabled"
 baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
-# Current milestone-specific dependency budget. M161 is registered as a
-# strictly zero-production feasibility/contract gate over the frozen modern
-# type-5 owner graph; this record authorizes no production path, file,
-# dependency, manifest, lockfile, Yosemite, or I2PControl-source change.
-# No successor beyond M161 is registered.
+# Current milestone-specific dependency budget. M161 closed complete as a
+# strictly zero-production feasibility/contract gate (outcome B) over the
+# frozen modern type-5 owner graph; this record authorizes no production
+# path, file, dependency, manifest, lockfile, Yosemite, or
+# I2PControl-source change. No successor is currently registered.
 [current_registration]
-milestone = "M161 (registered / dependency-ready; zero production)"
+milestone = "M161 (closed complete, outcome B, no registered successor)"
 production_paths = []
 new_files = []
 new_direct_dependencies = []
@@ -44,7 +44,7 @@ manifest_changes = []
 lockfile_change = false
 yosemite_change = false
 i2pcontrol_source_change = false
-rationale = "M161 gate runs only planning/test/evidence work over the M160-closed modern owner graph with no production, dependency, manifest/lock, Yosemite, or I2PControl production change (registration; see 161 plan)."
+rationale = "M161 gate ran only planning/test/evidence work over the M160-closed modern owner graph with no production, dependency, manifest/lock, Yosemite, or I2PControl production change (observed; see 161-closure.md)."
 
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its
@@ -54,9 +54,8 @@ rationale = "M161 gate runs only planning/test/evidence work over the M160-close
 #
 # M140-M145 are closed complete; M146 is closed blocked; M153 is closed
 # qualification authority; M154 closed disposition C and left M147/M148
-# configurable SigType blocked. M155-M160 are closed complete. M161 is the
-# sole registered successor with a zero-production budget (no production
-# path authorized). M162 and re-gated M152 remain deferred. No broad
+# configurable SigType blocked. M155-M161 are closed complete. No successor
+# is currently registered. M162 and re-gated M152 remain deferred. No broad
 # crypto/netdb/i2np/destination/primitives prefix allowance is created.
 root_manifests = [
   "Cargo.toml",

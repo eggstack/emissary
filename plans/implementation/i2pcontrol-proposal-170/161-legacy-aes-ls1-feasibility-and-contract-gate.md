@@ -1,19 +1,18 @@
 # M161 — Legacy AES / LeaseSet1 Feasibility and Contract Gate
 
-Status: **registered / dependency-ready; M160 closed complete**
+Status: **closed as complete; outcome B (see `plans/closure/i2pcontrol-proposal-170/161-closure.md`)**
 
 > M160 closed complete (`plans/closure/i2pcontrol-proposal-170/160-closure.md`),
 > satisfying this gate's hard dependency. The modern type-5 owner graph
 > (no-auth/lookup-secret/PSK/DH) is now frozen with zero Proposal
 > promotions.
 >
-> Registration baseline: `1629b0a5` (M160 implementation/closure head; clean
-> worktree before M161 gate work). Current M095 matrix `336/29/475`.
-> Current qualification authority M153. M161 is strictly zero-production:
-> planning/test/evidence only, no `emissary-core/src/**`,
-> `emissary-cli/src/**`, manifest, lockfile, Yosemite, or M095/M105
-> disposition change. No M061 production-path amendment is required; M062
-> records only zero-production current-registration bookkeeping.
+> Registration baseline: `1629b0a5` (M160 implementation/closure head); M161
+> registration: `e11b277` (zero-production gate registered). Closure:
+> `plans/closure/i2pcontrol-proposal-170/161-closure.md` (outcome B: valid
+> legacy-LS1 contract but disproportionate/unsafe under current
+> architecture/security policy; `EncryptLeaseSet` remains blocked; zero
+> production/dependency changes; M095 remains `336/29/475`).
 
 Class: invariant / compatibility-security feasibility
 

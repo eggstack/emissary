@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M155-M160 closed, M161 registered**
+Status: **active / partial; M155-M161 closed, no registered successor**
 
 Pinned Proposal authority: revision `2026-05-20`, status Open.
 
@@ -11,7 +11,7 @@ Current whole-surface qualification authority: M153.
 Current execution authority:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`;
-- no registered successor beyond M161; M161 registered / dependency-ready (zero production).
+- no registered successor; M161 closed outcome B; M162 deferred with satisfied hard deps, registration pending exact-path amendment.
 
 ## 1. Current residual inventory
 
@@ -49,7 +49,7 @@ M155 semantic/owner refreeze                   [CLOSED]
   -> M158 lookup-secret/blinded address        [CLOSED]
   -> M159 PSK client authorization             [CLOSED]
   -> M160 DH/X25519 authorization              [CLOSED]
-  -> M161 legacy AES/LS1 feasibility           [REGISTERED; ZERO PRODUCTION]
+  -> M161 legacy AES/LS1 feasibility           [CLOSED; OUTCOME B]
   -> M162 Proposal field integration           [DEFERRED]
   -> M152 final requalification                [DEFERRED]
 ```
@@ -79,7 +79,7 @@ M095 remains `336/29/475` after M160.
 
 M160 closed with the same four-file/zero-dependency owners realized against the exact envelope. It used existing X25519 support, the same 4096-byte work bound, explicit all-zero shared-secret rejection, duplicate preservation, and no persistent core secrets.
 
-M161 hard-depended on M160 closure (satisfied; M161 registered) and is strictly zero-production. It resolves legacy `encrypted (aes)` after the modern line is stable. Outcome A requires a separate exact implementation successor; outcomes B/C keep EncryptLeaseSet blocked.
+M161 closed outcome B (valid legacy-LS1 contract but blocked; zero production). It resolves legacy `encrypted (aes)` after the modern line is stable. No implementation successor is created; EncryptLeaseSet remains blocked.
 
 M162 has been corrected to require the exact Proposal PR mappings, including PSK/DH base-key semantics, per-user `Base64(UTF8(name)):Key` properties, typed/redacted I2PControl fields, persistent LeaseSet-security secret custody, transactional definition+secret generations, and complete-field promotion only when the full valid domain is operational.
 
@@ -120,6 +120,6 @@ M152 may declare full support only when the mechanically recomputed matrix has z
 
 ## 10. Current handoff
 
-No milestone beyond M161 is currently registered. M162/M152 remain deferred.
+No milestone is currently registered. Only M162 may be registered next (with exact-path amendment).
 
-Do not begin M162/M152 until M161 closes and the registry explicitly advances the handoff.
+Do not begin M162 until its registration is authored and the registry explicitly advances the handoff.

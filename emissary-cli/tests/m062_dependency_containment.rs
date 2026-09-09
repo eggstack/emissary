@@ -507,22 +507,25 @@ fn m061_source_boundary_files_remain_unchanged() {
             path == "plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml"
                 || path == "emissary-cli/tests/m061_containment.rs"
         }),
-        "M118/M156 may amend only the exact construction seam and the exact M156 \
+        "M118/M156/M157 may amend only the exact construction seam and the exact \
          crypto exception in M061 authority: {changed}"
     );
-    // M156 exact-exception reconciliation: the M061 guard must still prohibit
-    // broad crypto prefixes while authorizing only the two exact M156 files.
+    // M157 exact-exception reconciliation: the M061 guard must still prohibit
+    // broad crypto prefixes while authorizing only the exact sensitive files.
     let m061_source =
         std::fs::read_to_string(workspace_root().join("emissary-cli/tests/m061_containment.rs"))
             .expect("read M061 guard");
     assert!(
-        m061_source.contains("is_authorized_m156_crypto_exception"),
-        "M061 guard must record the exact M156 crypto exception"
+        m061_source.contains("is_authorized_sensitive_core_exception"),
+        "M061 guard must record the exact sensitive-core exception"
     );
     assert!(
         m061_source.contains("emissary-core/src/crypto/mod.rs")
-            && m061_source.contains("emissary-core/src/crypto/red25519.rs"),
-        "M061 guard must authorize only the two exact M156 crypto files"
+            && m061_source.contains("emissary-core/src/crypto/red25519.rs")
+            && m061_source.contains("emissary-core/src/crypto/els2.rs")
+            && m061_source.contains("emissary-core/src/i2np/database/store.rs")
+            && m061_source.contains("emissary-core/src/netdb/mod.rs"),
+        "M061 guard must authorize only the exact sensitive core files"
     );
 }
 
@@ -633,6 +636,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m154 = is_authorized_m154_path(path);
         let authorized_m155 = is_authorized_m155_path(path);
         let authorized_m156 = is_authorized_m156_path(path);
+        let authorized_m157 = is_authorized_m157_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -676,6 +680,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m154
                 || authorized_m155
                 || authorized_m156
+                || authorized_m157
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -721,6 +726,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m154
                     || authorized_m155
                     || authorized_m156
+                    || authorized_m157
                     || authorized_tunnel_runtime
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
@@ -1429,6 +1435,37 @@ fn is_authorized_m156_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
             | "plans/implementation/i2pcontrol-proposal-170/156-neutral-red25519-blinding-primitive.md"
             | "plans/implementation/i2pcontrol-proposal-170/157-modern-encrypted-leaseset2-publication-primitive.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md"
+    )
+}
+
+fn is_authorized_m157_path(path: &str) -> bool {
+    matches!(
+        path,
+        "AGENTS.md"
+            | "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/tunnel-manager.md"
+            | "emissary-cli/tests/m061_containment.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "emissary-core/src/crypto/els2.rs"
+            | "emissary-core/src/crypto/mod.rs"
+            | "emissary-core/src/primitives/lease_set.rs"
+            | "emissary-core/src/primitives/mod.rs"
+            | "emissary-core/src/i2np/database/store.rs"
+            | "emissary-core/src/netdb/mod.rs"
+            | "emissary-core/src/destination/lease_set.rs"
+            | "emissary-core/src/destination/mod.rs"
+            | "emissary-core/src/sam/parser.rs"
+            | "emissary-core/src/sam/session.rs"
+            | "plans/closure/i2pcontrol-proposal-170/157-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/061-containment-boundary.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/157-modern-encrypted-leaseset2-publication-primitive.md"
+            | "plans/implementation/i2pcontrol-proposal-170/158-leaseset-lookup-secret-and-blinded-address-primitive.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"

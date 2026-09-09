@@ -22,7 +22,7 @@ pub use capabilities::{Bandwidth, Capabilities};
 pub use datagram_flags::DatagramFlags;
 pub use date::Date;
 pub use destination::{Destination, DestinationId};
-pub use lease_set::{Lease, LeaseSet2, LeaseSet2Header};
+pub use lease_set::{EncryptedLeaseSet2, Lease, LeaseSet2, LeaseSet2Header};
 pub use mapping::Mapping;
 pub use offline_signature::OfflineSignature;
 pub use router_address::{MlKemPreference, RouterAddress, TransportKind};

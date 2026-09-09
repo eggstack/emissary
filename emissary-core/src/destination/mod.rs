@@ -54,10 +54,12 @@ use core::{
     time::Duration,
 };
 
-mod lease_set;
+pub mod lease_set;
 
 pub mod routing_path;
 pub mod session;
+
+pub use crate::destination::lease_set::EncryptedPublicationConfig;
 
 /// Logging target for the file.
 const LOG_TARGET: &str = "emissary::destination";
@@ -565,7 +567,11 @@ impl<R: Runtime> Destination<R> {
 
                 match payload {
                     DatabaseStorePayload::LeaseSet2 { .. } => {
-                        self.lease_set_manager.register_database_store(key.clone());
+                        self.lease_set_manager.register_database_store(key.clone(), false);
+                        return Ok(Vec::new());
+                    }
+                    DatabaseStorePayload::EncryptedLeaseSet2 { .. } => {
+                        self.lease_set_manager.register_database_store(key.clone(), true);
                         return Ok(Vec::new());
                     }
                     DatabaseStorePayload::RouterInfo { .. } => {
@@ -736,8 +742,27 @@ impl<R: Runtime> Destination<R> {
     pub fn publish_lease_set(&mut self, lease_set: Bytes) {
         // store our new lease set proactively to `SessionManager` so it can be given to all active
         // session right away while publishing the new lease set to NetDb in the background
+        //
+        // The stored object is always the ordinary inner object; an encrypted
+        // generation wraps it for floodfill publication inside its owner while
+        // end-to-end session use retains the ordinary form.
         self.session_manager.register_lease_set(lease_set.clone());
         self.lease_set_manager.register_lease_set(lease_set.clone());
+    }
+
+    /// Enable modern type-5 no-auth publication for this generation.
+    ///
+    /// Narrow composition seam from session construction into the
+    /// publication owner. Call before the destination becomes active;
+    /// `SessionManager` remains on the ordinary inner object.
+    pub fn enable_encrypted_publication(&mut self, config: EncryptedPublicationConfig) {
+        self.lease_set_manager.enable_encrypted_publication(config);
+    }
+
+    /// Whether modern type-5 publication is enabled.
+    #[allow(dead_code)]
+    pub fn is_encrypted_publication(&self) -> bool {
+        self.lease_set_manager.is_encrypted()
     }
 
     /// Set the outbound reply LeaseSet bundling policy for this destination.
@@ -876,8 +901,9 @@ impl<R: Runtime> Stream for Destination<R> {
                             ?error,
                             "failed to handle inbound message",
                         ),
-                        Ok(messages) if !messages.is_empty() =>
-                            return Poll::Ready(Some(DestinationEvent::Messages { messages })),
+                        Ok(messages) if !messages.is_empty() => {
+                            return Poll::Ready(Some(DestinationEvent::Messages { messages }))
+                        }
                         Ok(_) => {}
                     }
                 }
@@ -889,10 +915,11 @@ impl<R: Runtime> Stream for Destination<R> {
             match self.session_manager.poll_next_unpin(cx) {
                 Poll::Pending => break,
                 Poll::Ready(None) => return Poll::Ready(None),
-                Poll::Ready(Some(SessionManagerEvent::SessionTerminated { destination_id })) =>
+                Poll::Ready(Some(SessionManagerEvent::SessionTerminated { destination_id })) => {
                     return Poll::Ready(Some(DestinationEvent::SessionTerminated {
                         destination_id,
-                    })),
+                    }))
+                }
                 Poll::Ready(Some(SessionManagerEvent::SendMessage {
                     destination_id,
                     message,
@@ -1727,16 +1754,12 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn m135_destination_bridge_keeps_targets_coherent() {
         let mut destination = m135_test_destination(3, 3, false);
-        destination
-            .set_tunnel_quantity_target(1, 2)
-            .expect("valid target");
+        destination.set_tunnel_quantity_target(1, 2).expect("valid target");
         assert_eq!(destination.desired_quantity_target(), (1, 2));
         assert_eq!(destination.desired_inbound_count(), 1);
         assert_eq!(destination.base_quantity_target(), (3, 3));
 
-        destination
-            .restore_tunnel_quantity_target()
-            .expect("restore succeeds");
+        destination.restore_tunnel_quantity_target().expect("restore succeeds");
         assert_eq!(destination.desired_quantity_target(), (3, 3));
         assert_eq!(destination.desired_inbound_count(), 3);
     }
@@ -1799,12 +1822,8 @@ mod tests {
 
         // Normal excess expiry converges toward the new target.
         let retired = leases[0].tunnel_id;
-        destination
-            .lease_set_manager
-            .register_expiring_inbound_tunnel(retired);
-        destination
-            .lease_set_manager
-            .register_expired_inbound_tunnel(retired);
+        destination.lease_set_manager.register_expiring_inbound_tunnel(retired);
+        destination.lease_set_manager.register_expired_inbound_tunnel(retired);
         // After retiring one excess record, one real lease remains; the
         // desired count of one is satisfied without waiting for base two.
         assert_eq!(destination.desired_inbound_count(), 1);

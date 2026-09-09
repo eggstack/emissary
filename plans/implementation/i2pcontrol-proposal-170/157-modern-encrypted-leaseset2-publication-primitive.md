@@ -1,8 +1,8 @@
 # M157 — Modern Encrypted LeaseSet2 Publication Primitive
 
-Status: **registered / dependency-ready; M156 closed complete**
+Status: **closed as complete; see `plans/closure/i2pcontrol-proposal-170/157-closure.md`**
 
-Class: neutral LeaseSet/NetDB infrastructure
+Class: neutral LeaseSet/NetDB infrastructure (closed, zero promotions)
 
 Source roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 

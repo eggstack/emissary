@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | subordinate to current corrective roadmap |
-| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **M157 registered / dependency-ready** |
+| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **M157 closed; no registered successor (M158 deferred pending amendment)** |
 | Post-M146 corrective | **historical through M154 / superseded** | `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` | M153 complete; M154 disposition C; M147 path blocked |
 | Residual primitive completion | **historical through M146 / superseded** | `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md` | M140-M145 complete; M146 blocked |
 | Session-lifecycle completion | **closed complete** | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | M134 complete |
@@ -72,26 +72,27 @@ M154 disposition C closed the general configurable Destination signature-suite p
 
 This does **not** block the narrower type-7 Ed25519 -> type-11 Red25519 blinded key used internally by modern Encrypted LeaseSet2. M156 implemented that neutral primitive without reopening configurable `SigType`.
 
-## Registered handoff — M157
+## Registered handoff — none (M157 closed)
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/157-modern-encrypted-leaseset2-publication-primitive.md`.
 
-Status: **registered / dependency-ready**.
-
-Hard dependency:
-
-- M156 closed complete at `1678790cc74d4075e800425c57312da89e1169fe` with zero Proposal promotions.
+Status: **closed as complete** (see
+`plans/closure/i2pcontrol-proposal-170/157-closure.md`).
 
 M157 class:
 
 - neutral modern Encrypted LeaseSet2 / DatabaseStore / publication infrastructure;
-- Proposal promotion budget **zero**.
+- Proposal promotion budget **zero** (realized zero).
 
-### Frozen exact production paths
+Hard dependency (satisfied):
 
-M157 may modify exactly:
+- M156 closed complete at `1678790cc74d4075e800425c57312da89e1169fe` with zero Proposal promotions.
+
+### Realized exact production diff
+
+M157 changed exactly:
 
 1. `emissary-core/src/crypto/els2.rs` — new;
 2. `emissary-core/src/crypto/mod.rs` — module declaration/re-export only;
@@ -104,13 +105,15 @@ M157 may modify exactly:
 9. `emissary-core/src/sam/parser.rs`;
 10. `emissary-core/src/sam/session.rs`.
 
-No production path outside this list is authorized.
+No production path outside this list was changed.
 
-### Exact containment registration
+### Exact containment reconciliation (closed)
 
-M061 now contains a guarded `[registered_pending]` M157 ledger with the exact ten paths and exact owner evidence. It intentionally does **not** pre-add newly untouched files to the realized `[allowed]` upstream-diff ledger; the first production commit must atomically move every newly changed path into `[allowed]`/`[[evidence]]` so the current-diff invariant remains truthful.
-
-M062 independently records the same M157 exact path budget and:
+M061 reconciled every newly changed path from the registration-time
+`[registered_pending]` ledger into its ordinary `[allowed]`/`[[evidence]]`
+ledger in the closure commit; `[registered_pending]` is removed. M062
+records the realized zero dependency/manifest/lock/Yosemite/I2PControl-source
+outcome:
 
 - no new direct dependency;
 - no Cargo manifest change;
@@ -156,8 +159,8 @@ Only the next dependency-ready plan is registered at a time.
 
 | Milestone | Purpose | Status / budget |
 |---|---|---|
-| M157 | modern type-5 Encrypted LeaseSet2 publication/storage verification/UTC rollover | **registered**, 0 promotions |
-| M158 | lookup-secret + extended blinded-address primitive | deferred; 0 by default |
+| M157 | modern type-5 Encrypted LeaseSet2 publication/storage verification/UTC rollover | **closed**, 0 promotions |
+| M158 | lookup-secret + extended blinded-address primitive | deferred; 0 by default; hard dep satisfied, amendment pending |
 | M159 | PSK client authorization | deferred; 0 promotions |
 | M160 | DH/X25519 client authorization | deferred; 0 promotions |
 | M161 | legacy AES/LS1 feasibility and contract gate | deferred; 0 production/promotions |
@@ -200,7 +203,7 @@ M155 LeaseSet semantic/owner re-freeze         [CLOSED]
 M156 narrow Red25519/blinding                  [CLOSED]
   |
   v
-M157 modern Encrypted LS2 publication          [REGISTERED]
+M157 modern Encrypted LS2 publication          [CLOSED]
   |
   v
 M158 -> M159 -> M160                           [DEFERRED]
@@ -227,9 +230,10 @@ M152 final requalification                     [DEFERRED]
 
 ## Registration rules
 
-1. M157 is the **only registered** Proposal-170 successor.
-2. Do not begin M158 until M157 closes and the registry explicitly advances M158.
-3. The first M157 source commit must reconcile newly realized paths from M061 `[registered_pending]` into its current `[allowed]`/`[[evidence]]` ledger in the same commit.
+1. No Proposal-170 successor is currently registered; M158 may be registered
+   only after its exact-path amendment lands.
+2. Do not begin M158 until the registry explicitly advances it.
+3. M061 `[registered_pending]` is empty after the M157 closure reconciliation.
 4. No M158-M162 candidate path is executable authority.
 5. Material architecture/path/dependency deviation requires an amendment before implementation.
 6. Closure evidence, not parser/serializer reachability, determines support.

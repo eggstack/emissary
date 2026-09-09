@@ -34,6 +34,7 @@ use core::convert::TryInto;
 pub mod aes;
 pub mod chachapoly;
 pub mod dsa;
+pub mod els2;
 pub mod hmac;
 pub mod noise;
 pub mod red25519;
@@ -274,12 +275,15 @@ impl StaticPrivateKey {
     pub fn public(&self) -> StaticPublicKey {
         match self {
             Self::X25519(key) => StaticPublicKey::X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem512X25519(key) =>
-                StaticPublicKey::MlKem512X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem768X25519(key) =>
-                StaticPublicKey::MlKem768X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem1024X25519(key) =>
-                StaticPublicKey::MlKem1024X25519(x25519_dalek::PublicKey::from(key)),
+            Self::MlKem512X25519(key) => {
+                StaticPublicKey::MlKem512X25519(x25519_dalek::PublicKey::from(key))
+            }
+            Self::MlKem768X25519(key) => {
+                StaticPublicKey::MlKem768X25519(x25519_dalek::PublicKey::from(key))
+            }
+            Self::MlKem1024X25519(key) => {
+                StaticPublicKey::MlKem1024X25519(x25519_dalek::PublicKey::from(key))
+            }
         }
     }
 
@@ -287,12 +291,15 @@ impl StaticPrivateKey {
     pub fn diffie_hellman<T: AsRef<x25519_dalek::PublicKey>>(&self, public_key: &T) -> Vec<u8> {
         match self {
             Self::X25519(key) => key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem512X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem768X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem1024X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
+            Self::MlKem512X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
+            Self::MlKem768X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
+            Self::MlKem1024X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
         }
     }
 
@@ -403,12 +410,15 @@ impl EphemeralPrivateKey {
     pub fn public(&self) -> EphemeralPublicKey {
         match self {
             Self::X25519(key) => EphemeralPublicKey::X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem512X25519(key) =>
-                EphemeralPublicKey::MlKem512X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem768X25519(key) =>
-                EphemeralPublicKey::MlKem768X25519(x25519_dalek::PublicKey::from(key)),
-            Self::MlKem1024X25519(key) =>
-                EphemeralPublicKey::MlKem1024X25519(x25519_dalek::PublicKey::from(key)),
+            Self::MlKem512X25519(key) => {
+                EphemeralPublicKey::MlKem512X25519(x25519_dalek::PublicKey::from(key))
+            }
+            Self::MlKem768X25519(key) => {
+                EphemeralPublicKey::MlKem768X25519(x25519_dalek::PublicKey::from(key))
+            }
+            Self::MlKem1024X25519(key) => {
+                EphemeralPublicKey::MlKem1024X25519(x25519_dalek::PublicKey::from(key))
+            }
         }
     }
 
@@ -416,12 +426,15 @@ impl EphemeralPrivateKey {
     pub fn diffie_hellman<T: AsRef<x25519_dalek::PublicKey>>(&self, public_key: &T) -> Vec<u8> {
         match self {
             Self::X25519(key) => key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem512X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem768X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
-            Self::MlKem1024X25519(key) =>
-                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec(),
+            Self::MlKem512X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
+            Self::MlKem768X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
+            Self::MlKem1024X25519(key) => {
+                key.diffie_hellman(public_key.as_ref()).to_bytes().to_vec()
+            }
         }
     }
 }

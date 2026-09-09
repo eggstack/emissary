@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M157 registered**.
+Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M157 closed**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -17,9 +17,9 @@ Roadmap:
 
 Sole registered handoff:
 
-- **M157** `157-modern-encrypted-leaseset2-publication-primitive.md`.
+- **none** (M157 closed; M158 deferred pending its exact-path amendment).
 
-M157 has zero Proposal promotion budget and an exact ten-file neutral core path budget. M061/M062 contain registration-time pending ledgers for those paths; no Cargo, lockfile, Yosemite, I2PControl production source, or new dependency change is authorized.
+M157 has zero Proposal promotion budget and an exact ten-file neutral core path budget, now realized and reconciled into M061/M062. No Cargo, lockfile, Yosemite, I2PControl production source, or new dependency change occurred.
 
 ## Immediate lineage
 
@@ -27,7 +27,7 @@ M157 has zero Proposal promotion budget and an exact ten-file neutral core path 
 - M154 — closed disposition C; general configurable Destination `SigType` path blocked.
 - M155 — closed complete; LeaseSet-security semantic/owner re-freeze.
 - M156 — closed complete; neutral Red25519/Ed25519 blinding primitive; zero promotions.
-- **M157 — registered**; modern type-5 Encrypted LeaseSet2 publication/storage verification/UTC rollover; zero promotions.
+- **M157 — closed complete**; modern type-5 Encrypted LeaseSet2 publication/storage verification/UTC rollover; zero promotions.
 
 M146 `UseOutproxyPlugin` remains closed blocked ×4. M147/M148 configurable Destination `SigType` remains blocked ×10. Neither line is reopened by M157.
 
@@ -76,7 +76,7 @@ M155 LeaseSet semantic/owner refreeze               [CLOSED]
 M156 narrow Red25519 + Ed25519 blinding              [CLOSED]
   |
   v
-M157 modern Encrypted LeaseSet2 publication          [REGISTERED]
+M157 modern Encrypted LeaseSet2 publication          [CLOSED]
   |
   v
 M158 lookup-secret + blinded-address primitive       [DEFERRED]

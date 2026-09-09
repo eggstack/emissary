@@ -171,18 +171,21 @@ fn every_allowed_path_is_exact_and_has_owner_evidence() {
 #[test]
 fn registered_pending_paths_are_exact_and_evidenced() {
     let manifest = manifest();
-    let pending = manifest.registered_pending.expect("registered pending milestone");
+    let Some(pending) = manifest.registered_pending else {
+        // No registered successor after M157 closure; M158 remains deferred
+        // pending its exact-path amendment and must not authorize work.
+        return;
+    };
     assert_eq!(pending.milestone, "M157");
 
     let paths = pending.paths.into_iter().collect::<BTreeSet<_>>();
-    let evidence = pending
-        .evidence
-        .iter()
-        .map(|entry| entry.path.clone())
-        .collect::<BTreeSet<_>>();
+    let evidence = pending.evidence.iter().map(|entry| entry.path.clone()).collect::<BTreeSet<_>>();
     let new_files = pending.new_files.into_iter().collect::<BTreeSet<_>>();
 
-    assert_eq!(evidence, paths, "pending evidence must cover every exact path once");
+    assert_eq!(
+        evidence, paths,
+        "pending evidence must cover every exact path once"
+    );
     assert_eq!(
         new_files,
         BTreeSet::from(["emissary-core/src/crypto/els2.rs".to_owned()]),
@@ -190,9 +193,15 @@ fn registered_pending_paths_are_exact_and_evidenced() {
     );
 
     for path in &paths {
-        assert!(!path.ends_with('/'), "pending path is a broad prefix: {path}");
+        assert!(
+            !path.ends_with('/'),
+            "pending path is a broad prefix: {path}"
+        );
         assert!(!path.contains('*'), "pending path contains a glob: {path}");
-        assert!(path.starts_with("emissary-core/src/"), "pending path escaped core: {path}");
+        assert!(
+            path.starts_with("emissary-core/src/"),
+            "pending path escaped core: {path}"
+        );
         assert!(
             workspace_root().join(path).is_file() || new_files.contains(path),
             "pending path neither exists nor is the registered new file: {path}"
@@ -215,7 +224,11 @@ fn registered_pending_paths_are_exact_and_evidenced() {
             &entry.seam,
             &entry.reference,
         ] {
-            assert!(!field.trim().is_empty(), "empty pending evidence for {}", entry.path);
+            assert!(
+                !field.trim().is_empty(),
+                "empty pending evidence for {}",
+                entry.path
+            );
         }
     }
 }
@@ -235,7 +248,8 @@ fn high_sensitivity_core_paths_are_individually_named() {
         assert!(
             allowed
                 .iter()
-                .all(|path| !path.starts_with(prefix) || is_authorized_sensitive_core_exception(path)),
+                .all(|path| !path.starts_with(prefix)
+                    || is_authorized_sensitive_core_exception(path)),
             "prohibited production prefix was allowed: {prefix}"
         );
     }

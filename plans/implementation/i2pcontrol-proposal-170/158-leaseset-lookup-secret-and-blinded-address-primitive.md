@@ -1,6 +1,12 @@
 # M158 — LeaseSet Lookup-Secret and Blinded-Address Primitive
 
-Status: **deferred / unregistered; hard-depends on M157 closure**
+Status: **deferred / unregistered; hard dependency on M157 closure satisfied, exact-path amendment pending**
+
+M157 closed complete (see `plans/closure/i2pcontrol-proposal-170/157-closure.md`);
+no successor is registered. M158 may be registered next only after its
+exact-path amendment freezes secret-handoff ownership, extended-B32 codec
+ownership, secret-store/restart semantics, publication/address integration
+seams, exact files/dependencies, and interop vectors/fixtures.
 
 Class: neutral/application LeaseSet privacy infrastructure
 

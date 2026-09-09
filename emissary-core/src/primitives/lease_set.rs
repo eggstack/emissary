@@ -17,7 +17,10 @@
 // DEALINGS IN THE SOFTWARE.
 
 use crate::{
-    crypto::{SigningPrivateKey, SigningPublicKey, StaticPublicKey},
+    crypto::{
+        red25519::{self, BlindedPrivateKey},
+        SigningPrivateKey, SigningPublicKey, StaticPublicKey,
+    },
     error::parser::LeaseSetParseError,
     primitives::{Destination, Mapping, OfflineSignature, RouterId, TunnelId, LOG_TARGET},
     runtime::Runtime,
@@ -503,6 +506,215 @@ impl LeaseSet2 {
             },
             signing_private_key,
         )
+    }
+}
+
+/// Blinded signature-type code for the modern encrypted outer object.
+pub const ENCRYPTED_BLINDED_SIGTYPE: u16 = 11;
+
+/// Outer layer flags value for the no-offline-key subset.
+pub const ENCRYPTED_OUTER_FLAGS: u16 = 0;
+
+/// Maximum accepted outer ciphertext length.
+///
+/// Bounds floodfill-facing allocation before signature verification. The
+/// nested salts and markers add at most 128 bytes above the bounded inner
+/// payload.
+pub const MAX_ENCRYPTED_OUTER_CIPHERTEXT_LEN: usize = 32_896;
+
+/// Minimum accepted outer ciphertext length.
+///
+/// Covers the outer salt, the no-auth flags byte, the inner salt, and the
+/// inner type byte. Shorter objects fail closed before any crypto work.
+pub const MIN_ENCRYPTED_OUTER_CIPHERTEXT_LEN: usize = 66;
+
+/// Neutral modern type-5 encrypted LeaseSet2 outer object.
+///
+/// Owns the plaintext layer-0 header facts needed by floodfill and
+/// publication owners plus the opaque outer ciphertext and its Red25519
+/// signature. Decryption to a Destination is intentionally not provided
+/// here; that belongs to a future client-lookup owner.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EncryptedLeaseSet2 {
+    /// Blinded Red25519 public key (32-byte Edwards encoding).
+    blinded_public_key: [u8; 32],
+
+    /// Published timestamp, seconds since the Unix epoch.
+    published: u32,
+
+    /// Expiry offset from `published`, in seconds.
+    expires_offset: u16,
+
+    /// Outer ciphertext (`outerSalt || ChaCha(...)`).
+    outer_ciphertext: Vec<u8>,
+
+    /// Red25519 signature over `0x05 || layer-0 prefix`.
+    signature: [u8; 64],
+}
+
+impl EncryptedLeaseSet2 {
+    /// Attempt to parse [`EncryptedLeaseSet2`] from `input`.
+    ///
+    /// Verifies framing and the outer Red25519 signature. Returns the
+    /// parsed object and remaining input on success. Trailing-data policy
+    /// is enforced by [`EncryptedLeaseSet2::parse`], which requires exact
+    /// consumption.
+    pub fn parse_frame(input: &[u8]) -> IResult<&[u8], Self, LeaseSetParseError> {
+        let (rest, blinded_sigtype) = be_u16(input)?;
+        if blinded_sigtype != ENCRYPTED_BLINDED_SIGTYPE {
+            return Err(Err::Error(LeaseSetParseError::InvalidBitstream));
+        }
+        let (rest, blinded) = take(32usize)(rest)?;
+        let (rest, published) = be_u32(rest)?;
+        let (rest, expires_offset) = be_u16(rest)?;
+        let (rest, flags) = be_u16(rest)?;
+        if flags != ENCRYPTED_OUTER_FLAGS {
+            return Err(Err::Error(LeaseSetParseError::InvalidBitstream));
+        }
+        let (rest, outer_len) = be_u16(rest)?;
+        let outer_len = outer_len as usize;
+        if !(MIN_ENCRYPTED_OUTER_CIPHERTEXT_LEN..=MAX_ENCRYPTED_OUTER_CIPHERTEXT_LEN)
+            .contains(&outer_len)
+        {
+            return Err(Err::Error(LeaseSetParseError::InvalidBitstream));
+        }
+        let (rest, outer_ciphertext) = take(outer_len)(rest)?;
+        let (rest, signature) = take(64usize)(rest)?;
+
+        let mut blinded_key = [0u8; 32];
+        blinded_key.copy_from_slice(blinded);
+        let mut signature_bytes = [0u8; 64];
+        signature_bytes.copy_from_slice(signature);
+
+        let blinded_public = red25519::BlindedPublicKey::from_bytes(&blinded_key)
+            .map_err(|_| Err::Error(LeaseSetParseError::InvalidBitstream))?;
+        let signature = red25519::RedSignature::from_bytes(&signature_bytes)
+            .map_err(|_| Err::Error(LeaseSetParseError::InvalidSignature))?;
+
+        let consumed = input.len() - rest.len() - 64;
+        let mut signed = Vec::with_capacity(1 + consumed);
+        signed.push(5u8);
+        signed.extend_from_slice(&input[..consumed]);
+        red25519::verify(&blinded_public, &signed, &signature)
+            .map_err(|_| Err::Error(LeaseSetParseError::InvalidSignature))?;
+
+        Ok((
+            rest,
+            Self {
+                blinded_public_key: blinded_key,
+                published,
+                expires_offset,
+                outer_ciphertext: outer_ciphertext.to_vec(),
+                signature: signature_bytes,
+            },
+        ))
+    }
+
+    /// Attempt to parse `input` into [`EncryptedLeaseSet2`].
+    ///
+    /// Fails closed on trailing or short data.
+    pub fn parse(input: &[u8]) -> Result<Self, LeaseSetParseError> {
+        let (rest, outer) = Self::parse_frame(input)?;
+        if !rest.is_empty() {
+            return Err(LeaseSetParseError::InvalidBitstream);
+        }
+        Ok(outer)
+    }
+
+    /// Build and sign a new outer object with a blinded private scalar.
+    ///
+    /// Fails closed on malformed blinded inputs, out-of-range ciphertext
+    /// lengths, or signing failures. No fallback object is produced.
+    pub fn build(
+        blinded_public_key: &[u8; 32],
+        published: u32,
+        expires_offset: u16,
+        outer_ciphertext: Vec<u8>,
+        blinded_private: &BlindedPrivateKey,
+        rng: impl rand::rand_core::RngCore + rand::rand_core::CryptoRng,
+    ) -> Result<Self, LeaseSetParseError> {
+        if !(MIN_ENCRYPTED_OUTER_CIPHERTEXT_LEN..=MAX_ENCRYPTED_OUTER_CIPHERTEXT_LEN)
+            .contains(&outer_ciphertext.len())
+        {
+            return Err(LeaseSetParseError::InvalidBitstream);
+        }
+        let blinded_public = red25519::BlindedPublicKey::from_bytes(blinded_public_key)
+            .map_err(|_| LeaseSetParseError::InvalidBitstream)?;
+        if red25519::derive_public(blinded_private) != blinded_public {
+            return Err(LeaseSetParseError::InvalidSignature);
+        }
+
+        let mut prefix = Vec::with_capacity(44 + outer_ciphertext.len());
+        prefix.extend_from_slice(&ENCRYPTED_BLINDED_SIGTYPE.to_be_bytes());
+        prefix.extend_from_slice(blinded_public_key);
+        prefix.extend_from_slice(&published.to_be_bytes());
+        prefix.extend_from_slice(&expires_offset.to_be_bytes());
+        prefix.extend_from_slice(&ENCRYPTED_OUTER_FLAGS.to_be_bytes());
+        prefix.extend_from_slice(&(outer_ciphertext.len() as u16).to_be_bytes());
+        prefix.extend_from_slice(&outer_ciphertext);
+
+        let mut signed = Vec::with_capacity(1 + prefix.len());
+        signed.push(5u8);
+        signed.extend_from_slice(&prefix);
+        let signature = red25519::sign(blinded_private, &signed, rng)
+            .map_err(|_| LeaseSetParseError::InvalidSignature)?;
+
+        Ok(Self {
+            blinded_public_key: *blinded_public_key,
+            published,
+            expires_offset,
+            outer_ciphertext,
+            signature: signature.to_bytes(),
+        })
+    }
+
+    /// Serialize the outer object into exact wire bytes.
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(44 + self.outer_ciphertext.len() + 64);
+        out.extend_from_slice(&ENCRYPTED_BLINDED_SIGTYPE.to_be_bytes());
+        out.extend_from_slice(&self.blinded_public_key);
+        out.extend_from_slice(&self.published.to_be_bytes());
+        out.extend_from_slice(&self.expires_offset.to_be_bytes());
+        out.extend_from_slice(&ENCRYPTED_OUTER_FLAGS.to_be_bytes());
+        out.extend_from_slice(&(self.outer_ciphertext.len() as u16).to_be_bytes());
+        out.extend_from_slice(&self.outer_ciphertext);
+        out.extend_from_slice(&self.signature);
+        out
+    }
+
+    /// Blinded public key bytes.
+    pub fn blinded_public_key(&self) -> &[u8; 32] {
+        &self.blinded_public_key
+    }
+
+    /// Published timestamp, seconds since the Unix epoch.
+    pub fn published(&self) -> u32 {
+        self.published
+    }
+
+    /// Expiry offset from `published`, in seconds.
+    pub fn expires_offset(&self) -> u16 {
+        self.expires_offset
+    }
+
+    /// Absolute expiry, seconds since the Unix epoch.
+    pub fn expires(&self) -> Duration {
+        Duration::from_secs(self.published as u64 + self.expires_offset as u64)
+    }
+
+    /// Outer ciphertext bytes.
+    pub fn outer_ciphertext(&self) -> &[u8] {
+        &self.outer_ciphertext
+    }
+
+    /// Outer signature bytes.
+    pub fn signature(&self) -> &[u8; 64] {
+        &self.signature
+    }
+
+    /// Has the outer object expired.
+    pub fn is_expired<R: Runtime>(&self) -> bool {
+        R::time_since_epoch() >= self.expires()
     }
 }
 
@@ -1221,5 +1433,194 @@ mod tests {
         ];
 
         let _ = LeaseSet2::parse::<MockRuntime>(&input).unwrap();
+    }
+
+    #[test]
+    fn encrypted_outer_build_parse_roundtrip() {
+        use crate::crypto::els2;
+
+        let seed = [0x01u8; 32];
+        let unblinded = [
+            0x8a, 0x88, 0xe3, 0xdd, 0x74, 0x09, 0xf1, 0x95, 0xfd, 0x52, 0xdb, 0x2d, 0x3c, 0xba,
+            0x5d, 0x72, 0xca, 0x67, 0x09, 0xbf, 0x1d, 0x94, 0x12, 0x1b, 0xf3, 0x74, 0x88, 0x01,
+            0xb4, 0x0f, 0x6f, 0x5c,
+        ];
+        let day = *b"20260909";
+        let signing_seed = els2::SigningSeed::from_bytes(seed);
+        let (_, blinded_public, blinded_private, _) =
+            els2::blinded_day_material(&signing_seed, &unblinded, &day).unwrap();
+        let sub = els2::subcredential(&unblinded, blinded_public.as_bytes());
+        let published = 1_788_000_000u32;
+        let inner = [0x55u8; 128];
+        let outer_ciphertext =
+            els2::encrypt_no_auth_with_salts(&sub, published, &inner, &[0x11u8; 32], &[0x22u8; 32])
+                .unwrap();
+
+        let outer = EncryptedLeaseSet2::build(
+            blinded_public.as_bytes(),
+            published,
+            600,
+            outer_ciphertext.clone(),
+            &blinded_private,
+            MockRuntime::rng(),
+        )
+        .unwrap();
+
+        assert_eq!(outer.blinded_public_key(), blinded_public.as_bytes());
+        assert_eq!(outer.published(), published);
+        assert_eq!(outer.expires_offset(), 600);
+        assert_eq!(outer.outer_ciphertext(), &outer_ciphertext[..]);
+        assert_eq!(outer.expires(), Duration::from_secs(published as u64 + 600));
+
+        let bytes = outer.serialize();
+        let parsed = EncryptedLeaseSet2::parse(&bytes).unwrap();
+        assert_eq!(parsed, outer);
+
+        let recovered = els2::decrypt_no_auth(&sub, published, parsed.outer_ciphertext()).unwrap();
+        assert_eq!(recovered, inner);
+    }
+
+    #[test]
+    fn encrypted_outer_rejects_malformed() {
+        use crate::crypto::{els2, red25519};
+
+        let seed = [0x01u8; 32];
+        let unblinded = [
+            0x8a, 0x88, 0xe3, 0xdd, 0x74, 0x09, 0xf1, 0x95, 0xfd, 0x52, 0xdb, 0x2d, 0x3c, 0xba,
+            0x5d, 0x72, 0xca, 0x67, 0x09, 0xbf, 0x1d, 0x94, 0x12, 0x1b, 0xf3, 0x74, 0x88, 0x01,
+            0xb4, 0x0f, 0x6f, 0x5c,
+        ];
+        let day = *b"20260909";
+        let signing_seed = els2::SigningSeed::from_bytes(seed);
+        let (_, blinded_public, blinded_private, _) =
+            els2::blinded_day_material(&signing_seed, &unblinded, &day).unwrap();
+        let sub = els2::subcredential(&unblinded, blinded_public.as_bytes());
+        let published = 1_788_000_000u32;
+        let outer_ciphertext = els2::encrypt_no_auth_with_salts(
+            &sub,
+            published,
+            &[0x55u8; 64],
+            &[0x11u8; 32],
+            &[0x22u8; 32],
+        )
+        .unwrap();
+        let outer = EncryptedLeaseSet2::build(
+            blinded_public.as_bytes(),
+            published,
+            600,
+            outer_ciphertext,
+            &blinded_private,
+            MockRuntime::rng(),
+        )
+        .unwrap();
+        let bytes = outer.serialize();
+
+        // Bad blinded sig type.
+        let mut bad = bytes.clone();
+        bad[0] = 0x00;
+        bad[1] = 0x07;
+        assert!(EncryptedLeaseSet2::parse(&bad).is_err());
+
+        // Nonzero reserved flags.
+        let mut bad = bytes.clone();
+        let flags_pos = 2 + 32 + 4 + 2;
+        bad[flags_pos] = 0x00;
+        bad[flags_pos + 1] = 0x01;
+        assert!(EncryptedLeaseSet2::parse(&bad).is_err());
+
+        // Truncated lengths.
+        assert!(EncryptedLeaseSet2::parse(&bytes[..bytes.len() - 10]).is_err());
+        assert!(EncryptedLeaseSet2::parse(&bytes[..20]).is_err());
+
+        // Bad signature.
+        let mut bad = bytes.clone();
+        let last = bad.len() - 1;
+        bad[last] ^= 0xff;
+        assert!(EncryptedLeaseSet2::parse(&bad).is_err());
+
+        // Trailing data.
+        let mut bad = bytes.clone();
+        bad.push(0x00);
+        assert!(EncryptedLeaseSet2::parse(&bad).is_err());
+
+        // Wrong-key signature fails at build time.
+        let other_seed = els2::SigningSeed::from_bytes([0x02u8; 32]);
+        let (_, _, other_private, _) = els2::blinded_day_material(&other_seed, &unblinded, &day)
+            .unwrap_or_else(|_| {
+                let alpha = red25519::generate_alpha(&unblinded, 7, 11, &day, b"").unwrap();
+                let blinded = red25519::blind_public_key(&unblinded, &alpha).unwrap();
+                let private = red25519::blind_private_key_ed25519(&[0x02u8; 32], &alpha);
+                let storage = red25519::blinded_storage_key(&blinded);
+                (alpha, blinded, private, storage)
+            });
+        assert!(EncryptedLeaseSet2::build(
+            blinded_public.as_bytes(),
+            published,
+            600,
+            outer.outer_ciphertext().to_vec(),
+            &other_private,
+            MockRuntime::rng(),
+        )
+        .is_err());
+
+        // Type-3 builder bytes remain unchanged (ordinary parse still works).
+        let (ordinary, signing_key) = LeaseSet2::random();
+        let serialized = ordinary.serialize(&signing_key);
+        assert!(LeaseSet2::parse::<MockRuntime>(&serialized).is_ok());
+        let _ = bytes;
+    }
+
+    #[test]
+    fn encrypted_outer_expiry_enforced() {
+        use crate::crypto::els2;
+
+        let seed = [0x01u8; 32];
+        let unblinded = [
+            0x8a, 0x88, 0xe3, 0xdd, 0x74, 0x09, 0xf1, 0x95, 0xfd, 0x52, 0xdb, 0x2d, 0x3c, 0xba,
+            0x5d, 0x72, 0xca, 0x67, 0x09, 0xbf, 0x1d, 0x94, 0x12, 0x1b, 0xf3, 0x74, 0x88, 0x01,
+            0xb4, 0x0f, 0x6f, 0x5c,
+        ];
+        let day = *b"20260909";
+        let signing_seed = els2::SigningSeed::from_bytes(seed);
+        let (_, blinded_public, blinded_private, _) =
+            els2::blinded_day_material(&signing_seed, &unblinded, &day).unwrap();
+        let sub = els2::subcredential(&unblinded, blinded_public.as_bytes());
+        let published = MockRuntime::time_since_epoch().as_secs() as u32;
+        let outer_ciphertext = els2::encrypt_no_auth_with_salts(
+            &sub,
+            published,
+            &[0x55u8; 64],
+            &[0x11u8; 32],
+            &[0x22u8; 32],
+        )
+        .unwrap();
+        let outer = EncryptedLeaseSet2::build(
+            blinded_public.as_bytes(),
+            published,
+            600,
+            outer_ciphertext,
+            &blinded_private,
+            MockRuntime::rng(),
+        )
+        .unwrap();
+        assert!(!outer.is_expired::<MockRuntime>());
+
+        let expired = EncryptedLeaseSet2::build(
+            blinded_public.as_bytes(),
+            published.saturating_sub(10_000),
+            60,
+            els2::encrypt_no_auth_with_salts(
+                &els2::subcredential(&unblinded, blinded_public.as_bytes()),
+                published.saturating_sub(10_000),
+                &[0x55u8; 64],
+                &[0x11u8; 32],
+                &[0x22u8; 32],
+            )
+            .unwrap(),
+            &els2::blinded_day_material(&signing_seed, &unblinded, &day).unwrap().2,
+            MockRuntime::rng(),
+        )
+        .unwrap();
+        assert!(expired.is_expired::<MockRuntime>());
     }
 }

@@ -52,6 +52,97 @@ const LOG_TARGET: &str = "emissary::sam::parser";
 /// ElGamal key length.
 const ELGAMAL_KEY_LEN: usize = 256usize;
 
+/// Whether standard type-5 publication is requested.
+///
+/// Neutral pre-allocation gate: true only for `i2cp.leaseSetType=5`.
+pub fn is_type5_requested(options: &HashMap<String, String>) -> bool {
+    options.get("i2cp.leaseSetType").is_some_and(|value| value.trim() == "5")
+}
+
+/// Validate standard type-5 no-auth companion state before allocation.
+///
+/// Returns true only when type 5 is requested with the exact no-auth,
+/// no-secret subset: legacy AES flag absent/false, secret/auth companions
+/// absent, per-client entries absent, and publication enabled. Any other
+/// type-5 combination fails closed for successor work. Absent type 5
+/// preserves ordinary behavior and returns false without further checks.
+///
+/// This gate consumes only standard session properties and never
+/// interprets administrative strings.
+pub fn is_valid_type5_no_auth(options: &HashMap<String, String>) -> bool {
+    if !is_type5_requested(options) {
+        return false;
+    }
+    if options
+        .get("i2cp.encryptLeaseSet")
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("true") || value.trim() == "1")
+    {
+        return false;
+    }
+    if options.get("i2cp.leaseSetSecret").is_some_and(|value| !value.trim().is_empty()) {
+        return false;
+    }
+    if options.get("i2cp.leaseSetAuthType").is_some_and(|value| {
+        let trimmed = value.trim();
+        !trimmed.is_empty() && trimmed != "0"
+    }) {
+        return false;
+    }
+    for key in [
+        "i2cp.leaseSetPrivKey",
+        "i2cp.leaseSetKey",
+        "i2cp.leaseSetPrivateKey",
+        "i2cp.leaseSetSigningPrivateKey",
+        "i2cp.leaseSetBlindedType",
+    ] {
+        if options.get(key).is_some_and(|value| !value.trim().is_empty()) {
+            return false;
+        }
+    }
+    if options
+        .keys()
+        .any(|key| key.starts_with("i2cp.leaseSetClient") || key.starts_with("leaseSetClient"))
+    {
+        return false;
+    }
+    if options
+        .get("i2cp.dontPublishLeaseSet")
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("true") || value.trim() == "1")
+    {
+        return false;
+    }
+    true
+}
+
+/// Validate the standard lease-set type selector before allocation.
+///
+/// Absent or `3` preserves ordinary behavior. `5` requires the exact
+/// no-auth subset above. Any other value or any type-5 request with
+/// successor-only companions fails closed before session allocation.
+fn validate_lease_set_type_options(options: &HashMap<String, String>) -> Result<(), ()> {
+    match options.get("i2cp.leaseSetType").map(|value| value.trim()) {
+        None | Some("3") => Ok(()),
+        Some("5") => match is_valid_type5_no_auth(options) {
+            true => Ok(()),
+            false => {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    "rejecting type-5 session with unsupported companion options",
+                );
+                Err(())
+            }
+        },
+        Some(unsupported) => {
+            tracing::warn!(
+                target: LOG_TARGET,
+                ?unsupported,
+                "rejecting unsupported lease-set type",
+            );
+            Err(())
+        }
+    }
+}
+
 /// Parsed command.
 ///
 /// Represent a command that had value form but isn't necessarily
@@ -310,12 +401,15 @@ impl fmt::Display for SamCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Hello { min, max } => write!(f, "SamCommand::Hello({min:?}, {max:?})"),
-            Self::CreateSession { session_id, .. } =>
-                write!(f, "SamCommand::CreateSession({session_id})"),
-            Self::CreateSubSession { session_id, .. } =>
-                write!(f, "SamCommand::CreateSubSession({session_id})"),
-            Self::Connect { session_id, .. } =>
-                write!(f, "SamCommand::StreamConnect({session_id})"),
+            Self::CreateSession { session_id, .. } => {
+                write!(f, "SamCommand::CreateSession({session_id})")
+            }
+            Self::CreateSubSession { session_id, .. } => {
+                write!(f, "SamCommand::CreateSubSession({session_id})")
+            }
+            Self::Connect { session_id, .. } => {
+                write!(f, "SamCommand::StreamConnect({session_id})")
+            }
             Self::Accept { session_id, .. } => write!(f, "SamCommand::StreamAccept({session_id})"),
             Self::Forward { session_id, .. } => write!(f, "SamCommand::Forward({session_id})"),
             Self::NamingLookup { name } => write!(f, "SamCommand::NamingLookup({name})"),
@@ -590,6 +684,8 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                         "i2cp.leaseSetEncType missing, defaulting to 6,4",
                     );
 
+                    validate_lease_set_type_options(&options)?;
+
                     return Ok(SamCommand::CreateSession {
                         session_id,
                         session_kind,
@@ -661,6 +757,8 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                         );
                     }
                 }
+
+                validate_lease_set_type_options(&options)?;
 
                 Ok(SamCommand::CreateSession {
                     session_id,
@@ -865,8 +963,9 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                 name: parsed_cmd.key_value_pairs.get("NAME").ok_or(())?.to_string(),
             }),
             ("DEST", Some("GENERATE")) => match parsed_cmd.key_value_pairs.get("SIGNATURE_TYPE") {
-                Some(signature_type) if *signature_type == "7" =>
-                    Ok(SamCommand::GenerateDestination),
+                Some(signature_type) if *signature_type == "7" => {
+                    Ok(SamCommand::GenerateDestination)
+                }
                 Some(signature_type) => {
                     tracing::warn!(
                         target: LOG_TARGET,
@@ -1200,8 +1299,9 @@ mod tests {
             };
 
             match SamCommand::try_from(invalid_cmd) {
-                Ok(_) =>
-                    panic!("Failed to reject the invalid inbound tunnel length {invalid_in_len:?}",),
+                Ok(_) => {
+                    panic!("Failed to reject the invalid inbound tunnel length {invalid_in_len:?}",)
+                }
                 Err(_) => {}
             }
         }
@@ -1241,10 +1341,22 @@ mod tests {
              outbound.length=3 outbound.lengthVariance=2 outbound.backupQuantity=4",
         ) {
             Some(SamCommand::CreateSession { options, .. }) => {
-                assert_eq!(options.get("inbound.lengthVariance"), Some(&"-1".to_string()));
-                assert_eq!(options.get("inbound.backupQuantity"), Some(&"3".to_string()));
-                assert_eq!(options.get("outbound.lengthVariance"), Some(&"2".to_string()));
-                assert_eq!(options.get("outbound.backupQuantity"), Some(&"4".to_string()));
+                assert_eq!(
+                    options.get("inbound.lengthVariance"),
+                    Some(&"-1".to_string())
+                );
+                assert_eq!(
+                    options.get("inbound.backupQuantity"),
+                    Some(&"3".to_string())
+                );
+                assert_eq!(
+                    options.get("outbound.lengthVariance"),
+                    Some(&"2".to_string())
+                );
+                assert_eq!(
+                    options.get("outbound.backupQuantity"),
+                    Some(&"4".to_string())
+                );
             }
             response => panic!("invalid response: {response:?}"),
         }
@@ -1264,9 +1376,8 @@ mod tests {
         ];
 
         for options in invalid_options {
-            let command = format!(
-                "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT {options}"
-            );
+            let command =
+                format!("SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT {options}");
             assert!(
                 SamCommand::parse::<MockRuntime>(&command).is_none(),
                 "invalid tunnel options were accepted: {options}"
@@ -2154,5 +2265,99 @@ mod tests {
             }
             response => panic!("invalid response: {response:?}"),
         }
+    }
+
+    #[test]
+    fn type5_no_auth_accepted_and_companions_rejected() {
+        // Valid type-5 no-auth mode is accepted.
+        match SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT i2cp.leaseSetType=5",
+        ) {
+            Some(SamCommand::CreateSession { options, .. }) => {
+                assert!(is_type5_requested(&options));
+                assert!(is_valid_type5_no_auth(&options));
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+
+        // Absent type 5 preserves ordinary behavior.
+        match SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT",
+        ) {
+            Some(SamCommand::CreateSession { options, .. }) => {
+                assert!(!is_type5_requested(&options));
+                assert!(!is_valid_type5_no_auth(&options));
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+
+        // Legacy AES flag is not aliased to type 5.
+        assert!(SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.encryptLeaseSet=true",
+        )
+        .is_none());
+
+        // Secret companion rejected until successor work.
+        assert!(SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetSecret=c2VjcmV0",
+        )
+        .is_none());
+
+        // Auth-type companions rejected.
+        for auth in ["1", "2", "00", "hello"] {
+            let command = format!(
+                "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+                 i2cp.leaseSetType=5 i2cp.leaseSetAuthType={auth}"
+            );
+            assert!(
+                SamCommand::parse::<MockRuntime>(&command).is_none(),
+                "auth type {auth} was accepted"
+            );
+        }
+
+        // Auth type zero is the no-auth value and stays accepted.
+        match SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=0",
+        ) {
+            Some(SamCommand::CreateSession { options, .. }) => {
+                assert!(is_valid_type5_no_auth(&options));
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+
+        // Key companions rejected.
+        assert!(SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetPrivKey=AAAA",
+        )
+        .is_none());
+
+        // Per-client entries rejected.
+        assert!(SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetClient.psk.0=AAAA",
+        )
+        .is_none());
+        assert!(SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetClient.dh.0=AAAA",
+        )
+        .is_none());
+
+        // Unpublished type 5 would be accept-inert and is rejected.
+        assert!(SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.dontPublishLeaseSet=true",
+        )
+        .is_none());
+
+        // Unsupported type selector rejected.
+        assert!(SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT i2cp.leaseSetType=7",
+        )
+        .is_none());
     }
 }

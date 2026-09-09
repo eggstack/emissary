@@ -19,7 +19,7 @@
 use crate::{
     error::parser::DatabaseStoreParseError,
     i2np::{database::DATABASE_KEY_SIZE, ROUTER_HASH_LEN},
-    primitives::{LeaseSet2, RouterId, RouterInfo, TunnelId},
+    primitives::{EncryptedLeaseSet2, LeaseSet2, RouterId, RouterInfo, TunnelId},
     runtime::Runtime,
 };
 
@@ -158,6 +158,15 @@ pub enum DatabaseStorePayload {
         /// Lease set.
         lease_set: LeaseSet2,
     },
+
+    /// Modern encrypted lease set (store type 5).
+    EncryptedLeaseSet2 {
+        /// Verified outer object.
+        outer: EncryptedLeaseSet2,
+
+        /// Exact raw payload bytes for forwarding and verification.
+        raw: Bytes,
+    },
 }
 
 impl fmt::Display for DatabaseStorePayload {
@@ -173,17 +182,26 @@ impl fmt::Display for DatabaseStorePayload {
                 "DatabaseStorePayload::LeaseSet2 ({})",
                 lease_set.header.destination.id()
             ),
+            Self::EncryptedLeaseSet2 { .. } => {
+                write!(f, "DatabaseStorePayload::EncryptedLeaseSet2")
+            }
         }
     }
 }
 
 impl DatabaseStorePayload {
+    /// Whether the payload is a modern encrypted lease set.
+    pub fn is_encrypted_lease_set(&self) -> bool {
+        matches!(self, Self::EncryptedLeaseSet2 { .. })
+    }
+
     #[allow(unused)]
     fn serialized_len(&self) -> usize {
         match self {
             // TODO: calculate actual size
             Self::RouterInfo { .. } => 2048usize,
             Self::LeaseSet2 { lease_set } => lease_set.serialized_len(),
+            Self::EncryptedLeaseSet2 { raw, .. } => raw.len(),
         }
     }
 }
@@ -284,6 +302,22 @@ impl<R: Runtime> DatabaseStore<R> {
                     },
                 ))
             }
+            StoreType::EncryptedLeaseSet => {
+                let payload_start = rest;
+                let (rest, outer) = EncryptedLeaseSet2::parse_frame(rest).map_err(Err::convert)?;
+                let raw_len = payload_start.len() - rest.len();
+                let raw = Bytes::from(payload_start[..raw_len].to_vec());
+
+                Ok((
+                    rest,
+                    Self {
+                        key: Bytes::from(key.to_vec()),
+                        payload: DatabaseStorePayload::EncryptedLeaseSet2 { outer, raw },
+                        reply,
+                        _runtime: Default::default(),
+                    },
+                ))
+            }
             _ => Err(Err::Error(DatabaseStoreParseError::UnsupportedStoreType(
                 store_type,
             ))),
@@ -351,6 +385,12 @@ pub enum DatabaseStoreKind {
         /// Serialized [`LeaseSet2`].
         lease_set: Bytes,
     },
+
+    /// Modern encrypted lease set (store type 5).
+    EncryptedLeaseSet2 {
+        /// Serialized [`EncryptedLeaseSet2`] outer payload.
+        encrypted_lease_set: Bytes,
+    },
 }
 
 impl DatabaseStoreKind {
@@ -359,7 +399,15 @@ impl DatabaseStoreKind {
         match self {
             Self::RouterInfo { router_info } => router_info.len(),
             Self::LeaseSet2 { lease_set } => lease_set.len(),
+            Self::EncryptedLeaseSet2 {
+                encrypted_lease_set,
+            } => encrypted_lease_set.len(),
         }
+    }
+
+    /// Whether the kind carries a modern encrypted lease set.
+    pub fn is_encrypted_lease_set(&self) -> bool {
+        matches!(self, Self::EncryptedLeaseSet2 { .. })
     }
 }
 
@@ -406,6 +454,9 @@ impl DatabaseStoreBuilder {
         match &self.kind {
             DatabaseStoreKind::RouterInfo { .. } => out.put_u8(StoreType::RouterInfo.as_u8()),
             DatabaseStoreKind::LeaseSet2 { .. } => out.put_u8(StoreType::LeaseSet2.as_u8()),
+            DatabaseStoreKind::EncryptedLeaseSet2 { .. } => {
+                out.put_u8(StoreType::EncryptedLeaseSet.as_u8())
+            }
         }
 
         match reply {
@@ -437,6 +488,9 @@ impl DatabaseStoreBuilder {
                 out.put_slice(&router_info);
             }
             DatabaseStoreKind::LeaseSet2 { lease_set } => out.put_slice(&lease_set),
+            DatabaseStoreKind::EncryptedLeaseSet2 {
+                encrypted_lease_set,
+            } => out.put_slice(&encrypted_lease_set),
         }
 
         out
@@ -448,6 +502,43 @@ mod tests {
     use super::*;
     use crate::runtime::mock::MockRuntime;
     use rand::Rng;
+
+    fn type5_fixture() -> (Bytes, Vec<u8>) {
+        use crate::crypto::els2;
+
+        let seed = [0x01u8; 32];
+        let unblinded = [
+            0x8a, 0x88, 0xe3, 0xdd, 0x74, 0x09, 0xf1, 0x95, 0xfd, 0x52, 0xdb, 0x2d, 0x3c, 0xba,
+            0x5d, 0x72, 0xca, 0x67, 0x09, 0xbf, 0x1d, 0x94, 0x12, 0x1b, 0xf3, 0x74, 0x88, 0x01,
+            0xb4, 0x0f, 0x6f, 0x5c,
+        ];
+        let day = *b"20260909";
+        let signing_seed = els2::SigningSeed::from_bytes(seed);
+        let (_, blinded_public, blinded_private, storage_key) =
+            els2::blinded_day_material(&signing_seed, &unblinded, &day).unwrap();
+        let published = MockRuntime::time_since_epoch().as_secs() as u32;
+        let sub = els2::subcredential(&unblinded, blinded_public.as_bytes());
+        let inner_salt = [0x11u8; 32];
+        let outer_salt = [0x22u8; 32];
+        let outer_ciphertext = els2::encrypt_no_auth_with_salts(
+            &sub,
+            published,
+            &[0x55u8; 64],
+            &inner_salt,
+            &outer_salt,
+        )
+        .unwrap();
+        let outer = EncryptedLeaseSet2::build(
+            blinded_public.as_bytes(),
+            published,
+            600,
+            outer_ciphertext,
+            &blinded_private,
+            MockRuntime::rng(),
+        )
+        .unwrap();
+        (Bytes::from(storage_key.to_vec()), outer.serialize())
+    }
 
     #[test]
     fn parse_database_store() {
@@ -638,5 +729,66 @@ mod tests {
                 .all(|(lease1, lease2)| lease1 == lease2)),
             _ => panic!("invalid payload"),
         }
+    }
+
+    #[test]
+    fn type5_builder_emits_store_type_5_and_roundtrips() {
+        let (key, outer_bytes) = type5_fixture();
+
+        let serialized = DatabaseStoreBuilder::new(
+            key.clone(),
+            DatabaseStoreKind::EncryptedLeaseSet2 {
+                encrypted_lease_set: Bytes::from(outer_bytes.clone()),
+            },
+        )
+        .build();
+
+        assert_eq!(serialized[32], 5u8, "store type byte must be exactly 5");
+
+        let store = DatabaseStore::<MockRuntime>::parse(&serialized).unwrap();
+        assert_eq!(store.key, key);
+        assert!(store.payload.is_encrypted_lease_set());
+        match store.payload {
+            DatabaseStorePayload::EncryptedLeaseSet2 { outer, raw } => {
+                assert_eq!(raw.to_vec(), outer_bytes);
+                assert_eq!(outer.serialize(), outer_bytes);
+                assert!(!outer.is_expired::<MockRuntime>());
+            }
+            _ => panic!("invalid payload"),
+        }
+
+        let raw = DatabaseStore::<MockRuntime>::extract_raw_lease_set(&serialized);
+        assert_eq!(raw.to_vec(), outer_bytes);
+        assert!(EncryptedLeaseSet2::parse(&raw).is_ok());
+        assert!(LeaseSet2::parse::<MockRuntime>(&raw).is_err());
+    }
+
+    #[test]
+    fn type5_malformed_payloads_fail_and_type3_unchanged() {
+        let (key, outer_bytes) = type5_fixture();
+        let mut truncated = outer_bytes.clone();
+        truncated.truncate(truncated.len() - 10);
+
+        let serialized = DatabaseStoreBuilder::new(
+            key.clone(),
+            DatabaseStoreKind::EncryptedLeaseSet2 {
+                encrypted_lease_set: Bytes::from(truncated),
+            },
+        )
+        .build();
+        assert!(DatabaseStore::<MockRuntime>::parse(&serialized).is_err());
+
+        let (leaseset, signing_key) = LeaseSet2::random();
+        let ordinary = Bytes::from(leaseset.clone().serialize(&signing_key));
+        let serialized = DatabaseStoreBuilder::new(
+            key,
+            DatabaseStoreKind::LeaseSet2 {
+                lease_set: ordinary.clone(),
+            },
+        )
+        .build();
+        assert_eq!(serialized[32], 3u8);
+        let store = DatabaseStore::<MockRuntime>::parse(&serialized).unwrap();
+        assert!(!store.payload.is_encrypted_lease_set());
     }
 }

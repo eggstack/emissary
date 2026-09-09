@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M154 LeaseSet-Security Corrective Roadmap
 
-Status: **active / partial; M155/M156 closed, M157 registered**
+Status: **active / partial; M155/M156/M157 closed, no registered successor**
 
 This roadmap supersedes the LeaseSet-security execution ordering in the older residual and post-M146 roadmaps while preserving M146/M147/M154 closures as historical evidence.
 
@@ -12,7 +12,8 @@ Current authority:
 - M154 disposition C left configurable Destination `SigType` blocked ×10;
 - M155 closed semantic/owner re-freeze;
 - M156 closed neutral Red25519/blinding primitive;
-- **M157 is the sole registered successor**.
+- **M157 closed modern Encrypted LeaseSet2 publication (zero promotions)**;
+- **no registered successor** (M158 deferred pending its exact-path amendment).
 
 ## 1. Corrective architecture
 
@@ -42,11 +43,12 @@ This direct-source correction governs M157/M162. Historical M155 closure evidenc
 - M147/M148 remain blocked; no general signature-suite migration is smuggled into this line.
 - M146 remains blocked; no clearnet egress/provider work is mixed into this line.
 
-### M157 exact containment registration
+### M157 exact containment reconciliation (closed)
 
-M157 has an exact ten-path production budget in its plan plus M061/M062 `registered_pending` ledgers.
-
-The registration-time pending ledger deliberately does not pre-populate M061's realized upstream-diff `[allowed]` set with untouched files. The first M157 production commit must atomically reconcile every newly changed path into the ordinary M061 `[allowed]`/`[[evidence]]` ledger.
+M157 realized its exact ten-path production budget in its closure commit
+and reconciled every newly changed path into M061's ordinary
+`[allowed]`/`[[evidence]]` ledger; M061/M062 `[registered_pending]` is
+removed.
 
 M157 adds no dependency and authorizes no Cargo, lockfile, Yosemite or I2PControl production source change.
 
@@ -65,7 +67,7 @@ M155 LeaseSet semantic/owner refreeze               [CLOSED; ZERO PRODUCTION]
 M156 narrow Red25519/blinding primitive             [CLOSED; ZERO PROMOTION]
   |
   v
-M157 modern Encrypted LeaseSet2 publication         [REGISTERED; ZERO PROMOTION]
+M157 modern Encrypted LeaseSet2 publication         [CLOSED; ZERO PROMOTION]
   |
   v
 M158 lookup-secret + blinded-address primitive      [DEFERRED]
@@ -85,7 +87,7 @@ M162 Proposal LeaseSet-field integration            [DEFERRED; CONDITIONAL PROMO
 M152 final residual requalification                 [DEFERRED; ZERO PROMOTION]
 ```
 
-Only M157 is executable now.
+Only M158 may be registered next, with exact M061/M062 authorization in that registration commit.
 
 ## 5. M157 exact-owner findings
 

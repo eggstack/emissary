@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M157 registered**
+Status: **active / partial; M157 closed, no registered successor**
 
 Pinned Proposal authority:
 
@@ -13,7 +13,7 @@ Current machine authority:
 Current execution authority:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`;
-- sole registered implementation handoff: M157.
+- registered handoff: none (M157 closed; M158 deferred pending amendment).
 
 Current whole-surface qualification authority:
 
@@ -45,7 +45,7 @@ Full support means real externally observable behavior. Parser acceptance, persi
 - M154 closed the general configurable SigType path blocked; M147/M148 remain blocked.
 - M155 re-froze the LeaseSet-security line and separated modern ELS2 from configurable Destination SigType.
 - M156 implemented the narrow neutral Red25519/blinding primitive with zero promotions.
-- M157 has now been exact-path amended and registered.
+- M157 has now been implemented and closed with its exact ten-file budget reconciled into M061/M062.
 
 Historical closures remain immutable.
 
@@ -58,7 +58,7 @@ M155 LeaseSet semantic/owner refreeze               [CLOSED; ZERO PRODUCTION]
 M156 narrow Red25519 + Ed25519 blinding              [CLOSED; ZERO PROMOTION]
   |
   v
-M157 modern type-5 Encrypted LeaseSet2 publication   [REGISTERED; ZERO PROMOTION]
+M157 modern type-5 Encrypted LeaseSet2 publication   [CLOSED; ZERO PROMOTION]
   |
   v
 M158 lookup-secret + blinded-address primitive       [DEFERRED]
@@ -82,7 +82,7 @@ M149-M151 are superseded historical drafts and must not be executed directly.
 
 ## 5. M157 containment boundary
 
-M157 is a neutral zero-promotion infrastructure milestone. It has an exact ten-file core budget recorded in its plan and in M061/M062 registration ledgers. No broad path permission exists.
+M157 is a neutral zero-promotion infrastructure milestone. It had an exact ten-file core budget, now realized and reconciled into M061/M062 ordinary ledgers. No broad path permission exists.
 
 It authorizes no:
 
@@ -138,6 +138,6 @@ If accepted architecture/security blockers remain after all safe work is exhaust
 
 ## 11. Current handoff
 
-Execute **M157 only**.
+M157 is closed. Only M158 may be registered next, with exact M061/M062 authorization in that registration commit.
 
-Do not begin M158 until M157 closes and the registry explicitly advances it. Any M157 need outside its exact path/dependency budget requires a plan/M061/M062 amendment before the edit.
+Do not begin M158 until the registry explicitly advances it.

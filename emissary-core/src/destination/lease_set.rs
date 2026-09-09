@@ -17,7 +17,11 @@
 // DEALINGS IN THE SOFTWARE.
 
 use crate::{
-    crypto::{chachapoly::ChaChaPoly, EphemeralPrivateKey, StaticPublicKey},
+    crypto::{
+        chachapoly::ChaChaPoly,
+        els2::{self, SigningSeed},
+        EphemeralPrivateKey, StaticPublicKey,
+    },
     error::QueryError,
     i2np::{
         database::{
@@ -28,7 +32,9 @@ use crate::{
         MessageBuilder, MessageType, I2NP_MESSAGE_EXPIRATION,
     },
     netdb::{Dht, NetDbHandle},
-    primitives::{DestinationId, Lease, MessageId, RouterId, TunnelId},
+    primitives::{
+        DestinationId, EncryptedLeaseSet2, Lease, LeaseSet2, MessageId, RouterId, TunnelId,
+    },
     profile::ProfileStorage,
     runtime::{Instant, JoinSet, Runtime},
     tunnel::{NoiseContext, TunnelMessageSender},
@@ -76,6 +82,49 @@ const STORAGE_VERIFICATION_TIMEOUT: Duration = Duration::from_secs(2);
 ///
 /// Once deemed as failed, local lease set is republished to `NetDb`.
 const STORAGE_VERIFICATION_TOTAL_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Narrow generation-local publication configuration for modern type-5 mode.
+///
+/// Carries the type-7 seed and unblinded public key from session
+/// construction into the publication owner. Secret material is never
+/// `Debug`-formattable. Ordinary mode uses `None` and retains exact
+/// prior behavior.
+#[derive(Clone)]
+pub struct EncryptedPublicationConfig {
+    /// Type-7 signing seed.
+    seed: SigningSeed,
+
+    /// Unblinded type-7 signing public key.
+    unblinded_public_key: [u8; 32],
+}
+
+impl EncryptedPublicationConfig {
+    /// Create a new publication configuration.
+    pub fn new(seed_bytes: [u8; 32], unblinded_public_key: [u8; 32]) -> Self {
+        Self {
+            seed: SigningSeed::from_bytes(seed_bytes),
+            unblinded_public_key,
+        }
+    }
+}
+
+/// Derive the outer expiry offset for an inner header.
+///
+/// Handles both the absolute-expiry convention used by freshly built
+/// random objects and the offset convention used by live session objects
+/// whose header expiry field carries seconds rather than an absolute time.
+fn outer_expires_offset(inner_published: u32, inner_expires: u32) -> u16 {
+    if inner_expires > inner_published {
+        (inner_expires.saturating_sub(inner_published) as u64).min(u16::MAX as u64) as u16
+    } else if inner_expires == 0 {
+        600
+    } else if inner_expires <= u16::MAX as u32 && inner_expires < inner_published {
+        inner_expires as u16
+    } else {
+        (inner_expires.saturating_sub(inner_published) as u64).min(u16::MAX as u64) as u16
+    }
+    .max(1)
+}
 
 enum RetryKind<R: Runtime> {
     /// Get floodfills closet to [`Destination`].
@@ -150,19 +199,25 @@ impl<R: Runtime> fmt::Debug for PublishState<R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PublishState::Inactive => f.debug_struct("PublishState::Inactive").finish(),
-            PublishState::AwaitingLeaseSet =>
-                f.debug_struct("PublishState::AwaitingLeaseSet").finish(),
-            PublishState::AwaitingTunnels { .. } =>
-                f.debug_struct("PublishState::AwaitingTunnels").finish(),
+            PublishState::AwaitingLeaseSet => {
+                f.debug_struct("PublishState::AwaitingLeaseSet").finish()
+            }
+            PublishState::AwaitingTunnels { .. } => {
+                f.debug_struct("PublishState::AwaitingTunnels").finish()
+            }
             PublishState::Retry { .. } => f.debug_struct("PublishState::Retry").finish(),
-            PublishState::GetClosestFloodfills { .. } =>
-                f.debug_struct("PublishState::GetClosestFloodfills").finish(),
-            PublishState::PublishLeaseSet =>
-                f.debug_struct("PublishState::PublishLeaseSet").finish(),
-            PublishState::AwaitingFlooding { .. } =>
-                f.debug_struct("PublishState::AwaitingFlooding").finish(),
-            PublishState::VerifyStorage { .. } =>
-                f.debug_struct("PublishState::VerifyStorage").finish(),
+            PublishState::GetClosestFloodfills { .. } => {
+                f.debug_struct("PublishState::GetClosestFloodfills").finish()
+            }
+            PublishState::PublishLeaseSet => {
+                f.debug_struct("PublishState::PublishLeaseSet").finish()
+            }
+            PublishState::AwaitingFlooding { .. } => {
+                f.debug_struct("PublishState::AwaitingFlooding").finish()
+            }
+            PublishState::VerifyStorage { .. } => {
+                f.debug_struct("PublishState::VerifyStorage").finish()
+            }
             PublishState::Poisoned => f.debug_struct("PublishState::Poisoned").finish(),
         }
     }
@@ -241,6 +296,25 @@ pub struct LeaseSetManager<R: Runtime> {
 
     /// Waker.
     waker: Option<Waker>,
+
+    /// Modern type-5 publication configuration, if enabled.
+    ///
+    /// `None` preserves exact ordinary publication behavior.
+    encrypted_config: Option<EncryptedPublicationConfig>,
+
+    /// Current UTC-day string for the encrypted outer object.
+    encrypted_day: Option<[u8; 8]>,
+
+    /// Current blinded public key for the encrypted outer object.
+    encrypted_blinded: Option<[u8; 32]>,
+
+    /// Current encrypted outer payload for publication.
+    encrypted_outer: Option<Bytes>,
+
+    /// Owner-local timer for the next UTC-day boundary.
+    ///
+    /// Present only for published encrypted destinations.
+    rollover_timer: Option<R::Timer>,
 }
 
 impl<R: Runtime> LeaseSetManager<R> {
@@ -292,7 +366,197 @@ impl<R: Runtime> LeaseSetManager<R> {
             tunnels: HashMap::from_iter(tunnels.into_iter().map(|lease| (lease.tunnel_id, lease))),
             unpublished,
             waker: None,
+            encrypted_config: None,
+            encrypted_day: None,
+            encrypted_blinded: None,
+            encrypted_outer: None,
+            rollover_timer: None,
         }
+    }
+
+    /// Whether modern type-5 publication is enabled.
+    pub fn is_encrypted(&self) -> bool {
+        self.encrypted_config.is_some()
+    }
+
+    /// Enable modern type-5 no-auth publication for this generation.
+    ///
+    /// Derives the current-day blinded material, wraps the current inner
+    /// lease set, switches the publication key to the blinded storage key,
+    /// clears key-scoped verification state, and schedules UTC rollover.
+    /// Crypto or build failure never falls back to ordinary publication;
+    /// the manager retries publication without emitting a type-3 store.
+    /// Unpublished destinations retain the configuration but stay inactive.
+    pub fn enable_encrypted_publication(&mut self, config: EncryptedPublicationConfig) {
+        self.encrypted_config = Some(config);
+
+        if self.unpublished {
+            return;
+        }
+
+        if self.refresh_encrypted_outer().is_err() {
+            tracing::warn!(
+                target: LOG_TARGET,
+                local = %self.destination_id,
+                "failed to wrap inner lease set for encrypted publication",
+            );
+            self.encrypted_outer = None;
+            self.state = PublishState::Retry {
+                kind: RetryKind::PublishLeaseSet,
+                timer: R::timer(RETRY_TIMEOUT),
+            };
+            if let Some(waker) = self.waker.take() {
+                waker.wake_by_ref();
+            }
+            return;
+        }
+
+        self.floodfills.clear();
+        self.queried_floodfills.clear();
+        self.storage_floodfills.clear();
+        self.pending_floodfills.clear();
+        self.get_closest_floodfills();
+        if let Some(waker) = self.waker.take() {
+            waker.wake_by_ref();
+        }
+    }
+
+    /// Re-wrap the current inner lease set under the current UTC day.
+    ///
+    /// Atomically switches the publication key, blinded key, day, outer
+    /// payload, and rollover deadline. Returns an error without mutating
+    /// current publication state on any crypto, parse, or build failure.
+    fn refresh_encrypted_outer(&mut self) -> Result<(), ()> {
+        let config = self.encrypted_config.as_ref().ok_or(())?;
+        let now_secs = R::time_since_epoch().as_secs();
+        let day = els2::day_string_from_epoch_secs(now_secs);
+        let (_, blinded_public, blinded_private, storage_key) =
+            els2::blinded_day_material(&config.seed, &config.unblinded_public_key, &day)
+                .map_err(|_| ())?;
+
+        let inner = LeaseSet2::parse::<R>(&self.lease_set).map_err(|_| ())?;
+        if inner.is_expired::<R>() {
+            return Err(());
+        }
+        let published = inner.header.published;
+        let expires_offset = outer_expires_offset(inner.header.published, inner.header.expires);
+        let subcredential =
+            els2::subcredential(&config.unblinded_public_key, blinded_public.as_bytes());
+        let outer_ciphertext =
+            els2::encrypt_no_auth(&subcredential, published, &self.lease_set, R::rng())
+                .map_err(|_| ())?;
+        let outer = EncryptedLeaseSet2::build(
+            blinded_public.as_bytes(),
+            published,
+            expires_offset,
+            outer_ciphertext,
+            &blinded_private,
+            R::rng(),
+        )
+        .map_err(|_| ())?;
+
+        let boundary = els2::next_day_boundary_secs(now_secs);
+        let now = R::time_since_epoch();
+        let delay = boundary.saturating_sub(now_secs);
+        let delay = Duration::from_secs(delay.max(1));
+
+        self.key = Bytes::from(storage_key.to_vec());
+        self.encrypted_day = Some(day);
+        self.encrypted_blinded = Some(*blinded_public.as_bytes());
+        self.encrypted_outer = Some(Bytes::from(outer.serialize()));
+        self.rollover_timer = Some(R::timer(delay));
+        let _ = now;
+        Ok(())
+    }
+
+    /// Handle UTC-day rollover for encrypted publication.
+    ///
+    /// Rotates day material exactly once per boundary, republishes the
+    /// current still-valid inner object under the new key even when
+    /// tunnels are unchanged, ignores stale old-key state, and never
+    /// mixes old and new key material. Expired or invalid inner state is
+    /// never published; renewal is awaited instead.
+    fn handle_rollover(&mut self) {
+        if self.encrypted_config.is_none() || self.unpublished {
+            return;
+        }
+        let now_secs = R::time_since_epoch().as_secs();
+        let day = els2::day_string_from_epoch_secs(now_secs);
+        if self.encrypted_day.as_ref() == Some(&day) {
+            let boundary = els2::next_day_boundary_secs(now_secs);
+            let delay = Duration::from_secs(boundary.saturating_sub(now_secs).max(1));
+            self.rollover_timer = Some(R::timer(delay));
+            return;
+        }
+
+        let inner_valid = LeaseSet2::parse::<R>(&self.lease_set)
+            .map(|inner| !inner.is_expired::<R>())
+            .unwrap_or(false);
+
+        if !inner_valid {
+            if self.refresh_encrypted_day_only().is_err() {
+                let boundary = els2::next_day_boundary_secs(now_secs);
+                let delay = Duration::from_secs(boundary.saturating_sub(now_secs).max(1));
+                self.rollover_timer = Some(R::timer(delay));
+                return;
+            }
+            self.floodfills.clear();
+            self.queried_floodfills.clear();
+            self.storage_floodfills.clear();
+            self.pending_floodfills.clear();
+            self.encrypted_outer = None;
+            self.state = PublishState::AwaitingLeaseSet;
+            if let Some(waker) = self.waker.take() {
+                waker.wake_by_ref();
+            }
+            return;
+        }
+
+        if self.refresh_encrypted_outer().is_err() {
+            tracing::warn!(
+                target: LOG_TARGET,
+                local = %self.destination_id,
+                "encrypted rollover wrap failed, retrying publication",
+            );
+            self.state = PublishState::Retry {
+                kind: RetryKind::PublishLeaseSet,
+                timer: R::timer(RETRY_TIMEOUT),
+            };
+            if let Some(waker) = self.waker.take() {
+                waker.wake_by_ref();
+            }
+            return;
+        }
+
+        self.floodfills.clear();
+        self.queried_floodfills.clear();
+        self.storage_floodfills.clear();
+        self.pending_floodfills.clear();
+        self.get_closest_floodfills();
+        if let Some(waker) = self.waker.take() {
+            waker.wake_by_ref();
+        }
+    }
+
+    /// Rotate day-bound key material without an outer payload.
+    ///
+    /// Used when the current inner object is expired or invalid at a UTC
+    /// boundary so no stale state is published while the next renewal is
+    /// awaited.
+    fn refresh_encrypted_day_only(&mut self) -> Result<(), ()> {
+        let config = self.encrypted_config.as_ref().ok_or(())?;
+        let now_secs = R::time_since_epoch().as_secs();
+        let day = els2::day_string_from_epoch_secs(now_secs);
+        let (_, blinded_public, _, storage_key) =
+            els2::blinded_day_material(&config.seed, &config.unblinded_public_key, &day)
+                .map_err(|_| ())?;
+        let boundary = els2::next_day_boundary_secs(now_secs);
+        let delay = Duration::from_secs(boundary.saturating_sub(now_secs).max(1));
+        self.key = Bytes::from(storage_key.to_vec());
+        self.encrypted_day = Some(day);
+        self.encrypted_blinded = Some(*blinded_public.as_bytes());
+        self.rollover_timer = Some(R::timer(delay));
+        Ok(())
     }
 
     fn get_closest_floodfills(&mut self) {
@@ -310,11 +574,36 @@ impl<R: Runtime> LeaseSetManager<R> {
     }
 
     /// Register new lease set for the [`Destination`].
+    ///
+    /// The argument is always the canonical ordinary inner object. Encrypted
+    /// generations wrap it locally; crypto or build failure never emits an
+    /// ordinary fallback store.
     pub fn register_lease_set(&mut self, lease_set: Bytes) {
         self.lease_set = lease_set;
 
         if self.unpublished {
             return;
+        }
+
+        if self.encrypted_config.is_some() {
+            if self.refresh_encrypted_outer().is_err() {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    local = %self.destination_id,
+                    "failed to wrap renewed inner lease set, not publishing fallback",
+                );
+                self.encrypted_outer = None;
+                self.state = PublishState::Retry {
+                    kind: RetryKind::PublishLeaseSet,
+                    timer: R::timer(RETRY_TIMEOUT),
+                };
+                if let Some(waker) = self.waker.take() {
+                    waker.wake_by_ref();
+                }
+                return;
+            }
+            self.queried_floodfills.clear();
+            self.storage_floodfills.clear();
         }
 
         if let PublishState::AwaitingLeaseSet = &self.state {
@@ -323,17 +612,26 @@ impl<R: Runtime> LeaseSetManager<R> {
             if let Some(waker) = self.waker.take() {
                 waker.wake_by_ref();
             }
+        } else if self.encrypted_config.is_some() && matches!(self.state, PublishState::Inactive) {
+            self.get_closest_floodfills();
+            if let Some(waker) = self.waker.take() {
+                waker.wake_by_ref();
+            }
         }
     }
 
     /// Register [`DatabaseStore`] message.
-    pub fn register_database_store(&mut self, key: Bytes) {
-        if self.key != key {
+    ///
+    /// The `encrypted` flag must match the generation's publication mode
+    /// and `key` must equal the current publication key. Wrong-type, wrong-
+    /// key, or stale-key replies never complete verification.
+    pub fn register_database_store(&mut self, key: Bytes, encrypted: bool) {
+        if self.key != key || self.is_encrypted() != encrypted {
             tracing::warn!(
                 target: LOG_TARGET,
                 local = %self.destination_id,
-                key = ?key.to_vec(),
-                "received DSM for an unknown key",
+                encrypted,
+                "received DSM with wrong type or key",
             );
             return;
         }
@@ -656,18 +954,33 @@ impl<R: Runtime> LeaseSetManager<R> {
             .nth(R::rng().next_u32() as usize % self.tunnels.len())
             .expect("index to be within bounds");
 
-        let message = DatabaseStoreBuilder::new(
-            self.key.clone(),
-            DatabaseStoreKind::LeaseSet2 {
+        let kind = match self.encrypted_config.is_some() {
+            false => DatabaseStoreKind::LeaseSet2 {
                 lease_set: self.lease_set.clone(),
             },
-        )
-        .with_reply_type(ReplyType::Tunnel {
-            reply_token,
-            tunnel_id: *gateway_tunnel_id,
-            router_id: gateway_router_id.clone(),
-        })
-        .build();
+            true => {
+                let outer = self.encrypted_outer.clone().unwrap_or_default();
+                if outer.is_empty() {
+                    tracing::warn!(
+                        target: LOG_TARGET,
+                        local = %self.destination_id,
+                        "encrypted publication has no outer object, not falling back",
+                    );
+                    return None;
+                }
+                DatabaseStoreKind::EncryptedLeaseSet2 {
+                    encrypted_lease_set: outer,
+                }
+            }
+        };
+
+        let message = DatabaseStoreBuilder::new(self.key.clone(), kind)
+            .with_reply_type(ReplyType::Tunnel {
+                reply_token,
+                tunnel_id: *gateway_tunnel_id,
+                router_id: gateway_router_id.clone(),
+            })
+            .build();
 
         let mut message = GarlicMessageBuilder::default()
             .with_date_time(R::time_since_epoch().as_secs() as u32)
@@ -820,6 +1133,15 @@ impl<R: Runtime> Future for LeaseSetManager<R> {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.encrypted_config.is_some() && !self.unpublished {
+            if let Some(timer) = self.rollover_timer.as_mut() {
+                if timer.poll_unpin(cx).is_ready() {
+                    self.rollover_timer = None;
+                    self.handle_rollover();
+                }
+            }
+        }
+
         loop {
             match mem::replace(&mut self.state, PublishState::Poisoned) {
                 PublishState::AwaitingTunnels { mut timer } => match timer.poll_unpin(cx) {
@@ -1261,7 +1583,7 @@ mod tests {
                                 assert_eq!(key.as_ref(), &lookup_key);
 
                                 // send database store to lease set publisher
-                                manager.register_database_store(lookup_key);
+                                manager.register_database_store(lookup_key, false);
                             }
                             _ => panic!("invalid message type"),
                         }
@@ -1443,7 +1765,7 @@ mod tests {
                                 // send reply only for the last floodfill
                                 if floodfills.is_empty() {
                                     // send database store to lease set publisher
-                                    manager.register_database_store(lookup_key);
+                                    manager.register_database_store(lookup_key, false);
                                     break;
                                 }
                             }
@@ -1626,7 +1948,7 @@ mod tests {
 
                                 if lookup_floodfills.is_empty() {
                                     // send database store to lease set publisher
-                                    manager.register_database_store(lookup_key);
+                                    manager.register_database_store(lookup_key, false);
                                     break;
                                 } else {
                                     lookup_floodfills.remove(&router_id);
@@ -3077,7 +3399,7 @@ mod tests {
                                 assert_eq!(key.as_ref(), &lookup_key);
 
                                 // send database store to lease set publisher
-                                manager.register_database_store(lookup_key);
+                                manager.register_database_store(lookup_key, false);
                                 break;
                             }
                             _ => panic!("invalid message type"),
@@ -3182,7 +3504,7 @@ mod tests {
                                 assert_eq!(key.as_ref(), &lookup_key);
 
                                 // send database store to lease set publisher
-                                manager.register_database_store(lookup_key);
+                                manager.register_database_store(lookup_key, false);
                                 break;
                             }
                             _ => panic!("invalid message type"),
@@ -3277,10 +3599,7 @@ mod tests {
             PublishState::AwaitingTunnels { .. }
         ));
         manager.register_inbound_tunnel(m135_test_lease(600));
-        assert!(std::matches!(
-            manager.state,
-            PublishState::AwaitingLeaseSet
-        ));
+        assert!(std::matches!(manager.state, PublishState::AwaitingLeaseSet));
         assert_eq!(manager.tunnels.len(), 3);
     }
 
@@ -3292,10 +3611,7 @@ mod tests {
         for _ in 0..3 {
             manager.register_inbound_tunnel(m135_test_lease(600));
         }
-        assert!(std::matches!(
-            manager.state,
-            PublishState::AwaitingLeaseSet
-        ));
+        assert!(std::matches!(manager.state, PublishState::AwaitingLeaseSet));
         let before: Vec<TunnelId> = manager.tunnels.keys().copied().collect();
 
         manager.set_desired_inbound_count(1).unwrap();
@@ -3305,10 +3621,7 @@ mod tests {
         }
         // Still awaiting the upper-layer lease set for the real tunnels;
         // no synthetic publish and no deletion occurred.
-        assert!(std::matches!(
-            manager.state,
-            PublishState::AwaitingLeaseSet
-        ));
+        assert!(std::matches!(manager.state, PublishState::AwaitingLeaseSet));
     }
 
     // M135 §8.17: unpublished destinations remain unpublished across target
@@ -3354,5 +3667,185 @@ mod tests {
                 "lease-set state contains {forbidden}"
             );
         }
+    }
+
+    fn encrypted_test_inner(
+        published_secs: u64,
+        signing_seed_bytes: [u8; 32],
+    ) -> (Bytes, crate::crypto::SigningPrivateKey, DestinationId) {
+        use crate::{
+            crypto::{SigningPrivateKey, StaticPrivateKey},
+            primitives::{Destination, LeaseSet2Header},
+        };
+
+        let signing_key = SigningPrivateKey::from_bytes(&signing_seed_bytes).unwrap();
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+        let destination_id = destination.id();
+        let lease = Lease {
+            router_id: RouterId::random(),
+            tunnel_id: TunnelId::random(),
+            expires: Duration::from_secs(published_secs + 50_000),
+        };
+        let inner = LeaseSet2 {
+            header: LeaseSet2Header {
+                destination,
+                expires: 50_000,
+                is_unpublished: false,
+                offline_signature: None,
+                published: published_secs as u32,
+            },
+            public_keys: vec![StaticPrivateKey::random(MockRuntime::rng()).public()],
+            leases: vec![lease.clone()],
+        }
+        .serialize(&signing_key);
+        (Bytes::from(inner), signing_key, destination_id)
+    }
+
+    fn encrypted_test_manager(
+        published_secs: u64,
+        seed_bytes: [u8; 32],
+    ) -> (LeaseSetManager<MockRuntime>, [u8; 32], DestinationId) {
+        let (inner, signing_key, destination_id) = encrypted_test_inner(published_secs, seed_bytes);
+        let unblinded: [u8; 32] = AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap();
+        let (tp_handle, _tm_rx, _tp_tx, _srx) = TunnelPoolHandle::create();
+        let (netdb_handle, _netdb_rx) = NetDbHandle::create();
+        let noise_ctx = NoiseContext::new(
+            crate::crypto::StaticPrivateKey::random(MockRuntime::rng()),
+            Bytes::from(RouterId::random().to_vec()),
+        );
+        let mut manager = LeaseSetManager::<MockRuntime>::new(
+            Vec::new(),
+            destination_id.clone(),
+            tp_handle.sender(),
+            1usize,
+            netdb_handle,
+            noise_ctx,
+            ProfileStorage::new(&[], &[], None),
+            false,
+            inner,
+        );
+        manager
+            .enable_encrypted_publication(EncryptedPublicationConfig::new(seed_bytes, unblinded));
+        let _ = signing_key;
+        (manager, unblinded, destination_id)
+    }
+
+    #[tokio::test]
+    async fn encrypted_publication_uses_blinded_key_and_type5() {
+        use crate::{
+            crypto::els2,
+            primitives::{EncryptedLeaseSet2, LeaseSet2},
+        };
+
+        MockRuntime::set_time(Some(Duration::from_secs(1_788_000_000)));
+        let seed = [0x42u8; 32];
+        let (manager, unblinded, destination_id) = encrypted_test_manager(1_788_000_000, seed);
+        assert!(manager.is_encrypted());
+        assert!(manager.encrypted_outer.is_some());
+
+        let day = els2::day_string_from_epoch_secs(1_788_000_000);
+        let (_, blinded, _, storage) =
+            els2::blinded_day_material(&els2::SigningSeed::from_bytes(seed), &unblinded, &day)
+                .unwrap();
+        assert_eq!(manager.key.to_vec(), storage.to_vec());
+        assert_ne!(manager.key.to_vec(), destination_id.to_vec());
+        assert_eq!(manager.encrypted_blinded.unwrap(), *blinded.as_bytes());
+
+        let outer_bytes = manager.encrypted_outer.clone().unwrap();
+        let outer = EncryptedLeaseSet2::parse(&outer_bytes).unwrap();
+        assert_eq!(outer.blinded_public_key(), blinded.as_bytes());
+
+        let sub = els2::subcredential(&unblinded, blinded.as_bytes());
+        let recovered =
+            els2::decrypt_no_auth(&sub, outer.published(), outer.outer_ciphertext()).unwrap();
+        assert_eq!(recovered, manager.lease_set.to_vec());
+        assert!(LeaseSet2::parse::<MockRuntime>(&recovered).is_ok());
+
+        MockRuntime::set_time(None);
+    }
+
+    #[tokio::test]
+    async fn encrypted_verification_rejects_wrong_type_and_stale_key() {
+        MockRuntime::set_time(Some(Duration::from_secs(1_788_000_000)));
+        let seed = [0x43u8; 32];
+        let (mut manager, _, _) = encrypted_test_manager(1_788_000_000, seed);
+        let good_key = manager.key.clone();
+        manager.state = PublishState::VerifyStorage {
+            started: MockRuntime::now(),
+            timer: None,
+        };
+
+        manager.register_database_store(good_key.clone(), false);
+        assert!(matches!(manager.state, PublishState::VerifyStorage { .. }));
+
+        manager.register_database_store(Bytes::from(vec![0u8; 32]), true);
+        assert!(matches!(manager.state, PublishState::VerifyStorage { .. }));
+
+        manager.register_database_store(good_key.clone(), true);
+        assert!(matches!(manager.state, PublishState::Inactive));
+
+        MockRuntime::set_time(None);
+    }
+
+    #[tokio::test]
+    async fn encrypted_rollover_rotates_once_and_ignores_stale_ack() {
+        use crate::crypto::els2;
+
+        let before = 1_788_000_000u64;
+        let after = els2::next_day_boundary_secs(before) + 10;
+        MockRuntime::set_time(Some(Duration::from_secs(before)));
+        let seed = [0x44u8; 32];
+        let (mut manager, unblinded, _) = encrypted_test_manager(before, seed);
+        let old_key = manager.key.clone();
+        let old_outer = manager.encrypted_outer.clone().unwrap();
+        let old_day = manager.encrypted_day.unwrap();
+
+        MockRuntime::set_time(Some(Duration::from_secs(after)));
+        manager.handle_rollover();
+        let new_key = manager.key.clone();
+        let new_outer = manager.encrypted_outer.clone().unwrap();
+        let new_day = manager.encrypted_day.unwrap();
+        assert_ne!(old_key.to_vec(), new_key.to_vec());
+        assert_ne!(old_outer.to_vec(), new_outer.to_vec());
+        assert_ne!(old_day, new_day);
+        assert_eq!(new_day, els2::day_string_from_epoch_secs(after));
+
+        let day = els2::day_string_from_epoch_secs(after);
+        let (_, blinded, _, storage) =
+            els2::blinded_day_material(&els2::SigningSeed::from_bytes(seed), &unblinded, &day)
+                .unwrap();
+        assert_eq!(new_key.to_vec(), storage.to_vec());
+        assert_eq!(manager.encrypted_blinded.unwrap(), *blinded.as_bytes());
+
+        manager.state = PublishState::VerifyStorage {
+            started: MockRuntime::now(),
+            timer: None,
+        };
+        manager.register_database_store(old_key, true);
+        assert!(matches!(manager.state, PublishState::VerifyStorage { .. }));
+        manager.register_database_store(new_key, true);
+        assert!(matches!(manager.state, PublishState::Inactive));
+
+        MockRuntime::set_time(Some(Duration::from_secs(after + 5)));
+        let key_before = manager.key.clone();
+        manager.handle_rollover();
+        assert_eq!(manager.key.to_vec(), key_before.to_vec());
+
+        MockRuntime::set_time(None);
+    }
+
+    #[tokio::test]
+    async fn encrypted_build_failure_never_falls_back() {
+        MockRuntime::set_time(Some(Duration::from_secs(1_788_000_000)));
+        let seed = [0x45u8; 32];
+        let (mut manager, _, _) = encrypted_test_manager(1_788_000_000, seed);
+        assert!(manager.is_encrypted());
+
+        manager.lease_set = Bytes::from(vec![0u8; 10]);
+        manager.register_lease_set(Bytes::from(vec![0u8; 10]));
+        assert!(manager.encrypted_outer.is_none());
+        assert!(matches!(manager.state, PublishState::Retry { .. }));
+
+        MockRuntime::set_time(None);
     }
 }

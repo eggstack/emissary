@@ -20,7 +20,7 @@ use crate::{
     crypto::{base32_decode, base32_encode, base64_encode, sha256::Sha256, SigningPrivateKey},
     destination::{
         session::parse_bundle_reply_lease_set, DeliveryStyle, Destination, DestinationEvent,
-        LeaseSetStatus,
+        EncryptedPublicationConfig, LeaseSetStatus,
     },
     error::QueryError,
     events::EventHandle,
@@ -29,7 +29,9 @@ use crate::{
     protocol::Protocol,
     runtime::{AddressBook, Instant as InstantT, JoinSet, Runtime},
     sam::{
-        parser::{DestinationContext, SamCommand, SessionKind},
+        parser::{
+            is_type5_requested, is_valid_type5_no_auth, DestinationContext, SamCommand, SessionKind,
+        },
         pending::session::SamSessionContext,
         protocol::{
             datagram::DatagramManager,
@@ -480,8 +482,25 @@ impl<R: Runtime> SamSession<R> {
             // Neutral reply LeaseSet bundling: parsed before activation, generation-local,
             // fail-safe to enabled (preserves current behavior). Disabled suppresses
             // `ExistingSession` update bundling; `NewSession` retains mandatory bundling.
-            session_destination
-                .set_bundle_reply_lease_set(parse_bundle_reply_lease_set(&options));
+            session_destination.set_bundle_reply_lease_set(parse_bundle_reply_lease_set(&options));
+            // Modern type-5 no-auth publication: validated before allocation in
+            // the parser gate and re-validated here. The canonical ordinary
+            // inner object remains the signing source; the publication owner
+            // wraps it for floodfill use while session use stays ordinary.
+            // Invalid companion combinations never reach this owner through
+            // the socket path; direct construction enables only the exact
+            // valid subset and otherwise retains ordinary behavior.
+            if is_type5_requested(&options) && is_valid_type5_no_auth(&options) {
+                let seed_bytes: [u8; 32] =
+                    AsRef::<[u8]>::as_ref(&*signing_key).try_into().unwrap_or([0u8; 32]);
+                let public_bytes: [u8; 32] =
+                    AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap_or([0u8; 32]);
+                if seed_bytes != [0u8; 32] && public_bytes != [0u8; 32] {
+                    session_destination.enable_encrypted_publication(
+                        EncryptedPublicationConfig::new(seed_bytes, public_bytes),
+                    );
+                }
+            }
             // TODO: not needed anymore?
             session_destination.publish_lease_set(local_leaseset.clone());
 

@@ -41,7 +41,8 @@ I2PControl supports a large partial subset of Proposal 170. Keep Proposal/admin/
 - M154/M147/M148 configurable Destination `SigType` remains blocked (10 cells);
 - M155 closed the corrected LeaseSet-security semantic/owner re-freeze;
 - M156 closed the neutral Red25519/Ed25519 blinding primitive with zero Proposal promotions;
-- **M157 is the sole registered/dependency-ready handoff**.
+- M157 closed the neutral modern type-5 Encrypted LeaseSet2 publication primitive with zero Proposal promotions;
+- **no registered successor** (M158 deferred pending its exact-path amendment).
 
 Current execution roadmap:
 
@@ -49,13 +50,13 @@ Current execution roadmap:
 
 Registered plan:
 
-- `plans/implementation/i2pcontrol-proposal-170/157-modern-encrypted-leaseset2-publication-primitive.md`.
+- none (M157 closed; M158 deferred pending its exact-path amendment).
 
-M157 implements neutral modern type-5 Encrypted LeaseSet2 publication only. It has zero Proposal promotion budget.
+M157 closed neutral modern type-5 Encrypted LeaseSet2 publication with zero Proposal promotions (see `plans/closure/i2pcontrol-proposal-170/157-closure.md`).
 
-## M157 exact production budget
+## M157 realized production diff (closed)
 
-Only these production paths may change:
+The closure commit changed exactly:
 
 1. `emissary-core/src/crypto/els2.rs` — new;
 2. `emissary-core/src/crypto/mod.rs` — declaration/re-export only;
@@ -68,13 +69,11 @@ Only these production paths may change:
 9. `emissary-core/src/sam/parser.rs`;
 10. `emissary-core/src/sam/session.rs`.
 
-No other production file is authorized. No Cargo manifest, dependency, lockfile, Yosemite, or `emissary-cli/src/i2pcontrol/**` production change is authorized.
+No other production file was changed. No Cargo manifest, dependency, lockfile, Yosemite, or `emissary-cli/src/i2pcontrol/**` production change occurred.
 
-M061 contains a guarded `[registered_pending]` M157 ledger. The first M157 production commit must atomically move every newly changed path into M061's ordinary `[allowed]`/`[[evidence]]` realized-diff ledger. Existing paths already in `[allowed]` remain exact owners; do not add a broad prefix/glob.
+M061 reconciled every newly changed path from its `[registered_pending]` ledger into its ordinary `[allowed]`/`[[evidence]]` ledger in the closure commit. M062 records the realized zero dependency/manifest/lock/Yosemite/I2PControl-source outcome.
 
-M062 records the same path set and explicitly records zero dependency/manifest/lock/Yosemite/I2PControl-source change.
-
-## M157 key implementation constraints
+## M157 key implementation constraints (realized)
 
 - Standard modern activation is `i2cp.leaseSetType=5`.
 - Direct Proposal-170 PR source sets `i2cp.encryptLeaseSet=true` **only** for legacy `encrypted (aes)`; do not alias that legacy flag to modern type 5.
@@ -95,7 +94,7 @@ If implementation needs any file/dependency outside the registered budget, stop 
 ```text
 M155 semantic/owner refreeze            [CLOSED]
   -> M156 Red25519/blinding              [CLOSED]
-  -> M157 modern Encrypted LS2           [REGISTERED]
+  -> M157 modern Encrypted LS2           [CLOSED]
   -> M158 lookup-secret/blinded address  [DEFERRED]
   -> M159 PSK auth                       [DEFERRED]
   -> M160 DH auth                        [DEFERRED]

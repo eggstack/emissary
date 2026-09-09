@@ -36,7 +36,7 @@ use crate::{
         Message, MessageBuilder, MessageType, I2NP_MESSAGE_EXPIRATION,
     },
     netdb::{metrics::*, query::*},
-    primitives::{DestinationId, LeaseSet2, RouterId, RouterInfo},
+    primitives::{DestinationId, EncryptedLeaseSet2, LeaseSet2, RouterId, RouterInfo},
     profile::Bucket,
     router::context::RouterContext,
     runtime::{Counter, Gauge, Histogram, Instant, JoinSet, MetricType, MetricsHandle, Runtime},
@@ -97,6 +97,23 @@ const EXPLORATION_INTERVAL_LOW_ROUTER_COUNT: usize = 55usize;
 /// How often should router exploration be performed if the known peer count is high
 const EXPLORATION_INTERVAL_HIGH_ROUTER_COUNT: usize = 170usize;
 
+/// Cached lease-set object preserved with its original store type.
+///
+/// The raw payload is never transformed between type 3 and type 5;
+/// flooding and lookup replies re-emit the exact stored bytes with the
+/// matching DatabaseStore type.
+#[derive(Clone)]
+struct CachedLeaseSet {
+    /// Exact raw payload bytes as received.
+    raw: Bytes,
+
+    /// Absolute expiry derived from the verified plaintext header.
+    expires: Duration,
+
+    /// Whether the cached object is a modern encrypted (type 5) store.
+    encrypted: bool,
+}
+
 /// Network database (NetDB).
 pub struct NetDb<R: Runtime> {
     /// Active queries.
@@ -119,10 +136,12 @@ pub struct NetDb<R: Runtime> {
     /// RX channel for receiving queries from other subsystems.
     handle_rx: mpsc::Receiver<NetDbAction, NetDbActionRecycle>,
 
-    /// Serialized [`LeasSet2`]s received via `DatabaseStore` messages.
+    /// Serialized lease sets received via `DatabaseStore` messages.
     ///
-    /// This contains entries only if `floodfill` is true.
-    lease_sets: HashMap<Bytes, (Bytes, Duration)>,
+    /// This contains entries only if `floodfill` is true. Each entry
+    /// preserves whether the stored object is an ordinary (type 3) or a
+    /// modern encrypted (type 5) payload.
+    lease_sets: HashMap<Bytes, CachedLeaseSet>,
 
     /// `NetDb` maintenance timer.
     maintenance_timer: R::Timer,
@@ -469,7 +488,14 @@ impl<R: Runtime> NetDb<R> {
         let raw_lease_set = DatabaseStore::<R>::extract_raw_lease_set(message);
         let expires = lease_set.expires();
 
-        self.lease_sets.insert(key.clone(), (raw_lease_set.clone(), expires));
+        self.lease_sets.insert(
+            key.clone(),
+            CachedLeaseSet {
+                raw: raw_lease_set.clone(),
+                expires,
+                encrypted: false,
+            },
+        );
 
         match reply {
             StoreReplyType::None => {
@@ -576,6 +602,149 @@ impl<R: Runtime> NetDb<R> {
         self.send_message(&floodfills, message);
     }
 
+    /// Handle [`DatabaseStore`] for a modern encrypted lease set.
+    ///
+    /// Validity and expiry come from the verified plaintext outer header;
+    /// the floodfill never decrypts. The exact raw payload and its type-5
+    /// identity are preserved for flooding and lookup replies.
+    fn on_encrypted_lease_set_store(
+        &mut self,
+        key: Bytes,
+        reply: StoreReplyType,
+        message: &[u8],
+        outer: EncryptedLeaseSet2,
+        raw: Bytes,
+    ) {
+        tracing::trace!(
+            target: LOG_TARGET,
+            key = ?base32_encode(&key),
+            "encrypted lease set store",
+        );
+
+        if outer.is_expired::<R>() {
+            tracing::warn!(
+                target: LOG_TARGET,
+                expired = ?outer.expires(),
+                "received an expired encrypted lease set, ignoring",
+            );
+            return;
+        }
+
+        let expires = outer.expires();
+        let raw_lease_set = raw.clone();
+
+        self.lease_sets.insert(
+            key.clone(),
+            CachedLeaseSet {
+                raw: raw_lease_set.clone(),
+                expires,
+                encrypted: true,
+            },
+        );
+
+        match reply {
+            StoreReplyType::None => {
+                tracing::trace!(
+                    target: LOG_TARGET,
+                    "reply type is `None`, don't flood the encrypted lease set",
+                );
+                return;
+            }
+            StoreReplyType::Tunnel {
+                reply_token,
+                tunnel_id,
+                router_id,
+            } => {
+                tracing::trace!(
+                    target: LOG_TARGET,
+                    key = ?base32_encode(&key),
+                    ?reply_token,
+                    %router_id,
+                    %tunnel_id,
+                    "send encrypted lease set store reply to tunnel",
+                );
+
+                let expires = R::time_since_epoch() + I2NP_MESSAGE_EXPIRATION;
+                let message = MessageBuilder::standard()
+                    .with_expiration(expires)
+                    .with_message_type(MessageType::DeliveryStatus)
+                    .with_message_id(R::rng().next_u32())
+                    .with_payload(
+                        &DeliveryStatus {
+                            message_id: reply_token,
+                            timestamp: R::time_since_epoch(),
+                        }
+                        .serialize(),
+                    )
+                    .build();
+
+                let message = Message {
+                    expiration: expires,
+                    message_type: MessageType::TunnelGateway,
+                    message_id: R::rng().next_u32(),
+                    payload: TunnelGateway {
+                        tunnel_id,
+                        payload: &message,
+                    }
+                    .serialize(),
+                };
+                self.send_message(&[router_id], message);
+            }
+            StoreReplyType::Router {
+                reply_token,
+                router_id,
+            } => {
+                tracing::trace!(
+                    target: LOG_TARGET,
+                    key = ?base32_encode(&key),
+                    ?reply_token,
+                    %router_id,
+                    "send encrypted lease set store reply to router",
+                );
+
+                let message = Message {
+                    expiration: R::time_since_epoch() + I2NP_MESSAGE_EXPIRATION,
+                    message_type: MessageType::DatabaseStore,
+                    message_id: R::rng().next_u32(),
+                    payload: DeliveryStatus {
+                        message_id: reply_token,
+                        timestamp: R::time_since_epoch(),
+                    }
+                    .serialize()
+                    .to_vec(),
+                };
+
+                self.send_message(&[router_id], message);
+            }
+        }
+
+        let _ = message;
+        let floodfills = self.floodfill_dht.closest(&key, 3usize).collect::<Vec<_>>();
+        if floodfills.is_empty() {
+            tracing::debug!(
+                target: LOG_TARGET,
+                "cannot flood encrypted lease set, no floodfills",
+            );
+            return;
+        }
+
+        let message = Message {
+            expiration: R::time_since_epoch() + I2NP_MESSAGE_EXPIRATION,
+            message_type: MessageType::DatabaseStore,
+            message_id: R::rng().next_u32(),
+            payload: DatabaseStoreBuilder::new(
+                key,
+                DatabaseStoreKind::EncryptedLeaseSet2 {
+                    encrypted_lease_set: raw_lease_set,
+                },
+            )
+            .build()
+            .to_vec(),
+        };
+
+        self.send_message(&floodfills, message);
+    }
+
     /// Handle [`DatabaseLookup`] for a [`LeaseSet2`].
     ///
     /// If lease set under `key` is not found in local storage, a [`DatabaseSearchReply`] message
@@ -617,23 +786,27 @@ impl<R: Runtime> NetDb<R> {
                     .serialize(),
                 )
             }
-            Some((lease_set, _)) => {
+            Some(entry) => {
                 tracing::trace!(
                     target: LOG_TARGET,
                     key = %b32_key,
                     %destination_id,
+                    encrypted = %entry.encrypted,
                     "lease set found from local storage",
                 );
 
+                let kind = match entry.encrypted {
+                    false => DatabaseStoreKind::LeaseSet2 {
+                        lease_set: entry.raw.clone(),
+                    },
+                    true => DatabaseStoreKind::EncryptedLeaseSet2 {
+                        encrypted_lease_set: entry.raw.clone(),
+                    },
+                };
+
                 (
                     MessageType::DatabaseStore,
-                    DatabaseStoreBuilder::new(
-                        key,
-                        DatabaseStoreKind::LeaseSet2 {
-                            lease_set: lease_set.clone(),
-                        },
-                    )
-                    .build(),
+                    DatabaseStoreBuilder::new(key, kind).build(),
                 )
             }
         };
@@ -915,6 +1088,13 @@ impl<R: Runtime> NetDb<R> {
                     destination_id = %lease_set.header.destination.id(),
                     "ignoring lease set database store",
                 ),
+                DatabaseStorePayload::EncryptedLeaseSet2 { outer, raw } if self.floodfill => {
+                    self.on_encrypted_lease_set_store(key, reply, &message.payload, outer, raw);
+                }
+                DatabaseStorePayload::EncryptedLeaseSet2 { .. } => tracing::trace!(
+                    target: LOG_TARGET,
+                    "ignoring encrypted lease set database store",
+                ),
             },
             Some(kind) => match (payload, kind) {
                 (DatabaseStorePayload::LeaseSet2 { lease_set }, QueryKind::LeaseSet { query }) => {
@@ -1065,6 +1245,16 @@ impl<R: Runtime> NetDb<R> {
                         );
                         query.complete(Err(QueryError::Malformed));
                     }
+                }
+                (
+                    DatabaseStorePayload::EncryptedLeaseSet2 { .. },
+                    QueryKind::LeaseSet { query },
+                ) => {
+                    tracing::warn!(
+                        target: LOG_TARGET,
+                        "received encrypted lease set for ordinary lease-set query, ignoring",
+                    );
+                    self.active.insert(key.clone(), QueryKind::LeaseSet { query });
                 }
                 (payload, query) => tracing::warn!(
                     target: LOG_TARGET,
@@ -1293,8 +1483,9 @@ impl<R: Runtime> NetDb<R> {
                 target: LOG_TARGET,
                 "ignoring database lookup, not a floodfill",
             ),
-            MessageType::DatabaseSearchReply =>
-                return self.on_database_search_reply(message, sender),
+            MessageType::DatabaseSearchReply => {
+                return self.on_database_search_reply(message, sender)
+            }
             MessageType::DeliveryStatus => {}
             message_type => tracing::warn!(
                 target: LOG_TARGET,
@@ -1588,7 +1779,7 @@ impl<R: Runtime> NetDb<R> {
             let num_pruned = self
                 .lease_sets
                 .iter()
-                .filter_map(|(key, (_, expires))| (expires < &now).then_some(key.clone()))
+                .filter_map(|(key, entry)| (entry.expires < now).then_some(key.clone()))
                 .collect::<Vec<_>>()
                 .into_iter()
                 .fold(0usize, |count, key| {
@@ -1697,8 +1888,9 @@ impl<R: Runtime> NetDb<R> {
                     let reader = self.router_ctx.profile_storage().reader();
 
                     match reader.router_info(&floodfill) {
-                        Some(router_info) =>
-                            break (floodfill, router_info.identity.static_key().clone()),
+                        Some(router_info) => {
+                            break (floodfill, router_info.identity.static_key().clone())
+                        }
                         None => {
                             tracing::debug!(
                                 target: LOG_TARGET,
@@ -1849,7 +2041,7 @@ impl<R: Runtime> Future for NetDb<R> {
                         self.router_dht.as_mut().map(|dht| dht.add_router(router_id.clone()));
                     }
                 }
-                Poll::Ready(Some(NetDbEvent::Message { messages })) =>
+                Poll::Ready(Some(NetDbEvent::Message { messages })) => {
                     messages.into_iter().for_each(|(router_id, message)| {
                         if let Err(error) = self.on_message(message, Some(router_id)) {
                             tracing::debug!(
@@ -1858,7 +2050,8 @@ impl<R: Runtime> Future for NetDb<R> {
                                 "failed to handle message",
                             );
                         }
-                    }),
+                    })
+                }
                 Poll::Ready(Some(NetDbEvent::Dummy)) => {}
             }
         }
@@ -1912,12 +2105,15 @@ impl<R: Runtime> Future for NetDb<R> {
             match self.handle_rx.poll_recv(cx) {
                 Poll::Pending => break,
                 Poll::Ready(None) => return Poll::Ready(()),
-                Poll::Ready(Some(NetDbAction::QueryLeaseSet2 { key, tx })) =>
-                    self.query_lease_set(key, tx),
-                Poll::Ready(Some(NetDbAction::GetClosestFloodfills { key, tx })) =>
-                    self.get_closest_floodfills(key, tx),
-                Poll::Ready(Some(NetDbAction::QueryRouterInfo { router_id, tx })) =>
-                    self.query_router_info(router_id, tx),
+                Poll::Ready(Some(NetDbAction::QueryLeaseSet2 { key, tx })) => {
+                    self.query_lease_set(key, tx)
+                }
+                Poll::Ready(Some(NetDbAction::GetClosestFloodfills { key, tx })) => {
+                    self.get_closest_floodfills(key, tx)
+                }
+                Poll::Ready(Some(NetDbAction::QueryRouterInfo { router_id, tx })) => {
+                    self.query_router_info(router_id, tx)
+                }
                 Poll::Ready(Some(NetDbAction::PublishRouterInfo {
                     router_id,
                     router_info,
@@ -1941,10 +2137,11 @@ impl<R: Runtime> Future for NetDb<R> {
             match self.query_timers.poll_next_unpin(cx) {
                 Poll::Pending => break,
                 Poll::Ready(None) => return Poll::Ready(()),
-                Poll::Ready(Some(key)) =>
+                Poll::Ready(Some(key)) => {
                     if let Some(query) = self.active.remove(&key) {
                         self.handle_timeout(key, query);
-                    },
+                    }
+                }
             }
         }
 
@@ -2136,6 +2333,145 @@ mod tests {
                 .unwrap();
             assert!(floodfills.remove(&router_id));
         }
+    }
+
+    #[tokio::test]
+    async fn encrypted_store_preserved_as_type5() {
+        use crate::crypto::els2;
+
+        let storage = ProfileStorage::new(&Vec::new(), &Vec::new(), None);
+        let (tp_handle, _tm_rx, _tp_tx, _srx) = TunnelPoolHandle::create();
+
+        let floodfills = (0..3)
+            .map(|_| {
+                let info = RouterInfoBuilder::default().as_floodfill().build().0;
+                let id = info.identity.id();
+                storage.add_router(info);
+
+                id
+            })
+            .collect::<HashSet<_>>();
+
+        let (router_info, static_key, signing_key) = RouterInfoBuilder::default().build();
+        let SubsystemManagerContext {
+            dial_rx,
+            handle,
+            manager,
+            netdb_rx: _netdb_rx,
+            transit_rx: _transit_rx,
+            transport_tx: _transport_tx,
+            ..
+        } = SubsystemManager::<MockRuntime>::new(
+            router_info.identity.id().clone(),
+            NoiseContext::new(
+                static_key.clone(),
+                Bytes::from(router_info.identity.id().to_vec()),
+            ),
+            Default::default(),
+            MockRuntime::register_metrics(vec![], None),
+        );
+        let (_event_mgr, _event_subscriber, event_handle) =
+            EventManager::new(None, MockRuntime::register_metrics(vec![], None));
+        let (_netdb_tx, netdb_rx) = channel(64);
+
+        let (mut netdb, _handle) = NetDb::<MockRuntime>::new(
+            RouterContext::new(
+                MockRuntime::register_metrics(vec![], None),
+                storage,
+                router_info.identity.id(),
+                Bytes::from(router_info.serialize(&signing_key)),
+                static_key,
+                signing_key,
+                2u8,
+                event_handle.clone(),
+            ),
+            true,
+            tp_handle,
+            netdb_rx,
+            handle,
+        );
+        tokio::spawn(manager);
+
+        let seed = [0x01u8; 32];
+        let unblinded = [
+            0x8a, 0x88, 0xe3, 0xdd, 0x74, 0x09, 0xf1, 0x95, 0xfd, 0x52, 0xdb, 0x2d, 0x3c, 0xba,
+            0x5d, 0x72, 0xca, 0x67, 0x09, 0xbf, 0x1d, 0x94, 0x12, 0x1b, 0xf3, 0x74, 0x88, 0x01,
+            0xb4, 0x0f, 0x6f, 0x5c,
+        ];
+        let day = *b"20260909";
+        let signing_seed = els2::SigningSeed::from_bytes(seed);
+        let (_, blinded_public, blinded_private, storage_key) =
+            els2::blinded_day_material(&signing_seed, &unblinded, &day).unwrap();
+        let published = MockRuntime::time_since_epoch().as_secs() as u32;
+        let sub = els2::subcredential(&unblinded, blinded_public.as_bytes());
+        let inner_salt = [0x11u8; 32];
+        let outer_salt = [0x22u8; 32];
+        let outer_ciphertext = els2::encrypt_no_auth_with_salts(
+            &sub,
+            published,
+            &[0x55u8; 64],
+            &inner_salt,
+            &outer_salt,
+        )
+        .unwrap();
+        let outer = EncryptedLeaseSet2::build(
+            blinded_public.as_bytes(),
+            published,
+            600,
+            outer_ciphertext,
+            &blinded_private,
+            MockRuntime::rng(),
+        )
+        .unwrap();
+        let outer_bytes = outer.serialize();
+        let key = Bytes::from(storage_key.to_vec());
+
+        let message = DatabaseStoreBuilder::new(
+            key.clone(),
+            DatabaseStoreKind::EncryptedLeaseSet2 {
+                encrypted_lease_set: Bytes::from(outer_bytes.clone()),
+            },
+        )
+        .build();
+        assert_eq!(message[32], 5u8);
+
+        assert!(netdb.lease_sets.is_empty());
+        assert!(netdb
+            .on_message(
+                Message {
+                    payload: message.to_vec(),
+                    message_type: MessageType::DatabaseStore,
+                    ..Default::default()
+                },
+                None
+            )
+            .is_ok());
+        assert_eq!(netdb.lease_sets.len(), 1);
+
+        let entry = netdb.lease_sets.get(&key).expect("cached").clone();
+        assert!(entry.encrypted);
+        assert_eq!(entry.raw.to_vec(), outer_bytes);
+        assert_eq!(entry.expires, outer.expires());
+
+        let rebuilt = DatabaseStoreBuilder::new(
+            key.clone(),
+            DatabaseStoreKind::EncryptedLeaseSet2 {
+                encrypted_lease_set: entry.raw.clone(),
+            },
+        )
+        .build();
+        assert_eq!(rebuilt[32], 5u8);
+        let store = DatabaseStore::<MockRuntime>::parse(&rebuilt).unwrap();
+        assert!(store.payload.is_encrypted_lease_set());
+        match store.payload {
+            DatabaseStorePayload::EncryptedLeaseSet2 { outer, raw } => {
+                assert_eq!(raw.to_vec(), outer_bytes);
+                assert_eq!(outer.serialize(), outer_bytes);
+            }
+            _ => panic!("invalid payload"),
+        }
+
+        let _ = (dial_rx, floodfills);
     }
 
     #[tokio::test]
@@ -2565,8 +2901,9 @@ mod tests {
             // verify all floodfills have another pending message
             assert!(floodfills.iter().all(|_| {
                 match event_rx.try_recv().unwrap() {
-                    SubsystemManagerEvent::Message { router_id, .. } =>
-                        floodfills_clone.remove(&router_id),
+                    SubsystemManagerEvent::Message { router_id, .. } => {
+                        floodfills_clone.remove(&router_id)
+                    }
                     _ => panic!("invalid event"),
                 }
             }));
@@ -2612,8 +2949,9 @@ mod tests {
             // verify all floodfills have another pending message
             assert!(floodfills.iter().all(|_| {
                 match event_rx.try_recv().unwrap() {
-                    SubsystemManagerEvent::Message { router_id, .. } =>
-                        floodfills_clone.remove(&router_id),
+                    SubsystemManagerEvent::Message { router_id, .. } => {
+                        floodfills_clone.remove(&router_id)
+                    }
                     _ => panic!("invalid event"),
                 }
             }));
@@ -2922,7 +3260,14 @@ mod tests {
             (Bytes::from(id.to_vec()), lease_set, expires)
         };
 
-        netdb.lease_sets.insert(key.clone(), (lease_set, expires));
+        netdb.lease_sets.insert(
+            key.clone(),
+            CachedLeaseSet {
+                raw: lease_set,
+                expires,
+                encrypted: false,
+            },
+        );
 
         let tunnel_id = TunnelId::random();
         let router_id = RouterId::random();
@@ -3946,6 +4291,7 @@ mod tests {
                             true
                         }
                         DatabaseStorePayload::LeaseSet2 { .. } => false,
+                        DatabaseStorePayload::EncryptedLeaseSet2 { .. } => false,
                     }
                 }
                 _ => false,

@@ -30,11 +30,12 @@ metrics = []
 expected = "ordinary registry Yosemite plus exact optional git fork package when i2pcontrol is enabled"
 baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
-# Current milestone-specific dependency budget. M159 is the sole registered
-# successor. Its exact four-file production set is a strict subset of existing
-# realized M061 owners, so this record creates no new source-boundary waiver.
+# Current milestone-specific dependency budget. M159 realized its exact
+# four-file subset of already-realized M061 owners and closed with zero
+# dependency/manifest/lock/Yosemite/I2PControl-source change, so this record
+# does not authorize a new source path. No successor is currently registered.
 [current_registration]
-milestone = "M159"
+milestone = "M159 (closed complete, no registered successor)"
 production_paths = [
   "emissary-core/src/crypto/els2.rs",
   "emissary-core/src/destination/lease_set.rs",
@@ -47,7 +48,7 @@ manifest_changes = []
 lockfile_change = false
 yosemite_change = false
 i2pcontrol_source_change = false
-rationale = "M159 extends the existing M157/M158 ELS2 owners with standard PSK client authorization and reuses existing HMAC-SHA256, ChaCha20, RNG, zeroize, Base64, Red25519 and encrypted-LS2 primitives. No Cargo, lockfile, Yosemite, feature, I2PControl production-source, or new source-file change is required or authorized."
+rationale = "M159 realized a strict subset of already-realized M061 owners and reused existing HMAC-SHA256, ChaCha20, RNG, zeroize, Base64, Red25519 and encrypted-LS2 primitives with no new dependency or manifest/lock/Yosemite/I2PControl production change (observed; see 159-closure.md)."
 
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its

@@ -85,10 +85,10 @@ const STORAGE_VERIFICATION_TOTAL_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// Narrow generation-local publication configuration for modern type-5 mode.
 ///
-/// Carries the type-7 seed, unblinded public key, and optional lookup
-/// secret from session construction into the publication owner. Secret
-/// material is never `Debug`-formattable. Ordinary mode uses `None` and
-/// retains exact prior behavior.
+/// Carries the type-7 seed, unblinded public key, optional lookup secret,
+/// and optional PSK authorization from session construction into the
+/// publication owner. Secret material is never `Debug`-formattable.
+/// Ordinary mode uses `None` and retains exact prior behavior.
 #[derive(Clone)]
 pub struct EncryptedPublicationConfig {
     /// Type-7 signing seed.
@@ -99,6 +99,9 @@ pub struct EncryptedPublicationConfig {
 
     /// Generation-local lookup secret (empty means unsecreted).
     lookup_secret: els2::LookupSecret,
+
+    /// Generation-local PSK authorization (`None` means no client auth).
+    psk_auth: Option<els2::PskAuthorization>,
 }
 
 impl EncryptedPublicationConfig {
@@ -108,6 +111,7 @@ impl EncryptedPublicationConfig {
             seed: SigningSeed::from_bytes(seed_bytes),
             unblinded_public_key,
             lookup_secret: els2::LookupSecret::empty(),
+            psk_auth: None,
         }
     }
 
@@ -126,8 +130,49 @@ impl EncryptedPublicationConfig {
             seed: SigningSeed::from_bytes(seed_bytes),
             unblinded_public_key,
             lookup_secret,
+            psk_auth: None,
         }
     }
+
+    /// Create a new publication configuration with PSK authorization.
+    ///
+    /// The authorization sequence is owned for exactly one destination
+    /// generation. Every regenerated outer object uses a fresh auth
+    /// cookie/auth salt and freshly randomized client-record order when
+    /// more than one key exists. Core keeps no persistent copy.
+    pub fn with_psk(
+        seed_bytes: [u8; 32],
+        unblinded_public_key: [u8; 32],
+        psk_auth: els2::PskAuthorization,
+    ) -> Self {
+        Self {
+            seed: SigningSeed::from_bytes(seed_bytes),
+            unblinded_public_key,
+            lookup_secret: els2::LookupSecret::empty(),
+            psk_auth: Some(psk_auth),
+        }
+    }
+
+    /// Create a new publication configuration with lookup secret and PSK.
+    ///
+    /// The lookup secret feeds daily blinding exactly as in the
+    /// secret-only mode; the PSK sequence authorizes clients exactly as in
+    /// the PSK-only mode. Both are generation-local with no persistent
+    /// copy in core.
+    pub fn with_secret_and_psk(
+        seed_bytes: [u8; 32],
+        unblinded_public_key: [u8; 32],
+        lookup_secret: els2::LookupSecret,
+        psk_auth: els2::PskAuthorization,
+    ) -> Self {
+        Self {
+            seed: SigningSeed::from_bytes(seed_bytes),
+            unblinded_public_key,
+            lookup_secret,
+            psk_auth: Some(psk_auth),
+        }
+    }
+
 }
 
 /// Derive the outer expiry offset for an inner header.
@@ -469,9 +514,18 @@ impl<R: Runtime> LeaseSetManager<R> {
         let expires_offset = outer_expires_offset(inner.header.published, inner.header.expires);
         let subcredential =
             els2::subcredential(&config.unblinded_public_key, blinded_public.as_bytes());
-        let outer_ciphertext =
-            els2::encrypt_no_auth(&subcredential, published, &self.lease_set, R::rng())
-                .map_err(|_| ())?;
+        let outer_ciphertext = match config.psk_auth.as_ref() {
+            None => els2::encrypt_no_auth(&subcredential, published, &self.lease_set, R::rng())
+                .map_err(|_| ())?,
+            Some(psk_auth) => els2::encrypt_psk(
+                &subcredential,
+                published,
+                &self.lease_set,
+                psk_auth.as_slice(),
+                R::rng(),
+            )
+            .map_err(|_| ())?,
+        };
         let outer = EncryptedLeaseSet2::build(
             blinded_public.as_bytes(),
             published,
@@ -4026,6 +4080,200 @@ mod tests {
             els2::blinded_day_material(&els2::SigningSeed::from_bytes(seed), &unblinded, &day)
                 .unwrap();
         assert_eq!(plain_manager.key.to_vec(), plain_storage.to_vec());
+
+        MockRuntime::set_time(None);
+    }
+
+    fn encrypted_test_manager_with_psk(
+        published_secs: u64,
+        seed_bytes: [u8; 32],
+        psks: &[[u8; 32]],
+    ) -> (LeaseSetManager<MockRuntime>, [u8; 32], DestinationId) {
+        use crate::crypto::els2;
+        let (inner, signing_key, destination_id) = encrypted_test_inner(published_secs, seed_bytes);
+        let unblinded: [u8; 32] = AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap();
+        let (tp_handle, _tm_rx, _tp_tx, _srx) = TunnelPoolHandle::create();
+        let (netdb_handle, _netdb_rx) = NetDbHandle::create();
+        let noise_ctx = NoiseContext::new(
+            crate::crypto::StaticPrivateKey::random(MockRuntime::rng()),
+            Bytes::from(RouterId::random().to_vec()),
+        );
+        let mut manager = LeaseSetManager::<MockRuntime>::new(
+            Vec::new(),
+            destination_id.clone(),
+            tp_handle.sender(),
+            1usize,
+            netdb_handle,
+            noise_ctx,
+            ProfileStorage::new(&[], &[], None),
+            false,
+            inner,
+        );
+        let keys = psks.iter().map(|b| els2::PskKey::from_bytes(*b)).collect::<Vec<_>>();
+        let auth = els2::PskAuthorization::from_keys(keys).unwrap();
+        manager.enable_encrypted_publication(EncryptedPublicationConfig::with_psk(
+            seed_bytes, unblinded, auth,
+        ));
+        let _ = signing_key;
+        (manager, unblinded, destination_id)
+    }
+
+    #[tokio::test]
+    async fn encrypted_psk_publication_decrypts_and_sets_bounded_outer() {
+        use crate::{
+            crypto::els2,
+            primitives::{EncryptedLeaseSet2, LeaseSet2},
+        };
+
+        MockRuntime::set_time(Some(Duration::from_secs(1_788_000_000)));
+        let seed = [0x49u8; 32];
+        let psk_a = [0xA1u8; 32];
+        let psk_b = [0xB2u8; 32];
+        let (manager, unblinded, _) =
+            encrypted_test_manager_with_psk(1_788_000_000, seed, &[psk_a, psk_b]);
+        assert!(manager.is_encrypted());
+        let outer_bytes = manager.encrypted_outer.clone().unwrap();
+        assert!(outer_bytes.len() > 44);
+        let outer = EncryptedLeaseSet2::parse(&outer_bytes).unwrap();
+
+        let day = els2::day_string_from_epoch_secs(1_788_000_000);
+        let (_, blinded, _, storage) =
+            els2::blinded_day_material(&els2::SigningSeed::from_bytes(seed), &unblinded, &day)
+                .unwrap();
+        assert_eq!(manager.key.to_vec(), storage.to_vec());
+
+        let sub = els2::subcredential(&unblinded, blinded.as_bytes());
+        for psk in [&psk_a, &psk_b] {
+            let recovered =
+                els2::decrypt_psk(&sub, outer.published(), outer.outer_ciphertext(), psk).unwrap();
+            assert_eq!(recovered, manager.lease_set.to_vec());
+            assert!(LeaseSet2::parse::<MockRuntime>(&recovered).is_ok());
+        }
+        assert!(els2::decrypt_psk(
+            &sub,
+            outer.published(),
+            outer.outer_ciphertext(),
+            &[0x55; 32]
+        )
+        .is_err());
+        assert!(els2::decrypt_no_auth(&sub, outer.published(), outer.outer_ciphertext()).is_err());
+        assert!(outer.outer_ciphertext().len() <= els2::MAX_ENCRYPTED_DATA_LEN);
+
+        MockRuntime::set_time(None);
+    }
+
+    #[tokio::test]
+    async fn encrypted_psk_rollover_uses_fresh_object_and_keeps_auth() {
+        use crate::crypto::els2;
+
+        let before = 1_788_000_000u64;
+        let after = els2::next_day_boundary_secs(before) + 10;
+        MockRuntime::set_time(Some(Duration::from_secs(before)));
+        let seed = [0x4Au8; 32];
+        let psk_a = [0xA1u8; 32];
+        let (mut manager, unblinded, _) = encrypted_test_manager_with_psk(before, seed, &[psk_a]);
+        let old_outer = manager.encrypted_outer.clone().unwrap();
+
+        MockRuntime::set_time(Some(Duration::from_secs(after)));
+        manager.handle_rollover();
+        let new_outer = manager.encrypted_outer.clone().unwrap();
+        assert_ne!(old_outer.to_vec(), new_outer.to_vec());
+
+        let day = els2::day_string_from_epoch_secs(after);
+        let (_, blinded, _, _) =
+            els2::blinded_day_material(&els2::SigningSeed::from_bytes(seed), &unblinded, &day)
+                .unwrap();
+        let sub = els2::subcredential(&unblinded, blinded.as_bytes());
+        let outer = crate::primitives::EncryptedLeaseSet2::parse(&new_outer).unwrap();
+        let recovered =
+            els2::decrypt_psk(&sub, outer.published(), outer.outer_ciphertext(), &psk_a).unwrap();
+        assert_eq!(recovered, manager.lease_set.to_vec());
+
+        manager.state = PublishState::VerifyStorage {
+            started: MockRuntime::now(),
+            timer: None,
+        };
+        let new_key = manager.key.clone();
+        manager.register_database_store(new_key.clone(), false);
+        assert!(matches!(manager.state, PublishState::VerifyStorage { .. }));
+        manager.register_database_store(new_key, true);
+        assert!(matches!(manager.state, PublishState::Inactive));
+
+        MockRuntime::set_time(None);
+    }
+
+    #[tokio::test]
+    async fn encrypted_psk_with_secret_uses_secret_derived_key() {
+        use crate::{
+            crypto::els2,
+            primitives::{EncryptedLeaseSet2, LeaseSet2},
+        };
+
+        MockRuntime::set_time(Some(Duration::from_secs(1_788_000_000)));
+        let seed = [0x4Bu8; 32];
+        let psk_a = [0xA1u8; 32];
+        let (inner, signing_key, destination_id) = encrypted_test_inner(1_788_000_000, seed);
+        let unblinded: [u8; 32] = AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap();
+        let (tp_handle, _tm_rx, _tp_tx, _srx) = TunnelPoolHandle::create();
+        let (netdb_handle, _netdb_rx) = NetDbHandle::create();
+        let noise_ctx = NoiseContext::new(
+            crate::crypto::StaticPrivateKey::random(MockRuntime::rng()),
+            Bytes::from(RouterId::random().to_vec()),
+        );
+        let mut manager = LeaseSetManager::<MockRuntime>::new(
+            Vec::new(),
+            destination_id,
+            tp_handle.sender(),
+            1usize,
+            netdb_handle,
+            noise_ctx,
+            ProfileStorage::new(&[], &[], None),
+            false,
+            inner,
+        );
+        let auth =
+            els2::PskAuthorization::from_keys(vec![els2::PskKey::from_bytes(psk_a)]).unwrap();
+        let secret = els2::LookupSecret::from_bytes(b"lookup-secret".to_vec()).unwrap();
+        manager.enable_encrypted_publication(EncryptedPublicationConfig::with_secret_and_psk(
+            seed,
+            unblinded,
+            secret.clone(),
+            auth,
+        ));
+        assert!(manager.encrypted_outer.is_some());
+
+        let day = els2::day_string_from_epoch_secs(1_788_000_000);
+        let (_, blinded, _, storage) = els2::blinded_day_material_with_secret(
+            &els2::SigningSeed::from_bytes(seed),
+            &unblinded,
+            &day,
+            &secret,
+        )
+        .unwrap();
+        assert_eq!(manager.key.to_vec(), storage.to_vec());
+        let sub = els2::subcredential(&unblinded, blinded.as_bytes());
+        let outer_bytes = manager.encrypted_outer.clone().unwrap();
+        let outer = EncryptedLeaseSet2::parse(&outer_bytes).unwrap();
+        let recovered =
+            els2::decrypt_psk(&sub, outer.published(), outer.outer_ciphertext(), &psk_a).unwrap();
+        assert_eq!(recovered, manager.lease_set.to_vec());
+        assert!(LeaseSet2::parse::<MockRuntime>(&recovered).is_ok());
+
+        MockRuntime::set_time(None);
+    }
+
+    #[tokio::test]
+    async fn encrypted_psk_build_failure_never_falls_back() {
+        MockRuntime::set_time(Some(Duration::from_secs(1_788_000_000)));
+        let seed = [0x4Cu8; 32];
+        let (mut manager, _, _) =
+            encrypted_test_manager_with_psk(1_788_000_000, seed, &[[0xA1u8; 32]]);
+        assert!(manager.encrypted_outer.is_some());
+
+        manager.lease_set = Bytes::from(vec![0u8; 10]);
+        manager.register_lease_set(Bytes::from(vec![0u8; 10]));
+        assert!(manager.encrypted_outer.is_none());
+        assert!(matches!(manager.state, PublishState::Retry { .. }));
 
         MockRuntime::set_time(None);
     }

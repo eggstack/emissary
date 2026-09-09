@@ -1,6 +1,6 @@
 # M159 — Encrypted LeaseSet PSK Client-Authorization Primitive
 
-Status: **registered / dependency-ready; M158 closed complete**
+Status: **closed as complete** (closure: `plans/closure/i2pcontrol-proposal-170/159-closure.md`; M158 hard dependency was satisfied; zero promotions observed)
 
 Class: neutral modern Encrypted LeaseSet2 client-authorization infrastructure
 

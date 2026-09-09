@@ -1,6 +1,14 @@
 # M160 — Encrypted LeaseSet DH Client-Authorization Primitive
 
-Status: **deferred / unregistered; hard-depends on M159 closure; exact envelope pre-frozen**
+Status: **deferred / unregistered; M159 hard dependency satisfied, registration pending**
+
+> M159 closed complete (`plans/closure/i2pcontrol-proposal-170/159-closure.md`),
+> satisfying this milestone's hard dependency. The pre-frozen envelope
+> revalidates cleanly (same four exact files, existing `x25519-dalek`
+> sufficient, zero-dependency budget intact). Registration must still be
+> authored in a separate commit with exact M061/M062 authorization; this
+> file is otherwise unchanged and no production work is authorized by this
+> note.
 
 Class: neutral modern Encrypted LeaseSet2 client-authorization infrastructure
 

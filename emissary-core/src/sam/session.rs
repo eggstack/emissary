@@ -32,7 +32,8 @@ use crate::{
     runtime::{AddressBook, Instant as InstantT, JoinSet, Runtime},
     sam::{
         parser::{
-            is_type5_requested, is_valid_type5_no_auth, DestinationContext, SamCommand, SessionKind,
+            is_type5_requested, is_valid_type5_no_auth, is_valid_type5_psk, DestinationContext,
+            SamCommand, SessionKind,
         },
         pending::session::SamSessionContext,
         protocol::{
@@ -246,15 +247,15 @@ impl IdlePolicy {
 ///
 /// Published type-5 generations expose the canonical extended
 /// encrypted-service address for the unblinded type-7 public key with the
-/// public secret-required flag and no client-auth flag. All other
-/// destinations keep the ordinary destination-hash address byte-for-byte.
+/// public secret-required and auth-required flags. All other destinations
+/// keep the ordinary destination-hash address byte-for-byte.
 fn server_destination_address(
     destination_id: &DestinationId,
-    type5_public_key: Option<([u8; 32], bool)>,
+    type5_public_key: Option<([u8; 32], bool, bool)>,
 ) -> String {
     match type5_public_key {
-        Some((public_key, secret_required)) => {
-            els2::encode_encrypted_service_b32(&public_key, secret_required, false)
+        Some((public_key, secret_required, auth_required)) => {
+            els2::encode_encrypted_service_b32(&public_key, secret_required, auth_required)
         }
         None => base32_encode(destination_id.to_vec()),
     }
@@ -436,6 +437,7 @@ impl<R: Runtime> SamSession<R> {
                 private_key,
                 signing_key,
                 lookup_secret,
+                psk_auth,
             } = destination;
             let destination_id = destination.id();
 
@@ -483,14 +485,18 @@ impl<R: Runtime> SamSession<R> {
             // Published type-5 destinations expose the canonical extended
             // encrypted-service address through the existing opaque address
             // string. The secret itself is never encoded; only the public
-            // requirement flag reflects the generation-local secret.
-            // Ordinary destinations keep the exact prior address behavior.
+            // requirement flags reflect the generation-local secret and
+            // client-auth state. Ordinary destinations keep the exact prior
+            // address behavior.
             if is_unpublished {
                 event_handle.client_destination_started(session_id.to_string());
             } else {
-                let type5_public_key = match is_type5_requested(&options)
-                    && is_valid_type5_no_auth(&options)
-                {
+                let no_auth_valid =
+                    is_type5_requested(&options) && is_valid_type5_no_auth(&options);
+                let psk_valid = is_type5_requested(&options)
+                    && is_valid_type5_psk(&options)
+                    && psk_auth.is_some();
+                let type5_public_key = match no_auth_valid || psk_valid {
                     false => None,
                     true => {
                         let public_bytes: [u8; 32] = AsRef::<[u8]>::as_ref(&signing_key.public())
@@ -498,7 +504,7 @@ impl<R: Runtime> SamSession<R> {
                             .unwrap_or([0u8; 32]);
                         match public_bytes != [0u8; 32] {
                             false => None,
-                            true => Some((public_bytes, !lookup_secret.is_empty())),
+                            true => Some((public_bytes, !lookup_secret.is_empty(), psk_valid)),
                         }
                     }
                 };
@@ -530,10 +536,10 @@ impl<R: Runtime> SamSession<R> {
             // wraps it for floodfill use while session use stays ordinary.
             // Invalid companion combinations never reach this owner through
             // the socket path; direct construction enables only the exact
-            // valid subset and otherwise retains ordinary behavior. The
-            // generation-local secret moves once into the publication
-            // configuration; crypto or build failure never falls back to
-            // unsecreted or ordinary publication.
+            // valid subsets and otherwise retains ordinary behavior. The
+            // generation-local secret and PSK authorization move once into
+            // the publication configuration; crypto or build failure never
+            // falls back to unsecreted, no-auth, or ordinary publication.
             if is_type5_requested(&options) && is_valid_type5_no_auth(&options) {
                 let seed_bytes: [u8; 32] =
                     AsRef::<[u8]>::as_ref(&*signing_key).try_into().unwrap_or([0u8; 32]);
@@ -552,6 +558,32 @@ impl<R: Runtime> SamSession<R> {
                                 lookup_secret,
                             ),
                         );
+                    }
+                }
+            } else if is_type5_requested(&options)
+                && is_valid_type5_psk(&options)
+                && psk_auth.is_some()
+            {
+                let seed_bytes: [u8; 32] =
+                    AsRef::<[u8]>::as_ref(&*signing_key).try_into().unwrap_or([0u8; 32]);
+                let public_bytes: [u8; 32] =
+                    AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap_or([0u8; 32]);
+                if seed_bytes != [0u8; 32] && public_bytes != [0u8; 32] {
+                    if let Some(psk) = psk_auth {
+                        if lookup_secret.is_empty() {
+                            session_destination.enable_encrypted_publication(
+                                EncryptedPublicationConfig::with_psk(seed_bytes, public_bytes, psk),
+                            );
+                        } else {
+                            session_destination.enable_encrypted_publication(
+                                EncryptedPublicationConfig::with_secret_and_psk(
+                                    seed_bytes,
+                                    public_bytes,
+                                    lookup_secret,
+                                    psk,
+                                ),
+                            );
+                        }
                     }
                 }
             }
@@ -2199,6 +2231,7 @@ mod tests {
                     private_key: Vec::new(),
                     signing_key: Box::new(signing_key),
                     lookup_secret: els2::LookupSecret::empty(),
+                    psk_auth: None,
                 },
                 event_handle,
                 inbound: Default::default(),
@@ -2833,6 +2866,7 @@ mod tests {
                     private_key: Vec::new(),
                     signing_key: Box::new(signing_key),
                     lookup_secret: els2::LookupSecret::empty(),
+                    psk_auth: None,
                 },
                 event_handle,
                 inbound: Default::default(),
@@ -2949,8 +2983,10 @@ mod tests {
         let destination_id = destination.id();
 
         for secret_required in [false, true] {
-            let address =
-                server_destination_address(&destination_id, Some((public_bytes, secret_required)));
+            let address = server_destination_address(
+                &destination_id,
+                Some((public_bytes, secret_required, false)),
+            );
             assert!(address.ends_with(".b32.i2p"));
             assert_ne!(address, base32_encode(destination_id.to_vec()));
 
@@ -2958,6 +2994,26 @@ mod tests {
             assert_eq!(decoded.unblinded_public_key, public_bytes);
             assert_eq!(decoded.secret_required, secret_required);
             assert!(!decoded.auth_required);
+        }
+    }
+
+    #[test]
+    fn server_destination_address_sets_auth_required_for_psk() {
+        let signing_key = SigningPrivateKey::random(MockRuntime::rng());
+        let public_bytes: [u8; 32] =
+            AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap();
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+        let destination_id = destination.id();
+
+        for secret_required in [false, true] {
+            let address = server_destination_address(
+                &destination_id,
+                Some((public_bytes, secret_required, true)),
+            );
+            let decoded = els2::decode_encrypted_service_b32(&address).expect("address decodes");
+            assert_eq!(decoded.unblinded_public_key, public_bytes);
+            assert_eq!(decoded.secret_required, secret_required);
+            assert!(decoded.auth_required);
         }
     }
 

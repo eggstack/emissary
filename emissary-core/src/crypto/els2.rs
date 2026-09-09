@@ -18,18 +18,20 @@
 
 //! Neutral modern type-5 encrypted LeaseSet2 crypto helper.
 //!
-//! Implements the no-client-auth subset of the current encrypted LeaseSet
+//! Implements the no-client-auth subset plus the standard PSK
+//! client-authorization subset of the current encrypted LeaseSet
 //! construction on top of the closed blinding primitive:
 //! credential/subcredential derivation, exact 44-byte schedules for the two
 //! nested layers, no-auth layer encryption/decryption for deterministic
-//! self-validation, secure salts through caller-provided randomness, UTC
+//! self-validation, PSK layer-1 construction with fresh auth cookie/salt per
+//! generation, secure salts through caller-provided randomness, UTC
 //! epoch-day conversion, a zeroizing type-7 seed handoff, the optional
 //! standard lookup-secret contribution to daily blinding, and the canonical
 //! encrypted-service extended `.b32.i2p` address codec for the type-7 to
 //! type-11 domain.
 //!
-//! No per-client authorization, no persistent signature-type registry, and
-//! no generic key-derivation API are provided here. Successor work extends
+//! No DH authorization, no persistent signature-type registry, and no
+//! generic key-derivation API are provided here. Successor work extends
 //! this module through its exact owner.
 
 use crate::{
@@ -59,11 +61,38 @@ pub const INNER_LEASESET2_TYPE: u8 = 3;
 /// No-auth middle-layer flags byte.
 pub const NO_AUTH_LAYER1_FLAGS: u8 = 0;
 
+/// PSK client-authorization layer-1 flags byte.
+pub const PSK_LAYER1_FLAGS: u8 = 0x03;
+
 /// Key-derivation label for the outer layer.
 const L1_INFO: &[u8] = b"ELS2_L1K";
 
 /// Key-derivation label for the inner layer.
 const L2_INFO: &[u8] = b"ELS2_L2K";
+
+/// Key-derivation label for one PSK client record.
+const PSK_INFO: &[u8] = b"ELS2PSKA";
+
+/// Authenticated encrypted-data ceiling in bytes.
+///
+/// Pinned reference `EncryptedLeaseSet.MAX_ENCRYPTED_SIZE`. Bounds both
+/// allocation and per-client work: the complete outer ciphertext
+/// (`outerSalt || ChaCha(...)`) must fit. Entries are never dropped or
+/// truncated to fit.
+pub const MAX_ENCRYPTED_DATA_LEN: usize = 4096;
+
+/// Length of one PSK client record (`clientID[8] || encryptedCookie[32]`).
+pub const PSK_CLIENT_RECORD_LEN: usize = 40;
+
+/// Absolute pre-allocation ceiling for PSK client entries.
+///
+/// Derived from the minimum framing (`32 + 1 + 32 + 2 + 32 + 1 = 100` bytes
+/// for outer/auth/inner salts plus flags/count/type) against the 4096-byte
+/// ceiling with zero inner payload: `(4096 - 100) / 40 = 99`. The exact
+/// serialized size with the real inner payload is re-checked before any
+/// per-client crypto; the 4096-byte bound is always stricter than the `u16`
+/// client-count encoding.
+pub const MAX_PSK_CLIENTS: usize = 99;
 
 /// Salt length in bytes.
 const SALT_LEN: usize = 32;
@@ -102,6 +131,66 @@ impl SigningSeed {
 
     /// Return the seed bytes for one-shot derivation.
     pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+/// One 32-byte PSK client key.
+///
+/// Secret material: never `Debug`- or display-formattable and zeroized on
+/// drop. The base session key is always the first logical authorized key;
+/// indexed per-user keys follow in configured order before
+/// publication-order randomization.
+#[derive(Clone, PartialEq, Eq)]
+pub struct PskKey(Zeroizing<[u8; 32]>);
+
+impl PskKey {
+    /// Wrap exactly 32 key bytes.
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(Zeroizing::new(bytes))
+    }
+
+    /// Return the key bytes for one-shot derivation.
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+/// Generation-local bounded PSK authorization sequence.
+///
+/// Carries the base key first followed by indexed per-user keys in
+/// configured order (duplicates preserved exactly as configured). Secret
+/// material: never `Debug`- or display-formattable; each key zeroizes on
+/// drop. Empty sequences are rejected at construction; the exact
+/// serialized size is re-checked before per-client crypto.
+#[derive(Clone, PartialEq, Eq)]
+pub struct PskAuthorization(Vec<PskKey>);
+
+impl PskAuthorization {
+    /// Wrap a non-empty bounded key sequence.
+    ///
+    /// Fails closed on empty input or on more than [`MAX_PSK_CLIENTS`]
+    /// entries (absolute pre-allocation ceiling; the exact 4096-byte size
+    /// is re-checked with the real inner payload before crypto).
+    pub fn from_keys(keys: Vec<PskKey>) -> Result<Self, Error> {
+        if keys.is_empty() || keys.len() > MAX_PSK_CLIENTS {
+            return Err(Error::InvalidData);
+        }
+        Ok(Self(keys))
+    }
+
+    /// Number of authorized keys.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Whether no key is carried (never true for constructed values).
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Borrow the ordered key slice.
+    pub fn as_slice(&self) -> &[PskKey] {
         &self.0
     }
 }
@@ -177,11 +266,11 @@ pub fn subcredential(unblinded_pubkey: &[u8; 32], blinded_pubkey: &[u8; 32]) -> 
     hasher.finalize().into()
 }
 
-/// RFC-5869 HKDF-SHA256 with exact 44-byte output.
+/// RFC-5869 HKDF-SHA256 with caller-provided output length.
 ///
 /// Composed from the existing `hmac`/`sha2` primitives; no new KDF crate is
 /// introduced. Intermediate chaining material is zeroized.
-fn hkdf_sha256_44(salt: &[u8; 32], ikm: &[u8], info: &[u8]) -> [u8; 44] {
+fn hkdf_sha256_n(salt: &[u8; 32], ikm: &[u8], info: &[u8], okm: &mut [u8]) {
     let mut prk = Zeroizing::new([0u8; 32]);
     {
         let mut mac =
@@ -190,7 +279,6 @@ fn hkdf_sha256_44(salt: &[u8; 32], ikm: &[u8], info: &[u8]) -> [u8; 44] {
         prk.copy_from_slice(mac.finalize().into_bytes().as_ref());
     }
 
-    let mut okm = [0u8; 44];
     let mut previous = Zeroizing::new([0u8; 32]);
     let mut previous_len = 0usize;
     for (index, chunk) in okm.chunks_mut(32).enumerate() {
@@ -207,7 +295,88 @@ fn hkdf_sha256_44(salt: &[u8; 32], ikm: &[u8], info: &[u8]) -> [u8; 44] {
         previous_len = 32;
     }
     previous.zeroize();
+}
+
+/// RFC-5869 HKDF-SHA256 with exact 44-byte output.
+fn hkdf_sha256_44(salt: &[u8; 32], ikm: &[u8], info: &[u8]) -> [u8; 44] {
+    let mut okm = [0u8; 44];
+    hkdf_sha256_n(salt, ikm, info, &mut okm);
     okm
+}
+
+/// RFC-5869 HKDF-SHA256 with exact 52-byte output for PSK records.
+///
+/// Output layout is `clientKey[32] || clientIV[12] || clientID[8]`.
+fn hkdf_sha256_52(salt: &[u8; 32], ikm: &[u8], info: &[u8]) -> [u8; 52] {
+    let mut okm = [0u8; 52];
+    hkdf_sha256_n(salt, ikm, info, &mut okm);
+    okm
+}
+
+/// Derive one PSK client record schedule.
+///
+/// Input is `psk || subcredential || published_BE` with `ELS2PSKA`; output
+/// is split into the ChaCha key/IV for the encrypted cookie and the 8-byte
+/// client ID. Temporary input and output material is zeroized.
+fn derive_psk_client(
+    auth_salt: &[u8; 32],
+    psk: &[u8; 32],
+    subcredential: &[u8; 32],
+    published: u32,
+) -> ([u8; 32], [u8; 12], [u8; 8]) {
+    let mut input = Zeroizing::new([0u8; 68]);
+    input[..32].copy_from_slice(psk);
+    input[32..64].copy_from_slice(subcredential);
+    input[64..68].copy_from_slice(&published.to_be_bytes());
+    let mut okm = Zeroizing::new(hkdf_sha256_52(auth_salt, &input[..], PSK_INFO));
+    let mut key = [0u8; 32];
+    let mut iv = [0u8; 12];
+    let mut id = [0u8; 8];
+    key.copy_from_slice(&okm[..32]);
+    iv.copy_from_slice(&okm[32..44]);
+    id.copy_from_slice(&okm[44..52]);
+    okm.zeroize();
+    (key, iv, id)
+}
+
+/// Derive the auth-cookie-bound inner-layer schedule.
+///
+/// Input is `authCookie || subcredential || published_BE` with `ELS2_L2K`.
+/// The auth cookie affects the inner layer only; the outer layer input is
+/// unchanged from the no-auth schedule.
+fn derive_layer_keys_with_cookie(
+    salt: &[u8; 32],
+    auth_cookie: &[u8; 32],
+    subcredential: &[u8; 32],
+    published: u32,
+) -> ([u8; 32], [u8; 12]) {
+    let mut input = Zeroizing::new([0u8; 68]);
+    input[..32].copy_from_slice(auth_cookie);
+    input[32..64].copy_from_slice(subcredential);
+    input[64..68].copy_from_slice(&published.to_be_bytes());
+    let mut okm = hkdf_sha256_44(salt, &input[..], L2_INFO);
+    let mut key = [0u8; 32];
+    let mut iv = [0u8; 12];
+    key.copy_from_slice(&okm[..32]);
+    iv.copy_from_slice(&okm[32..44]);
+    okm.zeroize();
+    (key, iv)
+}
+
+/// Checked complete PSK outer-ciphertext length.
+///
+/// Returns `Some(total)` for `32 + 1 + 32 + 2 + 40*N + 32 + 1 + inner_len`
+/// with fully checked arithmetic, or `None` on overflow.
+pub fn psk_outer_len(inner_len: usize, num_clients: usize) -> Option<usize> {
+    num_clients
+        .checked_mul(PSK_CLIENT_RECORD_LEN)?
+        .checked_add(inner_len)?
+        .checked_add(SALT_LEN)?
+        .checked_add(1)?
+        .checked_add(SALT_LEN)?
+        .checked_add(2)?
+        .checked_add(SALT_LEN)?
+        .checked_add(1)
 }
 
 /// Derive the ChaCha key and IV for one layer.
@@ -406,6 +575,225 @@ pub fn decrypt_no_auth(
     let inner = decrypt_outer(subcredential, published, outer_ciphertext)?;
     let plain = decrypt_inner(subcredential, published, &inner)?;
     Ok(plain)
+}
+
+/// Encrypt the PSK client-authorization layers with explicit salts/cookie.
+///
+/// Plaintext layout follows the pinned reference: `outerSalt ||
+/// ChaCha(L1, 0x03 || authSalt || count_BE || records || innerCT)` where
+/// `innerCT = innerSalt || ChaCha(L2cookie, 0x03 || inner_ls2)` and each
+/// record is `clientID[8] || ChaCha(clientKey, clientIV, authCookie)`.
+/// Records are emitted in the slice order given; callers randomize that
+/// order for publication when more than one key exists. The complete size
+/// is checked with checked arithmetic against [`MAX_ENCRYPTED_DATA_LEN`]
+/// before any per-client crypto; oversize input fails closed without
+/// dropping entries. Temporary key material is zeroized.
+pub fn encrypt_psk_with_salts(
+    subcredential: &[u8; 32],
+    published: u32,
+    inner_ls2_bytes: &[u8],
+    inner_salt: &[u8; 32],
+    outer_salt: &[u8; 32],
+    auth_salt: &[u8; 32],
+    auth_cookie: &[u8; 32],
+    psks: &[PskKey],
+) -> Result<Vec<u8>, Error> {
+    if psks.is_empty() || psks.len() > MAX_PSK_CLIENTS {
+        return Err(Error::InvalidData);
+    }
+    if psks.len() > u16::MAX as usize {
+        return Err(Error::InvalidData);
+    }
+    if inner_ls2_bytes.is_empty() || inner_ls2_bytes.len() > MAX_INNER_PAYLOAD_LEN {
+        return Err(Error::InvalidData);
+    }
+    let total = psk_outer_len(inner_ls2_bytes.len(), psks.len()).ok_or(Error::InvalidData)?;
+    if total > MAX_ENCRYPTED_DATA_LEN {
+        return Err(Error::InvalidData);
+    }
+
+    let (l2_key, l2_iv) =
+        derive_layer_keys_with_cookie(inner_salt, auth_cookie, subcredential, published);
+    let mut inner_plain = Vec::with_capacity(1 + inner_ls2_bytes.len());
+    inner_plain.push(INNER_LEASESET2_TYPE);
+    inner_plain.extend_from_slice(inner_ls2_bytes);
+    chacha_apply(&l2_key, &l2_iv, &mut inner_plain);
+    let mut inner_ct = Vec::with_capacity(SALT_LEN + inner_plain.len());
+    inner_ct.extend_from_slice(inner_salt);
+    inner_ct.extend_from_slice(&inner_plain);
+    inner_plain.zeroize();
+
+    let mut records = Vec::with_capacity(psks.len() * PSK_CLIENT_RECORD_LEN);
+    for psk in psks {
+        let (ckey, civ, cid) =
+            derive_psk_client(auth_salt, psk.as_bytes(), subcredential, published);
+        let mut encrypted = Zeroizing::new(*auth_cookie);
+        chacha_apply(&ckey, &civ, &mut encrypted[..]);
+        records.extend_from_slice(&cid);
+        records.extend_from_slice(&encrypted[..]);
+    }
+
+    let mut l1_plain = Vec::with_capacity(1 + SALT_LEN + 2 + records.len() + inner_ct.len());
+    l1_plain.push(PSK_LAYER1_FLAGS);
+    l1_plain.extend_from_slice(auth_salt);
+    l1_plain.extend_from_slice(&(psks.len() as u16).to_be_bytes());
+    l1_plain.extend_from_slice(&records);
+    l1_plain.extend_from_slice(&inner_ct);
+    records.zeroize();
+    inner_ct.zeroize();
+
+    let (l1_key, l1_iv) = derive_layer_keys(outer_salt, subcredential, published, L1_INFO);
+    chacha_apply(&l1_key, &l1_iv, &mut l1_plain);
+    let mut out = Vec::with_capacity(SALT_LEN + l1_plain.len());
+    out.extend_from_slice(outer_salt);
+    out.extend_from_slice(&l1_plain);
+    l1_plain.zeroize();
+
+    debug_assert_eq!(out.len(), total);
+    if out.len() != total || out.len() > MAX_ENCRYPTED_DATA_LEN {
+        out.zeroize();
+        return Err(Error::InvalidData);
+    }
+    Ok(out)
+}
+
+/// Encrypt the PSK layers with fresh salts/cookie.
+///
+/// Generates fresh inner/outer/auth salts and a fresh auth cookie from the
+/// caller RNG. Record order is freshly randomized when more than one key
+/// exists; single-key output is deterministic given the salts/cookie.
+pub fn encrypt_psk(
+    subcredential: &[u8; 32],
+    published: u32,
+    inner_ls2_bytes: &[u8],
+    psks: &[PskKey],
+    mut rng: impl RngCore + CryptoRng,
+) -> Result<Vec<u8>, Error> {
+    if psks.is_empty() || psks.len() > MAX_PSK_CLIENTS {
+        return Err(Error::InvalidData);
+    }
+    if inner_ls2_bytes.is_empty() || inner_ls2_bytes.len() > MAX_INNER_PAYLOAD_LEN {
+        return Err(Error::InvalidData);
+    }
+    let total = psk_outer_len(inner_ls2_bytes.len(), psks.len()).ok_or(Error::InvalidData)?;
+    if total > MAX_ENCRYPTED_DATA_LEN {
+        return Err(Error::InvalidData);
+    }
+
+    let mut inner_salt = [0u8; SALT_LEN];
+    let mut outer_salt = [0u8; SALT_LEN];
+    let mut auth_salt = [0u8; SALT_LEN];
+    let mut auth_cookie = Zeroizing::new([0u8; 32]);
+    rng.fill_bytes(&mut inner_salt);
+    rng.fill_bytes(&mut outer_salt);
+    rng.fill_bytes(&mut auth_salt);
+    rng.fill_bytes(&mut auth_cookie[..]);
+
+    let mut order: Vec<usize> = (0..psks.len()).collect();
+    for i in (1..order.len()).rev() {
+        let j = (rng.next_u32() as usize) % (i + 1);
+        order.swap(i, j);
+    }
+    let shuffled: Vec<PskKey> = order.iter().map(|&i| psks[i].clone()).collect();
+    let out = encrypt_psk_with_salts(
+        subcredential,
+        published,
+        inner_ls2_bytes,
+        &inner_salt,
+        &outer_salt,
+        &auth_salt,
+        &auth_cookie,
+        &shuffled,
+    );
+    inner_salt.zeroize();
+    outer_salt.zeroize();
+    auth_salt.zeroize();
+    out
+}
+
+/// Decrypt a PSK outer object with one candidate PSK.
+///
+/// Decrypts the outer layer, selects the client record matching the
+/// candidate key's client ID, recovers the auth cookie, re-derives the
+/// cookie-bound inner layer, and returns the inner LeaseSet2 bytes. Any
+/// flags/type/salt/count/record/cookie mismatch, missing client match, or
+/// oversize framing fails closed without fallback.
+pub fn decrypt_psk(
+    subcredential: &[u8; 32],
+    published: u32,
+    outer_ciphertext: &[u8],
+    psk: &[u8; 32],
+) -> Result<Vec<u8>, Error> {
+    if outer_ciphertext.len() < SALT_LEN + 1 + SALT_LEN + 2 + SALT_LEN + 1
+        || outer_ciphertext.len() > MAX_ENCRYPTED_DATA_LEN
+    {
+        return Err(Error::InvalidData);
+    }
+    let mut outer_salt = [0u8; SALT_LEN];
+    outer_salt.copy_from_slice(&outer_ciphertext[..SALT_LEN]);
+    let (l1_key, l1_iv) = derive_layer_keys(&outer_salt, subcredential, published, L1_INFO);
+    let mut l1_plain = outer_ciphertext[SALT_LEN..].to_vec();
+    chacha_apply(&l1_key, &l1_iv, &mut l1_plain);
+
+    if l1_plain.is_empty() || l1_plain[0] != PSK_LAYER1_FLAGS {
+        l1_plain.zeroize();
+        return Err(Error::InvalidData);
+    }
+    if l1_plain.len() < 1 + SALT_LEN + 2 {
+        l1_plain.zeroize();
+        return Err(Error::InvalidData);
+    }
+    let mut auth_salt = [0u8; SALT_LEN];
+    auth_salt.copy_from_slice(&l1_plain[1..1 + SALT_LEN]);
+    let count = u16::from_be_bytes([l1_plain[1 + SALT_LEN], l1_plain[1 + SALT_LEN + 1]]) as usize;
+    if count == 0 || count > MAX_PSK_CLIENTS {
+        l1_plain.zeroize();
+        return Err(Error::InvalidData);
+    }
+    let header_len = 1 + SALT_LEN + 2;
+    let records_len = count.checked_mul(PSK_CLIENT_RECORD_LEN).ok_or(Error::InvalidData)?;
+    if l1_plain.len()
+        < header_len.checked_add(records_len).ok_or(Error::InvalidData)? + SALT_LEN + 1
+    {
+        l1_plain.zeroize();
+        return Err(Error::InvalidData);
+    }
+    let records = l1_plain[header_len..header_len + records_len].to_vec();
+    let inner_ct = l1_plain[header_len + records_len..].to_vec();
+    l1_plain.zeroize();
+
+    if inner_ct.len() < SALT_LEN + 1 || inner_ct.len() > MAX_OUTER_CIPHERTEXT_LEN {
+        return Err(Error::InvalidData);
+    }
+
+    let (ckey, civ, cid) = derive_psk_client(&auth_salt, psk, subcredential, published);
+    let mut encrypted_cookie: Option<[u8; 32]> = None;
+    let mut offset = 0;
+    while offset + PSK_CLIENT_RECORD_LEN <= records.len() {
+        let record = &records[offset..offset + PSK_CLIENT_RECORD_LEN];
+        if record[..8] == cid {
+            let mut cookie = [0u8; 32];
+            cookie.copy_from_slice(&record[8..40]);
+            encrypted_cookie = Some(cookie);
+            break;
+        }
+        offset += PSK_CLIENT_RECORD_LEN;
+    }
+    let encrypted_cookie = encrypted_cookie.ok_or(Error::InvalidData)?;
+    let mut auth_cookie = Zeroizing::new(encrypted_cookie);
+    chacha_apply(&ckey, &civ, &mut auth_cookie[..]);
+
+    let mut inner_salt = [0u8; SALT_LEN];
+    inner_salt.copy_from_slice(&inner_ct[..SALT_LEN]);
+    let (l2_key, l2_iv) =
+        derive_layer_keys_with_cookie(&inner_salt, &auth_cookie, subcredential, published);
+    let mut inner_plain = inner_ct[SALT_LEN..].to_vec();
+    chacha_apply(&l2_key, &l2_iv, &mut inner_plain);
+    if inner_plain.is_empty() || inner_plain[0] != INNER_LEASESET2_TYPE {
+        inner_plain.zeroize();
+        return Err(Error::InvalidData);
+    }
+    Ok(inner_plain[1..].to_vec())
 }
 
 /// Format the 8-byte ASCII `YYYYMMDD` day string for epoch seconds.
@@ -1063,5 +1451,315 @@ mod tests {
         // Trailing bytes after the hostname are not part of the codec.
         assert!(decode_encrypted_service_b32(&format!("{host} ")).is_err());
         assert!(decode_encrypted_service_b32(&format!("{host}x")).is_err());
+    }
+
+    const PSK_A: [u8; 32] = [0xA1; 32];
+    const PSK_B: [u8; 32] = [0xB2; 32];
+    const AUTH_SALT: [u8; 32] = [0x33; 32];
+    const AUTH_COOKIE: [u8; 32] = [0x44; 32];
+
+    fn independent_hkdf_52(salt: &[u8; 32], ikm: &[u8], info: &[u8]) -> [u8; 52] {
+        let mut prk = [0u8; 32];
+        {
+            let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(salt)
+                .expect("HMAC accepts 32-byte salt");
+            use hmac::Mac;
+            mac.update(ikm);
+            prk.copy_from_slice(mac.finalize().into_bytes().as_ref());
+        }
+        let mut okm = [0u8; 52];
+        let mut prev: Option<[u8; 32]> = None;
+        for (index, chunk) in okm.chunks_mut(32).enumerate() {
+            let mut mac =
+                hmac::Hmac::<sha2::Sha256>::new_from_slice(&prk).expect("HMAC accepts PRK");
+            use hmac::Mac;
+            if let Some(p) = prev {
+                mac.update(&p);
+            }
+            mac.update(info);
+            mac.update(&[(index + 1) as u8]);
+            let out = mac.finalize().into_bytes();
+            chunk.copy_from_slice(&out[..chunk.len()]);
+            let mut next = [0u8; 32];
+            next.copy_from_slice(out.as_ref());
+            prev = Some(next);
+        }
+        okm
+    }
+
+    #[test]
+    fn psk_types_enforce_bounded_nonempty_sequences() {
+        assert!(PskAuthorization::from_keys(Vec::new()).is_err());
+        let one = PskAuthorization::from_keys(vec![PskKey::from_bytes(PSK_A)]).unwrap();
+        assert_eq!(one.len(), 1);
+        assert!(!one.is_empty());
+        assert_eq!(one.as_slice()[0].as_bytes(), &PSK_A);
+
+        let too_many: Vec<PskKey> =
+            (0..MAX_PSK_CLIENTS + 1).map(|_| PskKey::from_bytes(PSK_A)).collect();
+        assert!(PskAuthorization::from_keys(too_many).is_err());
+        let max: Vec<PskKey> = (0..MAX_PSK_CLIENTS).map(|_| PskKey::from_bytes(PSK_A)).collect();
+        assert!(PskAuthorization::from_keys(max).is_ok());
+    }
+
+    #[test]
+    fn psk_outer_len_is_checked_and_bounded() {
+        assert_eq!(
+            psk_outer_len(16, 1),
+            Some(32 + 1 + 32 + 2 + 40 + 32 + 1 + 16)
+        );
+        assert_eq!(MAX_PSK_CLIENTS, 99);
+        assert!(psk_outer_len(16, 100).is_some_and(|len| len > MAX_ENCRYPTED_DATA_LEN));
+        assert!(psk_outer_len(usize::MAX, 1).is_none());
+        assert!(psk_outer_len(16, usize::MAX).is_none());
+        let min_frame = psk_outer_len(0, 0).unwrap();
+        assert_eq!(min_frame, 100);
+        let max_fit = psk_outer_len(36, 99).unwrap();
+        assert!(max_fit <= MAX_ENCRYPTED_DATA_LEN);
+        assert!(psk_outer_len(37, 99).unwrap() > MAX_ENCRYPTED_DATA_LEN);
+    }
+
+    #[test]
+    fn psk_kat_single_client_matches_independent_derivation() {
+        let (sub, _) = fixture_subcredential();
+        let psks = [PskKey::from_bytes(PSK_A)];
+
+        let mut input = [0u8; 68];
+        input[..32].copy_from_slice(&PSK_A);
+        input[32..64].copy_from_slice(&sub);
+        input[64..68].copy_from_slice(&PUBLISHED.to_be_bytes());
+        let expected = independent_hkdf_52(&AUTH_SALT, &input, b"ELS2PSKA");
+        let (key, iv, id) = derive_psk_client(&AUTH_SALT, &PSK_A, &sub, PUBLISHED);
+        assert_eq!(&key[..], &expected[..32]);
+        assert_eq!(&iv[..], &expected[32..44]);
+        assert_eq!(&id[..], &expected[44..52]);
+
+        let outer = encrypt_psk_with_salts(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &AUTH_SALT,
+            &AUTH_COOKIE,
+            &psks,
+        )
+        .unwrap();
+        let total = psk_outer_len(INNER.len(), 1).unwrap();
+        assert_eq!(outer.len(), total);
+        assert!(outer.len() <= MAX_ENCRYPTED_DATA_LEN);
+        assert_eq!(&outer[..32], &OUTER_SALT);
+
+        let (l1_key, l1_iv) = derive_layer_keys(&OUTER_SALT, &sub, PUBLISHED, L1_INFO);
+        let mut plain = outer[SALT_LEN..].to_vec();
+        chacha_apply(&l1_key, &l1_iv, &mut plain);
+        assert_eq!(plain[0], PSK_LAYER1_FLAGS);
+        assert_eq!(&plain[1..33], &AUTH_SALT);
+        assert_eq!(&plain[33..35], &1u16.to_be_bytes());
+        assert_eq!(&plain[35..43], &id);
+        let mut cookie = AUTH_COOKIE;
+        chacha_apply(&key, &iv, &mut cookie);
+        assert_eq!(&plain[43..75], &cookie);
+
+        let inner_ct = &plain[75..];
+        assert_eq!(&inner_ct[..32], &INNER_SALT);
+        let (l2_key, l2_iv) =
+            derive_layer_keys_with_cookie(&INNER_SALT, &AUTH_COOKIE, &sub, PUBLISHED);
+        let mut inner_plain = inner_ct[32..].to_vec();
+        chacha_apply(&l2_key, &l2_iv, &mut inner_plain);
+        assert_eq!(inner_plain[0], INNER_LEASESET2_TYPE);
+        assert_eq!(&inner_plain[1..], &INNER);
+
+        let recovered = decrypt_psk(&sub, PUBLISHED, &outer, &PSK_A).unwrap();
+        assert_eq!(recovered, INNER);
+
+        let (plain_l2_key, _) = derive_layer_keys(&INNER_SALT, &sub, PUBLISHED, L2_INFO);
+        assert_ne!(l2_key, plain_l2_key);
+        let (outer_l1_key, _) = derive_layer_keys(&OUTER_SALT, &sub, PUBLISHED, L1_INFO);
+        assert_eq!(l1_key, outer_l1_key);
+    }
+
+    #[test]
+    fn psk_multi_client_order_independent_and_randomized() {
+        let (sub, _) = fixture_subcredential();
+        let forward = [PskKey::from_bytes(PSK_A), PskKey::from_bytes(PSK_B)];
+        let reverse = [PskKey::from_bytes(PSK_B), PskKey::from_bytes(PSK_A)];
+
+        let fwd = encrypt_psk_with_salts(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &AUTH_SALT,
+            &AUTH_COOKIE,
+            &forward,
+        )
+        .unwrap();
+        let rev = encrypt_psk_with_salts(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &AUTH_SALT,
+            &AUTH_COOKIE,
+            &reverse,
+        )
+        .unwrap();
+        assert_ne!(fwd, rev);
+        for psk in [&PSK_A, &PSK_B] {
+            assert_eq!(decrypt_psk(&sub, PUBLISHED, &fwd, psk).unwrap(), INNER);
+            assert_eq!(decrypt_psk(&sub, PUBLISHED, &rev, psk).unwrap(), INNER);
+        }
+
+        use crate::runtime::{mock::MockRuntime, Runtime};
+        let prod_a = encrypt_psk(&sub, PUBLISHED, &INNER, &forward, MockRuntime::rng()).unwrap();
+        let prod_b = encrypt_psk(&sub, PUBLISHED, &INNER, &forward, MockRuntime::rng()).unwrap();
+        assert!(prod_a.len() <= MAX_ENCRYPTED_DATA_LEN);
+        for psk in [&PSK_A, &PSK_B] {
+            assert_eq!(decrypt_psk(&sub, PUBLISHED, &prod_a, psk).unwrap(), INNER);
+            assert_eq!(decrypt_psk(&sub, PUBLISHED, &prod_b, psk).unwrap(), INNER);
+        }
+    }
+
+    #[test]
+    fn psk_duplicate_entries_preserved_as_separate_records() {
+        let (sub, _) = fixture_subcredential();
+        let dup = [PskKey::from_bytes(PSK_A), PskKey::from_bytes(PSK_A)];
+        let outer = encrypt_psk_with_salts(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &AUTH_SALT,
+            &AUTH_COOKIE,
+            &dup,
+        )
+        .unwrap();
+        assert_eq!(outer.len(), psk_outer_len(INNER.len(), 2).unwrap());
+
+        let (l1_key, l1_iv) = derive_layer_keys(&OUTER_SALT, &sub, PUBLISHED, L1_INFO);
+        let mut plain = outer[SALT_LEN..].to_vec();
+        chacha_apply(&l1_key, &l1_iv, &mut plain);
+        assert_eq!(&plain[33..35], &2u16.to_be_bytes());
+        assert_eq!(&plain[35..75], &plain[75..115]);
+        assert_eq!(decrypt_psk(&sub, PUBLISHED, &outer, &PSK_A).unwrap(), INNER);
+
+        let max_inner = MAX_ENCRYPTED_DATA_LEN - 100 - 40 * MAX_PSK_CLIENTS;
+        let dup_max: Vec<PskKey> =
+            (0..MAX_PSK_CLIENTS).map(|_| PskKey::from_bytes(PSK_A)).collect();
+        let fitting = vec![0u8; max_inner];
+        assert!(encrypt_psk_with_salts(
+            &sub,
+            PUBLISHED,
+            &fitting,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &AUTH_SALT,
+            &AUTH_COOKIE,
+            &dup_max,
+        )
+        .is_ok());
+        let too_big = vec![0u8; max_inner + 1];
+        assert!(encrypt_psk_with_salts(
+            &sub,
+            PUBLISHED,
+            &too_big,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &AUTH_SALT,
+            &AUTH_COOKIE,
+            &dup_max,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn psk_negative_paths_fail_closed_without_fallback() {
+        let (sub, _) = fixture_subcredential();
+        let psks = [PskKey::from_bytes(PSK_A)];
+        let outer = encrypt_psk_with_salts(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &AUTH_SALT,
+            &AUTH_COOKIE,
+            &psks,
+        )
+        .unwrap();
+
+        assert!(encrypt_psk_with_salts(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &AUTH_SALT,
+            &AUTH_COOKIE,
+            &[],
+        )
+        .is_err());
+        assert!(decrypt_psk(&sub, PUBLISHED, &outer, &[0x55; 32]).is_err());
+        assert!(decrypt_psk(&sub, PUBLISHED + 1, &outer, &PSK_A).is_err());
+        assert!(decrypt_no_auth(&sub, PUBLISHED, &outer).is_err());
+        let no_auth =
+            encrypt_no_auth_with_salts(&sub, PUBLISHED, &INNER, &INNER_SALT, &OUTER_SALT).unwrap();
+        assert!(decrypt_psk(&sub, PUBLISHED, &no_auth, &PSK_A).is_err());
+
+        let mut tampered = outer.clone();
+        tampered[SALT_LEN] ^= 0xff;
+        assert!(decrypt_psk(&sub, PUBLISHED, &tampered, &PSK_A).is_err());
+
+        let (l1_key, l1_iv) = derive_layer_keys(&OUTER_SALT, &sub, PUBLISHED, L1_INFO);
+        let mut plain = outer[SALT_LEN..].to_vec();
+        chacha_apply(&l1_key, &l1_iv, &mut plain);
+        let mut bad = plain.clone();
+        bad[35] ^= 0x01;
+        let mut bad_plain = bad.clone();
+        chacha_apply(&l1_key, &l1_iv, &mut bad_plain);
+        let mut bad_outer = OUTER_SALT.to_vec();
+        bad_outer.extend_from_slice(&bad_plain);
+        assert!(decrypt_psk(&sub, PUBLISHED, &bad_outer, &PSK_A).is_err());
+
+        let mut bad_cookie = plain.clone();
+        bad_cookie[43] ^= 0x01;
+        let mut bad_cookie_ct = bad_cookie.clone();
+        chacha_apply(&l1_key, &l1_iv, &mut bad_cookie_ct);
+        let mut bad_cookie_outer = OUTER_SALT.to_vec();
+        bad_cookie_outer.extend_from_slice(&bad_cookie_ct);
+        assert!(decrypt_psk(&sub, PUBLISHED, &bad_cookie_outer, &PSK_A).is_err());
+
+        let mut bad_salt = plain.clone();
+        bad_salt[1] ^= 0x01;
+        let mut bad_salt_ct = bad_salt.clone();
+        chacha_apply(&l1_key, &l1_iv, &mut bad_salt_ct);
+        let mut bad_salt_outer = OUTER_SALT.to_vec();
+        bad_salt_outer.extend_from_slice(&bad_salt_ct);
+        assert!(decrypt_psk(&sub, PUBLISHED, &bad_salt_outer, &PSK_A).is_err());
+
+        let big_inner = vec![0u8; MAX_ENCRYPTED_DATA_LEN];
+        assert!(encrypt_psk_with_salts(
+            &sub,
+            PUBLISHED,
+            &big_inner,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &AUTH_SALT,
+            &AUTH_COOKIE,
+            &psks,
+        )
+        .is_err());
+        let mut oversize = outer.clone();
+        oversize.extend_from_slice(&[0u8; MAX_ENCRYPTED_DATA_LEN]);
+        assert!(decrypt_psk(&sub, PUBLISHED, &oversize, &PSK_A).is_err());
+
+        let mut other_sub = sub;
+        other_sub[0] ^= 0xff;
+        assert_ne!(sub, other_sub);
+        assert!(decrypt_psk(&other_sub, PUBLISHED, &outer, &PSK_A).is_err());
     }
 }

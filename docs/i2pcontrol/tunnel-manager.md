@@ -427,7 +427,7 @@ unchanged, legacy AES disposition C delegated to M161, narrow type-7 -> type-11
 blinding frozen without reopening M147/M148); M156 closes the neutral
 Red25519/blinding primitive with zero promotions (`336/29/475` unchanged,
 spec vectors 1–2, no-std/security review, exact M061/M062 authorization);
-M157 closes the neutral modern type-5 Encrypted LeaseSet2 publication primitive with zero promotions (`336/29/475` unchanged, exact ten-file budget); M158 closes the neutral standard lookup-secret/blinding and encrypted-service extended-B32 infrastructure with zero promotions (`336/29/475` unchanged, exact four-file subset); M159-M152 remain deferred (M159 hard dependency satisfied, amendment pending).
+M157 closes the neutral modern type-5 Encrypted LeaseSet2 publication primitive with zero promotions (`336/29/475` unchanged, exact ten-file budget); M158 closes the neutral standard lookup-secret/blinding and encrypted-service extended-B32 infrastructure with zero promotions (`336/29/475` unchanged, exact four-file subset); M159 closes the neutral standard PSK client-authorization primitive with zero promotions (`336/29/475` unchanged, exact four-file subset); M160-M152 remain deferred (M160 hard dependency satisfied, registration pending).
 
 | Disposition | Proposal 170 fields |
 |---|---|

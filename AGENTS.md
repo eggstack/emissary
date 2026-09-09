@@ -40,25 +40,26 @@ Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` whe
 - M153: current whole-surface runtime/security qualification authority;
 - M146 `UseOutproxyPlugin` ×4: closed blocked;
 - M154/M147/M148 configurable Destination `SigType` ×10: closed blocked;
-- M155-M158 LeaseSet-security neutral lineage: closed, zero Proposal promotions;
-- **M159 is the sole registered/dependency-ready handoff**.
+- M155-M159 LeaseSet-security neutral lineage: closed, zero Proposal promotions;
+- **no registered successor; M160 deferred with satisfied hard dep, registration pending**.
 
 Roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-Registered plan: `plans/implementation/i2pcontrol-proposal-170/159-leaseset-psk-client-authorization-primitive.md`.
+Closed plan: `plans/implementation/i2pcontrol-proposal-170/159-leaseset-psk-client-authorization-primitive.md`
+(closure: `plans/closure/i2pcontrol-proposal-170/159-closure.md`).
 
-## M159 exact production budget
+## M159 exact production budget (realized)
 
-Only these production files may change:
+Only these production files changed:
 
 1. `emissary-core/src/crypto/els2.rs`
 2. `emissary-core/src/destination/lease_set.rs`
 3. `emissary-core/src/sam/parser.rs`
 4. `emissary-core/src/sam/session.rs`
 
-All four are existing exact M061 owners. No new M061 path waiver is created.
+All four are existing exact M061 owners. No new M061 path waiver was created.
 
-M159 authorizes no:
+M159 authorized no:
 
 - new source file;
 - dependency;
@@ -69,9 +70,7 @@ M159 authorizes no:
 - `destination/mod.rs`/`destination/session/mod.rs` change;
 - NetDB/I2NP/primitives/event/router/tunnel/transport change.
 
-If a fifth production path or dependency is required, stop before editing and amend M159/M061/M062.
-
-## M159 PSK contract
+## M159 PSK contract (realized)
 
 Standard SAM/I2CP inputs:
 
@@ -82,18 +81,18 @@ i2cp.leaseSetPrivKey=Base64(32B)
 i2cp.leaseSetClient.psk.N=[Base64(UTF8(name)) ":"] Base64(32B)
 ```
 
-The base `leaseSetPrivKey` is itself an authorized PSK. Indexed entries are additional; do not require them for non-per-user PSK modes.
+The base `leaseSetPrivKey` is itself an authorized PSK. Indexed entries are additional; do not require them for non-per-user PSK modes. Duplicate entries are preserved exactly as configured (pinned Java semantics).
 
-Parser requirements:
+Parser requirements (realized):
 
 - decode every key to exactly 32 bytes before activation;
-- reject sparse indexed entries followed by later indices, duplicate PSK bytes, mixed DH entries and unsupported auth selectors;
+- reject sparse indexed entries followed by later indices, mixed DH entries and unsupported auth selectors;
 - strip optional `name:` prefixes but do not retain names in core;
 - remove base/indexed PSK values from generic debug-capable options before `SamCommand`/session retention;
 - carry key material only in zeroizing/non-`Debug` neutral types;
 - M158 lookup secret may coexist and remains independently secret-required.
 
-Crypto/wire requirements:
+Crypto/wire requirements (realized):
 
 - PSK layer-1 flags `0x03`;
 - fresh 32-byte auth cookie and auth salt for each regenerated outer object;
@@ -101,33 +100,33 @@ Crypto/wire requirements:
 - one client record = clientID8 + encrypted authCookie32;
 - auth cookie participates in `ELS2_L2K`; it does not alter `ELS2_L1K` input;
 - randomized client-record order for multiple keys;
-- no-auth M157 and lookup-secret-only M158 behavior must remain compatible.
+- no-auth M157 and lookup-secret-only M158 behavior remain compatible.
 
 ### Work bound
 
-Use pinned Java `EncryptedLeaseSet.MAX_ENCRYPTED_SIZE=4096` as the authenticated encrypted-data ceiling. Checked complete-size calculation must occur before per-client crypto. Never silently drop/truncate clients to fit.
+Pinned Java `EncryptedLeaseSet.MAX_ENCRYPTED_SIZE=4096` is the authenticated encrypted-data ceiling. Checked complete-size calculation occurs before per-client crypto. Never silently drop/truncate clients to fit.
 
 ### Publication
 
-`LeaseSetManager` remains the sole publication/UTC-rollover/storage-verification owner. Do not add another scheduler or publication state machine. Authenticated build failure must never fall back to no-auth or type 3.
+`LeaseSetManager` remains the sole publication/UTC-rollover/storage-verification owner. Authenticated build failure never falls back to no-auth or type 3.
 
 Extended B32 sets `auth_required=true`; `secret_required` continues to reflect the independent M158 lookup secret. The existing opaque event address seam remains unchanged.
 
 Core persists no PSK material. Proposal-layer key generation/persistence/names/edit/restart/Get-redaction/five-family integration remain M162.
 
-M159 promotes **zero Proposal cells**; M095 must remain exactly `336/29/475`.
+M159 promoted **zero Proposal cells**; M095 remains exactly `336/29/475`.
 
 ## Remaining line — already corrected
 
 ```text
-M159 PSK authorization             [REGISTERED]
-  -> M160 DH/X25519 authorization  [DEFERRED; SAME FOUR-FILE/ZERO-DEP ENVELOPE PRE-FROZEN]
+M159 PSK authorization             [CLOSED]
+  -> M160 DH/X25519 authorization  [DEFERRED; HARD DEP SATISFIED, REGISTRATION PENDING]
   -> M161 legacy AES/LS1 gate      [DEFERRED; HARD-DEPENDS M160; ZERO PRODUCTION]
   -> M162 Proposal field integration [DEFERRED]
   -> M152 final requalification    [DEFERRED]
 ```
 
-After a clean M159 closure, M160 may be registered directly if the exact four owners and existing X25519 dependency remain sufficient. M160 must use the same 4096-byte O(N) bound and explicitly reject all-zero X25519 shared secrets.
+M159 closure revalidates the exact four owners with the existing X25519 dependency sufficient, so M160 may be registered directly with exact M061/M062 authorization. M160 must use the same 4096-byte O(N) bound, preserve duplicates, and explicitly reject all-zero X25519 shared secrets.
 
 M161 runs only after M160 and cannot implement legacy LS1 inside the gate. M162 is the first milestone allowed to promote LeaseSet fields and must implement typed/redacted I2PControl state plus transactional LeaseSet-security secret custody across all five server families.
 

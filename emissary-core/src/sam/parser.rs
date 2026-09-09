@@ -17,7 +17,11 @@
 // DEALINGS IN THE SOFTWARE.
 
 use crate::{
-    crypto::{base32_decode, base64_decode, els2::LookupSecret, SigningPrivateKey},
+    crypto::{
+        base32_decode, base64_decode,
+        els2::{LookupSecret, PskAuthorization, PskKey, MAX_PSK_CLIENTS},
+        SigningPrivateKey,
+    },
     primitives::{Destination, DestinationId, Str},
     runtime::Runtime,
 };
@@ -86,6 +90,298 @@ fn parse_lookup_secret_value(value: &str) -> Result<LookupSecret, ()> {
     })
 }
 
+/// Decode one indexed PSK entry value.
+///
+/// Accepts either raw Base64(32B) or a single `name:` prefix followed by
+/// Base64(32B). The name prefix is stripped and never retained in core.
+/// Any malformed shape (empty, multiple colons, empty name/suffix, invalid
+/// Base64, or non-32-byte payload) fails closed before allocation. Only
+/// the failure shape is logged, never the value.
+fn parse_psk_entry_value(value: &str) -> Result<[u8; 32], ()> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed PSK client entry",
+        );
+        return Err(());
+    }
+    let key_part = match trimmed.split_once(':') {
+        None => trimmed,
+        Some((prefix, suffix)) => {
+            if prefix.is_empty() || suffix.is_empty() || suffix.contains(':') {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    "rejecting session with malformed PSK client entry",
+                );
+                return Err(());
+            }
+            suffix.trim()
+        }
+    };
+    if key_part.is_empty() {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed PSK client entry",
+        );
+        return Err(());
+    }
+    let decoded = base64_decode(key_part).ok_or_else(|| {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed PSK client entry",
+        );
+    })?;
+    if decoded.len() != 32 {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed PSK client entry",
+        );
+        return Err(());
+    }
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&decoded);
+    Ok(out)
+}
+
+/// Decode the required base PSK value.
+///
+/// The base `i2cp.leaseSetPrivKey` carries raw Base64(32B) with no name
+/// prefix. Any malformed shape fails closed before allocation.
+fn parse_base_psk_value(value: &str) -> Result<[u8; 32], ()> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.contains(':') {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed base PSK",
+        );
+        return Err(());
+    }
+    let decoded = base64_decode(trimmed).ok_or_else(|| {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed base PSK",
+        );
+    })?;
+    if decoded.len() != 32 {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed base PSK",
+        );
+        return Err(());
+    }
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&decoded);
+    Ok(out)
+}
+
+/// Extract the standard PSK authorization before allocation.
+///
+/// Scans `i2cp.leaseSetPrivKey` (required base) plus contiguous
+/// `i2cp.leaseSetClient.psk.N` entries from zero. Indexed entries are
+/// additional only; zero indexed entries is valid for non-per-user modes.
+/// Duplicate key bytes are preserved exactly as configured, each consuming
+/// one client record and the bounded work budget.
+///
+/// Fails closed on missing base when PSK is selected, malformed keys,
+/// sparse indices followed by later entries, mixed DH entries, unsupported
+/// auth selectors, incompatible companion keys, or more than
+/// [`MAX_PSK_CLIENTS`] total keys. Base/indexed values are removed from
+/// generic state so neither form survives in `SamCommand` options or later
+/// debug-capable surfaces. Returns `None` when no PSK selector or key is
+/// present (no-auth path).
+fn extract_psk_authorization(
+    pairs: &mut HashMap<&str, &str>,
+) -> Result<Option<PskAuthorization>, ()> {
+    let has_base = pairs.contains_key("i2cp.leaseSetPrivKey");
+    let has_indexed = pairs.keys().any(|key| key.starts_with("i2cp.leaseSetClient.psk."));
+    let auth_is_psk = pairs.get("i2cp.leaseSetAuthType").is_some_and(|value| value.trim() == "2");
+
+    if !has_base && !has_indexed && !auth_is_psk {
+        return Ok(None);
+    }
+
+    let is_type5 = pairs.get("i2cp.leaseSetType").is_some_and(|value| value.trim() == "5");
+    if !is_type5 {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting PSK keys without type-5 selector",
+        );
+        return Err(());
+    }
+    let auth_value = pairs.get("i2cp.leaseSetAuthType").map(|value| value.trim());
+    if auth_value != Some("2") {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting PSK keys with unsupported auth selector",
+        );
+        return Err(());
+    }
+    if pairs
+        .get("i2cp.encryptLeaseSet")
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("true") || value.trim() == "1")
+    {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting type-5 PSK session with legacy companion",
+        );
+        return Err(());
+    }
+    if pairs
+        .get("i2cp.dontPublishLeaseSet")
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("true") || value.trim() == "1")
+    {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting unpublished type-5 PSK session",
+        );
+        return Err(());
+    }
+    for key in [
+        "i2cp.leaseSetKey",
+        "i2cp.leaseSetPrivateKey",
+        "i2cp.leaseSetSigningPrivateKey",
+        "i2cp.leaseSetBlindedType",
+    ] {
+        if pairs.get(key).is_some_and(|value| !value.trim().is_empty()) {
+            tracing::warn!(
+                target: LOG_TARGET,
+                "rejecting type-5 PSK session with incompatible companion",
+            );
+            return Err(());
+        }
+    }
+    if pairs.keys().any(|key| {
+        key.starts_with("leaseSetClient")
+            || key.starts_with("i2cp.leaseSetClient.dh")
+            || key.starts_with("leaseSetClient.dh")
+    }) {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting type-5 PSK session with mixed client entries",
+        );
+        return Err(());
+    }
+
+    let base_value = pairs.remove("i2cp.leaseSetPrivKey").ok_or_else(|| {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting PSK session with missing base key",
+        );
+    })?;
+    let base_bytes = parse_base_psk_value(base_value)?;
+
+    let mut indexed: Vec<(usize, &str)> = Vec::new();
+    for key in pairs.keys().copied().collect::<Vec<_>>() {
+        if let Some(suffix) = key.strip_prefix("i2cp.leaseSetClient.psk.") {
+            let index: usize = suffix.parse().map_err(|_| {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    "rejecting PSK session with malformed client index",
+                );
+            })?;
+            let value = pairs.get(key).copied().ok_or(())?;
+            indexed.push((index, value));
+        } else if key.starts_with("i2cp.leaseSetClient") {
+            tracing::warn!(
+                target: LOG_TARGET,
+                "rejecting type-5 PSK session with unsupported client entry",
+            );
+            return Err(());
+        }
+    }
+    if indexed.len() > MAX_PSK_CLIENTS.saturating_sub(1) {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting PSK session exceeding client ceiling",
+        );
+        return Err(());
+    }
+    indexed.sort_by_key(|(index, _)| *index);
+    for (expected, (index, _)) in indexed.iter().enumerate() {
+        if *index != expected {
+            tracing::warn!(
+                target: LOG_TARGET,
+                "rejecting PSK session with sparse client entries",
+            );
+            return Err(());
+        }
+    }
+
+    let mut keys = Vec::with_capacity(1 + indexed.len());
+    keys.push(PskKey::from_bytes(base_bytes));
+    for (_, value) in &indexed {
+        keys.push(PskKey::from_bytes(parse_psk_entry_value(value)?));
+    }
+    for key in indexed.iter().map(|(index, _)| format!("i2cp.leaseSetClient.psk.{index}")) {
+        pairs.remove(key.as_str());
+    }
+    if pairs
+        .keys()
+        .any(|key| key.starts_with("i2cp.leaseSetClient") || key.starts_with("leaseSetClient"))
+    {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting type-5 PSK session with residual client entries",
+        );
+        return Err(());
+    }
+
+    PskAuthorization::from_keys(keys).map(Some).map_err(|_| {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting PSK session exceeding client ceiling",
+        );
+    })
+}
+
+/// Validate standard type-5 PSK selector state before allocation.
+///
+/// Returns true only when type 5 is requested with auth type exactly `2`,
+/// the legacy flag absent/false, forbidden key companions absent, no
+/// residual per-client entries in generic options (PSK values are already
+/// extracted), and publication enabled. The extracted PSK material itself
+/// was validated during extraction; this gate covers the remaining
+/// selector subset for the session bridge.
+pub fn is_valid_type5_psk(options: &HashMap<String, String>) -> bool {
+    if !is_type5_requested(options) {
+        return false;
+    }
+    if options.get("i2cp.leaseSetAuthType").map(|value| value.trim()) != Some("2") {
+        return false;
+    }
+    if options
+        .get("i2cp.encryptLeaseSet")
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("true") || value.trim() == "1")
+    {
+        return false;
+    }
+    for key in [
+        "i2cp.leaseSetPrivKey",
+        "i2cp.leaseSetKey",
+        "i2cp.leaseSetPrivateKey",
+        "i2cp.leaseSetSigningPrivateKey",
+        "i2cp.leaseSetBlindedType",
+    ] {
+        if options.get(key).is_some_and(|value| !value.trim().is_empty()) {
+            return false;
+        }
+    }
+    if options
+        .keys()
+        .any(|key| key.starts_with("i2cp.leaseSetClient") || key.starts_with("leaseSetClient"))
+    {
+        return false;
+    }
+    if options
+        .get("i2cp.dontPublishLeaseSet")
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("true") || value.trim() == "1")
+    {
+        return false;
+    }
+    true
+}
+
 /// Validate standard type-5 no-auth companion state before allocation.
 ///
 /// Returns true only when type 5 is requested with the exact no-auth
@@ -146,13 +442,15 @@ pub fn is_valid_type5_no_auth(options: &HashMap<String, String>) -> bool {
 
 /// Validate the standard lease-set type selector before allocation.
 ///
-/// Absent or `3` preserves ordinary behavior. `5` requires the exact
-/// no-auth subset above. Any other value or any type-5 request with
-/// successor-only companions fails closed before session allocation.
+/// Absent or `3` preserves ordinary behavior. `5` requires either the exact
+/// no-auth subset or the exact PSK selector subset above (PSK key material
+/// itself was validated during extraction). Any other value or any type-5
+/// request with successor-only companions fails closed before session
+/// allocation.
 fn validate_lease_set_type_options(options: &HashMap<String, String>) -> Result<(), ()> {
     match options.get("i2cp.leaseSetType").map(|value| value.trim()) {
         None | Some("3") => Ok(()),
-        Some("5") => match is_valid_type5_no_auth(options) {
+        Some("5") => match is_valid_type5_no_auth(options) || is_valid_type5_psk(options) {
             true => Ok(()),
             false => {
                 tracing::warn!(
@@ -273,6 +571,12 @@ pub struct DestinationContext {
     /// Empty means unsecreted. Secret material: never `Debug`- or
     /// display-formattable; the custom `Debug` below omits all fields.
     pub lookup_secret: LookupSecret,
+
+    /// Generation-local PSK authorization for type-5 publication.
+    ///
+    /// `None` means no client auth. Secret material: never `Debug`- or
+    /// display-formattable; the custom `Debug` below omits all fields.
+    pub psk_auth: Option<PskAuthorization>,
 }
 
 impl fmt::Debug for DestinationContext {
@@ -288,6 +592,7 @@ impl PartialEq for DestinationContext {
             && AsRef::<[u8]>::as_ref(&*self.signing_key)
                 == AsRef::<[u8]>::as_ref(&*other.signing_key)
             && self.lookup_secret == other.lookup_secret
+            && self.psk_auth == other.psk_auth
     }
 }
 
@@ -645,6 +950,14 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                     Some(value) => parse_lookup_secret_value(value)?,
                 };
 
+                // Extract the standard PSK authorization before allocation
+                // and remove base/indexed values from generic option state
+                // so neither form survives in `SamCommand` options or later
+                // debug-capable surfaces. Malformed, sparse, mixed, or
+                // over-ceiling input fails before the session is
+                // constructed. Names are stripped and never retained.
+                let psk_auth = extract_psk_authorization(&mut parsed_cmd.key_value_pairs)?;
+
                 let destination = match parsed_cmd.key_value_pairs.remove("DESTINATION") {
                     Some("TRANSIENT") => {
                         let signing_key = SigningPrivateKey::random(R::rng());
@@ -660,6 +973,7 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                             },
                             signing_key: Box::new(signing_key),
                             lookup_secret,
+                            psk_auth,
                         }
                     }
                     Some(destination) => {
@@ -704,6 +1018,7 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                                 SigningPrivateKey::from_bytes(signing_key).expect("to succeed"),
                             ),
                             lookup_secret,
+                            psk_auth,
                         }
                     }
                     None => {
@@ -2500,6 +2815,224 @@ mod tests {
         match SamCommand::parse::<MockRuntime>(&command) {
             Some(SamCommand::CreateSession { destination, .. }) => {
                 assert_eq!(destination.lookup_secret.as_bytes(), b"top-secret-lookup");
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+    }
+
+    fn psk_b64(bytes: &[u8; 32]) -> String {
+        base64_encode(bytes)
+    }
+
+    #[test]
+    fn type5_psk_base_only_accepted_and_redacted() {
+        let base = psk_b64(&[0xA1u8; 32]);
+        let command = format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base}",
+        );
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(SamCommand::CreateSession {
+                options,
+                destination,
+                ..
+            }) => {
+                assert!(is_type5_requested(&options));
+                assert!(is_valid_type5_psk(&options));
+                assert!(!is_valid_type5_no_auth(&options));
+                assert!(!options.contains_key("i2cp.leaseSetPrivKey"));
+                assert!(!options.values().any(|value| value.contains(&base)));
+                let psk = destination.psk_auth.expect("psk carried");
+                assert_eq!(psk.len(), 1);
+                assert_eq!(psk.as_slice()[0].as_bytes(), &[0xA1u8; 32]);
+                assert!(destination.lookup_secret.is_empty());
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+    }
+
+    #[test]
+    fn type5_psk_indexed_entries_ordered_and_names_stripped() {
+        let base = psk_b64(&[0xA1u8; 32]);
+        let client_b = psk_b64(&[0xB2u8; 32]);
+        let client_c = psk_b64(&[0xC3u8; 32]);
+        let name_b = base64_encode(b"alice");
+        let command = format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.psk.0={name_b}:{client_b} \
+             i2cp.leaseSetClient.psk.1={client_c}",
+        );
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(SamCommand::CreateSession {
+                options,
+                destination,
+                ..
+            }) => {
+                assert!(is_valid_type5_psk(&options));
+                assert!(!options.keys().any(|key| key.contains("leaseSetClient")));
+                assert!(!options.keys().any(|key| key.contains("leaseSetPrivKey")));
+                let psk = destination.psk_auth.expect("psk carried");
+                assert_eq!(psk.len(), 3);
+                assert_eq!(psk.as_slice()[0].as_bytes(), &[0xA1u8; 32]);
+                assert_eq!(psk.as_slice()[1].as_bytes(), &[0xB2u8; 32]);
+                assert_eq!(psk.as_slice()[2].as_bytes(), &[0xC3u8; 32]);
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+    }
+
+    #[test]
+    fn type5_psk_preserves_duplicate_entries() {
+        let base = psk_b64(&[0xA1u8; 32]);
+        let command = format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.psk.0={base}",
+        );
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(SamCommand::CreateSession { destination, .. }) => {
+                let psk = destination.psk_auth.expect("psk carried");
+                assert_eq!(psk.len(), 2);
+                assert_eq!(psk.as_slice()[0].as_bytes(), psk.as_slice()[1].as_bytes());
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+    }
+
+    #[test]
+    fn type5_psk_with_lookup_secret_coexists() {
+        let base = psk_b64(&[0xA1u8; 32]);
+        let secret_b64 = base64_encode(b"lookup-secret");
+        let command = format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetSecret={secret_b64}",
+        );
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(SamCommand::CreateSession {
+                options,
+                destination,
+                ..
+            }) => {
+                assert!(is_valid_type5_psk(&options));
+                assert!(destination.psk_auth.is_some());
+                assert_eq!(destination.lookup_secret.as_bytes(), b"lookup-secret");
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+    }
+
+    #[test]
+    fn type5_psk_negative_paths_rejected() {
+        let base = psk_b64(&[0xA1u8; 32]);
+        let other = psk_b64(&[0xB2u8; 32]);
+
+        // Missing base key with PSK auth selector.
+        assert!(SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2",
+        )
+        .is_none());
+
+        // Malformed and non-32-byte keys.
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey=AAAA",
+        ))
+        .is_none());
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.psk.0=AAAA",
+        ))
+        .is_none());
+
+        // Sparse indexed entries followed by later indices.
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.psk.1={other}",
+        ))
+        .is_none());
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.psk.0={other} i2cp.leaseSetClient.psk.2={other}",
+        ))
+        .is_none());
+
+        // Mixed DH entries.
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.dh.0={other}",
+        ))
+        .is_none());
+
+        // Wrong auth selectors.
+        for auth in ["0", "1", "00", "hello"] {
+            assert!(
+                SamCommand::parse::<MockRuntime>(&format!(
+                    "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+                     i2cp.leaseSetType=5 i2cp.leaseSetAuthType={auth} i2cp.leaseSetPrivKey={base}",
+                ))
+                .is_none(),
+                "auth type {auth} was accepted"
+            );
+        }
+
+        // Missing auth selector with base key.
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetPrivKey={base}",
+        ))
+        .is_none());
+
+        // Legacy and unpublished companions.
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.encryptLeaseSet=true",
+        ))
+        .is_none());
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.dontPublishLeaseSet=true",
+        ))
+        .is_none());
+
+        // Multiple colons in entry.
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.psk.0=a:b:{other}",
+        ))
+        .is_none());
+    }
+
+    #[test]
+    fn type5_psk_never_leaks_through_debug_surfaces() {
+        let base = psk_b64(&[0xA1u8; 32]);
+        let client = psk_b64(&[0xB2u8; 32]);
+        let name = base64_encode(b"alice");
+        let command = format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.psk.0={name}:{client}",
+        );
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(cmd @ SamCommand::CreateSession { .. }) => {
+                let debug = format!("{cmd:?}");
+                assert!(!debug.contains(&base), "command debug leaks base PSK");
+                assert!(!debug.contains(&client), "command debug leaks client PSK");
+                assert!(!debug.contains(&name), "command debug leaks client name");
+                if let SamCommand::CreateSession { destination, .. } = &cmd {
+                    let context_debug = format!("{destination:?}");
+                    assert!(!context_debug.contains(&base));
+                    assert!(!context_debug.contains(&client));
+                }
             }
             response => panic!("invalid response: {response:?}"),
         }

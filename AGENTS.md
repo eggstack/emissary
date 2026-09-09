@@ -41,8 +41,8 @@ I2PControl supports a large partial subset of Proposal 170. Keep Proposal/admin/
 - M154/M147/M148 configurable Destination `SigType` remains blocked (10 cells);
 - M155 closed the corrected LeaseSet-security semantic/owner re-freeze;
 - M156 closed the neutral Red25519/Ed25519 blinding primitive with zero Proposal promotions;
-- M157 closed the neutral modern type-5 Encrypted LeaseSet2 publication primitive with zero Proposal promotions;
-- **no registered successor** (M158 deferred pending its exact-path amendment).
+- M157 closed the neutral modern type-5/no-auth Encrypted LeaseSet2 publication primitive with zero Proposal promotions;
+- **M158 is the sole registered/dependency-ready handoff**.
 
 Current execution roadmap:
 
@@ -50,52 +50,111 @@ Current execution roadmap:
 
 Registered plan:
 
-- none (M157 closed; M158 deferred pending its exact-path amendment).
+- `plans/implementation/i2pcontrol-proposal-170/158-leaseset-lookup-secret-and-blinded-address-primitive.md`.
 
-M157 closed neutral modern type-5 Encrypted LeaseSet2 publication with zero Proposal promotions (see `plans/closure/i2pcontrol-proposal-170/157-closure.md`).
+M158 has zero Proposal-promotion budget.
 
-## M157 realized production diff (closed)
+## M158 exact production budget
 
-The closure commit changed exactly:
+Only these production paths may change:
 
-1. `emissary-core/src/crypto/els2.rs` — new;
-2. `emissary-core/src/crypto/mod.rs` — declaration/re-export only;
-3. `emissary-core/src/primitives/lease_set.rs`;
-4. `emissary-core/src/primitives/mod.rs` — exact type re-export only;
-5. `emissary-core/src/i2np/database/store.rs`;
-6. `emissary-core/src/netdb/mod.rs`;
-7. `emissary-core/src/destination/lease_set.rs`;
-8. `emissary-core/src/destination/mod.rs`;
-9. `emissary-core/src/sam/parser.rs`;
-10. `emissary-core/src/sam/session.rs`.
+1. `emissary-core/src/crypto/els2.rs`;
+2. `emissary-core/src/destination/lease_set.rs`;
+3. `emissary-core/src/sam/parser.rs`;
+4. `emissary-core/src/sam/session.rs`.
 
-No other production file was changed. No Cargo manifest, dependency, lockfile, Yosemite, or `emissary-cli/src/i2pcontrol/**` production change occurred.
+No new source file is authorized. All four are already individually present in M061's realized exact allowlist; M158 is a stricter active subset, not a new source-boundary waiver.
 
-M061 reconciled every newly changed path from its `[registered_pending]` ledger into its ordinary `[allowed]`/`[[evidence]]` ledger in the closure commit. M062 records the realized zero dependency/manifest/lock/Yosemite/I2PControl-source outcome.
+M062 records zero:
 
-## M157 key implementation constraints (realized)
+- new dependencies;
+- Cargo manifest changes;
+- lockfile changes;
+- Yosemite changes;
+- `emissary-cli/src/i2pcontrol/**` production changes.
 
-- Standard modern activation is `i2cp.leaseSetType=5`.
-- Direct Proposal-170 PR source sets `i2cp.encryptLeaseSet=true` **only** for legacy `encrypted (aes)`; do not alias that legacy flag to modern type 5.
-- M157 implements no client auth and no lookup secret. Type-5 requests containing successor-only secret/auth/PSK/DH companions must fail before activation.
-- Reuse the ordinary signed inner LeaseSet2 produced by `SamSession`; do not create a second inner-LS builder.
-- `LeaseSetManager` owns encrypted public/floodfill publication and UTC-day blinded-key rollover through its existing bounded state machine.
-- `NetDb` must preserve type 3 vs type 5 when caching/flooding/answering. It currently always re-emits cached LeaseSets as type 3; M157 must fix exactly that owner rather than add a new NetDB subsystem.
-- Keep `destination/session/mod.rs` unchanged. The ELS2 specification permits authenticated end-to-end clients to receive ordinary inner LS2 inside wrapped garlic while floodfill publication remains encrypted.
-- Reuse M156 `crypto/red25519.rs` unchanged unless a demonstrated correctness defect forces a plan amendment.
-- Reuse existing ChaCha20/HMAC/SHA256/RNG/zeroize; no new dependency.
-- No plaintext type-3 fallback for a destination activated in type-5 mode.
-- M157 must leave M095 exactly `336/29/475`.
+If implementation needs any production path or dependency outside this budget, stop before editing and amend M158/M061/M062.
 
-If implementation needs any file/dependency outside the registered budget, stop before editing and amend M157/M061/M062.
+## M158 implementation constraints
 
-## Deferred corrected line
+### Standard lookup secret
+
+Direct Java I2P/I2PTunnel source uses:
+
+```text
+i2cp.leaseSetSecret = Base64(UTF8(secret))
+```
+
+M158 consumes only this standard SAM/I2CP property. Proposal `OptionalLookup` plaintext mapping/persistence remains M162 work.
+
+`sam/parser.rs` must:
+
+- Base64-decode and UTF-8 validate the property before activation;
+- remove it from the generic options map before `SamCommand` is constructed;
+- move the decoded bytes into a dedicated zeroizing/non-`Debug` `LookupSecret` owned by `crypto/els2.rs` and carried inside redacted `DestinationContext`;
+- continue rejecting type-5 auth/PSK/DH/legacy-AES/legacy-key companions that belong to later milestones.
+
+Do not leave the source Base64 secret or decoded secret in generic `SamCommand`/`SamSession` option state: those types have debug-capable surfaces.
+
+`destination/lease_set.rs` keeps the secret generation-locally inside `EncryptedPublicationConfig` and uses it on every current-day and rollover blinding derivation. There is no core secret persistence.
+
+`crypto/red25519.rs` is already secret-capable and must remain unchanged unless a demonstrated correctness defect forces plan amendment.
+
+### Extended encrypted-service B32
+
+Implement in `crypto/els2.rs` only for the current type-7 -> type-11 one-byte-sigtype domain:
+
+- exactly 35 decoded bytes / 56 I2P Base32 characters + `.b32.i2p`;
+- flag bit 1 = secret required;
+- flag bit 2 = client auth required;
+- bits 7..3 zero; two-byte sigtype flag rejected;
+- unblinded sigtype 7, blinded sigtype 11;
+- 32-byte unblinded Ed25519 public key;
+- IEEE CRC-32 over public-key bytes, XOR low three CRC bytes into header bytes 0..2 before Base32 encoding;
+- strict length/suffix/checksum/flags/sigtype/public-key validation.
+
+No CRC dependency: use a small exact local helper and pin against Java `net.i2p.crypto.Blinding` vectors.
+
+M158 runtime emission sets `auth_required=false` but the codec may round-trip that public flag for M159/M160.
+
+### Address publication
+
+For published type-5 server destinations, `sam/session.rs` emits the canonical extended encrypted-service B32 through the existing opaque server-destination event string. Set `secret_required=true` iff the decoded secret is nonempty.
+
+Ordinary/non-type5 destination event behavior must remain unchanged. `events.rs` is not in scope.
+
+### Publication behavior
+
+- absent/empty secret must preserve M157 blinded publication semantics;
+- nonempty secret must feed the exact M156 daily alpha derivation;
+- same destination/day/secret is deterministic;
+- different secrets change blinded public/storage keys;
+- UTC rollover retains the same generation-local secret;
+- no failure may downgrade a secret-required generation to empty-secret or ordinary publication.
+
+## Explicit M158 exclusions
+
+Do not modify:
+
+- `emissary-core/src/crypto/red25519.rs` or `crypto/mod.rs`;
+- `destination/mod.rs`, `destination/session/mod.rs`, or `events.rs`;
+- any `i2np/**`, `netdb/**`, `primitives/**`;
+- router/tunnel/transport/frontend code;
+- `emissary-cli/src/i2pcontrol/**` or `emissary-cli/src/tunnel/**`;
+- Yosemite;
+- Cargo manifests or `Cargo.lock`.
+
+Do not add client-side blinded NetDB lookup/decryption, PSK/DH authorization, legacy AES/LS1, or configurable Destination `SigType` in M158.
+
+M158 promotes **zero Proposal cells**. M095 must remain `336/29/475`. `OptionalLookup` remains blocked until M162 supplies the administrative mapping, persistent secret custody, redaction, edit/restart transactionality, and five-family integration.
+
+## Corrected line
 
 ```text
 M155 semantic/owner refreeze            [CLOSED]
   -> M156 Red25519/blinding              [CLOSED]
   -> M157 modern Encrypted LS2           [CLOSED]
-  -> M158 lookup-secret/blinded address  [DEFERRED]
+  -> M158 lookup-secret/blinded address  [REGISTERED]
   -> M159 PSK auth                       [DEFERRED]
   -> M160 DH auth                        [DEFERRED]
   -> M161 legacy AES/LS1 feasibility     [DEFERRED]
@@ -103,7 +162,7 @@ M155 semantic/owner refreeze            [CLOSED]
   -> M152 final requalification          [DEFERRED]
 ```
 
-M149-M151 remain historical drafts but are superseded for execution by M155-M162. Do not execute them directly.
+M149-M151 remain historical superseded drafts. Do not execute them directly.
 
 Do not reopen M147/M148 without a separate explicit architecture/security decision superseding M154. Do not create a dummy outproxy provider, alias `ProxyList`, or add direct-clearnet DNS/TCP egress to resolve M146.
 

@@ -111,6 +111,27 @@ const NS_MAX_AGE: Duration = Duration::from_secs(5 * 60);
 /// session_message
 const NS_FUTURE_LIMIT: Duration = Duration::from_secs(2 * 60);
 
+/// Neutral SAM session option carrying the reply LeaseSet bundling policy.
+///
+/// This is the standard session property consumed by the neutral outbound-message
+/// owner. It carries no administrative policy.
+pub const BUNDLE_REPLY_LEASE_SET_OPTION: &str = "shouldBundleReplyInfo";
+
+/// Parse the neutral reply LeaseSet bundling policy from SAM session options.
+///
+/// Fail-safe to enabled when absent or malformed, preserving the current
+/// always-bundle behavior. Explicit `false` (case-insensitive, per reference
+/// `Boolean.parseBoolean`) disables `ExistingSession` update bundling; the
+/// `NewSession` handshake retains mandatory bundling for liveness.
+pub fn parse_bundle_reply_lease_set(options: &hashbrown::HashMap<String, String>) -> bool {
+    match options.get(BUNDLE_REPLY_LEASE_SET_OPTION) {
+        None => true,
+        Some(value) if value.eq_ignore_ascii_case("true") => true,
+        Some(value) if value.eq_ignore_ascii_case("false") => false,
+        Some(_) => true,
+    }
+}
+
 /// Active session with remote destination.
 struct ActiveSession<R: Runtime> {
     /// Pending ACK requests received from remote.
@@ -185,6 +206,15 @@ pub struct SessionManager<R: Runtime> {
     /// Active sessions.
     active: HashMap<DestinationId, ActiveSession<R>>,
 
+    /// Whether outbound reply LeaseSet bundling is enabled.
+    ///
+    /// Neutral session policy for optional reply LeaseSet bundling on outbound
+    /// client messages (reference `shouldBundleReplyInfo`, defaults to true).
+    /// When disabled, `ExistingSession` update bundling is suppressed; the
+    /// `NewSession` handshake retains mandatory bundling for liveness since
+    /// inbound rejects a `NewSession` without a `DatabaseStore`.
+    bundle_reply_lease_set: bool,
+
     /// Destination ID.
     destination_id: DestinationId,
 
@@ -253,6 +283,7 @@ impl<R: Runtime> SessionManager<R> {
     ) -> Self {
         Self {
             active: HashMap::new(),
+            bundle_reply_lease_set: true,
             destination_id,
             garlic_tags: Default::default(),
             key_context: KeyContext::from_keys(private_key, public_keys),
@@ -265,6 +296,30 @@ impl<R: Runtime> SessionManager<R> {
             remote_destinations: HashMap::new(),
             waker: None,
             ratchet_threshold,
+        }
+    }
+
+    /// Whether outbound reply LeaseSet bundling is enabled.
+    ///
+    /// Defaults to true, preserving the current always-bundle behavior.
+    /// No Proposal vocabulary; the caller maps the standard session property.
+    #[allow(dead_code)]
+    pub fn bundle_reply_lease_set(&self) -> bool {
+        self.bundle_reply_lease_set
+    }
+
+    /// Set the outbound reply LeaseSet bundling policy for this destination.
+    ///
+    /// Generation-local: call before the destination becomes active. Disabling
+    /// clears stale pending update state so no successor message bundles a
+    /// LeaseSet configured off. The current LeaseSet itself is retained for the
+    /// mandatory `NewSession` handshake.
+    pub fn set_bundle_reply_lease_set(&mut self, enabled: bool) {
+        self.bundle_reply_lease_set = enabled;
+        if !enabled {
+            self.active.iter_mut().for_each(|(_, session)| {
+                session.lease_set = None;
+            });
         }
     }
 
@@ -285,6 +340,9 @@ impl<R: Runtime> SessionManager<R> {
         );
 
         self.lease_set = lease_set.clone();
+        if !self.bundle_reply_lease_set {
+            return;
+        }
         self.active.iter_mut().for_each(|(destination_id, session)| {
             session.lease_set = Some(lease_set.clone());
 
@@ -379,6 +437,9 @@ impl<R: Runtime> SessionManager<R> {
 
     /// Attempt to publish local lease set to remote destination.
     fn publish_local_lease_set(&mut self, destination_id: &DestinationId) -> Option<Vec<u8>> {
+        if !self.bundle_reply_lease_set {
+            return None;
+        }
         let session = self.active.get_mut(destination_id)?;
 
         // explicity database store needs to be sent only if there are no acks pending
@@ -475,8 +536,29 @@ impl<R: Runtime> SessionManager<R> {
                     builder = builder.with_ack(acks.into_iter().collect());
                 }
 
+                // Reply LeaseSet bundling is policy-gated: disabled suppresses the
+                // `DatabaseStore` update clove on `ExistingSession` traffic. The
+                // `NewSession` handshake path below retains mandatory bundling.
+                let bundle_enabled = self.bundle_reply_lease_set;
                 match &session.lease_set {
                     None => session
+                        .session
+                        .encrypt(builder)
+                        .map(|(_, _, message)| {
+                            let mut out = BytesMut::with_capacity(message.len() + 4);
+
+                            out.put_u32(message.len() as u32);
+                            out.put_slice(&message);
+                            out.freeze().to_vec()
+                        })
+                        .map_err(|error| {
+                            if let SessionError::SessionTerminated = error {
+                                self.remove_session(destination_id);
+                            }
+
+                            error
+                        }),
+                    Some(_) if !bundle_enabled => session
                         .session
                         .encrypt(builder)
                         .map(|(_, _, message)| {
@@ -4992,5 +5074,216 @@ mod tests {
                 .unwrap();
             decrypt_and_verify!(&mut outbound_session, message, vec![(i + 1) as u8; 4]);
         }
+    }
+
+    fn bundle_options(pairs: &[(&str, &str)]) -> hashbrown::HashMap<String, String> {
+        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    }
+
+    #[test]
+    fn bundle_reply_policy_defaults_to_enabled() {
+        assert!(parse_bundle_reply_lease_set(&hashbrown::HashMap::new()));
+        assert_eq!(
+            BUNDLE_REPLY_LEASE_SET_OPTION, "shouldBundleReplyInfo",
+            "neutral option must be the standard session property"
+        );
+    }
+
+    #[test]
+    fn bundle_reply_policy_parses_reference_booleans() {
+        assert!(parse_bundle_reply_lease_set(&bundle_options(&[(
+            BUNDLE_REPLY_LEASE_SET_OPTION,
+            "true"
+        )])));
+        assert!(parse_bundle_reply_lease_set(&bundle_options(&[(
+            BUNDLE_REPLY_LEASE_SET_OPTION,
+            "TRUE"
+        )])));
+        assert!(!parse_bundle_reply_lease_set(&bundle_options(&[(
+            BUNDLE_REPLY_LEASE_SET_OPTION,
+            "false"
+        )])));
+        assert!(!parse_bundle_reply_lease_set(&bundle_options(&[(
+            BUNDLE_REPLY_LEASE_SET_OPTION,
+            "FALSE"
+        )])));
+        // Malformed fails safe to enabled, preserving current behavior.
+        for raw in ["", " ", "yes", "0", "1", "bundle"] {
+            assert!(
+                parse_bundle_reply_lease_set(&bundle_options(&[(
+                    BUNDLE_REPLY_LEASE_SET_OPTION,
+                    raw
+                )])),
+                "malformed {raw:?} must fail safe to enabled"
+            );
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn disabled_policy_suppresses_update_bundling() {
+        let destination_id = DestinationId::random();
+        let private_key = crate::crypto::StaticPrivateKey::random(MockRuntime::rng());
+        let public_key = private_key.public();
+        let (leaseset, signing_key) = LeaseSet2::random();
+        let leaseset = Bytes::from(leaseset.serialize(&signing_key));
+        let mut manager = SessionManager::<MockRuntime>::new(
+            destination_id,
+            private_key,
+            vec![public_key],
+            leaseset,
+        );
+        assert!(manager.bundle_reply_lease_set());
+
+        manager.set_bundle_reply_lease_set(false);
+        assert!(!manager.bundle_reply_lease_set());
+
+        // Disabling with no active sessions records no timers and keeps the
+        // current LeaseSet for the mandatory handshake.
+        let (fresh, fresh_key) = LeaseSet2::random();
+        let fresh = Bytes::from(fresh.serialize(&fresh_key));
+        manager.register_lease_set(fresh);
+        assert!(manager.lease_set_publish_timers.is_empty());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn disabled_policy_sends_updates_without_database_store() {
+        // Establish an active session, prove enabled update bundling pends the
+        // LeaseSet, then disable and prove updates carry no DatabaseStore.
+        let inbound_private = crate::crypto::StaticPrivateKey::random(MockRuntime::rng());
+        let inbound_public = inbound_private.public();
+        let (inbound_ls, inbound_signing) = LeaseSet2::random();
+        let inbound_id = inbound_ls.header.destination.id();
+        let inbound_ls = Bytes::from(inbound_ls.serialize(&inbound_signing));
+        let mut inbound =
+            SessionManager::<MockRuntime>::new(inbound_id.clone(), inbound_private, vec![
+                inbound_public.clone()
+            ], inbound_ls);
+
+        let outbound_private = crate::crypto::StaticPrivateKey::random(MockRuntime::rng());
+        let (outbound_ls, outbound_signing) = LeaseSet2::random();
+        let outbound_id = outbound_ls.header.destination.id();
+        let outbound_dest = outbound_ls.header.destination.clone();
+        let outbound_ls = Bytes::from(outbound_ls.serialize(&outbound_signing));
+        let mut outbound = SessionManager::<MockRuntime>::new(
+            outbound_id.clone(),
+            outbound_private.clone(),
+            vec![outbound_private.public()],
+            outbound_ls,
+        );
+        outbound.add_remote_destination(inbound_id.clone(), inbound_public);
+
+        // Handshake: NS -> NSR -> ES (both managers become active).
+        let ns = outbound.encrypt(&inbound_id, vec![1, 2, 3, 4]).unwrap();
+        let nsr = inbound
+            .decrypt(Message {
+                payload: ns,
+                ..Default::default()
+            })
+            .unwrap()
+            .find(|clove| std::matches!(clove.message_type, MessageType::Data))
+            .map(|_| inbound.encrypt(&outbound_id, vec![5, 6, 7, 8]).unwrap())
+            .unwrap();
+        {
+            let mut cloves = outbound
+                .decrypt(Message {
+                    payload: nsr,
+                    ..Default::default()
+                })
+                .unwrap();
+            assert!(cloves.any(|clove| std::matches!(clove.message_type, MessageType::Data)));
+        }
+        let es = outbound.encrypt(&inbound_id, vec![9, 9, 9, 9]).unwrap();
+        {
+            let mut cloves = inbound
+                .decrypt(Message {
+                    payload: es,
+                    ..Default::default()
+                })
+                .unwrap();
+            assert!(cloves.any(|clove| std::matches!(clove.message_type, MessageType::Data)));
+        }
+        assert!(outbound.active.contains_key(&inbound_id));
+        assert!(inbound.active.contains_key(&outbound_id));
+
+        // Enabled: registering a new LeaseSet pends it with a publish timer.
+        let fresh = Bytes::from(
+            LeaseSet2 {
+                header: LeaseSet2Header {
+                    destination: outbound_dest.clone(),
+                    expires: (MockRuntime::time_since_epoch() + Duration::from_secs(10 * 60))
+                        .as_secs() as u32,
+                    is_unpublished: false,
+                    offline_signature: None,
+                    published: MockRuntime::time_since_epoch().as_secs() as u32,
+                },
+                public_keys: vec![outbound_private.public()],
+                leases: vec![Lease {
+                    router_id: RouterId::random(),
+                    tunnel_id: TunnelId::random(),
+                    expires: MockRuntime::time_since_epoch() + Duration::from_secs(10 * 60),
+                }],
+            }
+            .serialize(&outbound_signing),
+        );
+        outbound.register_lease_set(fresh);
+        assert!(outbound.active.get(&inbound_id).unwrap().lease_set.is_some());
+        assert_eq!(outbound.lease_set_publish_timers.len(), 1);
+
+        // Disabling clears stale pending state.
+        outbound.set_bundle_reply_lease_set(false);
+        assert!(!outbound.bundle_reply_lease_set());
+        assert!(outbound.active.get(&inbound_id).unwrap().lease_set.is_none());
+
+        // Disabled: registering another LeaseSet records no pending and no timer.
+        let fresh2 = Bytes::from(
+            LeaseSet2 {
+                header: LeaseSet2Header {
+                    destination: outbound_dest,
+                    expires: (MockRuntime::time_since_epoch() + Duration::from_secs(10 * 60))
+                        .as_secs() as u32,
+                    is_unpublished: false,
+                    offline_signature: None,
+                    published: MockRuntime::time_since_epoch().as_secs() as u32,
+                },
+                public_keys: vec![outbound_private.public()],
+                leases: vec![Lease {
+                    router_id: RouterId::random(),
+                    tunnel_id: TunnelId::random(),
+                    expires: MockRuntime::time_since_epoch() + Duration::from_secs(10 * 60),
+                }],
+            }
+            .serialize(&outbound_signing),
+        );
+        outbound.register_lease_set(fresh2);
+        assert!(outbound.active.get(&inbound_id).unwrap().lease_set.is_none());
+        // Only the earlier enabled timer remains (bounded, no new timer).
+        assert_eq!(outbound.lease_set_publish_timers.len(), 1);
+
+        // Disabled encrypt succeeds without bundling an ack request.
+        let update = outbound.encrypt(&inbound_id, vec![7, 7, 7, 7]).unwrap();
+        assert!(outbound
+            .active
+            .get(&inbound_id)
+            .unwrap()
+            .outbound_ack_requests
+            .is_empty());
+        let mut cloves = inbound
+            .decrypt(Message {
+                payload: update,
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(cloves.any(|clove| std::matches!(clove.message_type, MessageType::Data)));
+        // No DatabaseStore clove was bundled for the disabled update.
+        let mut cloves = inbound
+            .decrypt(Message {
+                payload: outbound.encrypt(&inbound_id, vec![8, 8, 8, 8]).unwrap(),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(cloves.all(|clove| !std::matches!(
+            clove.message_type,
+            MessageType::DatabaseStore
+        )));
     }
 }

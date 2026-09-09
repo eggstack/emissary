@@ -39,6 +39,7 @@ core_owner_hooks = [
   "emissary-core/src/config.rs",
   "emissary-core/src/destination/lease_set.rs",
   "emissary-core/src/destination/mod.rs",
+  "emissary-core/src/destination/session/mod.rs",
   "emissary-core/src/sam/mod.rs",
   "emissary-core/src/sam/parser.rs",
   "emissary-core/src/transport/ntcp2/mod.rs",
@@ -466,3 +467,13 @@ why_upstream_insufficient = "TransitTunnelManager alone observes admission/expir
 sensitivity = "bounded tunnel snapshot"
 seam = "passive lifecycle hook"
 reference = "M060 closure retained-owner seam"
+
+[[evidence]]
+path = "emissary-core/src/destination/session/mod.rs"
+owner = "SessionManager (ECIES outbound reply-LeaseSet bundling owner)"
+purpose = "Gates ExistingSession LeaseSet update bundling on the neutral bundle_reply_lease_set policy; NewSession retains mandatory handshake bundling."
+consumer = "Destination coordination bridge and SAM session activation."
+why_upstream_insufficient = "Only the outbound client-message owner observes the pending-until-ack bundling state and can suppress updates without fabricating leases or adding NetDB lookups."
+sensitivity = "bounded owner-local policy"
+seam = "generation-local immutable-after-set flag"
+reference = "M145 neutral reply-bundling primitive; zero administrative vocabulary"

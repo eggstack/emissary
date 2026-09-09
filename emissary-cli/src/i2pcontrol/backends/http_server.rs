@@ -635,6 +635,26 @@ pub(crate) fn unique_local_enabled(definition: &TunnelDefinition) -> BackendResu
     }
 }
 
+/// Extract the exact Proposal `MultiHoming` boolean from raw config before any
+/// accepted-stream allocation (M145).
+///
+/// Absent means bundle default (preserves current always-bundle behavior).
+/// Explicit `true` is the same effective bundle with distinct persistence;
+/// `false` suppresses `ExistingSession` update bundling. Any present
+/// non-boolean value fails before allocation with no echo.
+pub(crate) fn multihoming_enabled(definition: &TunnelDefinition) -> BackendResult<Option<bool>> {
+    match definition.raw_config.get("MultiHoming") {
+        None => Ok(None),
+        Some(value) => value
+            .as_bool()
+            .map(Some)
+            .ok_or_else(|| BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::HttpServer,
+                option: "MultiHoming".to_owned(),
+            }),
+    }
+}
+
 /// Connect to the already-normalized literal-loopback target, source-binding
 /// the reference-derived local address first when `unique_local` is enabled.
 ///
@@ -987,6 +1007,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "HostingDestination",
         "UniqueLocalAddressPerClient",
         "UseSSL",
+        "MultiHoming",
         "i2p.tunnel.httpHost",
         "i2p.tunnel.accessList",
     ];
@@ -1043,6 +1064,10 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
     }
     // Boolean-typed extraction fails before allocation on malformed values.
     let _ = unique_local_enabled(definition)?;
+    // M145: `MultiHoming` boolean validation before allocation with no echo.
+    // Mismatched/malformed values surface as `MultiHoming` rejection here; the
+    // typed session builder re-validates before mapping to `shouldBundleReplyInfo`.
+    let _ = multihoming_enabled(definition)?;
     // M144: `UseSSL` boolean validation before allocation with no echo.
     // Mismatched/malformed values surface as `UseSSL` rejection here; the
     // typed config builder re-validates before building TLS material.

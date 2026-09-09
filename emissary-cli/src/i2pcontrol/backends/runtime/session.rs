@@ -752,6 +752,42 @@ fn parse_profile_policy(definition: &TunnelDefinition) -> BackendResult<Option<S
     }
 }
 
+/// Validated Proposal `MultiHoming` policy for one definition (M145).
+///
+/// `None` means omitted (bundle default, no wire option). `Some(true)` is
+/// explicit enabled (same effective as omitted, distinct persisted string).
+/// `Some(false)` disables `ExistingSession` update bundling.
+///
+/// Frozen semantics (Proposal + pinned Java `OutboundClientMessageOneShotJob`):
+/// - `BUNDLE_REPLY_LEASESET = "shouldBundleReplyInfo"`, defaults to true
+///   (absent means bundle; `Boolean.parseBoolean` case-insensitive);
+/// - Proposal `MultiHoming` maps directly: `true` → bundle, `false` → suppress;
+/// - only `httpserver`/`httpbidirserver` are applicable (HTTP server
+///   presentation roles); all other families reject any presence;
+/// - malformed types fail before allocation with no echo.
+///
+/// Core remains fail-safe for non-I2PControl SAM input, but I2PControl
+/// enforces Proposal-valid values here before listener/session allocation.
+fn parse_multihoming_policy(definition: &TunnelDefinition) -> BackendResult<Option<bool>> {
+    let tunnel_type = definition.tunnel_type;
+    let Some(raw) = definition.raw_config.get("MultiHoming") else {
+        return Ok(None);
+    };
+    if !matches!(
+        tunnel_type,
+        TunnelType::HttpServer | TunnelType::HttpBidirServer
+    ) {
+        return Err(BackendError::UnsupportedOption {
+            tunnel_type,
+            option: "MultiHoming".to_owned(),
+        });
+    }
+    raw.as_bool().map(Some).ok_or_else(|| BackendError::UnsupportedOption {
+        tunnel_type,
+        option: "MultiHoming".to_owned(),
+    })
+}
+
 /// Validated Proposal idle-reduction policy for one definition.
 ///
 /// `None` means reduction disabled (no timer/work). `Some` carries the exact
@@ -1064,6 +1100,26 @@ pub fn build_session_options(
                 .map_err(|_| BackendError::UnsupportedOption {
                     tunnel_type: definition.tunnel_type,
                     option: "Profile".to_owned(),
+                })?;
+        }
+    }
+
+    // M145: map validated Proposal `MultiHoming` (two HTTP server families)
+    // through Yosemite's existing validated generic additional-session-option
+    // path. Omitted and explicit `true` emit nothing (bundle default, same
+    // effective; distinct persisted strings for round-trip, shared session).
+    // `false` emits `"false"` (suppress `ExistingSession` updates; `NewSession`
+    // retains mandatory handshake bundling). No Yosemite change, no raw SAM
+    // command construction. Shared-session compatibility follows from the
+    // existing `additional_options_identity`: disabled never shares with
+    // enabled/default.
+    if let Some(enabled) = parse_multihoming_policy(definition)? {
+        if !enabled {
+            options
+                .add_session_option("shouldBundleReplyInfo".to_owned(), "false".to_owned())
+                .map_err(|_| BackendError::UnsupportedOption {
+                    tunnel_type: definition.tunnel_type,
+                    option: "MultiHoming".to_owned(),
                 })?;
         }
     }

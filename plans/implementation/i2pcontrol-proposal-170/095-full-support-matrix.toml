@@ -13,8 +13,8 @@ current_production_head = "e4f217cb1459e26bf011da46b67fc2c83cd192b5"
 
 [current_matrix_counts]
 total = 840
-apply = 334
-blocked_primitive = 31
+apply = 336
+blocked_primitive = 29
 not_applicable = 475
 
 [contract_counts]
@@ -1425,12 +1425,10 @@ secret_bearing = false
 path_bearing = false
 identity_or_key_affecting = false
 compatibility_aliases = []
-completion_owner = "residual-option-line"
-current_or_planned_disposition = "blocked_primitive_or_not_applicable"
-blocked_primitive = "no neutral server-session owner for Proposal shouldBundleReplyInfo/LeaseSet bundling semantics"
-blocking_milestone = "M099"
-cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "blocked_primitive", "blocked_primitive", "not_applicable", "not_applicable"]
-cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "httpserver" = "Blocked: Proposal/Java maps MultiHoming to shouldBundleReplyInfo/LeaseSet reply bundling; no neutral Emissary server-session owner exposes that decision.", "httpbidirserver" = "Blocked: Proposal/Java maps MultiHoming to shouldBundleReplyInfo/LeaseSet reply bundling; no neutral Emissary server-session owner exposes that decision.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
+completion_owner = "M145"
+current_or_planned_disposition = "apply_or_not_applicable"
+cells = ["not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "not_applicable", "apply", "apply", "not_applicable", "not_applicable"]
+cell_notes = { "client" = "This type is not an HTTP server presentation role.", "httpclient" = "This type is not an HTTP server presentation role.", "ircclient" = "This type is not an HTTP server presentation role.", "socks" = "This type is not an HTTP server presentation role.", "socksirc" = "This type is not an HTTP server presentation role.", "connectclient" = "This type is not an HTTP server presentation role.", "streamrclient" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option.", "server" = "This type is not an HTTP server presentation role.", "httpserver" = "M145 applies reference-compatible reply LeaseSet bundling via the neutral SessionManager policy (shouldBundleReplyInfo); omitted/true bundles, false suppresses ExistingSession updates with NewSession handshake retained.", "httpbidirserver" = "M145 applies the same shared server-half bundling policy as httpserver; client half never inherits.", "ircserver" = "This type is not an HTTP server presentation role.", "streamrserver" = "Streamr uses its bounded datagram/session contract and does not expose this TCP/cryptographic option." }
 
 [[tunnel_manager.options]]
 canonical_key = "AccessOption"

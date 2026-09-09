@@ -869,6 +869,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "HostingDestination",
         "UniqueLocalAddressPerClient",
         "UseSSL",
+        "MultiHoming",
         "Description",
         "PrivKeyFile",
         "StartOnLoad",
@@ -889,6 +890,19 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
     // Boolean-typed extraction fails before allocation on malformed values.
     let _ = super::http_server::unique_local_enabled(definition)
         .map_err(|_| invalid_option("UniqueLocalAddressPerClient"))?;
+    // M145: `MultiHoming` boolean validation before allocation with no echo.
+    // The typed session builder re-validates before mapping the server half to
+    // `shouldBundleReplyInfo`; the client half never inherits it.
+    match super::http_server::multihoming_enabled(definition) {
+        Ok(_) => {}
+        Err(BackendError::UnsupportedOption { option, .. }) if option == "MultiHoming" => {
+            return Err(BackendError::UnsupportedOption {
+                tunnel_type: TunnelType::HttpBidirServer,
+                option,
+            });
+        }
+        Err(error) => return Err(error),
+    }
     // M144: single `UseSSL` boolean for both halves.
     match presentation_tls::parse_use_ssl(definition) {
         Ok(_) => Ok(()),

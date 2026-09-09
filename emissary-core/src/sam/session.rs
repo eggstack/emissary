@@ -18,7 +18,10 @@
 
 use crate::{
     crypto::{base32_decode, base32_encode, base64_encode, sha256::Sha256, SigningPrivateKey},
-    destination::{DeliveryStyle, Destination, DestinationEvent, LeaseSetStatus},
+    destination::{
+        session::parse_bundle_reply_lease_set, DeliveryStyle, Destination, DestinationEvent,
+        LeaseSetStatus,
+    },
     error::QueryError,
     events::EventHandle,
     i2cp::{I2cpPayload, I2cpPayloadBuilder},
@@ -474,6 +477,11 @@ impl<R: Runtime> SamSession<R> {
                 is_unpublished,
                 profile_storage,
             );
+            // Neutral reply LeaseSet bundling: parsed before activation, generation-local,
+            // fail-safe to enabled (preserves current behavior). Disabled suppresses
+            // `ExistingSession` update bundling; `NewSession` retains mandatory bundling.
+            session_destination
+                .set_bundle_reply_lease_set(parse_bundle_reply_lease_set(&options));
             // TODO: not needed anymore?
             session_destination.publish_lease_set(local_leaseset.clone());
 

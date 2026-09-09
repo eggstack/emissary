@@ -417,7 +417,19 @@ fn audit_covers_the_exact_m104_residual_inventory() {
     assert_eq!(m144_completed.len(), 4);
     let expected_post_m144 =
         expected_post_m143.difference(&m144_completed).cloned().collect::<BTreeSet<_>>();
-    assert_eq!(current_blocked, expected_post_m144);
+    // M145 promotes the two MultiHoming HTTP server cells to apply with the
+    // neutral reply-bundling primitive (shouldBundleReplyInfo).
+    let m145_completed = [
+        ("MultiHoming", "httpserver"),
+        ("MultiHoming", "httpbidirserver"),
+    ]
+    .into_iter()
+    .map(|(option, tunnel_type)| (option.to_owned(), tunnel_type.to_owned()))
+    .collect::<BTreeSet<_>>();
+    assert_eq!(m145_completed.len(), 2);
+    let expected_post_m145 =
+        expected_post_m144.difference(&m145_completed).cloned().collect::<BTreeSet<_>>();
+    assert_eq!(current_blocked, expected_post_m145);
     assert_eq!(
         audit["summary"]["post_m116_reclassified_cells"].as_integer(),
         Some(7)

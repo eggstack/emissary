@@ -392,8 +392,10 @@ with port 0 before loopback connect via the canonical peer hash; targets stay
 literal loopback, no DNS, no fallback, per-connection state only; IPv6 ULA
 bind requires an OS-assigned address as in Java, otherwise fails closed with
 502), while
-`MultiHoming` maps to `shouldBundleReplyInfo`/LeaseSet reply bundling and has no
-neutral server-session owner. `EncryptLeaseSet`, `OptionalLookup`, and
+`MultiHoming` maps to `shouldBundleReplyInfo`/LeaseSet reply bundling and is applied
+by M145 through the neutral `SessionManager` policy (omitted/`true` bundles,
+`false` suppresses `ExistingSession` updates with `NewSession` handshake retained).
+`EncryptLeaseSet`, `OptionalLookup`, and
 `LeaseSetClientAuths` have typed Y005 SAM fields but still lack Emissary
 construction, key-custody, lookup/publication and session-handoff owners.
 The underlying SAM transport is no longer the blocker: Yosemite Y004's canonical
@@ -411,8 +413,9 @@ with 2 promotions; M142 applies the HTTP SSLProxies + JumpList completion to
 retained streaming Profile completion to `330 apply / 35 blocked /
 475 not_applicable` with 1 promotion; M144 applies the presentation UseSSL
 completion to `334 apply / 31 blocked / 475 not_applicable` with 4 promotions;
-no successor is
-registered, M145-M152 remain deferred.
+M145 applies the LeaseSet reply-bundling completion to `336 apply / 29 blocked /
+475 not_applicable` with 2 promotions; no successor is
+registered, M146-M152 remain deferred.
 
 | Disposition | Proposal 170 fields |
 |---|---|
@@ -423,8 +426,8 @@ registered, M145-M152 remain deferred.
 | Applied by seven client idle owners (M137) | `Close` (boolean master switch), `CloseTime` (ms, minimum 300000, default 1800000) via standard `i2cp.close*` with close-before-reduce ordering and canonical teardown; `CloseTime` without `Close=true` fails before allocation |
 | Applied by six TCP proven-resume owners (M134) | `NewDest` only on a proven `IdlePolicy` resume (requires `Close=true`, conflicts with `PersistentClientKey`/`PrivKeyFile`, Streamr/servers not applicable); ordinary/manual/restart/failure paths reuse without rotation |
 | Rejected before allocation as residual client blockers | `UseOutproxyPlugin` and `SigType` for all applicable families (M140 re-freezes six constructor-overridden/UDP `Profile` cells and Streamr `ConnectDelay` as not_applicable; M143 applies retained `Profile:client`; M144 applies `UseSSL` for HTTP/CONNECT clients) |
-| Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `UniqueLocalAddressPerClient` (M141 HTTP servers only, per-client loopback source bind), `UseSSL` (M144 HTTP servers only, TLS to loopback target) |
-| Rejected before allocation as residual server blockers | `MultiHoming`, `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
+| Applied by server runtimes | `WebsiteHostname`, `SpoofedHost`, `BlockAccessInProxies`, `BlockUserAgents`, `UserAgents`, `BlockReferers`, `AllowUserAgent`, `AllowReferer`, `AllowAccept`, `AccessOption`, `AccessList`, `FilterFilePath`, `MaxConcurrentConns`, `ClientPerMinute`, `ClientPerHour`, `ClientPerDay`, `TotalInPerMinute`, `TotalInPerHour`, `TotalInPerDay`, `PostLimit`, `PostLimitTime`, `PerClientPeriod`, `TotalPeriod`, `TotalBanTime`, `UniqueLocalAddressPerClient` (M141 HTTP servers only, per-client loopback source bind), `UseSSL` (M144 HTTP servers only, TLS to loopback target), `MultiHoming` (M145 HTTP servers only, reply LeaseSet bundling via `shouldBundleReplyInfo`) |
+| Rejected before allocation as residual server blockers | `OptionalLookup`, `EncryptLeaseSet`, `LeaseSetClientAuths` |
 | Validated and retained without an accepted runtime path | `TunnelLength` (0–3), `TunnelVariance` (−2–2), `TunnelQuantity` (1–6), `TunnelBackupQuantity` (0–3), `Shared`, `SigType`, `EncType`, `CustomOptions`, `PersistentClientKey`, `PrivKeyFile`, `LeaseSetClientAuths` |
 
 `PrivKeyFile` is part of the pinned input inventory and is retained as a redacted

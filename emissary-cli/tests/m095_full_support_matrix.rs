@@ -556,6 +556,26 @@ fn matrix_is_exhaustive_and_truthful_at_the_current_baseline() {
             }
             continue;
         }
+        if key == "MultiHoming" {
+            // M145 promotes the two HTTP server cells to apply with the neutral
+            // reply-bundling primitive (shouldBundleReplyInfo).
+            assert_eq!(string_field(row, "completion_owner"), "M145", "{key} owner");
+            assert_eq!(
+                string_field(row, "current_or_planned_disposition"),
+                "apply_or_not_applicable",
+                "{key} disposition"
+            );
+            assert!(row.get("blocking_milestone").is_none(), "{key} milestone");
+            assert!(row.get("blocked_primitive").is_none(), "{key} primitive");
+            assert_eq!(cells[8].as_str(), Some("apply"), "{key} cell 8");
+            assert_eq!(cells[9].as_str(), Some("apply"), "{key} cell 9");
+            for (index, cell) in cells.iter().enumerate() {
+                if index != 8 && index != 9 {
+                    assert_eq!(cell.as_str(), Some("not_applicable"), "{key} cell {index}");
+                }
+            }
+            continue;
+        }
         assert_eq!(
             string_field(row, "completion_owner"),
             "residual-option-line",
@@ -640,13 +660,13 @@ fn current_matrix_counts_are_explicit_and_exact() {
             counts
         },
     );
-    assert_eq!(counts, (334, 31, 475));
+    assert_eq!(counts, (336, 29, 475));
     let declared = root
         .get("current_matrix_counts")
         .and_then(Value::as_table)
         .expect("current matrix counts are declared");
-    assert_eq!(declared["apply"].as_integer(), Some(334));
-    assert_eq!(declared["blocked_primitive"].as_integer(), Some(31));
+    assert_eq!(declared["apply"].as_integer(), Some(336));
+    assert_eq!(declared["blocked_primitive"].as_integer(), Some(29));
     assert_eq!(declared["not_applicable"].as_integer(), Some(475));
 }
 

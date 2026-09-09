@@ -50,19 +50,22 @@ M143 (`plans/closure/i2pcontrol-proposal-170/143-closure.md`) is closed as compl
 as the retained streaming Profile completion with 1 promotion.
 M144 (`plans/closure/i2pcontrol-proposal-170/144-closure.md`) is closed as complete
 as the presentation UseSSL completion with 4 promotions.
+M145 (`plans/closure/i2pcontrol-proposal-170/145-closure.md`) is closed as complete
+as the LeaseSet reply-bundling completion with 2 promotions.
 
 The current Proposal 170 baseline remains partial: RouterInfo is 43 additions with
 42 available, 1 protocol-permitted neutral, and 0 unavailable; AddressBook all 13
 SetConfig keys are operational; and unapplied runtime options (including
 10 SigType, 4 UseOutproxyPlugin client proxy/lifecycle (with Streamr ConnectDelay
 re-frozen as not_applicable by M140, HTTP SSLProxies/JumpList applied by M142,
-retained Profile:client applied by M143, and presentation UseSSL applied by M144),
-and 17 server LeaseSet/presentation cells (M141 applies 2 UniqueLocalAddressPerClient cells),
+retained Profile:client applied by M143, presentation UseSSL applied by M144,
+and reply LeaseSet bundling applied by M145),
+and 15 server LeaseSet/presentation cells (M141 applies 2 UniqueLocalAddressPerClient cells),
 with client idle `Reduce*` applied by M136, `Close`/`CloseTime` applied by M137,
 and `NewDest` proven-resume applied by M134)
 fail before allocation. The authoritative completion inventory is
-`plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (334
-apply / 31 blocked_primitive / 475 not_applicable after M144).
+`plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (336
+apply / 29 blocked_primitive / 475 not_applicable after M145).
 
 Streamr is intentionally separate from TCP tunnel helpers. Preserve its documented
 16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh,

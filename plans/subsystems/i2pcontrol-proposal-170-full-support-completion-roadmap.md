@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M140 closed as complete; M141 closed; M142 closed as complete (329/36/475); M143 closed as complete (330/35/475); M144 closed as complete (334/31/475); no registered successor**
+Status: **active / partial; M140 closed as complete; M141 closed; M142 closed as complete (329/36/475); M143 closed as complete (330/35/475); M144 closed as complete (334/31/475); M145 closed as complete (336/29/475); no registered successor**
 
 Current runtime/security qualification authority:
 
@@ -12,15 +12,15 @@ Current residual applicability authority:
 
 Current registered handoff:
 
-- none (M144 closed; M145-M152 deferred). Last closed: M144 `plans/implementation/i2pcontrol-proposal-170/144-presentation-usessl-runtime-completion.md`.
+- none (M145 closed; M146-M152 deferred). Last closed: M145 `plans/implementation/i2pcontrol-proposal-170/145-leaseset-reply-bundling-multihoming-completion.md`.
 
 Focused residual execution roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`.
 
-Current machine authority after M144 closure:
+Current machine authority after M145 closure:
 
-- M095 matrix: `334 apply / 31 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells.
+- M095 matrix: `336 apply / 29 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells.
 
 Pinned Proposal authority:
 
@@ -195,7 +195,7 @@ M143 retained streaming Profile                       [CLOSED AS COMPLETE — 33
   |
   v
 M144 presentation UseSSL                               [CLOSED AS COMPLETE — 334/31/475, 4 PROMOTIONS]
-  -> M145 reply LeaseSet bundling / MultiHoming        [DEFERRED]
+  -> M145 reply LeaseSet bundling / MultiHoming        [CLOSED AS COMPLETE — 336/29/475, 2 PROMOTIONS]
   -> M146 real outproxy provider / UseOutproxyPlugin   [DEFERRED]
   -> M147 neutral destination signature suites         [DEFERRED / ZERO PROMOTION]
   -> M148 Proposal SigType                             [DEFERRED]
@@ -205,7 +205,7 @@ M144 presentation UseSSL                               [CLOSED AS COMPLETE — 3
   -> M152 final whole-surface requalification          [DEFERRED / ZERO PROMOTION]
 ```
 
-M142-M152 are committed handoff documents but are not executable authority until the registry promotes them after their hard dependencies close (M144 closed; M145-M152 remain deferred). M145/M147/M149-M151 require explicit pre-registration amendments to freeze exact cells/files/spec/security decisions.
+M142-M152 are committed handoff documents but are not executable authority until the registry promotes them after their hard dependencies close (M145 closed; M146-M152 remain deferred). M147/M149-M151 require explicit pre-registration amendments to freeze exact cells/files/spec/security decisions. M145 was amended via M145-AMEND-01 before registration.
 
 ## 8. Remaining 38 residual cells after M141 closure
 

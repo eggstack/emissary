@@ -310,6 +310,24 @@ reclassification_reason = "M144 implements presentation UseSSL with I2PControl-l
 matrix_sha256_after = "af01bc0efb4723f471e442e4cdf5dd8e70f6a9473ac5fe0be022ae9cadfa34c9"
 closure = "plans/closure/i2pcontrol-proposal-170/144-closure.md"
 
+[post_m145]
+status = "closed as complete"
+matrix_before_apply = 334
+matrix_before_blocked_primitive = 31
+matrix_before_not_applicable = 475
+matrix_after_apply = 336
+matrix_after_blocked_primitive = 29
+matrix_after_not_applicable = 475
+completed_cell_count = 2
+completed_options = ["MultiHoming"]
+completed_tunnel_types = ["httpserver", "httpbidirserver"]
+reclassified_cells = [
+    "MultiHoming:httpserver", "MultiHoming:httpbidirserver",
+]
+reclassification_reason = "M145 implements reply LeaseSet bundling via the neutral SessionManager policy (shouldBundleReplyInfo); omitted/true bundles, false suppresses ExistingSession updates with NewSession handshake retained; I2PControl maps the two HTTP server families through Yosemite generic session options with shared-session compatibility."
+matrix_sha256_after = "81851be26af3ed1e4d3f0526d914aaae3d061224d8b78c5cc985cd586d84b20d"
+closure = "plans/closure/i2pcontrol-proposal-170/145-closure.md"
+
 [ownership]
 session_registry = "emissary-cli/src/i2pcontrol/backends/runtime/session.rs::SharedClientSessionRegistry"
 stream_listener_owner = "emissary-cli/src/i2pcontrol/backends/runtime/client_listener.rs"

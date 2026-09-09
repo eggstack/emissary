@@ -740,6 +740,15 @@ impl<R: Runtime> Destination<R> {
         self.lease_set_manager.register_lease_set(lease_set.clone());
     }
 
+    /// Set the outbound reply LeaseSet bundling policy for this destination.
+    ///
+    /// Neutral owner-local bridge for the standard `shouldBundleReplyInfo` session
+    /// property. Generation-local; call before the destination becomes active.
+    /// Defaults to enabled inside `SessionManager`, preserving current behavior.
+    pub fn set_bundle_reply_lease_set(&mut self, enabled: bool) {
+        self.session_manager.set_bundle_reply_lease_set(enabled);
+    }
+
     /// Shutdown session by shutting down the tunnel pool.
     pub fn shutdown(&mut self) {
         self.tunnel_pool_handle.shutdown();

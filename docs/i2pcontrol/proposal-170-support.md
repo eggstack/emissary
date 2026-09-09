@@ -1,6 +1,6 @@
 # Proposal 170 Support Status
 
-Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 historical requalification, M131 residual re-freeze, M135 neutral live-quantity primitive, M136 Reduce completion, M137 Close completion, M134 NewDest proven-resume completion, M139 current-head post-lifecycle requalification, M140 residual streaming applicability re-freeze, and M141 HTTP unique-local source-address completion and M142 HTTP SSLProxies + JumpList completion and M143 retained streaming Profile completion and M144 presentation UseSSL completion recorded; residual option cells remain (31 blocked: 10 SigType + 4 client proxy/lifecycle + 17 server LeaseSet/presentation, with 2 UniqueLocalAddressPerClient applied by M141 and 2 SSLProxies/JumpList applied by M142 and 1 Profile applied by M143 and 4 UseSSL applied by M144)
+Status: partial Proposal 170 support; M093 production/security reclosure, M095-M099 completion slices, and M100-M103 source closures recorded; M104/M112/M113 closed as blocked; M121 corrective demotion, M125 capability/crypto audit, M126 historical requalification, M131 residual re-freeze, M135 neutral live-quantity primitive, M136 Reduce completion, M137 Close completion, M134 NewDest proven-resume completion, M139 current-head post-lifecycle requalification, M140 residual streaming applicability re-freeze, and M141 HTTP unique-local source-address completion and M142 HTTP SSLProxies + JumpList completion and M143 retained streaming Profile completion and M144 presentation UseSSL completion and M145 LeaseSet reply-bundling completion recorded; residual option cells remain (29 blocked: 10 SigType + 4 client proxy/lifecycle + 15 server LeaseSet/presentation, with 2 UniqueLocalAddressPerClient applied by M141 and 2 SSLProxies/JumpList applied by M142 and 1 Profile applied by M143 and 4 UseSSL applied by M144 and 2 MultiHoming applied by M145)
 
 Proposal 170 remains Open. This status is pinned to the `2026-05-20` revision.
 
@@ -14,7 +14,7 @@ Current roadmap:
 - `plans/subsystems/i2pcontrol-proposal-170-roadmap.md`
 - tunnel-runtime completion: `plans/subsystems/i2pcontrol-proposal-170-tunnel-runtime-completion-roadmap.md`
 - full-support completion: `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`
-- authoritative aggregate matrix: `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (`334/31/475`); current runtime/security qualification: `plans/closure/i2pcontrol-proposal-170/139-closure.md`; residual streaming applicability: `plans/closure/i2pcontrol-proposal-170/140-closure.md`; HTTP unique-local source-address completion: `plans/closure/i2pcontrol-proposal-170/141-closure.md`; HTTP SSLProxies + JumpList completion: `plans/closure/i2pcontrol-proposal-170/142-closure.md`; retained streaming Profile completion: `plans/closure/i2pcontrol-proposal-170/143-closure.md`; presentation UseSSL completion: `plans/closure/i2pcontrol-proposal-170/144-closure.md`
+- authoritative aggregate matrix: `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` (`336/29/475`); current runtime/security qualification: `plans/closure/i2pcontrol-proposal-170/139-closure.md`; residual streaming applicability: `plans/closure/i2pcontrol-proposal-170/140-closure.md`; HTTP unique-local source-address completion: `plans/closure/i2pcontrol-proposal-170/141-closure.md`; HTTP SSLProxies + JumpList completion: `plans/closure/i2pcontrol-proposal-170/142-closure.md`; retained streaming Profile completion: `plans/closure/i2pcontrol-proposal-170/143-closure.md`; presentation UseSSL completion: `plans/closure/i2pcontrol-proposal-170/144-closure.md`; LeaseSet reply-bundling completion: `plans/closure/i2pcontrol-proposal-170/145-closure.md`
 
 Tunnel-runtime reclosure:
 
@@ -345,10 +345,10 @@ handler work. Filter-file generations are parsed completely beneath the
 server-owned administrative root; invalid generations do not replace a valid
 running configuration.
 
-The M131-reconciled matrix records `MultiHoming`,
-`EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` as explicit
-residual blockers; M141 applies the two `UniqueLocalAddressPerClient` HTTP
-server cells through the reference-compatible per-client loopback source bind
+The M131-reconciled matrix records `EncryptLeaseSet`, `OptionalLookup`, and
+`LeaseSetClientAuths` as explicit residual blockers; M141 applies the two
+`UniqueLocalAddressPerClient` HTTP server cells through the reference-compatible
+per-client loopback source bind
 (`127.<hash[0]>.<hash[1]>.<hash[2]>` for IPv4, `fd` + 15 hash bytes for IPv6,
 source-bound with port 0 before loopback connect via the canonical peer-hash
 owner, literal-loopback targets only, no DNS, no fallback, per-connection
@@ -360,9 +360,12 @@ Streamr `DelayOpen` and `NewDest` are not applicable. M142 applies the two HTTP-
 and last-failure avoidance for HTTPS/CONNECT clearnet; bounded http-only jump-server
 address-helper response with strict escaping and no fetch). M143 applies the retained
 `Profile:client` cell (neutral streaming max window: bulk/omitted → 128 default,
-interactive → 16; six other Profile families stay not applicable by M140). No server-side TLS trust
-owner, per-client address allocator, neutral LeaseSet bundling owner, or
-end-to-end encrypted/authenticated LeaseSet runtime exists in this checkout;
+interactive → 16; six other Profile families stay not applicable by M140). M145 applies the
+two `MultiHoming` HTTP server cells (neutral reply LeaseSet bundling via
+`shouldBundleReplyInfo`: omitted/`true` bundles, `false` suppresses `ExistingSession`
+updates with `NewSession` handshake retained; ten other families stay not applicable).
+No server-side per-client address allocator beyond M141, neutral LeaseSet bundling owner
+beyond M145, or end-to-end encrypted/authenticated LeaseSet runtime exists in this checkout;
 the remaining options fail before allocation and never silently downgrade.
 M104/M113 are historical blocked closures, and M125 records the corrective
 classification and capability/crypto audit. See

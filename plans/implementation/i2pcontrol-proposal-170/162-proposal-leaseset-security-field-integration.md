@@ -32,10 +32,35 @@ M162 may register only after:
 - any M161 outcome-A implementation successor has closed before `EncryptLeaseSet` promotion is considered;
 - exact I2PControl files/secret-store fields and M061/M062 production paths are frozen.
 
+## Direct-source mapping correction
+
+M162 MUST use the pinned Proposal-170 PR's `ServiceTunnelCreator` source as the property-mapping authority.
+
+The direct source sets:
+
+```text
+i2cp.encryptLeaseSet = true only when mode == "encrypted (aes)"
+```
+
+For the modern blinded/PSK/DH modes it instead uses:
+
+```text
+i2cp.leaseSetType = 5
+```
+
+with the applicable secret/auth/key companion properties. Therefore:
+
+- the legacy `i2cp.encryptLeaseSet=true` flag MUST NOT be used as the selector for modern type-5 ELS2;
+- modern type-5 integration consumes the neutral standard `i2cp.leaseSetType=5` path established by M157;
+- M161 owns the legacy AES flag/value contract;
+- any older immutable M155 planning/closure table that implies the legacy flag is true for modern modes is superseded for execution by this direct-source correction, without editing historical closure evidence.
+
 ## Proposal mapping requirements
 
 For each of the ten `EncryptLeaseSet` strings, build a machine-readable table recording:
 
+- exact `i2cp.encryptLeaseSet` value;
+- exact `i2cp.leaseSetType` value/presence;
 - required lower primitive;
 - exact standard session properties;
 - required/forbidden `OptionalLookup` value;
@@ -91,6 +116,8 @@ Expected work remains in exact `emissary-cli/src/i2pcontrol/**` backend/options/
 
 Require table-driven tests covering all ten EncryptLeaseSet strings across all five target families, every valid/invalid OptionalLookup coupling, PSK/DH client-auth structures, omitted/default behavior, edits/restarts, secret-store redaction/failure, reference interoperability, and exact fail-before-allocation behavior.
 
+At least one test must assert that modern type-5 modes do **not** set/require legacy `i2cp.encryptLeaseSet=true`, while the AES mode does not silently map to type 5.
+
 Run full core/I2PControl/M061/M062/M095/M105 qualification. Any promoted cell must have direct runtime evidence.
 
 ## Stop conditions
@@ -99,4 +126,4 @@ Stop/split if integration discovers missing crypto/NetDB/LeaseSet behavior, if a
 
 ## Closure evidence
 
-Record the final ten-mode table, exact changed paths, secret-store schema changes, all interoperability results, per-field promotion decisions, matrix delta, containment/dependency evidence, implementation SHA, unresolved blockers, and M152 readiness.
+Record the final ten-mode table, direct-source mapping evidence, exact changed paths, secret-store schema changes, all interoperability results, per-field promotion decisions, matrix delta, containment/dependency evidence, implementation SHA, unresolved blockers, and M152 readiness.

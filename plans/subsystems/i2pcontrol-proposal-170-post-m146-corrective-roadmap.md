@@ -1,244 +1,33 @@
 # I2PControl Proposal 170 Post-M146 Corrective Roadmap
 
-Status: **active / partial; M153 closed; M154 closed (disposition C, M147 path blocked)**
+Status: **historical through M154 / superseded for current execution**
 
-This roadmap supersedes the post-M146 execution ordering in:
+This roadmap governed the corrective sequence after M146 through M153/M154. It is retained as historical planning context, but it is no longer the execution authority after M154 disposition C showed that the general configurable Destination `SigType` path could not safely gate the LeaseSet-security tail.
 
-- `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md`;
-- `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`;
+Current execution authority:
 
-while preserving those documents as historical planning authority for M140-M146 and the broader full-support objective.
+- `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-Current repository baseline at roadmap creation:
+## Historical outcomes governed here
 
-- `master` after M146 closure: `a0c4a791a6a7a974d34eaf93c45330aafd11116f`;
-- last production-bearing commit: `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2`;
-- current M095 matrix: `336 apply / 29 blocked_primitive / 475 not_applicable`;
-- M146 closed as blocked with zero promotions and zero production delta;
-- M139 remains the last whole-surface runtime/security qualification authority but predates M141-M145;
-- no residual capability successor is currently registered.
+- M146 closed blocked with 4 `UseOutproxyPlugin` cells remaining unsupported.
+- M153 closed complete as current whole-surface runtime/security qualification authority at `336/29/475`.
+- M154 closed complete with disposition C after freezing the destination-capable SigType domain and proving the general M147 primitive could not truthfully satisfy it under current security/dependency policy.
+- M147 path is therefore closed blocked; M148 remains blocked behind it.
 
-Pinned Proposal/reference authority remains unchanged and read-only:
+## Why execution moved to a new roadmap
 
-- Proposal 170 revision `2026-05-20`, status Open;
-- Java I2PControl reference head `45bb593000408071dd376b78848fdc246dccd964`;
-- Java I2P/I2PTunnel snapshot `2c3fd2a9532cd86ec06cb6f2b9f3f813ca752243`;
-- Yosemite optional exact revision `59140a2277bf296928d2e8ce39a148182eeff044`.
+Post-M154 reference research established two facts not represented in this roadmap's original dependency chain:
 
-## 1. Why this corrective roadmap exists
+1. modern Encrypted LeaseSet2 can start from an existing type-7 Ed25519 Destination and derive a narrower type-11 Red25519 blinded signing key without implementing user-selectable/persistent Destination `SigType`;
+2. `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` are coupled through the Proposal's ten-value encryption mode domain, so the old M149 -> M150 -> M151 sequencing is not a truthful capability-promotion order.
 
-M140-M145 materially advanced the residual line:
+The current roadmap therefore decomposes the LeaseSet tail into M155-M162 and re-gates M152 on that line.
 
-- M140 reclassified seven false blockers to affirmative N/A;
-- M141 promoted 2 `UniqueLocalAddressPerClient` cells;
-- M142 promoted 2 HTTP `SSLProxies`/`JumpList` cells;
-- M143 promoted 1 `Profile:client` cell through a neutral streaming primitive;
-- M144 promoted 4 `UseSSL` cells with application-local TLS;
-- M145 promoted 2 `MultiHoming` cells through neutral reply LeaseSet bundling.
+## Historical authority preserved
 
-That moved the matrix from `325/47/468` after M139 to `336/29/475`.
+Historical closure records for M146, M153 and M154 remain immutable and authoritative for what those milestones actually proved. This file does not reopen or alter their dispositions.
 
-M146 then correctly stopped blocked because no real bounded local outproxy provider exists within the accepted I2P-only security boundary. A dummy provider or alias over existing `ProxyList` would be accept-inert, while direct-clearnet networking is prohibited.
+M149-M151 remain in-tree only as superseded historical drafts. M147/M148 remain blocked. M146 remains blocked unless a separate future architecture/security plan supersedes it.
 
-The successful M141-M145 production work now creates a qualification gap before the cryptographic tail:
-
-- M139 is no longer a current-head whole-surface qualification;
-- M095 `current_production_head` is stale;
-- several historical tests fail on legitimate later matrix deltas;
-- M145 required a small no-std/format follow-up commit after its closure;
-- M147 itself requires a dedicated signature-domain/security/exact-owner audit before registration.
-
-This roadmap closes those gaps without reopening M146 or weakening containment.
-
-## 2. Current residual inventory
-
-Machine authority at entry:
-
-| Cluster | Cells | Disposition |
-|---|---:|---|
-| `SigType` | 10 | blocked; destination signature-suite primitive missing |
-| `EncryptLeaseSet` | 5 | blocked; encrypted LeaseSet publication/runtime missing |
-| `OptionalLookup` | 5 | blocked; blinded/secret lookup runtime missing |
-| `LeaseSetClientAuths` | 5 | blocked; authorized-client modes missing |
-| `UseOutproxyPlugin` | 4 | blocked by M146; no safe real provider in current architecture |
-| **Total** | **29** | |
-
-No planning milestone may reduce this count without real runtime behavior or affirmative N/A evidence.
-
-## 3. Containment policy
-
-The fork remains governed by M061/M062 and M093.
-
-- Proposal/admin/application policy stays under `emissary-cli/src/i2pcontrol/**` wherever possible.
-- Neutral core changes require exact-file authorization, independent lower-layer ownership and Proposal-free APIs.
-- Broad `crypto/**`, `netdb/**`, `i2np/**`, `destination/**`, `primitives/**` or transport exceptions are prohibited.
-- Planning-only M062 entries do not authorize production code.
-- No direct-I2P-to-clearnet DNS/TCP path may be introduced to satisfy `UseOutproxyPlugin`.
-- No crypto algorithm may silently fall back to Ed25519 or another suite.
-- No encrypted/authenticated LeaseSet option may downgrade to ordinary plaintext publication/lookup.
-- Secrets/private keys/auth material remain redacted and generation/persistence safe.
-- Yosemite remains exact optional Y005; no global/path/floating fork.
-- External/upstream interaction remains read-only.
-
-## 4. Corrective dependency graph
-
-```text
-M146 UseOutproxyPlugin feasibility              [CLOSED AS BLOCKED — 336/29/475]
-  |
-  v
-M153 post-M146 current-head requalification     [CLOSED — ZERO PROMOTION]
-  |
-  v
-M154 M147 signature-domain/owner re-freeze      [CLOSED — DISPOSITION C, ZERO PROMOTION]
-  |
-  v
-M147 neutral destination signature primitive    [CLOSED AS BLOCKED (PATH)]
-  |
-  v
-M148 Proposal SigType completion                [DEFERRED — BLOCKED BEHIND M147]
-  |
-  v
-M149 encrypted LeaseSet runtime                 [DEFERRED — needs re-gating, see §7]
-  |
-  v
-M150 OptionalLookup runtime                     [DEFERRED — up to 5 promotions]
-  |
-  v
-M151 LeaseSetClientAuths runtime                [DEFERRED — up to 5 promotions]
-  |
-  v
-M152 final residual requalification             [DEFERRED — ZERO PROMOTION]
-```
-
-M146's four blocked `UseOutproxyPlugin` cells are a parallel terminal constraint. The crypto/LeaseSet chain may proceed without reopening M146, but M152 cannot claim full Proposal support while those four cells remain blocked.
-
-A future M146 successor requires an explicit architecture/security decision that introduces a genuinely distinct safe provider. This roadmap does not fabricate such a provider or relax the no-direct-clearnet invariant merely to achieve zero blockers.
-
-## 5. M153 — closed corrective
-
-Plan/closure:
-
-- `plans/implementation/i2pcontrol-proposal-170/153-post-m146-current-head-requalification-and-authority-rebase.md`;
-- `plans/closure/i2pcontrol-proposal-170/153-closure.md`.
-
-Status: **closed as complete**.
-
-M153:
-
-- made the post-M145 production source (`7cbd80a...`) the integrated runtime/security baseline;
-- repaired historical-vs-current test authority so the ordinary suite does not remain red from stale aggregate assertions;
-- requalified M140-M146 composition plus M127-M139 security/lifecycle invariants;
-- updated M095 production-head metadata;
-- explicitly absorbed the M145 `7cbd80a...` no-std follow-up into accepted production evidence;
-- preserved `336/29/475` with zero promotions and zero production changes.
-
-## 6. M154 — closed signature pre-registration gate (disposition C)
-
-Plan/closure:
-
-- `plans/implementation/i2pcontrol-proposal-170/154-m147-signature-domain-security-and-owner-refreeze.md`;
-- `plans/closure/i2pcontrol-proposal-170/154-closure.md`.
-
-M154 was required because M147's own plan forbids registration until the exact signature suite/domain, security disposition, persistence implications, dependencies and exact core owners are frozen.
-
-Status: **closed as complete; disposition C — M147 path closed as blocked**.
-
-M154 (zero production, zero promotion) froze the destination-capable domain as
-`{0, 1, 2, 3, 7, 11}` with type-0 generation rejected by security policy, types 1–3
-legacy-only, type 11 missing a maintained primitive, and Ed25519-only end-to-end
-capability. Neither one bounded M147 (A) nor a split (B) can satisfy the configurable
-field, so M154 registered nothing and advanced no crypto implementation.
-
-## 7. M147-M151 security-sensitive tail
-
-M147 is **closed as blocked (path)** via M154 disposition C; M148 is **deferred
-behind the unsatisfiable M147 gate** (blocked-behind-M147, not closed). The remaining
-plans stay deferred:
-
-- M147 neutral destination signature-suite primitive — **closed as blocked (path)**; no budget authorised; re-opening needs a separate architecture/security decision and plan;
-- M148 Proposal `SigType` — up to ten promotions only after real generated identity/signing/persistence support (unreachable on this path);
-- M149 `EncryptLeaseSet` — up to five promotions only after actual encrypted LeaseSet publication/consumption;
-- M150 `OptionalLookup` — up to five promotions only after exact blinded/secret lookup with no public downgrade;
-- M151 `LeaseSetClientAuths` — up to five promotions only after real PSK/DH/required client-auth semantics and unauthorized-client rejection;
-- M152 final whole-surface qualification — zero promotions and no production changes.
-
-The listed maximums are budgets, not promises. Closure evidence determines actual deltas.
-M149–M151 gates chain through M148 closure, which is unsatisfiable on this path;
-their LeaseSet-security targets may still be conceptually possible for the Ed25519
-suite, but they need explicit re-gating by a future planning action before any of
-them can register. M154 creates no such gate.
-
-## 8. M146 terminal blocker policy
-
-M146 remains immutable blocked evidence.
-
-Current accepted behavior:
-
-- `UseOutproxyPlugin` supplied to any of its four applicable families fails before allocation;
-- omitted flag preserves ordinary configured I2P outproxy behavior;
-- no dummy registry/provider exists;
-- no direct-clearnet fallback exists;
-- no support cells promoted.
-
-Do not reopen M146 merely because later crypto work succeeds.
-
-A future provider successor is allowed only if an independently real provider appears or maintainers explicitly change the architecture/security policy. That successor must be separately planned and cannot be hidden inside M147-M152.
-
-## 9. Final-line completion semantics
-
-This corrective line can terminate in two truthful states:
-
-### Full completion
-
-M152 may mark Proposal 170 complete for the pinned revision only when M095 has zero applicable blockers, including resolution of the four M146 cells by a separately accepted provider successor.
-
-### Safe partial completion
-
-If M147-M151 close successfully but M146 remains blocked, M152 must close the residual implementation line as **partial / terminal under current security policy**, with:
-
-- exact remaining four blockers;
-- all other applicable cells requalified;
-- no full-support claim;
-- no fabricated provider;
-- explicit statement that completing those four cells requires a future architecture/security decision.
-
-This is a valid completion of the current safe workstream, not full Proposal support.
-
-## 10. Verification policy
-
-Every milestone must preserve the current durable baseline:
-
-- core and CLI checks;
-- no-std where touched core participates;
-- M061/M062 containment/dependency guards;
-- M095/M105 exact matrix/residual guards;
-- M127-M129 security regressions;
-- lifecycle composition regressions;
-- milestone-specific adversarial/runtime tests;
-- `git diff --check`;
-- clippy/fmt with pre-existing unrelated drift recorded, never normalized opportunistically.
-
-M153 specifically owns repair of stale historical aggregate tests so future broad test failures again carry signal.
-
-## 11. Registration discipline
-
-Per `plans/003-planning-process.md`:
-
-1. No plan is currently registered; M154 is closed complete (disposition C) and M147 is closed as blocked (path).
-2. M147 cannot be re-registered without a separate explicit architecture/security decision and plan superseding M154 disposition C.
-3. M148 remains deferred behind the unsatisfiable M147 gate; M149-M152 remain unregistered behind hard dependencies (M149-M151 need explicit re-gating).
-4. M146 remains closed blocked and is not an active plan.
-5. No plan file presence or M062 planning entry authorizes production work.
-6. Material architecture/path/dependency changes require plan amendment before coding.
-
-## 12. Exit criteria
-
-This corrective roadmap closes when:
-
-- M153 establishes a current integrated qualification authority;
-- M154 resolves M147 readiness truthfully (closed with disposition C; M147 path blocked);
-- the safe crypto/LeaseSet chain reaches its truthful terminal state;
-- M152 performs final whole-surface qualification;
-- active planning/docs identify either zero blockers/full support or exact terminal blockers/partial support;
-- containment/security invariants remain intact;
-- no upstream mutation/contact/submission occurred.
+All containment/security rules from M061/M062/M093 and the external read-only boundary remain in force.

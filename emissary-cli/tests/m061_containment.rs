@@ -15,6 +15,8 @@ struct BoundaryManifest {
     allowed: Allowed,
     prohibited: Prohibited,
     evidence: Vec<PathEvidence>,
+    #[serde(default)]
+    registered_pending: Option<RegisteredPending>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,6 +45,14 @@ struct PathEvidence {
     sensitivity: String,
     seam: String,
     reference: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RegisteredPending {
+    milestone: String,
+    paths: Vec<String>,
+    new_files: Vec<String>,
+    evidence: Vec<PathEvidence>,
 }
 
 fn workspace_root() -> &'static Path {
@@ -154,6 +164,58 @@ fn every_allowed_path_is_exact_and_has_owner_evidence() {
                 "empty evidence for {}",
                 entry.path
             );
+        }
+    }
+}
+
+#[test]
+fn registered_pending_paths_are_exact_and_evidenced() {
+    let manifest = manifest();
+    let pending = manifest.registered_pending.expect("registered pending milestone");
+    assert_eq!(pending.milestone, "M157");
+
+    let paths = pending.paths.into_iter().collect::<BTreeSet<_>>();
+    let evidence = pending
+        .evidence
+        .iter()
+        .map(|entry| entry.path.clone())
+        .collect::<BTreeSet<_>>();
+    let new_files = pending.new_files.into_iter().collect::<BTreeSet<_>>();
+
+    assert_eq!(evidence, paths, "pending evidence must cover every exact path once");
+    assert_eq!(
+        new_files,
+        BTreeSet::from(["emissary-core/src/crypto/els2.rs".to_owned()]),
+        "M157 may create exactly one new production source file"
+    );
+
+    for path in &paths {
+        assert!(!path.ends_with('/'), "pending path is a broad prefix: {path}");
+        assert!(!path.contains('*'), "pending path contains a glob: {path}");
+        assert!(path.starts_with("emissary-core/src/"), "pending path escaped core: {path}");
+        assert!(
+            workspace_root().join(path).is_file() || new_files.contains(path),
+            "pending path neither exists nor is the registered new file: {path}"
+        );
+    }
+    for path in &new_files {
+        assert!(
+            !workspace_root().join(path).exists(),
+            "registered new file already exists before M157 implementation: {path}"
+        );
+    }
+
+    for entry in &pending.evidence {
+        for field in [
+            &entry.owner,
+            &entry.purpose,
+            &entry.consumer,
+            &entry.why_upstream_insufficient,
+            &entry.sensitivity,
+            &entry.seam,
+            &entry.reference,
+        ] {
+            assert!(!field.trim().is_empty(), "empty pending evidence for {}", entry.path);
         }
     }
 }

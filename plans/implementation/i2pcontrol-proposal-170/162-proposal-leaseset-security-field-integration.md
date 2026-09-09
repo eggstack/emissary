@@ -1,17 +1,31 @@
 # M162 — Proposal LeaseSet-Security Field Integration
 
-Status: **deferred / unregistered; M160 closed and M161 closed outcome B, registration pending exact-path amendment**
+Status: **registered / dependency-ready; M160 closed, M161 closed outcome B**
 
-> M160 closed complete (`plans/closure/i2pcontrol-proposal-170/160-closure.md`)
-> and M161 closed outcome B
-> (`plans/closure/i2pcontrol-proposal-170/161-closure.md`: legacy
-> `encrypted (aes)` valid but blocked under current architecture/security
-> policy; all five `EncryptLeaseSet` cells remain blocked even when modern
-> type-5 modes work). M162 hard dependencies are therefore satisfied for
-> modern field integration, but M162 is **not** registered by the M161
-> closure: registration still requires revalidation of the exact
-> I2PControl owner set and secret-store schema against the then-current
-> head with M061/M062 authorization in that registration commit.
+> Registration baseline: `a05e0f0` (M161 outcome-B implementation/closure
+> head; clean worktree before M162 work). Current M095 matrix
+> `336/29/475`. Current whole-surface qualification authority M153.
+>
+> Entry gate (all satisfied): M155 closed
+> (`plans/closure/i2pcontrol-proposal-170/155-closure.md`); M156 closed;
+> M157 closed; M158 closed; M159 closed; M160 closed
+> (`plans/closure/i2pcontrol-proposal-170/160-closure.md`); M161 closed
+> outcome B (`plans/closure/i2pcontrol-proposal-170/161-closure.md`,
+> no implementation successor, so no M161-A successor blocks
+> `EncryptLeaseSet` consideration — which stays blocked per M161-B in any
+> case); exact I2PControl owner set and secret-store schema revalidated
+> against the registration head and frozen below with M061/M062
+> authorization in this registration commit.
+>
+> Promotion budget: **conditional** — `OptionalLookup` + `LeaseSetClientAuths`
+> up to 10 cells only on full-contract proof per §§Promotion rules/Required
+> tests; `EncryptLeaseSet` stays blocked on all five families per M161-B
+> (ceiling `346/19/475`, not a promise).
+>
+> External-interaction authority (§11 of `plans/003-planning-process.md`):
+> internal-only; all reference/specification access read-only; no upstream
+> issue/PR/discussion/contact/submission activity is authorized by this
+> registration.
 
 Class: I2PControl capability integration
 
@@ -176,6 +190,60 @@ The then-current head must be revalidated, but M162 should stay within existing 
 - M095/M105 tests/matrix/docs after real promotion.
 
 This list is **not executable authority** while M162 is deferred. Registration must enumerate concrete file paths after M160/M161 close. Any need for lower-layer core changes is a stop/split condition, not a reason to broaden this list.
+
+### Registration freeze (revalidated at `a05e0f0`; executable authority)
+
+All ten files exist at the registration head under the M061 policy root
+(`emissary-cli/src/i2pcontrol/`, which the M061 guard excludes from the
+exact-allowlist check), so **no M061 production-path amendment is
+required**. Roles revalidate as follows:
+
+1. `emissary-cli/src/i2pcontrol/domain/tunnel.rs` — typed/redacted Proposal
+   fields (`TunnelDefinition`/`TunnelOptions` live here; `raw_config` must
+   not carry secret material);
+2. `emissary-cli/src/i2pcontrol/backends/options.rs` — common
+   fail-before-allocation field/coupling validation;
+3. `emissary-cli/src/i2pcontrol/backends/runtime/session.rs` — canonical
+   standard-property translation into Yosemite/SAM session options (M124
+   typed path is the composition seam; no Proposal strings in core);
+4. `emissary-cli/src/i2pcontrol/backends/server.rs` — `server` family
+   capability declaration/runtime composition (currently rejects
+   `EncryptLeaseSet`/`LeaseSetClientAuths` before allocation);
+5. `emissary-cli/src/i2pcontrol/backends/http_server.rs` — `httpserver`
+   family (`:1046-1047` currently rejects both fields);
+6. `emissary-cli/src/i2pcontrol/backends/http_bidir.rs` — `httpbidirserver`
+   family (capability declaration only; reuses the canonical server
+   destination/session owner for crypto state per the invariants);
+7. `emissary-cli/src/i2pcontrol/backends/irc_server.rs` — `ircserver`
+   family;
+8. `emissary-cli/src/i2pcontrol/backends/streamr.rs` — `streamrserver`
+   family (within Streamr's documented bounded limits);
+9. `emissary-cli/src/i2pcontrol/server_secret_store.rs` — LeaseSet-security
+   secret custody: extend `ServerDestinationStore` with a separate typed
+   secret record (lookup secret, base PSK/X25519 private key, per-user
+   `{name,key}` entries, generation/revision metadata) reusing the existing
+   stage/commit/discard + current/backup atomic-publish discipline
+   (`:100-220`); **no new secret-store file**;
+10. `emissary-cli/src/i2pcontrol/tunnel_manager.rs` — TunnelManager
+    create/edit/get/start/restart/delete orchestration and
+    definition+secret generation transaction wiring (ten-mode validation
+    domain `MODES` at `:1734-1751` is the field gate to extend, not bypass).
+
+`stores/tunnel_store.rs` (`TunnelStore::upsert`, revisioned definition
+persistence) needs no change: typed definition fields persist through the
+existing generic upsert. If implementation proves otherwise, stop and amend
+before editing.
+
+Explicitly out of scope without amendment: any `emissary-core/**`,
+`emissary-util/**`, Yosemite, manifest/lockfile/dependency, or second
+secret-store file change; any `emissary-cli/src/**` path outside
+`i2pcontrol/`; new NetDB/query/decryption behavior.
+
+Dependency freeze: **no new dependency**. Reuse `serde`/`serde_json`
+(typed fields), existing Base64 UTF-8 codecs, `rand`/`zeroize`, and the
+Yosemite `SessionOptions`/`LeaseSetClientAuth` types already behind the
+`yosemite-i2pcontrol` optional dependency. No manifest/lockfile/Yosemite
+change is authorized; M062 records this exact zero-dependency budget.
 
 ## Promotion rules
 

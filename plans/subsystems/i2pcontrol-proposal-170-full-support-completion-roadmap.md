@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M155-M161 closed, no registered successor**
+Status: **active / partial; M155-M161 closed, M162 registered**
 
 Pinned Proposal authority: revision `2026-05-20`, status Open.
 
@@ -11,7 +11,7 @@ Current whole-surface qualification authority: M153.
 Current execution authority:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`;
-- no registered successor; M161 closed outcome B; M162 deferred with satisfied hard deps, registration pending exact-path amendment.
+- M162 registered / dependency-ready (I2PControl-only ten-file envelope); M161 closed outcome B with `EncryptLeaseSet` held blocked.
 
 ## 1. Current residual inventory
 
@@ -50,7 +50,7 @@ M155 semantic/owner refreeze                   [CLOSED]
   -> M159 PSK client authorization             [CLOSED]
   -> M160 DH/X25519 authorization              [CLOSED]
   -> M161 legacy AES/LS1 feasibility           [CLOSED; OUTCOME B]
-  -> M162 Proposal field integration           [DEFERRED]
+  -> M162 Proposal field integration           [REGISTERED; I2PCONTROL-ONLY]
   -> M152 final requalification                [DEFERRED]
 ```
 
@@ -81,7 +81,7 @@ M160 closed with the same four-file/zero-dependency owners realized against the 
 
 M161 closed outcome B (valid legacy-LS1 contract but blocked; zero production). It resolves legacy `encrypted (aes)` after the modern line is stable. No implementation successor is created; EncryptLeaseSet remains blocked.
 
-M162 has been corrected to require the exact Proposal PR mappings, including PSK/DH base-key semantics, per-user `Base64(UTF8(name)):Key` properties, typed/redacted I2PControl fields, persistent LeaseSet-security secret custody, transactional definition+secret generations, and complete-field promotion only when the full valid domain is operational.
+M162 is registered on the M160+M161-closed head with the frozen ten-file I2PControl envelope (see the M162 plan registration freeze), requiring the exact Proposal PR mappings, including PSK/DH base-key semantics, per-user `Base64(UTF8(name)):Key` properties, typed/redacted I2PControl fields, persistent LeaseSet-security secret custody, transactional definition+secret generations, and complete-field promotion only when the full valid domain is operational.
 
 M152 has been rebased to requalify the closed M156-M159 lineage plus authenticated M159/M160 bounds, M161 disposition and M162 persistence/no-downgrade behavior.
 
@@ -120,6 +120,6 @@ M152 may declare full support only when the mechanically recomputed matrix has z
 
 ## 10. Current handoff
 
-No milestone is currently registered. Only M162 may be registered next (with exact-path amendment).
+M162 is the sole registered handoff. M152 remains deferred.
 
-Do not begin M162 until its registration is authored and the registry explicitly advances the handoff.
+M162 work is now executing under its frozen ten-file I2PControl envelope.

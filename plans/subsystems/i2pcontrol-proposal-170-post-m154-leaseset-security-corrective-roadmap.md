@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M154 LeaseSet-Security Corrective Roadmap
 
-Status: **active / partial; M155-M161 closed, no registered successor**
+Status: **active / partial; M155-M161 closed, M162 registered**
 
 This roadmap supersedes the LeaseSet-security execution ordering in the older residual and post-M146 roadmaps while preserving M146/M147/M154 closures as historical evidence.
 
@@ -11,7 +11,7 @@ Current authority:
 - M146 `UseOutproxyPlugin` ×4 closed blocked;
 - M154 configurable Destination `SigType` ×10 closed blocked;
 - M155-M161 closed with zero Proposal promotions;
-- **no registered successor; M162 deferred with satisfied hard deps, registration pending exact-path amendment**.
+- **M162 registered / dependency-ready (I2PControl-only ten-file envelope; `EncryptLeaseSet` held blocked per M161-B)**.
 
 ## 1. Corrective architecture
 
@@ -102,7 +102,7 @@ Possible outcomes remain A (separate exact implementation successor), B (valid b
 
 ### M162 — Proposal integration
 
-Deferred until M160 + M161 disposition. Its contract is pre-corrected to require:
+Registered on the M160+M161-closed head with the frozen ten-file I2PControl envelope (see the M162 plan registration freeze). Its contract requires:
 
 - exact ten-mode machine-readable mapping;
 - typed Proposal fields rather than raw generic I2CP/custom smuggling;
@@ -146,13 +146,13 @@ M160 DH/X25519 client authorization            [CLOSED]
 M161 legacy AES/LS1 feasibility                [CLOSED; OUTCOME B]
   |
   v
-M162 Proposal field integration                [DEFERRED; CONDITIONAL PROMOTIONS]
+M162 Proposal field integration                [REGISTERED; I2PCONTROL-ONLY]
   |
   v
 M152 final whole-surface requalification       [DEFERRED; ZERO PROMOTIONS]
 ```
 
-No milestone is currently registered. Only M162 may be registered next (with exact-path amendment).
+M162 is the sole registered handoff. M152 remains deferred.
 
 ## 7. Promotion ceilings
 

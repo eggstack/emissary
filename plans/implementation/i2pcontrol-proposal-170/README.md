@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M161 closed outcome B, no registered successor**.
+Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M162 registered**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -12,9 +12,9 @@ Residual blockers: 10 `SigType`, 5 `EncryptLeaseSet`, 5 `OptionalLookup`, 5 `Lea
 
 Roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-No registered handoff (M161 closed outcome B; only M162 may be registered next with exact-path amendment):
+Registered handoff (M162 registered / dependency-ready; I2PControl-only ten-file envelope):
 
-- **M162** `162-proposal-leaseset-security-field-integration.md` (deferred/unregistered; hard deps satisfied).
+- **M162** `162-proposal-leaseset-security-field-integration.md` (registered/unblocked by M160 closure + M161 outcome B).
 
 M160 closed the neutral DH infrastructure with **zero Proposal promotions observed**.
 
@@ -97,7 +97,7 @@ M160 promoted **zero cells**. M095 remains `336/29/475`.
 M159 PSK authorization             [CLOSED]
   -> M160 DH/X25519 authorization  [CLOSED]
   -> M161 legacy AES/LS1 gate      [CLOSED; OUTCOME B]
-  -> M162 Proposal integration     [DEFERRED; HARD DEPS SATISFIED]
+  -> M162 Proposal integration     [REGISTERED; I2PCONTROL-ONLY]
   -> M152 final requalification    [DEFERRED]
 ```
 
@@ -126,4 +126,4 @@ M149-M151 remain superseded historical drafts and must not be executed.
 - No secret/private/auth material in generic diagnostics or response-facing storage.
 - External/upstream access remains read-only.
 
-No milestone is currently registered. Only M162 may be registered next (with exact-path amendment).
+M162 is registered on the closed M160+M161 head with a frozen ten-file I2PControl envelope (no core/Yosemite/dependency change). `EncryptLeaseSet` stays blocked per M161-B even when modern modes work.

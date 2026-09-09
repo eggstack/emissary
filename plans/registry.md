@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | subordinate to current corrective roadmap |
-| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **no registered successor (M161 closed B; only M162 may be registered next)** |
+| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **M162 registered / dependency-ready** |
 | Post-M146 corrective | historical through M154 | `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` | M153 complete; M154 disposition C |
 | Residual primitive completion | historical through M146 | `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md` | M140-M145 complete; M146 blocked |
 | Session-lifecycle completion | closed complete | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | M134 complete |
@@ -211,10 +211,10 @@ M095 remains `336/29/475` after M159.
 |---|---|---|
 | M160 DH/X25519 | closed complete | same four-file/zero-dependency envelope realized; exact M061/M062 authorization observed |
 | M161 legacy AES/LS1 gate | closed complete, outcome B | zero-production gate; legacy AES valid but blocked; no successor; M095 unchanged |
-| M162 Proposal integration | deferred/unregistered | hard deps satisfied (M160 closed + M161 B); registration pending exact-path amendment |
-| M152 final requalification | deferred/unregistered | rebased to closed M156-M160 + M161/M162 outcomes |
+| M162 Proposal integration | registered / dependency-ready | I2PControl-only ten-file envelope frozen at registration; exact M062 authorization recorded |
+| M152 final requalification | deferred/unregistered | rebased to closed M156-M161 + M162 outcome |
 
-M161 closed outcome B (valid legacy-LS1 contract but disproportionate/unsafe; no implementation successor). All five `EncryptLeaseSet` cells remain blocked. M162 hard dependencies (M160 closure + M161 disposition) are satisfied for modern field integration, but M162 is not registered by this closure and still requires an exact-path amendment at registration.
+M161 closed outcome B (valid legacy-LS1 contract but disproportionate/unsafe; no implementation successor). All five `EncryptLeaseSet` cells remain blocked. M162 is registered for modern field integration over the closed M156-M160 primitives with `EncryptLeaseSet` held blocked.
 
 M162 is the first milestone allowed to promote LeaseSet fields. It must materialize the exact ten-mode table and implement persistent I2PControl custody/transactions across all five server families. Neutral primitive availability alone never promotes a field.
 
@@ -270,14 +270,14 @@ M146 UseOutproxyPlugin                         [CLOSED BLOCKED]
   -> M159 PSK authorization                    [CLOSED]
   -> M160 DH authorization                     [CLOSED]
   -> M161 legacy AES gate                      [CLOSED; OUTCOME B]
-  -> M162 Proposal integration                 [DEFERRED; HARD DEPS SATISFIED]
+  -> M162 Proposal integration                 [REGISTERED; I2PCONTROL-ONLY]
   -> M152 final qualification                  [DEFERRED]
 ```
 
 ## Canonical containment/registration rules
 
-1. **No milestone is currently registered; only M162 may be registered next** (with exact-path amendment).
-2. M161 gate work is closed; M162 registration must revalidate owners and M061/M062 authorization.
+1. **M162 is the sole registered milestone; M152 remains deferred**.
+2. M162 work is now executing under its frozen ten-file I2PControl envelope with `EncryptLeaseSet` held blocked per M161-B.
 3. Proposal/admin policy remains I2PControl-owned; neutral core changes are exact and Proposal-free.
 4. No broad core prefix waiver.
 5. No secret/auth downgrade or diagnostic exposure.

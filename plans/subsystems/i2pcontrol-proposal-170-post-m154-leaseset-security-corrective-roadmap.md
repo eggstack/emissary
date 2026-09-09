@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M154 LeaseSet-Security Corrective Roadmap
 
-Status: **active / partial; M155/M156/M157 closed, no registered successor**
+Status: **active / partial; M155-M157 closed, M158 registered**
 
 This roadmap supersedes the LeaseSet-security execution ordering in the older residual and post-M146 roadmaps while preserving M146/M147/M154 closures as historical evidence.
 
@@ -12,45 +12,62 @@ Current authority:
 - M154 disposition C left configurable Destination `SigType` blocked ×10;
 - M155 closed semantic/owner re-freeze;
 - M156 closed neutral Red25519/blinding primitive;
-- **M157 closed modern Encrypted LeaseSet2 publication (zero promotions)**;
-- **no registered successor** (M158 deferred pending its exact-path amendment).
+- M157 closed modern Encrypted LeaseSet2 publication with zero promotions;
+- **M158 is the sole registered successor**.
 
 ## 1. Corrective architecture
 
-M154 correctly blocked a general configurable destination-signature-suite primitive, but modern Encrypted LeaseSet2 does not require that entire capability. The current line uses the existing type-7 Ed25519 Destination and the closed M156 type-11 Red25519 blinded-key primitive without reopening M147/M148.
+M154 correctly blocked a general configurable destination-signature-suite primitive, but modern Encrypted LeaseSet2 does not require that entire capability. The active line uses the existing type-7 Ed25519 Destination and the closed M156 type-11 Red25519 blinded-key primitive without reopening M147/M148.
 
 The old M149 -> M150 -> M151 ordering remains superseded because `EncryptLeaseSet` is a ten-value mode selector whose lookup-password and PSK/DH modes consume the independently visible `OptionalLookup` and `LeaseSetClientAuths` fields.
 
 Legacy `encrypted (aes)` remains a separate M161 compatibility gate; it must not block modern ELS2 infrastructure, but it may continue to block all five `EncryptLeaseSet` cells if that enum value remains valid and unsupported.
 
-## 2. Direct Proposal-PR mapping correction
+## 2. Direct Proposal/reference corrections
 
-Direct `ServiceTunnelCreator` source in the pinned Proposal-170 PR establishes:
+Direct Proposal-170 PR source establishes:
 
 - `i2cp.encryptLeaseSet=true` only for the legacy AES mode;
 - modern blinded/PSK/DH modes select `i2cp.leaseSetType=5` and do not use the legacy flag as the modern selector.
 
-This direct-source correction governs M157/M162. Historical M155 closure evidence remains immutable.
+Direct Java I2P/I2PTunnel source additionally establishes the lookup-secret standard property:
+
+```text
+i2cp.leaseSetSecret = Base64(UTF8(secret))
+```
+
+and the encrypted-service extended B32 implementation uses type-7 -> type-11 one-byte sigtypes with secret/auth flags and CRC-32/XOR header protection.
+
+These direct-source contracts govern M158 and later M162 integration. Historical closure evidence remains immutable.
 
 ## 3. Containment rules
 
 - M061/M062/M093 remain binding.
 - Proposal policy and secret/config mapping stay in `emissary-cli/src/i2pcontrol/**` where possible.
 - Red25519, ELS2 serialization/publication, lookup-secret derivation and auth crypto are neutral lower-layer primitives with Proposal-free APIs.
-- Every production milestone requires exact-file registration; no broad crypto/netdb/i2np/destination/primitives prefix authority.
-- No downgrade from requested encrypted/authenticated publication to ordinary public LeaseSet2.
+- Every production milestone requires an exact-file budget; no broad crypto/netdb/i2np/destination/primitives prefix authority.
+- A later milestone may use a stricter subset of already-realized M061 exact paths without creating a duplicate source-boundary waiver; the milestone plan and registry must enumerate that subset exactly.
+- No downgrade from requested encrypted/authenticated publication to ordinary public LeaseSet2 or empty-secret blinding.
 - Secret, PSK, DH and blinding private material is never response-facing or logged.
 - M147/M148 remain blocked; no general signature-suite migration is smuggled into this line.
 - M146 remains blocked; no clearnet egress/provider work is mixed into this line.
 
-### M157 exact containment reconciliation (closed)
+### M157 containment reconciliation — closed
 
-M157 realized its exact ten-path production budget in its closure commit
-and reconciled every newly changed path into M061's ordinary
-`[allowed]`/`[[evidence]]` ledger; M061/M062 `[registered_pending]` is
-removed.
+M157 realized its exact ten-path production budget and reconciled every new path into M061's ordinary `[allowed]`/`[[evidence]]` ledger. It added no dependency, Cargo/lockfile, Yosemite, or I2PControl production source change.
 
-M157 adds no dependency and authorizes no Cargo, lockfile, Yosemite or I2PControl production source change.
+### M158 containment registration — current
+
+M158 uses exactly four existing M061-authorized owners:
+
+1. `emissary-core/src/crypto/els2.rs`;
+2. `emissary-core/src/destination/lease_set.rs`;
+3. `emissary-core/src/sam/parser.rs`;
+4. `emissary-core/src/sam/session.rs`.
+
+No new source path is authorized. M062 records zero new files, dependencies, manifests, lockfile, Yosemite, and I2PControl-source changes.
+
+The secret must be extracted from generic SAM options before `SamCommand` construction and carried through a dedicated zeroizing/non-`Debug` type. This prevents the standard Base64 secret from escaping through debug-capable generic option state.
 
 ## 4. Dependency graph
 
@@ -70,7 +87,7 @@ M156 narrow Red25519/blinding primitive             [CLOSED; ZERO PROMOTION]
 M157 modern Encrypted LeaseSet2 publication         [CLOSED; ZERO PROMOTION]
   |
   v
-M158 lookup-secret + blinded-address primitive      [DEFERRED]
+M158 lookup-secret + blinded-address primitive      [REGISTERED; ZERO PROMOTION]
   |
   v
 M159 PSK client-authorization primitive             [DEFERRED; ZERO PROMOTION]
@@ -87,32 +104,19 @@ M162 Proposal LeaseSet-field integration            [DEFERRED; CONDITIONAL PROMO
 M152 final residual requalification                 [DEFERRED; ZERO PROMOTION]
 ```
 
-Only M158 may be registered next, with exact M061/M062 authorization in that registration commit.
+Only M158 is executable now.
 
-## 5. M157 exact-owner findings
-
-The current source audit expanded the earlier M155 candidate set for concrete reasons:
-
-- `sam/session.rs` owns the Ed25519 signing seed and constructs every ordinary inner LS2;
-- `sam/parser.rs` is the neutral fail-before-allocation standard-option gate;
-- `destination/mod.rs` joins SessionManager/LeaseSetManager and receives direct DatabaseStore verification replies;
-- `destination/lease_set.rs` owns the bounded publication/storage-verification state machine and therefore UTC blinded-key rollover;
-- `i2np/database/store.rs` recognizes store type 5 internally but lacks payload/builder support;
-- `netdb/mod.rs` currently caches raw LeaseSet bytes without their store type and always re-emits type 3, so it must preserve type 5 exactly after support is introduced;
-- `primitives/lease_set.rs`/`primitives/mod.rs` own the type-5 outer common structure;
-- a single new `crypto/els2.rs` owns credential/subcredential, exact HKDF schedules, no-auth layer encryption and UTC day conversion while reusing M156 and existing crypto.
-
-M145's `destination/session/mod.rs` is intentionally excluded: the I2P ELS2 specification explicitly permits an authenticated end-to-end session to receive the ordinary unencrypted LeaseSet inside wrapped garlic while floodfill publication is encrypted.
-
-## 6. Milestone intents
+## 5. Milestone intents
 
 ### M157 — modern encrypted-LS2 publication
 
-Registered. Implement type-5 outer framing, nested no-auth encryption, blinded storage key, DatabaseStore type preservation, canonical publication/storage verification and UTC-day rollover using real current inner LeaseSet2 bytes. Zero Proposal promotions.
+Closed complete. Type-5 outer framing, nested no-auth encryption, blinded storage key, DatabaseStore type preservation, canonical publication/storage verification and UTC-day rollover use real current inner LeaseSet2 bytes. Zero Proposal promotions.
 
 ### M158 — lookup secret and blinded address
 
-Deferred until M157 closure. Add optional secret contribution to blinding plus the extended encrypted-service `.b32.i2p` format. Default zero promotions until its entire field contract is proven.
+Registered. Add the standard Base64(UTF8) lookup-secret contribution to the existing daily blinding/publication path and implement the canonical encrypted-service extended `.b32.i2p` format.
+
+M158 does not persist I2PControl secrets, add client-side NetDB lookup/decryption, or promote `OptionalLookup`. Those administrative/runtime-integration semantics remain M162 work.
 
 ### M159 — PSK client authorization
 
@@ -128,13 +132,13 @@ Deferred. Resolve the Proposal's `encrypted (aes)` legacy contract. Zero product
 
 ### M162 — Proposal integration
 
-Deferred. Map real completed primitives into the five server families and promote only fields whose complete valid contract is operational.
+Deferred. Map real completed primitives into the five server families and promote only fields whose complete valid administrative/runtime contract is operational.
 
 ### M152 — final requalification
 
 Deferred. Recompute all 840 cells and establish final full/safe-partial status. Zero promotions.
 
-## 7. Promotion ceilings
+## 6. Promotion ceilings
 
 From `336/29/475`:
 
@@ -143,11 +147,11 @@ From `336/29/475`:
 
 These remain ceilings, not claims. `SigType` ×10 and `UseOutproxyPlugin` ×4 remain independent blockers.
 
-## 8. Completion conditions
+## 7. Completion conditions
 
 This corrective line completes when:
 
-- M157-M162 close according to their gates;
+- M158-M162 close according to their gates;
 - modern ELS2 publication/auth/lookup primitives are implemented or truthfully blocked;
 - legacy AES has an explicit final disposition;
 - M152 requalifies the actual current head;

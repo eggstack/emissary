@@ -43,12 +43,12 @@ Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` whe
 - M155-M159 LeaseSet-security neutral lineage: closed, zero Proposal promotions;
 - M160 DH/X25519 neutral lineage: closed, zero Proposal promotions;
 - M161 legacy AES/LS1 gate: closed outcome B (valid but blocked), zero production/promotions;
-- **M162 Proposal LeaseSet-security field integration registered / dependency-ready (I2PControl-only)**.
+- **M162 Proposal LeaseSet-security blocked integration: closed, zero promotions (nine-file I2PControl subset; all 15 cells remain blocked)**.
 
 Roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
 Registered plan: `plans/implementation/i2pcontrol-proposal-170/162-proposal-leaseset-security-field-integration.md`
-(registered / dependency-ready; M160 closed, M161 closed outcome B).
+(closed blocked; zero promotions; closure: `plans/closure/i2pcontrol-proposal-170/162-closure.md`).
 
 Closed plan: `plans/implementation/i2pcontrol-proposal-170/161-legacy-aes-ls1-feasibility-and-contract-gate.md`
 (closure: `plans/closure/i2pcontrol-proposal-170/161-closure.md`; outcome B).
@@ -131,13 +131,13 @@ M160 promoted **zero Proposal cells**; M095 remains exactly `336/29/475`.
 M159 PSK authorization             [CLOSED]
   -> M160 DH/X25519 authorization  [CLOSED]
   -> M161 legacy AES/LS1 gate      [CLOSED; OUTCOME B]
-  -> M162 Proposal field integration [REGISTERED; I2PCONTROL-ONLY]
-  -> M152 final requalification    [DEFERRED]
+  -> M162 Proposal field integration [CLOSED; BLOCKED INTEGRATION]
+  -> M152 final requalification    [DEFERRED; HARD DEP SATISFIED]
 ```
 
 M160 reused the exact four M159 owners with the existing `x25519-dalek` dependency sufficient and no manifest/lock change. M160 must use the same 4096-byte O(N) bound, preserve duplicates, and explicitly reject all-zero X25519 shared secrets.
 
-M161 closed outcome B on the closed M160 head and did not implement legacy LS1 inside the gate. M162 is registered on the closed M160+M161 head with a frozen ten-file I2PControl envelope (no core/Yosemite/dependency change) and is the first milestone allowed to promote LeaseSet fields; it must implement typed/redacted I2PControl state plus transactional LeaseSet-security secret custody across all five server families with `EncryptLeaseSet` held blocked.
+M161 closed outcome B on the closed M160 head and did not implement legacy LS1 inside the gate. M162 closed blocked on the closed M160+M161 head as a nine-file I2PControl subset with zero promotions (typed/redacted domain, ten-mode table, five-family fail-closed gates, redaction hardening; server_secret_store.rs intentionally unchanged) and is the first milestone allowed to promote LeaseSet fields; it must implement typed/redacted I2PControl state plus transactional LeaseSet-security secret custody across all five server families with `EncryptLeaseSet` held blocked.
 
 Correct modern/legacy mappings for M162:
 

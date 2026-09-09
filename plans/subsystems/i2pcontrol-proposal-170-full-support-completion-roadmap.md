@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M155-M161 closed, M162 registered**
+Status: **active / partial; M155-M162 closed, M152 hard dependency satisfied, registration pending**
 
 Pinned Proposal authority: revision `2026-05-20`, status Open.
 
@@ -11,7 +11,7 @@ Current whole-surface qualification authority: M153.
 Current execution authority:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`;
-- M162 registered / dependency-ready (I2PControl-only ten-file envelope); M161 closed outcome B with `EncryptLeaseSet` held blocked.
+- M162 closed blocked (nine-file I2PControl subset; zero promotions); M161 closed outcome B with `EncryptLeaseSet` held blocked plus Yosemite base/duplicate/bound gaps.
 
 ## 1. Current residual inventory
 
@@ -50,8 +50,8 @@ M155 semantic/owner refreeze                   [CLOSED]
   -> M159 PSK client authorization             [CLOSED]
   -> M160 DH/X25519 authorization              [CLOSED]
   -> M161 legacy AES/LS1 feasibility           [CLOSED; OUTCOME B]
-  -> M162 Proposal field integration           [REGISTERED; I2PCONTROL-ONLY]
-  -> M152 final requalification                [DEFERRED]
+  -> M162 Proposal field integration           [CLOSED; BLOCKED INTEGRATION]
+  -> M152 final requalification                [DEFERRED; HARD DEP SATISFIED]
 ```
 
 M149-M151 are superseded historical drafts and must not be executed.
@@ -81,9 +81,9 @@ M160 closed with the same four-file/zero-dependency owners realized against the 
 
 M161 closed outcome B (valid legacy-LS1 contract but blocked; zero production). It resolves legacy `encrypted (aes)` after the modern line is stable. No implementation successor is created; EncryptLeaseSet remains blocked.
 
-M162 is registered on the M160+M161-closed head with the frozen ten-file I2PControl envelope (see the M162 plan registration freeze), requiring the exact Proposal PR mappings, including PSK/DH base-key semantics, per-user `Base64(UTF8(name)):Key` properties, typed/redacted I2PControl fields, persistent LeaseSet-security secret custody, transactional definition+secret generations, and complete-field promotion only when the full valid domain is operational.
+M162 is closed blocked on the M160+M161-closed head as a nine-file I2PControl subset (closure: `plans/closure/i2pcontrol-proposal-170/162-closure.md`; strict subset of the frozen ten — `server_secret_store.rs` intentionally unchanged), realizing the exact Proposal PR mappings, PSK/DH base-key semantics, per-user `Base64(UTF8(name)):Key` validation, typed/redacted I2PControl fields, the executable ten-mode table, five-family fail-closed gates, and redaction hardening with zero promotions. Persistent custody was deferred (would be inert without a Yosemite base-key path) with the design frozen for a future Yosemite-amended successor; Yosemite base/duplicate/bound gaps plus M161-B legacy block keep all fifteen cells blocked.
 
-M152 has been rebased to requalify the closed M156-M159 lineage plus authenticated M159/M160 bounds, M161 disposition and M162 persistence/no-downgrade behavior.
+M152 has been rebased to requalify the closed M156-M159 lineage plus authenticated M159/M160 bounds, M161 disposition and M162 blocked-integration evidence (typed domain, ten-mode table, fail-closed gates, redaction, Yosemite gaps, zero promotions). Hard dependency satisfied by M162 closure; registration pending.
 
 ## 6. Field-completeness rules
 
@@ -120,6 +120,6 @@ M152 may declare full support only when the mechanically recomputed matrix has z
 
 ## 10. Current handoff
 
-M162 is the sole registered handoff. M152 remains deferred.
+No registered successor; only M152 may be registered next (hard dependency satisfied by M162 closure).
 
-M162 work is now executing under its frozen ten-file I2PControl envelope.
+M162 closed blocked on its frozen envelope as a nine-file subset with zero promotions (closure: plans/closure/i2pcontrol-proposal-170/162-closure.md).

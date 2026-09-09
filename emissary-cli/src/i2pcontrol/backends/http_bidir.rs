@@ -978,6 +978,36 @@ mod tests {
     }
 
     #[test]
+    fn m162_leaseset_security_fails_before_allocation_without_echo() {
+        use crate::i2pcontrol::domain::tunnel::{EncryptLeaseSetMode, OptionRedacted};
+        let backend = HttpBidirServerTunnelBackend::new(1, ServerDestinationStore::new("."), None);
+        for key in ["EncryptLeaseSet", "OptionalLookup", "LeaseSetClientAuths"] {
+            let mut bad = definition();
+            bad.raw_config.insert(key.to_owned(), serde_json::json!("inert"));
+            assert!(
+                matches!(backend.validate_start(&bad), Err(BackendError::UnsupportedOption { option, .. }) if option == key),
+                "httpbidirserver raw {key} must fail before allocation"
+            );
+            assert!(!format!("{:?}", backend.validate_start(&bad).unwrap_err()).contains("inert"));
+        }
+        let mut typed = definition();
+        typed.options.encrypt_lease_set = Some(EncryptLeaseSetMode::Blinded);
+        assert!(
+            matches!(backend.validate_start(&typed), Err(BackendError::UnsupportedOption { option, .. }) if option == "EncryptLeaseSet")
+        );
+        let mut typed = definition();
+        typed.options.optional_lookup = OptionRedacted::new("secret-lookup");
+        let error = backend.validate_start(&typed).unwrap_err();
+        assert!(
+            matches!(&error, BackendError::UnsupportedOption { option, .. } if option.as_str() == "OptionalLookup")
+        );
+        assert!(!format!("{error:?}").contains("secret-lookup"));
+        // httpbidirserver reuses the canonical server destination/session owner
+        // rather than duplicating cryptographic state (no second owner here).
+        assert!(backend.validate_start(&definition()).is_ok());
+    }
+
+    #[test]
     fn clearnet_and_outproxy_options_fail_before_allocation() {
         let mut definition = definition();
         definition.raw_config.insert(

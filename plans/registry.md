@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | subordinate to current corrective roadmap |
-| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **M162 registered / dependency-ready** |
+| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **M162 closed blocked; M152 hard dependency satisfied, registration pending** |
 | Post-M146 corrective | historical through M154 | `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` | M153 complete; M154 disposition C |
 | Residual primitive completion | historical through M146 | `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md` | M140-M145 complete; M146 blocked |
 | Session-lifecycle completion | closed complete | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | M134 complete |
@@ -68,12 +68,15 @@ Full Proposal-170 status remains **partial**. M153 remains the current whole-sur
 - M159 — neutral standard PSK client-authorization infrastructure; zero promotions.
 - M160 — neutral standard DH (X25519) client-authorization infrastructure; zero promotions.
 - M161 — legacy AES/LS1 feasibility gate, outcome B (valid but blocked); zero production/promotions.
+- M162 — Proposal LeaseSet-security blocked integration (typed/redacted domain, ten-mode table, five-family fail-closed gates, redaction hardening); zero promotions.
 
 M159 closure: `plans/closure/i2pcontrol-proposal-170/159-closure.md` at implementation/closure head `c0bbf9d4`.
 
 M160 closure: `plans/closure/i2pcontrol-proposal-170/160-closure.md` at implementation/closure head recorded therein.
 
 M161 closure: `plans/closure/i2pcontrol-proposal-170/161-closure.md` at implementation/closure head recorded therein (outcome B, zero production).
+
+M162 closure: `plans/closure/i2pcontrol-proposal-170/162-closure.md` at implementation/closure head recorded therein (blocked integration, zero promotions, nine-file I2PControl subset).
 
 ## Closed handoff — M160 (realized record)
 
@@ -211,8 +214,10 @@ M095 remains `336/29/475` after M159.
 |---|---|---|
 | M160 DH/X25519 | closed complete | same four-file/zero-dependency envelope realized; exact M061/M062 authorization observed |
 | M161 legacy AES/LS1 gate | closed complete, outcome B | zero-production gate; legacy AES valid but blocked; no successor; M095 unchanged |
-| M162 Proposal integration | registered / dependency-ready | I2PControl-only ten-file envelope frozen at registration; exact M062 authorization recorded |
-| M152 final requalification | deferred/unregistered | rebased to closed M156-M161 + M162 outcome |
+| M162 Proposal integration | closed complete, blocked integration | nine-file I2PControl subset realized (server_secret_store.rs intentionally unchanged); typed domain + ten-mode table + five-family fail-closed gates; zero promotions; exact M061/M062 authorization observed |
+| M152 final requalification | deferred/unregistered, hard dependency satisfied | rebased to closed M156-M162 (M161-B + M162 blocked); registration pending, zero-production/zero-promotion requalification only |
+
+M161 closed outcome B (valid legacy-LS1 contract but disproportionate/unsafe; no implementation successor). All five `EncryptLeaseSet` cells remain blocked. M162 closed blocked: modern field integration is valid but blocked by the frozen Yosemite base-key/duplicate/bound gaps plus inherited M161-B legacy block; no inert acceptance, no partial-enum apply, M095 unchanged.
 
 M161 closed outcome B (valid legacy-LS1 contract but disproportionate/unsafe; no implementation successor). All five `EncryptLeaseSet` cells remain blocked. M162 is registered for modern field integration over the closed M156-M160 primitives with `EncryptLeaseSet` held blocked.
 
@@ -270,14 +275,14 @@ M146 UseOutproxyPlugin                         [CLOSED BLOCKED]
   -> M159 PSK authorization                    [CLOSED]
   -> M160 DH authorization                     [CLOSED]
   -> M161 legacy AES gate                      [CLOSED; OUTCOME B]
-  -> M162 Proposal integration                 [REGISTERED; I2PCONTROL-ONLY]
-  -> M152 final qualification                  [DEFERRED]
+  -> M162 Proposal integration                 [CLOSED; BLOCKED INTEGRATION]
+  -> M152 final qualification                  [DEFERRED; HARD DEP SATISFIED]
 ```
 
 ## Canonical containment/registration rules
 
-1. **M162 is the sole registered milestone; M152 remains deferred**.
-2. M162 work is now executing under its frozen ten-file I2PControl envelope with `EncryptLeaseSet` held blocked per M161-B.
+1. **No registered successor; M152 hard dependency is satisfied, registration pending (only M152 may be registered next)**.
+2. M162 closed blocked with its nine-file I2PControl subset and `EncryptLeaseSet` held blocked per M161-B plus Yosemite base/duplicate/bound gaps.
 3. Proposal/admin policy remains I2PControl-owned; neutral core changes are exact and Proposal-free.
 4. No broad core prefix waiver.
 5. No secret/auth downgrade or diagnostic exposure.

@@ -582,6 +582,37 @@ pub struct TunnelOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub streamr_target: Option<String>,
 
+    // === LeaseSet-security (Proposal 170, M162) ===
+    /// Typed `EncryptLeaseSet` mode selector.
+    ///
+    /// Stored as a typed enum with the exact Proposal spelling. The mode
+    /// string itself is not secret and may appear in `get`; all key/secret
+    /// material stays in redacted fields and never in `raw_config`.
+    /// M162 keeps every mode blocked before allocation (M161-B legacy plus
+    /// Yosemite base-key/duplicate/bound gaps); the type exists so validation
+    /// is exact rather than stringly-typed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encrypt_lease_set: Option<EncryptLeaseSetMode>,
+
+    /// Typed `OptionalLookup` lookup password (secret, redacted).
+    ///
+    /// Persisted in the definition store through the existing redacted
+    /// convention (plaintext at rest like other proxy passwords, redacted in
+    /// Debug/Display/Get). Never serialized into `raw_config`. M162 keeps
+    /// every use blocked before allocation; no SAM wire emission occurs.
+    #[serde(skip_serializing_if = "OptionRedacted::is_none")]
+    pub optional_lookup: OptionRedacted,
+
+    /// Typed `LeaseSetClientAuths` per-user entries (names + secret keys).
+    ///
+    /// Each entry carries a non-empty name and a 32-byte key (Base64). Keys
+    /// are redacted in Debug/Display/Get. Never serialized into `raw_config`.
+    /// M162 keeps every use blocked before allocation; entries are validated
+    /// syntactically at the control plane but never reach Yosemite/core.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub lease_set_client_auths: Vec<LeaseSetClientAuthEntry>,
+
     // === Generic I2CP options ===
     /// I2CP options as a deterministic key-value map.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
@@ -634,6 +665,9 @@ impl Default for TunnelOptions {
             irc_password: OptionRedacted::none(),
             irc_channels: None,
             streamr_target: None,
+            encrypt_lease_set: None,
+            optional_lookup: OptionRedacted::none(),
+            lease_set_client_auths: Vec::new(),
             i2cp_options: BTreeMap::new(),
             custom_options: BTreeMap::new(),
         }
@@ -687,6 +721,187 @@ impl fmt::Display for OptionRedacted {
         }
     }
 }
+
+/// Exact Proposal 170 `EncryptLeaseSet` mode strings (M162 ten-mode table).
+///
+/// Each variant maps to exactly one external wire spelling. No aliases or
+/// case-insensitive parsing is introduced. M162 keeps every mode blocked
+/// before allocation; the enum exists so validation is exact and future
+/// Yosemite/legacy gaps can be reasoned per mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum EncryptLeaseSetMode {
+    #[serde(rename = "disable")]
+    Disable,
+    #[serde(rename = "encrypted (aes)")]
+    EncryptedAes,
+    #[serde(rename = "blinded")]
+    Blinded,
+    #[serde(rename = "blinded with lookup password")]
+    BlindedWithLookup,
+    #[serde(rename = "encrypted (psk)")]
+    EncryptedPsk,
+    #[serde(rename = "encrypted with lookup password (psk)")]
+    EncryptedWithLookupPsk,
+    #[serde(rename = "encrypted with per-user key (psk)")]
+    EncryptedPerUserPsk,
+    #[serde(rename = "encrypted with lookup password and per-user key (psk)")]
+    EncryptedLookupPerUserPsk,
+    #[serde(rename = "encrypted with per-user key (dh)")]
+    EncryptedPerUserDh,
+    #[serde(rename = "encrypted with lookup password and per-user key (dh)")]
+    EncryptedLookupPerUserDh,
+}
+
+/// All ten exact `EncryptLeaseSet` strings in Proposal wire order.
+#[allow(dead_code)]
+pub const ALL_ENCRYPT_LEASE_SET_MODES: &[EncryptLeaseSetMode] = &[
+    EncryptLeaseSetMode::Disable,
+    EncryptLeaseSetMode::EncryptedAes,
+    EncryptLeaseSetMode::Blinded,
+    EncryptLeaseSetMode::BlindedWithLookup,
+    EncryptLeaseSetMode::EncryptedPsk,
+    EncryptLeaseSetMode::EncryptedWithLookupPsk,
+    EncryptLeaseSetMode::EncryptedPerUserPsk,
+    EncryptLeaseSetMode::EncryptedLookupPerUserPsk,
+    EncryptLeaseSetMode::EncryptedPerUserDh,
+    EncryptLeaseSetMode::EncryptedLookupPerUserDh,
+];
+
+impl EncryptLeaseSetMode {
+    /// Return the exact external wire string for this mode.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Disable => "disable",
+            Self::EncryptedAes => "encrypted (aes)",
+            Self::Blinded => "blinded",
+            Self::BlindedWithLookup => "blinded with lookup password",
+            Self::EncryptedPsk => "encrypted (psk)",
+            Self::EncryptedWithLookupPsk => "encrypted with lookup password (psk)",
+            Self::EncryptedPerUserPsk => "encrypted with per-user key (psk)",
+            Self::EncryptedLookupPerUserPsk => {
+                "encrypted with lookup password and per-user key (psk)"
+            }
+            Self::EncryptedPerUserDh => "encrypted with per-user key (dh)",
+            Self::EncryptedLookupPerUserDh => {
+                "encrypted with lookup password and per-user key (dh)"
+            }
+        }
+    }
+
+    /// Parse from an exact external wire string.
+    pub fn from_str_exact(s: &str) -> Option<Self> {
+        match s {
+            "disable" => Some(Self::Disable),
+            "encrypted (aes)" => Some(Self::EncryptedAes),
+            "blinded" => Some(Self::Blinded),
+            "blinded with lookup password" => Some(Self::BlindedWithLookup),
+            "encrypted (psk)" => Some(Self::EncryptedPsk),
+            "encrypted with lookup password (psk)" => Some(Self::EncryptedWithLookupPsk),
+            "encrypted with per-user key (psk)" => Some(Self::EncryptedPerUserPsk),
+            "encrypted with lookup password and per-user key (psk)" => {
+                Some(Self::EncryptedLookupPerUserPsk)
+            }
+            "encrypted with per-user key (dh)" => Some(Self::EncryptedPerUserDh),
+            "encrypted with lookup password and per-user key (dh)" => {
+                Some(Self::EncryptedLookupPerUserDh)
+            }
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for EncryptLeaseSetMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl std::str::FromStr for EncryptLeaseSetMode {
+    type Err = EncryptLeaseSetModeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_str_exact(s).ok_or_else(|| EncryptLeaseSetModeError(s.to_string()))
+    }
+}
+
+/// Error returned when a string is not a valid `EncryptLeaseSet` mode.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EncryptLeaseSetModeError(pub String);
+
+impl fmt::Display for EncryptLeaseSetModeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "invalid EncryptLeaseSet mode {:?}", self.0)
+    }
+}
+
+impl std::error::Error for EncryptLeaseSetModeError {}
+
+/// One typed `LeaseSetClientAuths` per-user entry (M162).
+///
+/// `name` is the exact Proposal display name (non-empty, no control bytes).
+/// `key` is the exact Proposal Base64 key string that must decode to 32
+/// bytes (PSK or DH public material depending on the selected mode). Key
+/// material is secret: `Debug`/`Display` never emit names or keys.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LeaseSetClientAuthEntry {
+    pub name: String,
+    pub key: String,
+}
+
+impl LeaseSetClientAuthEntry {
+    /// Create a validated entry without checking 32-byte length.
+    ///
+    /// Length/encoding checks live in the control-plane validator
+    /// (`backends/options.rs`) so domain construction stays total; this
+    /// constructor only rejects empty names/keys and control bytes.
+    pub fn new(
+        name: impl Into<String>,
+        key: impl Into<String>,
+    ) -> Result<Self, LeaseSetClientAuthEntryError> {
+        let name = name.into();
+        let key = key.into();
+        if name.is_empty() || key.is_empty() {
+            return Err(LeaseSetClientAuthEntryError::Empty);
+        }
+        if name.chars().any(char::is_control) || key.chars().any(char::is_control) {
+            return Err(LeaseSetClientAuthEntryError::Control);
+        }
+        Ok(Self { name, key })
+    }
+}
+
+impl fmt::Debug for LeaseSetClientAuthEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("LeaseSetClientAuthEntry(***)")
+    }
+}
+
+impl fmt::Display for LeaseSetClientAuthEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("***")
+    }
+}
+
+/// Error returned when a `LeaseSetClientAuths` entry is malformed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LeaseSetClientAuthEntryError {
+    Empty,
+    Control,
+}
+
+impl fmt::Display for LeaseSetClientAuthEntryError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Empty => write!(f, "LeaseSetClientAuths entry name/key must not be empty"),
+            Self::Control => write!(
+                f,
+                "LeaseSetClientAuths entry must not contain control bytes"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for LeaseSetClientAuthEntryError {}
 
 /// A complete tunnel definition stored by the Proposal 170 control plane.
 ///
@@ -989,5 +1204,86 @@ mod tests {
             )]),
         };
         assert!(!format!("{def:?}").contains("do-not-log"));
+    }
+
+    #[test]
+    fn m162_encrypt_lease_set_modes_are_exact_ten() {
+        let expected = [
+            "disable",
+            "encrypted (aes)",
+            "blinded",
+            "blinded with lookup password",
+            "encrypted (psk)",
+            "encrypted with lookup password (psk)",
+            "encrypted with per-user key (psk)",
+            "encrypted with lookup password and per-user key (psk)",
+            "encrypted with per-user key (dh)",
+            "encrypted with lookup password and per-user key (dh)",
+        ];
+        assert_eq!(ALL_ENCRYPT_LEASE_SET_MODES.len(), 10);
+        for (mode, spelling) in ALL_ENCRYPT_LEASE_SET_MODES.iter().zip(expected) {
+            assert_eq!(mode.as_str(), spelling);
+            assert_eq!(EncryptLeaseSetMode::from_str_exact(spelling), Some(*mode));
+            assert_eq!(mode.to_string(), spelling);
+            let json = serde_json::to_string(mode).unwrap();
+            assert_eq!(json, format!("\"{spelling}\""));
+            let back: EncryptLeaseSetMode = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, *mode);
+        }
+        // No aliases, no case-insensitivity, no trimming.
+        assert!(EncryptLeaseSetMode::from_str_exact("Disable").is_none());
+        assert!(EncryptLeaseSetMode::from_str_exact("ENCRYPTED (PSK)").is_none());
+        assert!(EncryptLeaseSetMode::from_str_exact(" blinded").is_none());
+        assert!(EncryptLeaseSetMode::from_str_exact("").is_none());
+        assert!(EncryptLeaseSetMode::from_str_exact("encrypted").is_none());
+    }
+
+    #[test]
+    fn m162_leaseset_client_auth_entry_redacts_name_and_key() {
+        let entry =
+            LeaseSetClientAuthEntry::new("alice", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+                .unwrap();
+        let debug = format!("{entry:?}");
+        let display = format!("{entry}");
+        assert!(!debug.contains("alice"));
+        assert!(!debug.contains("AAAA"));
+        assert!(!display.contains("alice"));
+        assert!(!display.contains("AAAA"));
+        assert_eq!(debug, "LeaseSetClientAuthEntry(***)");
+        assert_eq!(display, "***");
+        assert!(LeaseSetClientAuthEntry::new("", "key").is_err());
+        assert!(LeaseSetClientAuthEntry::new("name", "").is_err());
+        assert!(LeaseSetClientAuthEntry::new("bad\nname", "key").is_err());
+    }
+
+    #[test]
+    fn m162_tunnel_options_leaseset_fields_roundtrip_and_redact() {
+        let opts = TunnelOptions {
+            encrypt_lease_set: Some(EncryptLeaseSetMode::Blinded),
+            optional_lookup: OptionRedacted::new("lookup-secret"),
+            lease_set_client_auths: vec![LeaseSetClientAuthEntry::new(
+                "bob",
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            )
+            .unwrap()],
+            ..Default::default()
+        };
+        let debug = format!("{opts:?}");
+        assert!(!debug.contains("lookup-secret"));
+        assert!(!debug.contains("AAAA"));
+        assert!(!debug.contains("bob"));
+        assert!(debug.contains("Blinded"));
+        let json = serde_json::to_value(&opts).unwrap();
+        assert_eq!(json["encrypt_lease_set"], serde_json::json!("blinded"));
+        // Secrets persist through the existing redacted convention (plaintext
+        // at rest, redacted in diagnostics) but never enter raw_config.
+        let back: TunnelOptions = serde_json::from_value(json).unwrap();
+        assert_eq!(back, opts);
+        // Default stays empty for backward compatibility.
+        let empty = TunnelOptions::default();
+        assert!(empty.encrypt_lease_set.is_none());
+        assert!(empty.optional_lookup.is_none());
+        assert!(empty.lease_set_client_auths.is_empty());
+        assert_eq!(serde_json::to_string(&empty).unwrap(), "{}");
     }
 }

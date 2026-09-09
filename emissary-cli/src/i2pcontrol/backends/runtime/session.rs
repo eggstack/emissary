@@ -985,6 +985,14 @@ pub fn build_session_options(
 ) -> BackendResult<SessionOptions> {
     validate_common_options(definition.tunnel_type, &definition.options).map_err(option_error)?;
 
+    // M162: defense-in-depth LeaseSet-security gate. Typed Proposal fields are
+    // already rejected by `validate_common_options`; raw `EncryptLeaseSet` /
+    // `OptionalLookup` / `LeaseSetClientAuths` presence is rejected here as
+    // well so no path can smuggle them to Yosemite/core. No modern mode sets
+    // legacy `i2cp.encryptLeaseSet=true` and legacy AES never maps to type 5:
+    // both stay blocked before allocation with no downgrade and no secret echo.
+    reject_leaseset_raw_presence(definition)?;
+
     // M137: `Close`/`CloseTime` are validated by `parse_close_policy`
     // below (including Streamr which bypasses `client_lifecycle_config`).
     // No Yosemite change, no raw SAM command construction.
@@ -1125,6 +1133,26 @@ pub fn build_session_options(
     }
 
     Ok(options)
+}
+
+/// M162 raw LeaseSet-security presence gate (defense in depth).
+///
+/// Typed fields are already rejected by `validate_common_options`. Raw
+/// `EncryptLeaseSet` / `OptionalLookup` / `LeaseSetClientAuths` keys are
+/// rejected here with the field name only so a hand-built definition that
+/// bypasses `extract_tunnel_options` still fails before any SAM wire work.
+/// No secret value is echoed.
+fn reject_leaseset_raw_presence(definition: &TunnelDefinition) -> BackendResult<()> {
+    let tunnel_type = definition.tunnel_type;
+    for key in ["EncryptLeaseSet", "OptionalLookup", "LeaseSetClientAuths"] {
+        if definition.raw_config.contains_key(key) {
+            return Err(BackendError::UnsupportedOption {
+                tunnel_type,
+                option: key.to_owned(),
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Apply validated generic Yosemite session-wire settings through the one
@@ -2738,5 +2766,108 @@ mod tests {
         // name may appear as a wire key.
         assert!(!command.contains(" newDest="));
         assert!(!command.contains(" NewDest="));
+    }
+
+    #[test]
+    fn m162_leaseset_typed_and_raw_presence_rejects_before_wire_without_echo() {
+        use crate::i2pcontrol::domain::tunnel::{
+            EncryptLeaseSetMode, LeaseSetClientAuthEntry, OptionRedacted,
+        };
+        // Typed presence rejects for every server family (blocked) and never
+        // reaches Yosemite wire construction.
+        for tunnel_type in [
+            TunnelType::Server,
+            TunnelType::HttpServer,
+            TunnelType::HttpBidirServer,
+            TunnelType::IrcServer,
+            TunnelType::StreamrServer,
+        ] {
+            for mode in [
+                EncryptLeaseSetMode::Disable,
+                EncryptLeaseSetMode::EncryptedAes,
+                EncryptLeaseSetMode::Blinded,
+                EncryptLeaseSetMode::BlindedWithLookup,
+                EncryptLeaseSetMode::EncryptedPsk,
+                EncryptLeaseSetMode::EncryptedPerUserDh,
+            ] {
+                let mut def = definition();
+                def.tunnel_type = tunnel_type;
+                def.options.encrypt_lease_set = Some(mode);
+                let error = build_session_options(&def, 7656, true, DestinationKind::Transient)
+                    .unwrap_err();
+                assert!(
+                    matches!(&error, BackendError::UnsupportedOption { option, .. } if option.as_str() == "EncryptLeaseSet"),
+                    "mode {mode} on {tunnel_type} must fail before allocation"
+                );
+                assert!(!format!("{error:?}").contains(mode.as_str()));
+            }
+            let mut def = definition();
+            def.tunnel_type = tunnel_type;
+            def.options.optional_lookup = OptionRedacted::new("lookup-secret-value");
+            let error =
+                build_session_options(&def, 7656, true, DestinationKind::Transient).unwrap_err();
+            assert!(
+                matches!(&error, BackendError::UnsupportedOption { option, .. } if option.as_str() == "OptionalLookup")
+            );
+            assert!(!format!("{error:?}").contains("lookup-secret"));
+
+            let mut def = definition();
+            def.tunnel_type = tunnel_type;
+            def.options.lease_set_client_auths = vec![LeaseSetClientAuthEntry::new(
+                "dave",
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            )
+            .unwrap()];
+            let error =
+                build_session_options(&def, 7656, true, DestinationKind::Transient).unwrap_err();
+            assert!(
+                matches!(&error, BackendError::UnsupportedOption { option, .. } if option.as_str() == "LeaseSetClientAuths")
+            );
+            assert!(!format!("{error:?}").contains("dave"));
+
+            // Raw presence is rejected defense-in-depth even when typed fields
+            // are absent (hand-built definitions bypassing extract).
+            for key in ["EncryptLeaseSet", "OptionalLookup", "LeaseSetClientAuths"] {
+                let mut def = definition();
+                def.tunnel_type = tunnel_type;
+                def.raw_config.insert(key.to_owned(), serde_json::json!("inert-value"));
+                let error = build_session_options(&def, 7656, true, DestinationKind::Transient)
+                    .unwrap_err();
+                assert!(
+                    matches!(&error, BackendError::UnsupportedOption { option, .. } if option.as_str() == key),
+                    "raw {key} on {tunnel_type} must fail before allocation"
+                );
+                assert!(!format!("{error:?}").contains("inert-value"));
+            }
+        }
+        // Ordinary definitions without any LeaseSet-security presence still
+        // build with no LeaseSet wire emission.
+        let def = definition();
+        let options = build_session_options(&def, 7656, false, DestinationKind::Transient).unwrap();
+        assert_eq!(options.lease_set_type, 1);
+        assert_eq!(options.lease_set_auth_type, 0);
+        assert!(!options.encrypt_lease_set);
+        assert!(options.lease_set_secret.is_none());
+        assert!(options.lease_set_client_auths.is_empty());
+    }
+
+    #[tokio::test]
+    async fn m162_blocked_leaseset_emits_no_sam_wire_and_never_aliases_legacy() {
+        // The ordinary wire for a definition without LeaseSet-security carries
+        // no encrypt/type/auth/secret/client-auth keys and never aliases
+        // legacy AES to modern type 5.
+        let mut def = definition();
+        def.tunnel_type = TunnelType::Server;
+        let mut options =
+            build_session_options(&def, 7656, true, DestinationKind::Transient).unwrap();
+        options.nickname = "m162-ordinary-wire".to_owned();
+        let command = fake_sam_session_create_command(options).await;
+        assert!(!command.contains("i2cp.encryptLeaseSet"));
+        assert!(!command.contains("i2cp.leaseSetType"));
+        assert!(!command.contains("i2cp.leaseSetAuthType"));
+        assert!(!command.contains("i2cp.leaseSetSecret"));
+        assert!(!command.contains("i2cp.leaseSetClient"));
+        assert!(!command.contains("i2cp.leaseSetPrivKey"));
+        assert!(!command.contains("i2cp.leaseSetPrivateKey"));
     }
 }

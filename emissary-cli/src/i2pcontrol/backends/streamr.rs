@@ -886,6 +886,18 @@ fn validate_raw_streamr_options(
     tunnel_type: TunnelType,
     client: bool,
 ) -> BackendResult<()> {
+    // M162: LeaseSet-security Proposal fields never ride the bounded Streamr
+    // datagram/session contract. Reject before allocation with the field name
+    // only (no secret echo); typed presence is rejected separately via
+    // `validate_common_options`.
+    for key in ["EncryptLeaseSet", "OptionalLookup", "LeaseSetClientAuths"] {
+        if definition.raw_config.contains_key(key) {
+            return Err(BackendError::UnsupportedOption {
+                tunnel_type,
+                option: key.to_owned(),
+            });
+        }
+    }
     for key in definition.raw_config.keys() {
         let supported = matches!(
             key.as_str(),
@@ -1009,6 +1021,42 @@ mod tests {
             backend.validate_start(&bad),
             Err(BackendError::UnsupportedOption { option, .. }) if option == "SigType"
         ));
+    }
+
+    #[test]
+    fn m162_leaseset_security_fails_before_allocation_within_bounded_limits() {
+        use crate::i2pcontrol::domain::tunnel::{EncryptLeaseSetMode, OptionRedacted};
+        let root = tempfile::tempdir().unwrap();
+        let backend = StreamrServerTunnelBackend::new(1, ServerDestinationStore::new(root.path()));
+        // Raw presence rejects before allocation (previously inert for Streamr).
+        for key in ["EncryptLeaseSet", "OptionalLookup", "LeaseSetClientAuths"] {
+            let mut bad = definition(TunnelType::StreamrServer);
+            bad.options.listen_port = Some(0);
+            bad.raw_config.insert(key.to_owned(), serde_json::json!("inert"));
+            assert!(
+                matches!(backend.validate_start(&bad), Err(BackendError::UnsupportedOption { option, .. }) if option == key),
+                "streamrserver raw {key} must fail before allocation"
+            );
+        }
+        // Typed presence rejects identically; Streamr stays within its
+        // documented bounded limits (no new task, no UDP change, loopback only).
+        let mut typed = definition(TunnelType::StreamrServer);
+        typed.options.listen_port = Some(0);
+        typed.options.encrypt_lease_set = Some(EncryptLeaseSetMode::Blinded);
+        assert!(
+            matches!(backend.validate_start(&typed), Err(BackendError::UnsupportedOption { option, .. }) if option == "EncryptLeaseSet")
+        );
+        let mut typed = definition(TunnelType::StreamrServer);
+        typed.options.listen_port = Some(0);
+        typed.options.optional_lookup = OptionRedacted::new("secret-lookup");
+        let error = backend.validate_start(&typed).unwrap_err();
+        assert!(
+            matches!(&error, BackendError::UnsupportedOption { option, .. } if option.as_str() == "OptionalLookup")
+        );
+        assert!(!format!("{error:?}").contains("secret-lookup"));
+        let mut valid = definition(TunnelType::StreamrServer);
+        valid.options.listen_port = Some(0);
+        assert!(backend.validate_start(&valid).is_ok());
     }
 
     #[test]

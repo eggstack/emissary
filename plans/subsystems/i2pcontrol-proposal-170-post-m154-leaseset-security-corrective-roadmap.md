@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M154 LeaseSet-Security Corrective Roadmap
 
-Status: **active / partial; M155-M161 closed, M162 registered**
+Status: **active / partial; M155-M162 closed, M152 hard dependency satisfied, registration pending**
 
 This roadmap supersedes the LeaseSet-security execution ordering in the older residual and post-M146 roadmaps while preserving M146/M147/M154 closures as historical evidence.
 
@@ -10,8 +10,8 @@ Current authority:
 - M095: `336 apply / 29 blocked_primitive / 475 not_applicable`;
 - M146 `UseOutproxyPlugin` ×4 closed blocked;
 - M154 configurable Destination `SigType` ×10 closed blocked;
-- M155-M161 closed with zero Proposal promotions;
-- **M162 registered / dependency-ready (I2PControl-only ten-file envelope; `EncryptLeaseSet` held blocked per M161-B)**.
+- M155-M162 closed with zero Proposal promotions;
+- **M162 closed blocked (nine-file I2PControl subset; typed domain + ten-mode table + five-family fail-closed gates; `EncryptLeaseSet` held blocked per M161-B plus Yosemite base/duplicate/bound gaps)**.
 
 ## 1. Corrective architecture
 
@@ -102,7 +102,10 @@ Possible outcomes remain A (separate exact implementation successor), B (valid b
 
 ### M162 — Proposal integration
 
-Registered on the M160+M161-closed head with the frozen ten-file I2PControl envelope (see the M162 plan registration freeze). Its contract requires:
+Closed blocked on the M160+M161-closed head as a nine-file I2PControl subset
+(closure: `plans/closure/i2pcontrol-proposal-170/162-closure.md`; strict subset
+of the registered ten — `server_secret_store.rs` intentionally unchanged to
+avoid inert custody). Its contract required:
 
 - exact ten-mode machine-readable mapping;
 - typed Proposal fields rather than raw generic I2CP/custom smuggling;
@@ -112,9 +115,16 @@ Registered on the M160+M161-closed head with the frozen ten-file I2PControl enve
 - complete-field promotion only after all valid values/uses are operational;
 - no lower-layer changes; missing neutral primitive means stop/split.
 
+Outcome: blocked integration, zero promotions. The ten-mode table and typed/
+redacted domain plus five-family fail-closed gates are realized; persistent
+custody was deferred (would be inert without a Yosemite base-key path) with
+the schema/transaction design frozen in the closure for a future
+Yosemite-amended successor. Yosemite base/duplicate/bound gaps plus M161-B
+legacy block keep all fifteen cells blocked.
+
 ### M152 — final requalification
 
-Rebased to treat M156-M158 as closed lineage and explicitly requalify M159/M160 authenticated ELS2 bounds/negative behavior plus M162 secret transactionality. Zero production/promotions.
+Rebased to treat M156-M158 as closed lineage and explicitly requalify M159/M160 authenticated ELS2 bounds/negative behavior plus M162 blocked-integration evidence (typed domain, ten-mode table, fail-closed gates, redaction, Yosemite gaps, zero promotions). Zero production/promotions. Hard dependency satisfied by M162 closure; registration pending.
 
 ## 6. Dependency graph
 
@@ -146,13 +156,13 @@ M160 DH/X25519 client authorization            [CLOSED]
 M161 legacy AES/LS1 feasibility                [CLOSED; OUTCOME B]
   |
   v
-M162 Proposal field integration                [REGISTERED; I2PCONTROL-ONLY]
+M162 Proposal field integration                [CLOSED; BLOCKED INTEGRATION]
   |
   v
-M152 final whole-surface requalification       [DEFERRED; ZERO PROMOTIONS]
+M152 final whole-surface requalification       [DEFERRED; HARD DEP SATISFIED; ZERO PROMOTIONS]
 ```
 
-M162 is the sole registered handoff. M152 remains deferred.
+No registered successor; only M152 may be registered next.
 
 ## 7. Promotion ceilings
 

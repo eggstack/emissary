@@ -1,6 +1,7 @@
 # M162 — Proposal LeaseSet-Security Field Integration
 
-Status: **registered / dependency-ready; M160 closed, M161 closed outcome B**
+Status: **closed as complete; zero promotions; blocked integration
+(`plans/closure/i2pcontrol-proposal-170/162-closure.md`)**
 
 > Registration baseline: `a05e0f0` (M161 outcome-B implementation/closure
 > head; clean worktree before M162 work). Current M095 matrix

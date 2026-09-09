@@ -7,7 +7,7 @@
 
 use std::fmt;
 
-use crate::i2pcontrol::domain::tunnel::{TunnelOptions, TunnelType};
+use crate::i2pcontrol::domain::tunnel::{EncryptLeaseSetMode, TunnelOptions, TunnelType};
 use yosemite_i2pcontrol::SessionOption;
 
 const MAX_CUSTOM_OPTIONS: usize = 32;
@@ -274,6 +274,287 @@ pub fn validate_common_options(
         return Err(common_unsupported(tunnel_type, "PersistentClientKey"));
     }
 
+    // M162: LeaseSet-security fields stay blocked before allocation on every
+    // family (servers blocked_primitive, clients not_applicable). No mode is
+    // accepted inertly and no secret is echoed.
+    validate_lease_set_security(tunnel_type, options)?;
+
+    Ok(())
+}
+
+/// Whether an `OptionalLookup` secret is required, forbidden, or absent for
+/// one exact `EncryptLeaseSet` mode (M162 ten-mode table).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LeaseSetLookupRequirement {
+    Required,
+    Forbidden,
+    Absent,
+}
+
+/// Whether indexed `LeaseSetClientAuths` entries are required, allowed, or
+/// forbidden for one exact mode (M162 ten-mode table).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+pub enum LeaseSetIndexedRequirement {
+    Required,
+    Allowed,
+    Forbidden,
+}
+
+/// One executable row of the M162 ten-mode machine table.
+///
+/// This is acceptance authority, not a runtime capability source: every row
+/// currently records a blocked disposition (M161-B legacy plus Yosemite
+/// base-key/duplicate/bound gaps). Tests iterate this table across all five
+/// server families and assert fail-before-allocation with redaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LeaseSetSecurityModeRow {
+    /// Exact Proposal `EncryptLeaseSet` spelling.
+    pub mode: EncryptLeaseSetMode,
+    /// Legacy `i2cp.encryptLeaseSet=true` selector (true) or absent (false).
+    pub legacy_encrypt_flag: bool,
+    /// Modern `i2cp.leaseSetType` selector when present.
+    pub lease_set_type: Option<u8>,
+    /// `i2cp.leaseSetAuthType` selector when present.
+    pub auth_type: Option<u8>,
+    /// Neutral lower primitive that would own the mode.
+    pub primitive: &'static str,
+    /// Lookup-secret coupling.
+    pub lookup: LeaseSetLookupRequirement,
+    /// Indexed per-user coupling.
+    pub indexed: LeaseSetIndexedRequirement,
+    /// Key interpretation (`none`, `psk-32B`, `dh-x25519-32B`).
+    pub key_kind: &'static str,
+    /// Persistent base-key role.
+    pub base_role: &'static str,
+    /// Extended-B32 `secret_required` flag when the mode were operational.
+    pub b32_secret_required: bool,
+    /// Extended-B32 `auth_required` flag when the mode were operational.
+    pub b32_auth_required: bool,
+    /// Generation/import rule (future custody design, currently unallocated).
+    pub generation: &'static str,
+    /// Published DatabaseStore type when the mode were operational.
+    pub database_store: &'static str,
+    /// Whether M161 legacy-AES disposition gates this mode.
+    pub m161_dependency: bool,
+    /// M162 blocked reason (executable: every row is blocked).
+    pub blocked_reason: &'static str,
+}
+
+/// Machine-readable ten-mode table in Proposal wire order (M162 §Ten-mode).
+///
+/// Order matches `ALL_ENCRYPT_LEASE_SET_MODES`: disable, encrypted (aes),
+/// blinded, blinded+lookup, psk, psk+lookup, psk per-user, psk lookup+per-user,
+/// dh per-user, dh lookup+per-user.
+pub const LEASE_SET_SECURITY_MODES: &[LeaseSetSecurityModeRow] = &[
+    LeaseSetSecurityModeRow {
+        mode: EncryptLeaseSetMode::Disable,
+        legacy_encrypt_flag: false,
+        lease_set_type: None,
+        auth_type: None,
+        primitive: "none/ordinary",
+        lookup: LeaseSetLookupRequirement::Forbidden,
+        indexed: LeaseSetIndexedRequirement::Forbidden,
+        key_kind: "none",
+        base_role: "none; omit field for ordinary type-3 publication",
+        b32_secret_required: false,
+        b32_auth_required: false,
+        generation: "none; no secret custody",
+        database_store: "ordinary LeaseSet2 type 3 (field omitted)",
+        m161_dependency: false,
+        blocked_reason:
+            "M162 blocked: explicit disable is rejected before allocation; omit the field for ordinary publication (matrix stays blocked_primitive)",
+    },
+    LeaseSetSecurityModeRow {
+        mode: EncryptLeaseSetMode::EncryptedAes,
+        legacy_encrypt_flag: true,
+        lease_set_type: None,
+        auth_type: None,
+        primitive: "M161 legacy LS1 AES",
+        lookup: LeaseSetLookupRequirement::Absent,
+        indexed: LeaseSetIndexedRequirement::Forbidden,
+        key_kind: "none (legacy SessionKey/keyring, no modern base)",
+        base_role: "none modern; legacy destination-hash keyring (unimplemented)",
+        b32_secret_required: false,
+        b32_auth_required: false,
+        generation: "none; LS1 resurrection forbidden inside M162",
+        database_store: "legacy LeaseSet type 1 with keyring-gated AES leases (unimplemented)",
+        m161_dependency: true,
+        blocked_reason:
+            "M161 outcome B: valid but blocked legacy LS1 (deprecated, insecure); all five EncryptLeaseSet cells stay blocked",
+    },
+    LeaseSetSecurityModeRow {
+        mode: EncryptLeaseSetMode::Blinded,
+        legacy_encrypt_flag: false,
+        lease_set_type: Some(5),
+        auth_type: Some(0),
+        primitive: "M157 no-auth type-5",
+        lookup: LeaseSetLookupRequirement::Forbidden,
+        indexed: LeaseSetIndexedRequirement::Forbidden,
+        key_kind: "none",
+        base_role: "none; blinding is core-internal (M156), no I2PControl base",
+        b32_secret_required: false,
+        b32_auth_required: false,
+        generation: "none I2PControl custody; core blinding only",
+        database_store: "EncryptedLeaseSet2 type 5, blinded DHT key (frozen M157)",
+        m161_dependency: false,
+        blocked_reason:
+            "M162 blocked: Yosemite-expressible but field-level blocked pending full ten-value domain (no partial-enum apply)",
+    },
+    LeaseSetSecurityModeRow {
+        mode: EncryptLeaseSetMode::BlindedWithLookup,
+        legacy_encrypt_flag: false,
+        lease_set_type: Some(5),
+        auth_type: Some(0),
+        primitive: "M158 lookup-secret type-5",
+        lookup: LeaseSetLookupRequirement::Required,
+        indexed: LeaseSetIndexedRequirement::Forbidden,
+        key_kind: "none",
+        base_role: "none; lookup secret imported from OptionalLookup only",
+        b32_secret_required: true,
+        b32_auth_required: false,
+        generation: "import lookup Base64(UTF8) persistently; no base key",
+        database_store: "EncryptedLeaseSet2 type 5, blinded DHT key",
+        m161_dependency: false,
+        blocked_reason:
+            "M162 blocked: lookup custody/transaction owner absent; field-level blocked pending full domain",
+    },
+    LeaseSetSecurityModeRow {
+        mode: EncryptLeaseSetMode::EncryptedPsk,
+        legacy_encrypt_flag: false,
+        lease_set_type: Some(5),
+        auth_type: Some(2),
+        primitive: "M159 PSK base-only",
+        lookup: LeaseSetLookupRequirement::Forbidden,
+        indexed: LeaseSetIndexedRequirement::Forbidden,
+        key_kind: "psk-32B base",
+        base_role: "generated persistent 32B base PSK; authorized even with zero indexed",
+        b32_secret_required: false,
+        b32_auth_required: true,
+        generation: "generate base PSK persistently; no import surface in Proposal",
+        database_store: "EncryptedLeaseSet2 type 5, blinded DHT key",
+        m161_dependency: false,
+        blocked_reason:
+            "M162 blocked: Yosemite 59140a2 has no typed leaseSetPrivKey base emission (reserved generic); base would be inert",
+    },
+    LeaseSetSecurityModeRow {
+        mode: EncryptLeaseSetMode::EncryptedWithLookupPsk,
+        legacy_encrypt_flag: false,
+        lease_set_type: Some(5),
+        auth_type: Some(2),
+        primitive: "M159 PSK + M158 secret",
+        lookup: LeaseSetLookupRequirement::Required,
+        indexed: LeaseSetIndexedRequirement::Forbidden,
+        key_kind: "psk-32B base",
+        base_role: "generated persistent base PSK plus imported lookup secret",
+        b32_secret_required: true,
+        b32_auth_required: true,
+        generation: "import lookup plus generate base PSK persistently",
+        database_store: "EncryptedLeaseSet2 type 5, blinded DHT key",
+        m161_dependency: false,
+        blocked_reason: "M162 blocked: Yosemite base-key gap plus lookup custody absent",
+    },
+    LeaseSetSecurityModeRow {
+        mode: EncryptLeaseSetMode::EncryptedPerUserPsk,
+        legacy_encrypt_flag: false,
+        lease_set_type: Some(5),
+        auth_type: Some(2),
+        primitive: "M159 PSK per-user",
+        lookup: LeaseSetLookupRequirement::Forbidden,
+        indexed: LeaseSetIndexedRequirement::Required,
+        key_kind: "psk-32B base + indexed",
+        base_role: "generated base PSK plus imported indexed per-user PSKs",
+        b32_secret_required: false,
+        b32_auth_required: true,
+        generation: "generate base plus import indexed {name,key} persistently",
+        database_store: "EncryptedLeaseSet2 type 5, blinded DHT key",
+        m161_dependency: false,
+        blocked_reason:
+            "M162 blocked: Yosemite base gap plus duplicate/bound gaps (Yosemite rejects duplicates, caps 16 vs core 99)",
+    },
+    LeaseSetSecurityModeRow {
+        mode: EncryptLeaseSetMode::EncryptedLookupPerUserPsk,
+        legacy_encrypt_flag: false,
+        lease_set_type: Some(5),
+        auth_type: Some(2),
+        primitive: "M159 PSK per-user + M158 secret",
+        lookup: LeaseSetLookupRequirement::Required,
+        indexed: LeaseSetIndexedRequirement::Required,
+        key_kind: "psk-32B base + indexed",
+        base_role: "generated base PSK plus imported lookup and indexed PSKs",
+        b32_secret_required: true,
+        b32_auth_required: true,
+        generation: "import lookup plus generate base plus import indexed",
+        database_store: "EncryptedLeaseSet2 type 5, blinded DHT key",
+        m161_dependency: false,
+        blocked_reason: "M162 blocked: Yosemite base/duplicate/bound gaps plus lookup custody absent",
+    },
+    LeaseSetSecurityModeRow {
+        mode: EncryptLeaseSetMode::EncryptedPerUserDh,
+        legacy_encrypt_flag: false,
+        lease_set_type: Some(5),
+        auth_type: Some(1),
+        primitive: "M160 DH per-user",
+        lookup: LeaseSetLookupRequirement::Forbidden,
+        indexed: LeaseSetIndexedRequirement::Required,
+        key_kind: "dh-x25519-32B (base private + indexed publics)",
+        base_role: "generated persistent X25519 private; derived public always authorized plus indexed",
+        b32_secret_required: false,
+        b32_auth_required: true,
+        generation: "generate base X25519 private persistently plus import indexed publics",
+        database_store: "EncryptedLeaseSet2 type 5, blinded DHT key",
+        m161_dependency: false,
+        blocked_reason:
+            "M162 blocked: Yosemite base gap plus duplicate/bound gaps (Yosemite rejects duplicates, caps 16 vs core 99)",
+    },
+    LeaseSetSecurityModeRow {
+        mode: EncryptLeaseSetMode::EncryptedLookupPerUserDh,
+        legacy_encrypt_flag: false,
+        lease_set_type: Some(5),
+        auth_type: Some(1),
+        primitive: "M160 DH per-user + M158 secret",
+        lookup: LeaseSetLookupRequirement::Required,
+        indexed: LeaseSetIndexedRequirement::Required,
+        key_kind: "dh-x25519-32B (base private + indexed publics)",
+        base_role: "generated base X25519 private plus imported lookup and indexed publics",
+        b32_secret_required: true,
+        b32_auth_required: true,
+        generation: "import lookup plus generate base private plus import indexed",
+        database_store: "EncryptedLeaseSet2 type 5, blinded DHT key",
+        m161_dependency: false,
+        blocked_reason: "M162 blocked: Yosemite base/duplicate/bound gaps plus lookup custody absent",
+    },
+];
+
+/// Fail-before-allocation gate for all LeaseSet-security typed fields.
+///
+/// M162 keeps every mode blocked (including explicit `disable`: omit the
+/// field for ordinary publication). Any typed presence — mode selector,
+/// lookup secret, or per-user entries — rejects with the field name only;
+/// secret values never enter the error. This is the common gate every server
+/// backend reaches through `validate_common_options` before any secret-store
+/// lookup, runtime reservation, or SAM wire work.
+pub fn validate_lease_set_security(
+    tunnel_type: TunnelType,
+    options: &TunnelOptions,
+) -> Result<(), OptionValidationError> {
+    // Executable-table anchor: the ten-mode authority stays exactly ten rows
+    // in Proposal wire order. Every row is currently blocked (§M162).
+    debug_assert_eq!(LEASE_SET_SECURITY_MODES.len(), 10);
+    debug_assert_eq!(
+        LEASE_SET_SECURITY_MODES[0].mode,
+        EncryptLeaseSetMode::Disable
+    );
+    if let Some(mode) = options.encrypt_lease_set {
+        let _ = mode;
+        return Err(common_unsupported(tunnel_type, "EncryptLeaseSet"));
+    }
+    if options.optional_lookup.is_some() {
+        return Err(common_unsupported(tunnel_type, "OptionalLookup"));
+    }
+    if !options.lease_set_client_auths.is_empty() {
+        return Err(common_unsupported(tunnel_type, "LeaseSetClientAuths"));
+    }
     Ok(())
 }
 
@@ -299,6 +580,9 @@ fn is_common_runtime_field(field: &str) -> bool {
             | "PersistentClientKey"
             | "PrivKeyFile"
             | "CustomOptions"
+            | "EncryptLeaseSet"
+            | "OptionalLookup"
+            | "LeaseSetClientAuths"
     )
 }
 
@@ -483,6 +767,12 @@ fn present_runtime_fields(options: &TunnelOptions) -> Vec<&'static str> {
         ("IrcPassword", options.irc_password.is_some()),
         ("IrcChannels", options.irc_channels.is_some()),
         ("StreamrTarget", options.streamr_target.is_some()),
+        ("EncryptLeaseSet", options.encrypt_lease_set.is_some()),
+        ("OptionalLookup", options.optional_lookup.is_some()),
+        (
+            "LeaseSetClientAuths",
+            !options.lease_set_client_auths.is_empty(),
+        ),
     ] {
         if present {
             fields.push(field);
@@ -765,5 +1055,135 @@ mod tests {
         options.custom_options.clear();
         options.custom_options.insert("i2cp.custom".to_owned(), "bad value".to_owned());
         assert!(validate_common_options(TunnelType::Client, &options).is_err());
+    }
+
+    #[test]
+    fn m162_ten_mode_table_is_exact_and_blocked() {
+        use crate::i2pcontrol::domain::tunnel::EncryptLeaseSetMode;
+        assert_eq!(LEASE_SET_SECURITY_MODES.len(), 10);
+        let spellings = [
+            "disable",
+            "encrypted (aes)",
+            "blinded",
+            "blinded with lookup password",
+            "encrypted (psk)",
+            "encrypted with lookup password (psk)",
+            "encrypted with per-user key (psk)",
+            "encrypted with lookup password and per-user key (psk)",
+            "encrypted with per-user key (dh)",
+            "encrypted with lookup password and per-user key (dh)",
+        ];
+        for (row, spelling) in LEASE_SET_SECURITY_MODES.iter().zip(spellings) {
+            assert_eq!(row.mode.as_str(), spelling);
+            assert!(!row.blocked_reason.is_empty());
+            assert!(row.blocked_reason.contains("blocked"));
+        }
+        // Legacy/modern selector split: only legacy AES sets the legacy flag;
+        // every modern mode selects type 5 and never the legacy flag.
+        assert!(LEASE_SET_SECURITY_MODES[1].legacy_encrypt_flag);
+        assert!(LEASE_SET_SECURITY_MODES[1].lease_set_type.is_none());
+        assert!(LEASE_SET_SECURITY_MODES[1].m161_dependency);
+        for row in &LEASE_SET_SECURITY_MODES[2..] {
+            assert!(!row.legacy_encrypt_flag);
+            assert_eq!(row.lease_set_type, Some(5));
+            assert!(!row.m161_dependency);
+        }
+        // Auth selectors: disable none, legacy none, blinded 0, PSK 2, DH 1.
+        assert_eq!(LEASE_SET_SECURITY_MODES[0].auth_type, None);
+        assert_eq!(LEASE_SET_SECURITY_MODES[1].auth_type, None);
+        assert_eq!(LEASE_SET_SECURITY_MODES[2].auth_type, Some(0));
+        assert_eq!(LEASE_SET_SECURITY_MODES[3].auth_type, Some(0));
+        for row in &LEASE_SET_SECURITY_MODES[4..8] {
+            assert_eq!(row.auth_type, Some(2));
+            assert!(row.key_kind.contains("psk"));
+        }
+        for row in &LEASE_SET_SECURITY_MODES[8..] {
+            assert_eq!(row.auth_type, Some(1));
+            assert!(row.key_kind.contains("dh"));
+        }
+        // Lookup/indexed coupling.
+        assert_eq!(
+            LEASE_SET_SECURITY_MODES[3].lookup,
+            LeaseSetLookupRequirement::Required
+        );
+        assert_eq!(
+            LEASE_SET_SECURITY_MODES[2].lookup,
+            LeaseSetLookupRequirement::Forbidden
+        );
+        assert_eq!(
+            LEASE_SET_SECURITY_MODES[6].indexed,
+            LeaseSetIndexedRequirement::Required
+        );
+        assert_eq!(
+            LEASE_SET_SECURITY_MODES[4].indexed,
+            LeaseSetIndexedRequirement::Forbidden
+        );
+        // B32 flags follow secret/auth presence.
+        assert!(!LEASE_SET_SECURITY_MODES[2].b32_secret_required);
+        assert!(LEASE_SET_SECURITY_MODES[3].b32_secret_required);
+        assert!(LEASE_SET_SECURITY_MODES[4].b32_auth_required);
+        assert!(!LEASE_SET_SECURITY_MODES[0].b32_auth_required);
+        // Modern rows publish type-5 ELS2; legacy publishes LS1; disable is ordinary.
+        assert!(LEASE_SET_SECURITY_MODES[2].database_store.contains("type 5"));
+        assert!(LEASE_SET_SECURITY_MODES[1].database_store.contains("type 1"));
+        assert!(LEASE_SET_SECURITY_MODES[0].database_store.contains("type 3"));
+        let _ = EncryptLeaseSetMode::Disable;
+    }
+
+    #[test]
+    fn m162_all_typed_leaseset_presence_fails_before_allocation_without_echo() {
+        use crate::i2pcontrol::domain::tunnel::{LeaseSetClientAuthEntry, OptionRedacted};
+        // Every server family plus a client family: any typed presence rejects
+        // with the field name only.
+        for tunnel_type in [
+            TunnelType::Server,
+            TunnelType::HttpServer,
+            TunnelType::HttpBidirServer,
+            TunnelType::IrcServer,
+            TunnelType::StreamrServer,
+            TunnelType::Client,
+        ] {
+            for mode in crate::i2pcontrol::domain::tunnel::ALL_ENCRYPT_LEASE_SET_MODES {
+                let options = TunnelOptions {
+                    encrypt_lease_set: Some(*mode),
+                    ..Default::default()
+                };
+                let error = validate_common_options(tunnel_type, &options).unwrap_err();
+                assert_eq!(
+                    error.to_string(),
+                    format!("{tunnel_type} does not support option EncryptLeaseSet"),
+                    "mode {mode} on {tunnel_type} must fail before allocation"
+                );
+                assert!(!error.to_string().contains(mode.as_str()));
+            }
+            let options = TunnelOptions {
+                optional_lookup: OptionRedacted::new("top-secret-lookup"),
+                ..Default::default()
+            };
+            let error = validate_common_options(tunnel_type, &options).unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                format!("{tunnel_type} does not support option OptionalLookup")
+            );
+            assert!(!error.to_string().contains("top-secret"));
+
+            let options = TunnelOptions {
+                lease_set_client_auths: vec![LeaseSetClientAuthEntry::new(
+                    "carol",
+                    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                )
+                .unwrap()],
+                ..Default::default()
+            };
+            let error = validate_common_options(tunnel_type, &options).unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                format!("{tunnel_type} does not support option LeaseSetClientAuths")
+            );
+            assert!(!error.to_string().contains("carol"));
+            assert!(!error.to_string().contains("AAAA"));
+        }
+        // Absent fields still validate (ordinary path unaffected).
+        assert!(validate_common_options(TunnelType::Server, &TunnelOptions::default()).is_ok());
     }
 }

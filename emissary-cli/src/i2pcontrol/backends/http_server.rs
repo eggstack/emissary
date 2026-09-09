@@ -612,7 +612,12 @@ pub(crate) fn normalize_loopback_target(host: &str, allow_ipv6: bool) -> Option<
 /// never stored; collisions are allowed exactly as the reference allows them.
 pub(crate) fn derive_unique_local_source(canonical_id: &[u8; 32], target: IpAddr) -> IpAddr {
     match target {
-        IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::new(127, canonical_id[0], canonical_id[1], canonical_id[2])),
+        IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::new(
+            127,
+            canonical_id[0],
+            canonical_id[1],
+            canonical_id[2],
+        )),
         IpAddr::V6(_) => {
             let mut octets = [0u8; 16];
             octets[0] = 0xfd;
@@ -645,13 +650,10 @@ pub(crate) fn unique_local_enabled(definition: &TunnelDefinition) -> BackendResu
 pub(crate) fn multihoming_enabled(definition: &TunnelDefinition) -> BackendResult<Option<bool>> {
     match definition.raw_config.get("MultiHoming") {
         None => Ok(None),
-        Some(value) => value
-            .as_bool()
-            .map(Some)
-            .ok_or_else(|| BackendError::UnsupportedOption {
-                tunnel_type: TunnelType::HttpServer,
-                option: "MultiHoming".to_owned(),
-            }),
+        Some(value) => value.as_bool().map(Some).ok_or_else(|| BackendError::UnsupportedOption {
+            tunnel_type: TunnelType::HttpServer,
+            option: "MultiHoming".to_owned(),
+        }),
     }
 }
 
@@ -810,8 +812,8 @@ impl HttpServerTunnelBackend {
         }
         // M144: presentation TLS to the loopback target. Validated and built
         // before any listener/session allocation; generation-local connector.
-        let use_ssl = presentation_tls::parse_use_ssl(definition)
-            .map_err(|_| invalid_option("UseSSL"))?;
+        let use_ssl =
+            presentation_tls::parse_use_ssl(definition).map_err(|_| invalid_option("UseSSL"))?;
         let trust_anchors = presentation_tls::test_trust_anchors(definition)
             .map_err(|_| invalid_option("UseSSL"))?;
         if !use_ssl && trust_anchors.is_some() {
@@ -1044,6 +1046,7 @@ fn validate_raw_options(definition: &TunnelDefinition) -> BackendResult<()> {
         "SigType",
         "EncType",
         "EncryptLeaseSet",
+        "OptionalLookup",
         "LeaseSetClientAuths",
         "i2cp",
     ];
@@ -1153,6 +1156,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn m162_leaseset_security_fails_before_allocation_without_echo() {
+        use crate::i2pcontrol::domain::tunnel::{
+            EncryptLeaseSetMode, LeaseSetClientAuthEntry, OptionRedacted,
+        };
+        let root = tempfile::tempdir().unwrap();
+        let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
+        // Raw presence (including the previously-inert OptionalLookup gap)
+        // rejects before allocation.
+        for key in ["EncryptLeaseSet", "OptionalLookup", "LeaseSetClientAuths"] {
+            let bad = definition(&[(key, serde_json::json!("inert-value"))]);
+            assert!(
+                matches!(backend.validate_start(&bad), Err(BackendError::UnsupportedOption { option, .. }) if option == key),
+                "httpserver raw {key} must fail before allocation"
+            );
+            assert!(
+                matches!(backend.start(&bad).await, Err(BackendError::UnsupportedOption { option, .. }) if option == key),
+                "httpserver raw {key} start must fail before allocation"
+            );
+            assert!(
+                !format!("{:?}", backend.validate_start(&bad).unwrap_err()).contains("inert-value")
+            );
+        }
+        // Typed presence rejects identically (no store/session allocation).
+        let mut typed = definition(&[]);
+        typed.options.encrypt_lease_set = Some(EncryptLeaseSetMode::EncryptedAes);
+        assert!(
+            matches!(backend.validate_start(&typed), Err(BackendError::UnsupportedOption { option, .. }) if option == "EncryptLeaseSet")
+        );
+        let mut typed = definition(&[]);
+        typed.options.optional_lookup = OptionRedacted::new("lookup-secret");
+        let error = backend.validate_start(&typed).unwrap_err();
+        assert!(
+            matches!(&error, BackendError::UnsupportedOption { option, .. } if option.as_str() == "OptionalLookup")
+        );
+        assert!(!format!("{error:?}").contains("lookup-secret"));
+        let mut typed = definition(&[]);
+        typed.options.lease_set_client_auths = vec![LeaseSetClientAuthEntry::new(
+            "frank",
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        )
+        .unwrap()];
+        let error = backend.validate_start(&typed).unwrap_err();
+        assert!(
+            matches!(&error, BackendError::UnsupportedOption { option, .. } if option.as_str() == "LeaseSetClientAuths")
+        );
+        assert!(!format!("{error:?}").contains("frank"));
+        assert!(backend.validate_start(&definition(&[])).is_ok());
+    }
+
+    #[tokio::test]
     async fn option_validation_rejects_unsupported_security_modes_before_destination_lookup() {
         let root = tempfile::tempdir().unwrap();
         let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
@@ -1179,11 +1232,10 @@ mod tests {
     async fn target_host_is_loopback_confined() {
         let root = tempfile::tempdir().unwrap();
         let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
-        let result = backend
-            .config_without_destination(&definition(&[(
-                "TargetHost",
-                serde_json::json!("10.0.0.1"),
-            )]));
+        let result = backend.config_without_destination(&definition(&[(
+            "TargetHost",
+            serde_json::json!("10.0.0.1"),
+        )]));
         assert!(matches!(
             result,
             Err(BackendError::UnsupportedOption { .. })
@@ -1243,11 +1295,10 @@ mod tests {
             .unwrap();
         assert_eq!(config.admission.max_concurrent_connections(), 7);
 
-        let invalid = backend
-            .config_without_destination(&definition(&[(
-                "MaxConcurrentConns",
-                serde_json::json!(0),
-            )]));
+        let invalid = backend.config_without_destination(&definition(&[(
+            "MaxConcurrentConns",
+            serde_json::json!(0),
+        )]));
         assert!(
             matches!(invalid, Err(BackendError::Internal { message }) if message.contains("MaxConcurrentConns"))
         );
@@ -1489,10 +1540,7 @@ mod tests {
         hash[0] = 0x01;
         hash[1] = 0x02;
         hash[2] = 0x03;
-        let source = derive_unique_local_source(
-            &hash,
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-        );
+        let source = derive_unique_local_source(&hash, IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
         assert_eq!(source, IpAddr::V4(Ipv4Addr::new(127, 0x01, 0x02, 0x03)));
 
         // Edge bytes .0 and .255 are preserved byte-for-byte, not clamped.
@@ -1552,18 +1600,16 @@ mod tests {
         for (i, byte) in hash.iter_mut().enumerate() {
             *byte = i as u8;
         }
-        let source =
-            derive_unique_local_source(&hash, IpAddr::V6(Ipv6Addr::LOCALHOST));
+        let source = derive_unique_local_source(&hash, IpAddr::V6(Ipv6Addr::LOCALHOST));
         let expected_octets = [
-            0xfd, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
-            0x0b, 0x0c, 0x0d, 0x0e,
+            0xfd, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
+            0x0d, 0x0e,
         ];
         assert_eq!(source, IpAddr::V6(Ipv6Addr::from(expected_octets)));
         // Only the first 15 hash bytes participate; trailing hash bytes are ignored.
         let mut variant = hash;
         variant[14] = 0xff;
-        let variant_source =
-            derive_unique_local_source(&variant, IpAddr::V6(Ipv6Addr::LOCALHOST));
+        let variant_source = derive_unique_local_source(&variant, IpAddr::V6(Ipv6Addr::LOCALHOST));
         assert_ne!(variant_source, source);
         let mut ignored_tail = hash;
         ignored_tail[15] = 0xff;
@@ -1580,20 +1626,16 @@ mod tests {
         let backend = HttpServerTunnelBackend::new(7656, ServerDestinationStore::new(root.path()));
         // Absent and explicit false are disabled, never a failure.
         assert!(!unique_local_enabled(&definition(&[])).unwrap());
-        assert!(
-            !unique_local_enabled(&definition(&[(
-                "UniqueLocalAddressPerClient",
-                serde_json::json!(false)
-            )]))
-            .unwrap()
-        );
-        assert!(
-            unique_local_enabled(&definition(&[(
-                "UniqueLocalAddressPerClient",
-                serde_json::json!(true)
-            )]))
-            .unwrap()
-        );
+        assert!(!unique_local_enabled(&definition(&[(
+            "UniqueLocalAddressPerClient",
+            serde_json::json!(false)
+        )]))
+        .unwrap());
+        assert!(unique_local_enabled(&definition(&[(
+            "UniqueLocalAddressPerClient",
+            serde_json::json!(true)
+        )]))
+        .unwrap());
         // Malformed types fail before allocation.
         for bad in [
             serde_json::json!("true"),
@@ -1685,11 +1727,7 @@ mod tests {
         client.read_to_end(&mut response).await.unwrap();
         // Local listener is a raw TCP socket, not HTTP, so filtering yields 502,
         // but the ordinary connect must still have reached it.
-        assert!(
-            String::from_utf8(response)
-                .unwrap()
-                .starts_with("HTTP/1.1 502 Bad Gateway\r\n")
-        );
+        assert!(String::from_utf8(response).unwrap().starts_with("HTTP/1.1 502 Bad Gateway\r\n"));
         task.await.unwrap().unwrap();
         let peer = local.await.unwrap().unwrap();
         assert_eq!(peer.ip(), IpAddr::V4(Ipv4Addr::LOCALHOST));
@@ -1710,10 +1748,8 @@ mod tests {
             peer
         });
         let peer = distinct_peer(0x51);
-        let expected = derive_unique_local_source(
-            peer.canonical_id(),
-            IpAddr::V4(Ipv4Addr::LOCALHOST),
-        );
+        let expected =
+            derive_unique_local_source(peer.canonical_id(), IpAddr::V4(Ipv4Addr::LOCALHOST));
         assert_ne!(expected, IpAddr::V4(Ipv4Addr::LOCALHOST));
         let (mut client, server) = duplex(64 * 1024);
         let (server_read, server_write) = tokio::io::split(server);
@@ -1769,10 +1805,8 @@ mod tests {
             peer
         });
         let peer = distinct_peer(0x52);
-        let expected = derive_unique_local_source(
-            peer.canonical_id(),
-            IpAddr::V4(Ipv4Addr::LOCALHOST),
-        );
+        let expected =
+            derive_unique_local_source(peer.canonical_id(), IpAddr::V4(Ipv4Addr::LOCALHOST));
         let (mut client, server) = duplex(64 * 1024);
         let (server_read, server_write) = tokio::io::split(server);
         let task = tokio::spawn(handle_http_stream(
@@ -1873,11 +1907,7 @@ mod tests {
         client.shutdown().await.unwrap();
         let mut response = Vec::new();
         client.read_to_end(&mut response).await.unwrap();
-        assert!(
-            String::from_utf8(response)
-                .unwrap()
-                .starts_with("HTTP/1.1 502 Bad Gateway\r\n")
-        );
+        assert!(String::from_utf8(response).unwrap().starts_with("HTTP/1.1 502 Bad Gateway\r\n"));
         task.await.unwrap().unwrap();
         assert!(
             local.await.unwrap().is_err(),

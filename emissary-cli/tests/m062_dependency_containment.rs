@@ -641,6 +641,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m159 = is_authorized_m159_path(path);
         let authorized_m160 = is_authorized_m160_path(path);
         let authorized_m161 = is_authorized_m161_path(path);
+        let authorized_m162 = is_authorized_m162_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -689,6 +690,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m159
                 || authorized_m160
                 || authorized_m161
+                || authorized_m162
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -740,6 +742,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m159
                     || authorized_m160
                     || authorized_m161
+                    || authorized_m162
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
             );
@@ -1565,6 +1568,33 @@ fn is_authorized_m161_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/161-closure.md"
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
             | "plans/implementation/i2pcontrol-proposal-170/161-legacy-aes-ls1-feasibility-and-contract-gate.md"
+            | "plans/implementation/i2pcontrol-proposal-170/162-proposal-leaseset-security-field-integration.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md"
+    )
+}
+
+fn is_authorized_m162_path(path: &str) -> bool {
+    matches!(
+        path,
+        "AGENTS.md"
+            | "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/tunnel-manager.md"
+            | "emissary-cli/src/i2pcontrol/backends/http_bidir.rs"
+            | "emissary-cli/src/i2pcontrol/backends/http_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/irc_server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/options.rs"
+            | "emissary-cli/src/i2pcontrol/backends/runtime/session.rs"
+            | "emissary-cli/src/i2pcontrol/backends/server.rs"
+            | "emissary-cli/src/i2pcontrol/backends/streamr.rs"
+            | "emissary-cli/src/i2pcontrol/domain/tunnel.rs"
+            | "emissary-cli/src/i2pcontrol/tunnel_manager.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/162-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
             | "plans/implementation/i2pcontrol-proposal-170/162-proposal-leaseset-security-field-integration.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"

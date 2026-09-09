@@ -403,8 +403,7 @@ impl TunnelBackend for ServerTunnelBackend {
         // Pure preflight: every deterministic gate `start` would reject before
         // secret-store lookup or runtime-map reservation. No store access, no
         // supervisor reservation, no network I/O.
-        validate_common_options(TunnelType::Server, &definition.options)
-            .map_err(option_error)?;
+        validate_common_options(TunnelType::Server, &definition.options).map_err(option_error)?;
         validate_raw_options(definition)?;
         validate_i2cp_options(definition)?;
         validate_options(TunnelType::Server, &definition.options, SERVER_OPTIONS)
@@ -835,6 +834,65 @@ mod tests {
             .unwrap();
         let backend = ServerTunnelBackend::new(1, store);
         assert!(!format!("{backend:?}").contains(&private));
+    }
+
+    #[tokio::test]
+    async fn m162_leaseset_security_fails_before_store_or_session_allocation() {
+        use crate::i2pcontrol::domain::tunnel::{
+            EncryptLeaseSetMode, LeaseSetClientAuthEntry, OptionRedacted,
+        };
+        let backend = ServerTunnelBackend::without_store(1);
+        // Typed presence rejects in preflight and in start identically, before
+        // any secret-store lookup or runtime reservation, with no secret echo.
+        for (mut def, expected) in [
+            (
+                {
+                    let mut def = definition("m162-mode", "identity");
+                    def.options.encrypt_lease_set = Some(EncryptLeaseSetMode::Blinded);
+                    def
+                },
+                "EncryptLeaseSet",
+            ),
+            (
+                {
+                    let mut def = definition("m162-lookup", "identity");
+                    def.options.optional_lookup = OptionRedacted::new("lookup-secret");
+                    def
+                },
+                "OptionalLookup",
+            ),
+            (
+                {
+                    let mut def = definition("m162-auths", "identity");
+                    def.options.lease_set_client_auths = vec![LeaseSetClientAuthEntry::new(
+                        "eve",
+                        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    )
+                    .unwrap()];
+                    def
+                },
+                "LeaseSetClientAuths",
+            ),
+        ] {
+            // Raw duplication is also rejected defense-in-depth.
+            def.raw_config.insert(
+                expected.to_owned(),
+                serde_json::json!("inert-should-not-matter"),
+            );
+            assert!(
+                matches!(backend.validate_start(&def), Err(BackendError::UnsupportedOption { option, .. }) if option == expected),
+                "server {expected} must fail preflight before allocation"
+            );
+            assert!(
+                matches!(backend.start(&def).await, Err(BackendError::UnsupportedOption { option, .. }) if option == expected),
+                "server {expected} must fail start before allocation"
+            );
+            assert!(!format!("{:?}", backend.validate_start(&def).unwrap_err())
+                .contains("lookup-secret"));
+            assert!(!format!("{:?}", backend.validate_start(&def).unwrap_err()).contains("eve"));
+        }
+        // Ordinary definitions still pass preflight.
+        assert!(backend.validate_start(&definition("m162-ordinary", "identity")).is_ok());
     }
 
     async fn fake_sam() -> (u16, tokio::task::JoinHandle<()>) {

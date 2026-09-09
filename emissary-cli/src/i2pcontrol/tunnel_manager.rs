@@ -42,8 +42,9 @@
 
 use crate::i2pcontrol::{
     domain::tunnel::{
-        StartIntent, TunnelDefinition, TunnelName, TunnelOptions, TunnelOwnership,
-        TunnelRuntimeState, TunnelType, ALL_TUNNEL_TYPES,
+        EncryptLeaseSetMode, LeaseSetClientAuthEntry, OptionRedacted, StartIntent,
+        TunnelDefinition, TunnelName, TunnelOptions, TunnelOwnership, TunnelRuntimeState,
+        TunnelType, ALL_TUNNEL_TYPES,
     },
     rpc::{self, JsonRpcErrorResponse, JsonRpcRequest, JsonRpcSuccess, RequestId},
     server::I2pControlState,
@@ -1119,6 +1120,16 @@ fn insert_typed_canonical_options(
     if let Some(value) = &def.options.priv_key_file {
         insert("PrivKeyFile", serde_json::json!(value), raw_config);
     }
+    // M162: the mode string is safe to return; secrets never enter Get.
+    // `OptionalLookup` and `LeaseSetClientAuths` stay redacted/omitted per
+    // existing secret-store convention.
+    if let Some(value) = def.options.encrypt_lease_set {
+        insert(
+            "EncryptLeaseSet",
+            serde_json::json!(value.as_str()),
+            raw_config,
+        );
+    }
 }
 
 fn option_text(value: &serde_json::Value, key: &str) -> Result<String, String> {
@@ -1316,6 +1327,64 @@ fn extract_tunnel_options(
         options.streamr_target = Some(v.to_string());
     }
 
+    // M162: typed LeaseSet-security Proposal fields (never in raw_config).
+    //
+    // `EncryptLeaseSet` is the exact ten-string mode selector (validated
+    // syntactically here; blocked before allocation by the backends).
+    // `OptionalLookup` is a secret lookup password (redacted).
+    // `LeaseSetClientAuths` is a list of `{Name,Key}` objects where each Key
+    // must Base64-decode to exactly 32 bytes; duplicates are preserved
+    // syntactically (pinned Java semantics) and blocked before allocation.
+    if let Some(v) = params.get("EncryptLeaseSet").and_then(|v| v.as_str()) {
+        let mode = EncryptLeaseSetMode::from_str_exact(v)
+            .ok_or_else(|| "EncryptLeaseSet has an unsupported value".to_string())?;
+        options.encrypt_lease_set = Some(mode);
+    }
+    if let Some(v) = params.get("OptionalLookup").and_then(|v| v.as_str()) {
+        if v.is_empty() || v.len() > 512 || v.chars().any(char::is_control) {
+            return Err("OptionalLookup has an invalid value".to_string());
+        }
+        options.optional_lookup = OptionRedacted::new(v);
+    }
+    if let Some(entries) = params.get("LeaseSetClientAuths").and_then(|v| v.as_array()) {
+        let mut parsed = Vec::with_capacity(entries.len());
+        if entries.len() > 64 {
+            return Err("LeaseSetClientAuths contains too many entries".to_string());
+        }
+        for entry in entries {
+            let object = entry
+                .as_object()
+                .ok_or_else(|| "LeaseSetClientAuths entries must be objects".to_string())?;
+            let name = object
+                .get("Name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "LeaseSetClientAuths entries must have a Name".to_string())?;
+            let key = object
+                .get("Key")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "LeaseSetClientAuths entries must have a Key".to_string())?;
+            if name.is_empty()
+                || name.len() > 64
+                || name.chars().any(char::is_control)
+                || key.is_empty()
+                || key.len() > 128
+                || key.chars().any(char::is_control)
+            {
+                return Err("LeaseSetClientAuths entries have an invalid value".to_string());
+            }
+            let decoded = emissary_core::crypto::base64_decode(key)
+                .ok_or_else(|| "LeaseSetClientAuths entries have an invalid Key".to_string())?;
+            if decoded.len() != 32 {
+                return Err("LeaseSetClientAuths entries have an invalid Key".to_string());
+            }
+            parsed
+                .push(LeaseSetClientAuthEntry::new(name, key).map_err(|_| {
+                    "LeaseSetClientAuths entries have an invalid value".to_string()
+                })?);
+        }
+        options.lease_set_client_auths = parsed;
+    }
+
     // I2CP options
     if let Some(obj) = params.get("i2cp").and_then(|v| v.as_object()) {
         for (k, v) in obj {
@@ -1402,6 +1471,20 @@ fn merge_tunnel_options(existing: &TunnelOptions, new: &TunnelOptions) -> Tunnel
         },
         irc_channels: new.irc_channels.clone().or(existing.irc_channels.clone()),
         streamr_target: new.streamr_target.clone().or(existing.streamr_target.clone()),
+        // M162: LeaseSet-security typed fields merge like other Proposal
+        // options. Presence always fails before allocation at the backends;
+        // merge only preserves the persisted definition for truthful Get.
+        encrypt_lease_set: new.encrypt_lease_set.or(existing.encrypt_lease_set),
+        optional_lookup: if new.optional_lookup.is_some() {
+            new.optional_lookup.clone()
+        } else {
+            existing.optional_lookup.clone()
+        },
+        lease_set_client_auths: if new.lease_set_client_auths.is_empty() {
+            existing.lease_set_client_auths.clone()
+        } else {
+            new.lease_set_client_auths.clone()
+        },
         i2cp_options: if new.i2cp_options.is_empty() {
             existing.i2cp_options.clone()
         } else {
@@ -1540,6 +1623,7 @@ const SENSITIVE_OPTION_KEYS: &[&str] = &[
     "ProxyPassword",
     "OutproxyPassword",
     "PrivKeyFile",
+    "OptionalLookup",
     "LeaseSetClientAuths",
     "FilterFilePath",
     "i2p.tunnel.sslKey",
@@ -1560,6 +1644,8 @@ fn is_typed_secret_key(key: &str) -> bool {
         key,
         "ProxyPassword"
             | "OutproxyPassword"
+            | "OptionalLookup"
+            | "LeaseSetClientAuths"
             | "i2p.tunnel.sslKey"
             | "i2p.tunnel.proxyPassword"
             | "i2p.tunnel.ircPassword"
@@ -2185,6 +2271,118 @@ mod tests {
         assert!(info["State"].is_null());
         assert!(info["rawConfig"]["ProxyPassword"].is_null());
         assert!(info["rawConfig"]["OutproxyPassword"].is_null());
+    }
+
+    #[tokio::test]
+    async fn m162_leaseset_secrets_never_enter_raw_config_or_get() {
+        // Typed secrets persist in the definition store (redacted convention)
+        // but never serialize into `raw_config` and never appear in Get.
+        let state = test_state();
+        let create = tm_request(
+            "TunnelManager",
+            serde_json::json!({
+                "Action": "create",
+                "Type": "server",
+                "Name": "m162-secret",
+                "EncryptLeaseSet": "blinded",
+                "OptionalLookup": "lookup-password-value",
+                "LeaseSetClientAuths": [
+                    {"Name": "alice", "Key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}
+                ],
+            }),
+        );
+        assert!(handle_tunnel_manager(&state, &create).await["error"].is_null());
+
+        let stored = state.tunnel_get("m162-secret").await.unwrap().unwrap();
+        assert_eq!(
+            stored.options.encrypt_lease_set,
+            Some(EncryptLeaseSetMode::Blinded)
+        );
+        assert!(stored.options.optional_lookup.is_some());
+        assert_eq!(stored.options.lease_set_client_auths.len(), 1);
+        // No raw secret serialization.
+        assert!(!stored.raw_config.contains_key("OptionalLookup"));
+        assert!(!stored.raw_config.contains_key("LeaseSetClientAuths"));
+        // Debug never carries secrets or names.
+        let debug = format!("{stored:?}");
+        assert!(!debug.contains("lookup-password-value"));
+        assert!(!debug.contains("alice"));
+        assert!(!debug.contains("AAAA"));
+
+        let get = handle_tunnel_manager(
+            &state,
+            &tm_request(
+                "TunnelManager",
+                serde_json::json!({"Action": "get", "Name": "m162-secret"}),
+            ),
+        )
+        .await;
+        let serialized = serde_json::to_string(&get).unwrap();
+        assert!(!serialized.contains("lookup-password-value"));
+        assert!(!serialized.contains("alice"));
+        assert!(!serialized.contains("AAAA"));
+        // Mode string is safe and returned; secrets are omitted.
+        assert_eq!(
+            get["result"]["info"]["rawConfig"]["EncryptLeaseSet"],
+            "blinded"
+        );
+        assert!(get["result"]["info"]["rawConfig"]["OptionalLookup"].is_null());
+        assert!(get["result"]["info"]["rawConfig"]["LeaseSetClientAuths"].is_null());
+    }
+
+    #[tokio::test]
+    async fn m162_malformed_leaseset_client_auths_fail_before_persistence_without_echo() {
+        let state = test_state();
+        for params in [
+            // Missing Key.
+            serde_json::json!({
+                "Action": "create", "Type": "server", "Name": "m162-bad-0",
+                "LeaseSetClientAuths": [{"Name": "alice"}],
+            }),
+            // Missing Name.
+            serde_json::json!({
+                "Action": "create", "Type": "server", "Name": "m162-bad-1",
+                "LeaseSetClientAuths": [{"Key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}],
+            }),
+            // Short key (not 32 bytes).
+            serde_json::json!({
+                "Action": "create", "Type": "server", "Name": "m162-bad-2",
+                "LeaseSetClientAuths": [{"Name": "alice", "Key": "AAAA"}],
+            }),
+            // Non-Base64 key.
+            serde_json::json!({
+                "Action": "create", "Type": "server", "Name": "m162-bad-3",
+                "LeaseSetClientAuths": [{"Name": "alice", "Key": "not-base64!!"}],
+            }),
+            // Control bytes in name.
+            serde_json::json!({
+                "Action": "create", "Type": "server", "Name": "m162-bad-4",
+                "LeaseSetClientAuths": [{"Name": "bad\nname", "Key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}],
+            }),
+        ] {
+            let response =
+                handle_tunnel_manager(&state, &tm_request("TunnelManager", params)).await;
+            assert_eq!(
+                response["error"]["code"],
+                rpc::error_codes::INVALID_PARAMS,
+                "malformed LeaseSetClientAuths must fail before persistence"
+            );
+            let serialized = serde_json::to_string(&response).unwrap();
+            assert!(!serialized.contains("AAAA"));
+        }
+        // Malformed OptionalLookup (control bytes) also fails before persistence.
+        let response = handle_tunnel_manager(
+            &state,
+            &tm_request(
+                "TunnelManager",
+                serde_json::json!({
+                    "Action": "create", "Type": "server", "Name": "m162-bad-lookup",
+                    "OptionalLookup": "bad\nlookup",
+                }),
+            ),
+        )
+        .await;
+        assert_eq!(response["error"]["code"], rpc::error_codes::INVALID_PARAMS);
     }
 
     #[test]

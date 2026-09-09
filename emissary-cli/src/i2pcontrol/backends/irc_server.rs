@@ -789,6 +789,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn m162_leaseset_security_fails_before_allocation_without_echo() {
+        use crate::i2pcontrol::domain::tunnel::{EncryptLeaseSetMode, OptionRedacted};
+        let backend = IrcServerTunnelBackend::new(1, ServerDestinationStore::new("."));
+        for key in ["EncryptLeaseSet", "OptionalLookup", "LeaseSetClientAuths"] {
+            let mut bad = definition("identity");
+            bad.raw_config.insert(key.to_owned(), serde_json::json!("inert"));
+            assert!(
+                matches!(backend.validate_start(&bad), Err(BackendError::UnsupportedOption { option, .. }) if option == key),
+                "ircserver raw {key} must fail before allocation"
+            );
+            assert!(
+                matches!(backend.start(&bad).await, Err(BackendError::UnsupportedOption { option, .. }) if option == key),
+                "ircserver raw {key} start must fail before allocation"
+            );
+        }
+        let mut typed = definition("identity");
+        typed.options.encrypt_lease_set = Some(EncryptLeaseSetMode::EncryptedPsk);
+        assert!(
+            matches!(backend.validate_start(&typed), Err(BackendError::UnsupportedOption { option, .. }) if option == "EncryptLeaseSet")
+        );
+        let mut typed = definition("identity");
+        typed.options.optional_lookup = OptionRedacted::new("secret-lookup");
+        let error = backend.validate_start(&typed).unwrap_err();
+        assert!(
+            matches!(&error, BackendError::UnsupportedOption { option, .. } if option.as_str() == "OptionalLookup")
+        );
+        assert!(!format!("{error:?}").contains("secret-lookup"));
+        assert!(backend.validate_start(&definition("identity")).is_ok());
+    }
+
+    #[tokio::test]
     async fn registration_rewrites_trusted_peer_and_rejects_http() {
         let (mut client, server) = duplex(4096);
         let read = async move {

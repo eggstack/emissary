@@ -30,15 +30,15 @@ metrics = []
 expected = "ordinary registry Yosemite plus exact optional git fork package when i2pcontrol is enabled"
 baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
-# Current milestone-specific dependency budget. M162 is registered for
-# I2PControl-only Proposal LeaseSet-security field integration over the
-# M160-closed neutral primitives with M161 outcome B holding
-# `EncryptLeaseSet` blocked. All production paths are inside the M061
-# policy root (`emissary-cli/src/i2pcontrol/`), so no M061 amendment and no
-# new file, dependency, manifest, lockfile, Yosemite, or core change is
-# authorized at registration.
+# Current milestone-specific dependency budget. M162 is closed as a blocked
+# integration (nine-file I2PControl-only subset; server_secret_store.rs
+# intentionally unchanged) over the M160-closed neutral primitives with M161
+# outcome B holding `EncryptLeaseSet` blocked. All production paths are inside
+# the M061 policy root (`emissary-cli/src/i2pcontrol/`), so no M061 amendment
+# and no new file, dependency, manifest, lockfile, Yosemite, or core change
+# was required or made.
 [current_registration]
-milestone = "M162 (registered / dependency-ready)"
+milestone = "M162 (closed complete, zero promotions, blocked integration)"
 production_paths = [
   "emissary-cli/src/i2pcontrol/domain/tunnel.rs",
   "emissary-cli/src/i2pcontrol/backends/options.rs",
@@ -48,7 +48,6 @@ production_paths = [
   "emissary-cli/src/i2pcontrol/backends/http_bidir.rs",
   "emissary-cli/src/i2pcontrol/backends/irc_server.rs",
   "emissary-cli/src/i2pcontrol/backends/streamr.rs",
-  "emissary-cli/src/i2pcontrol/server_secret_store.rs",
   "emissary-cli/src/i2pcontrol/tunnel_manager.rs",
 ]
 new_files = []
@@ -57,7 +56,7 @@ manifest_changes = []
 lockfile_change = false
 yosemite_change = false
 i2pcontrol_source_change = true
-rationale = "M162 integrates already-proven M156-M160 neutral primitives into typed/redacted I2PControl fields with persistent secret custody; all ten paths are existing policy-root owners revalidated at the registration head (see 162 plan registration freeze); zero new dependency/manifest/lock/Yosemite/core change."
+rationale = "M162 closed blocked with typed/redacted I2PControl fields, the executable ten-mode table, fail-before-allocation gates on all five server families, and control-plane redaction hardening; strict nine-file subset of the registered ten (server_secret_store.rs intentionally unchanged to avoid inert custody without a Yosemite base-key path); zero new dependency/manifest/lock/Yosemite/core change."
 
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its

@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Post-M154 LeaseSet-Security Corrective Roadmap
 
-Status: **active / partial; M155-M159 closed, M160 registered**
+Status: **active / partial; M155-M160 closed, no registered successor**
 
 This roadmap supersedes the LeaseSet-security execution ordering in the older residual and post-M146 roadmaps while preserving M146/M147/M154 closures as historical evidence.
 
@@ -10,8 +10,8 @@ Current authority:
 - M095: `336 apply / 29 blocked_primitive / 475 not_applicable`;
 - M146 `UseOutproxyPlugin` ×4 closed blocked;
 - M154 configurable Destination `SigType` ×10 closed blocked;
-- M155-M159 closed with zero Proposal promotions;
-- **M160 is the sole registered successor**.
+- M155-M160 closed with zero Proposal promotions;
+- **no registered successor; M161 deferred with satisfied hard dep, registration pending**.
 
 ## 1. Corrective architecture
 
@@ -59,20 +59,22 @@ Non-per-user PSK/DH modes still use the persistent base key; indexed entries are
 - No secret/PSK/DH/private key material in logs/debug/Get/rawConfig outside exact safe Proposal semantics.
 - M147/M148 and M146 remain separate blocked lines.
 
-## 4. Current exact handoff — M160
+## 4. Current exact handoff — M160 closed
 
-M160 exact production set:
+M160 realized production set (closed):
 
 1. `emissary-core/src/crypto/els2.rs`;
 2. `emissary-core/src/destination/lease_set.rs`;
 3. `emissary-core/src/sam/parser.rs`;
 4. `emissary-core/src/sam/session.rs`.
 
-All four are already realized M061 owners. M160 adds no file/dependency/Cargo/lock/Yosemite/I2PControl production change.
+All four are already realized M061 owners. M160 added no file/dependency/Cargo/lock/Yosemite/I2PControl production change.
 
 M159 closed record: standard PSK layer-1 authorization with flags `0x03`, fresh auth cookie/salt, `ELS2PSKA` schedule, duplicate-preserving records, and zero promotions (closure: `plans/closure/i2pcontrol-proposal-170/159-closure.md`).
 
-M160 adds standard DH layer-1 authorization only, with:
+M160 closed record: standard DH layer-1 authorization with flags `0x01`, fresh ephemeral X25519 keypair + fresh auth cookie per regenerated object, `ELS2_XCA` 52-byte HKDF schedule with explicit all-zero shared-secret rejection, duplicate-preserving records, and zero promotions (closure: `plans/closure/i2pcontrol-proposal-170/160-closure.md`).
+
+M160 added standard DH layer-1 authorization only, with:
 
 - auth flags `0x01`;
 - fresh ephemeral X25519 keypair + fresh auth cookie per regenerated object;
@@ -88,13 +90,13 @@ M160 adds standard DH layer-1 authorization only, with:
 
 ### M160 — DH/X25519
 
-Registered with the same four exact files and zero new dependencies (revalidated at registration against the M159 closure).
+Closed with the same four exact files and zero new dependencies (closure: `plans/closure/i2pcontrol-proposal-170/160-closure.md`).
 
-It must use existing X25519 support, standard DH flags/ephemeral-key construction, explicit all-zero shared-secret rejection, the same 4096-byte O(N) bound, randomized records, duplicate preservation, and no persistent core secret state.
+It used existing X25519 support, standard DH flags/ephemeral-key construction, explicit all-zero shared-secret rejection, the same 4096-byte O(N) bound, randomized records, duplicate preservation, and no persistent core secret state.
 
 ### M161 — legacy AES/LS1 gate
 
-Corrected dependency: **hard-depends on M160 closure**, not merely M155. It is zero-production and runs only after the modern authorization owner graph is frozen.
+Corrected dependency: **hard-depends on M160 closure** (now satisfied, registration pending), not merely M155. It is zero-production and runs only after the modern authorization owner graph is frozen.
 
 Possible outcomes remain A (separate exact implementation successor), B (valid but blocked under current architecture/security policy), or C (reference-incoherent/dead operational value; still blocked absent authoritative applicability correction).
 
@@ -138,10 +140,10 @@ M158 lookup-secret + blinded address           [CLOSED]
 M159 PSK client authorization                  [CLOSED]
   |
   v
-M160 DH/X25519 client authorization            [REGISTERED]
+M160 DH/X25519 client authorization            [CLOSED]
   |
   v
-M161 legacy AES/LS1 feasibility                [DEFERRED; ZERO PRODUCTION]
+M161 legacy AES/LS1 feasibility                [DEFERRED; HARD DEP SATISFIED; ZERO PRODUCTION]
   |
   v
 M162 Proposal field integration                [DEFERRED; CONDITIONAL PROMOTIONS]
@@ -150,7 +152,7 @@ M162 Proposal field integration                [DEFERRED; CONDITIONAL PROMOTIONS
 M152 final whole-surface requalification       [DEFERRED; ZERO PROMOTIONS]
 ```
 
-Only M160 is executable now.
+No milestone is currently registered. Only M161 may be registered next.
 
 ## 7. Promotion ceilings
 

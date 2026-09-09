@@ -18,24 +18,28 @@
 
 //! Neutral modern type-5 encrypted LeaseSet2 crypto helper.
 //!
-//! Implements the no-client-auth subset plus the standard PSK
-//! client-authorization subset of the current encrypted LeaseSet
+//! Implements the no-client-auth subset plus the standard PSK and DH
+//! client-authorization subsets of the current encrypted LeaseSet
 //! construction on top of the closed blinding primitive:
 //! credential/subcredential derivation, exact 44-byte schedules for the two
 //! nested layers, no-auth layer encryption/decryption for deterministic
 //! self-validation, PSK layer-1 construction with fresh auth cookie/salt per
-//! generation, secure salts through caller-provided randomness, UTC
-//! epoch-day conversion, a zeroizing type-7 seed handoff, the optional
-//! standard lookup-secret contribution to daily blinding, and the canonical
-//! encrypted-service extended `.b32.i2p` address codec for the type-7 to
-//! type-11 domain.
+//! generation, DH layer-1 construction with a fresh ephemeral X25519 keypair
+//! and fresh auth cookie per generation, secure salts through caller-provided
+//! randomness, UTC epoch-day conversion, a zeroizing type-7 seed handoff,
+//! the optional standard lookup-secret contribution to daily blinding, and
+//! the canonical encrypted-service extended `.b32.i2p` address codec for the
+//! type-7 to type-11 domain.
 //!
-//! No DH authorization, no persistent signature-type registry, and no
-//! generic key-derivation API are provided here. Successor work extends
-//! this module through its exact owner.
+//! No persistent signature-type registry, and no generic key-derivation API
+//! are provided here. Successor work extends this module through its exact
+//! owner.
 
 use crate::{
-    crypto::{base32_decode, base32_encode, chachapoly::ChaCha, red25519},
+    crypto::{
+        base32_decode, base32_encode, chachapoly::ChaCha, red25519, SecretKey as X25519SecretKey,
+        StaticPrivateKey as X25519StaticKey, StaticPublicKey as X25519PublicWrap,
+    },
     error::Error,
 };
 
@@ -64,6 +68,9 @@ pub const NO_AUTH_LAYER1_FLAGS: u8 = 0;
 /// PSK client-authorization layer-1 flags byte.
 pub const PSK_LAYER1_FLAGS: u8 = 0x03;
 
+/// DH client-authorization layer-1 flags byte.
+pub const DH_LAYER1_FLAGS: u8 = 0x01;
+
 /// Key-derivation label for the outer layer.
 const L1_INFO: &[u8] = b"ELS2_L1K";
 
@@ -72,6 +79,9 @@ const L2_INFO: &[u8] = b"ELS2_L2K";
 
 /// Key-derivation label for one PSK client record.
 const PSK_INFO: &[u8] = b"ELS2PSKA";
+
+/// Key-derivation label for one DH client record.
+const XCA_INFO: &[u8] = b"ELS2_XCA";
 
 /// Authenticated encrypted-data ceiling in bytes.
 ///
@@ -93,6 +103,18 @@ pub const PSK_CLIENT_RECORD_LEN: usize = 40;
 /// per-client crypto; the 4096-byte bound is always stricter than the `u16`
 /// client-count encoding.
 pub const MAX_PSK_CLIENTS: usize = 99;
+
+/// Length of one DH client record (`clientID[8] || encryptedCookie[32]`).
+pub const DH_CLIENT_RECORD_LEN: usize = 40;
+
+/// Absolute pre-allocation ceiling for DH client entries.
+///
+/// Same framing as PSK (`32 + 1 + 32 + 2 + 32 + 1 = 100` bytes for
+/// outer/ephemeral/inner salts plus flags/count/type): `(4096 - 100) / 40 =
+/// 99`. The exact serialized size with the real inner payload is re-checked
+/// before any per-client X25519 work; the 4096-byte bound is always stricter
+/// than the `u16` client-count encoding.
+pub const MAX_DH_CLIENTS: usize = 99;
 
 /// Salt length in bytes.
 const SALT_LEN: usize = 32;
@@ -191,6 +213,93 @@ impl PskAuthorization {
 
     /// Borrow the ordered key slice.
     pub fn as_slice(&self) -> &[PskKey] {
+        &self.0
+    }
+}
+
+/// One 32-byte DH base private key.
+///
+/// Secret material: never `Debug`- or display-formattable and zeroized on
+/// drop. The corresponding public key, derived via X25519, is always the
+/// first logical authorized client; the private bytes themselves never
+/// appear on the wire and are dropped after derivation.
+#[derive(Clone, PartialEq, Eq)]
+pub struct DhPrivateKey(Zeroizing<[u8; 32]>);
+
+impl DhPrivateKey {
+    /// Wrap exactly 32 private-key bytes.
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(Zeroizing::new(bytes))
+    }
+
+    /// Return the private bytes for one-shot derivation.
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// Derive the X25519 public key for the base private key.
+    pub fn public(&self) -> [u8; 32] {
+        let secret = x25519_dalek::StaticSecret::from(*self.as_bytes());
+        x25519_dalek::PublicKey::from(&secret).to_bytes()
+    }
+}
+
+/// One 32-byte DH client public key.
+///
+/// Public key material: never `Debug`- or display-formattable so authorized
+/// client sets never become response-facing via this primitive. Carries the
+/// base-derived public first followed by indexed per-user publics in
+/// configured order (duplicates preserved exactly as configured).
+#[derive(Clone, PartialEq, Eq)]
+pub struct DhPublicKey([u8; 32]);
+
+impl DhPublicKey {
+    /// Wrap exactly 32 public-key bytes.
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    /// Return the public bytes for one-shot derivation.
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+/// Generation-local bounded DH authorization sequence.
+///
+/// Carries the base-derived public first followed by indexed per-user
+/// publics in configured order (duplicates preserved exactly as configured).
+/// Never `Debug`- or display-formattable. Empty sequences are rejected at
+/// construction; the exact serialized size is re-checked before any
+/// per-client X25519 work.
+#[derive(Clone, PartialEq, Eq)]
+pub struct DhAuthorization(Vec<DhPublicKey>);
+
+impl DhAuthorization {
+    /// Wrap a non-empty bounded public-key sequence.
+    ///
+    /// Fails closed on empty input or on more than [`MAX_DH_CLIENTS`]
+    /// entries (absolute pre-allocation ceiling; the exact 4096-byte size
+    /// is re-checked with the real inner payload before crypto).
+    pub fn from_keys(keys: Vec<DhPublicKey>) -> Result<Self, Error> {
+        if keys.is_empty() || keys.len() > MAX_DH_CLIENTS {
+            return Err(Error::InvalidData);
+        }
+        Ok(Self(keys))
+    }
+
+    /// Number of authorized keys.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Whether no key is carried (never true for constructed values).
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Borrow the ordered key slice.
+    pub fn as_slice(&self) -> &[DhPublicKey] {
         &self.0
     }
 }
@@ -339,6 +448,73 @@ fn derive_psk_client(
     (key, iv, id)
 }
 
+/// Derive one DH client record schedule.
+///
+/// Input is `shared || cpk || subcredential || published_BE` with
+/// `ELS2_XCA` salted by the ephemeral public key; output is split into the
+/// ChaCha key/IV for the encrypted cookie and the 8-byte client ID.
+/// Temporary input and output material is zeroized.
+fn derive_dh_client(
+    ephemeral_public: &[u8; 32],
+    shared: &[u8; 32],
+    client_public: &[u8; 32],
+    subcredential: &[u8; 32],
+    published: u32,
+) -> ([u8; 32], [u8; 12], [u8; 8]) {
+    let mut input = Zeroizing::new([0u8; 100]);
+    input[..32].copy_from_slice(shared);
+    input[32..64].copy_from_slice(client_public);
+    input[64..96].copy_from_slice(subcredential);
+    input[96..100].copy_from_slice(&published.to_be_bytes());
+    let mut okm = Zeroizing::new(hkdf_sha256_52(ephemeral_public, &input[..], XCA_INFO));
+    let mut key = [0u8; 32];
+    let mut iv = [0u8; 12];
+    let mut id = [0u8; 8];
+    key.copy_from_slice(&okm[..32]);
+    iv.copy_from_slice(&okm[32..44]);
+    id.copy_from_slice(&okm[44..52]);
+    okm.zeroize();
+    (key, iv, id)
+}
+
+/// Perform one server-side X25519 exchange with explicit all-zero rejection.
+///
+/// Uses the existing [`X25519SecretKey::diffie_hellman`] seam. An all-zero
+/// shared secret (including low-order peer contributions) fails closed at
+/// the ELS2 boundary before any key derivation.
+fn dh_shared_or_reject(
+    ephemeral: &X25519StaticKey,
+    client_public: &[u8; 32],
+) -> Result<[u8; 32], Error> {
+    let peer = X25519PublicWrap::from_bytes(*client_public);
+    let shared: [u8; 32] = X25519SecretKey::diffie_hellman(ephemeral, &peer);
+    if shared == [0u8; 32] {
+        return Err(Error::InvalidData);
+    }
+    Ok(shared)
+}
+
+/// Derive the client-side shared secret with explicit all-zero rejection.
+///
+/// Derives the client public from the candidate private key, exchanges
+/// against the transmitted ephemeral public, and fails closed on an
+/// all-zero shared secret before any key derivation. Returns the shared
+/// secret and the derived client public (the KDF binds the public).
+fn dh_shared_client_or_reject(
+    client_private: &[u8; 32],
+    ephemeral_public: &[u8; 32],
+) -> Result<([u8; 32], [u8; 32]), Error> {
+    let secret = x25519_dalek::StaticSecret::from(*client_private);
+    let derived = x25519_dalek::PublicKey::from(&secret).to_bytes();
+    let holder = X25519StaticKey::X25519(secret);
+    let peer = X25519PublicWrap::from_bytes(*ephemeral_public);
+    let shared: [u8; 32] = X25519SecretKey::diffie_hellman(&holder, &peer);
+    if shared == [0u8; 32] {
+        return Err(Error::InvalidData);
+    }
+    Ok((shared, derived))
+}
+
 /// Derive the auth-cookie-bound inner-layer schedule.
 ///
 /// Input is `authCookie || subcredential || published_BE` with `ELS2_L2K`.
@@ -370,6 +546,24 @@ fn derive_layer_keys_with_cookie(
 pub fn psk_outer_len(inner_len: usize, num_clients: usize) -> Option<usize> {
     num_clients
         .checked_mul(PSK_CLIENT_RECORD_LEN)?
+        .checked_add(inner_len)?
+        .checked_add(SALT_LEN)?
+        .checked_add(1)?
+        .checked_add(SALT_LEN)?
+        .checked_add(2)?
+        .checked_add(SALT_LEN)?
+        .checked_add(1)
+}
+
+/// Checked complete DH outer-ciphertext length.
+///
+/// Returns `Some(total)` for `32 + 1 + 32 + 2 + 40*N + 32 + 1 + inner_len`
+/// with fully checked arithmetic, or `None` on overflow. The framing is
+/// identical to PSK with the 32-byte ephemeral public key in place of the
+/// 32-byte auth salt.
+pub fn dh_outer_len(inner_len: usize, num_clients: usize) -> Option<usize> {
+    num_clients
+        .checked_mul(DH_CLIENT_RECORD_LEN)?
         .checked_add(inner_len)?
         .checked_add(SALT_LEN)?
         .checked_add(1)?
@@ -778,6 +972,252 @@ pub fn decrypt_psk(
             break;
         }
         offset += PSK_CLIENT_RECORD_LEN;
+    }
+    let encrypted_cookie = encrypted_cookie.ok_or(Error::InvalidData)?;
+    let mut auth_cookie = Zeroizing::new(encrypted_cookie);
+    chacha_apply(&ckey, &civ, &mut auth_cookie[..]);
+
+    let mut inner_salt = [0u8; SALT_LEN];
+    inner_salt.copy_from_slice(&inner_ct[..SALT_LEN]);
+    let (l2_key, l2_iv) =
+        derive_layer_keys_with_cookie(&inner_salt, &auth_cookie, subcredential, published);
+    let mut inner_plain = inner_ct[SALT_LEN..].to_vec();
+    chacha_apply(&l2_key, &l2_iv, &mut inner_plain);
+    if inner_plain.is_empty() || inner_plain[0] != INNER_LEASESET2_TYPE {
+        inner_plain.zeroize();
+        return Err(Error::InvalidData);
+    }
+    Ok(inner_plain[1..].to_vec())
+}
+
+/// Encrypt the DH client-authorization layers with explicit ephemeral/cookie.
+///
+/// Plaintext layout follows the pinned reference: `outerSalt ||
+/// ChaCha(L1, 0x01 || ephemeralPub || count_BE || records || innerCT)`
+/// where `innerCT = innerSalt || ChaCha(L2cookie, 0x03 || inner_ls2)` and
+/// each record is `clientID[8] || ChaCha(clientKey, clientIV, authCookie)`
+/// with `okm = HKDF-SHA256(ephemeralPub, shared || cpk || subcredential ||
+/// published_BE, "ELS2_XCA", 52)`. Records are emitted in the slice order
+/// given; callers randomize that order for publication when more than one
+/// key exists. The complete size is checked with checked arithmetic against
+/// [`MAX_ENCRYPTED_DATA_LEN`] before any per-client X25519 work; oversize
+/// input fails closed without dropping entries. An all-zero shared secret
+/// for any client fails the whole object closed at the ELS2 boundary.
+/// Temporary key material is zeroized.
+pub fn encrypt_dh_with_ephemeral(
+    subcredential: &[u8; 32],
+    published: u32,
+    inner_ls2_bytes: &[u8],
+    inner_salt: &[u8; 32],
+    outer_salt: &[u8; 32],
+    ephemeral_private: &[u8; 32],
+    auth_cookie: &[u8; 32],
+    clients: &[DhPublicKey],
+) -> Result<Vec<u8>, Error> {
+    if clients.is_empty() || clients.len() > MAX_DH_CLIENTS {
+        return Err(Error::InvalidData);
+    }
+    if clients.len() > u16::MAX as usize {
+        return Err(Error::InvalidData);
+    }
+    if inner_ls2_bytes.is_empty() || inner_ls2_bytes.len() > MAX_INNER_PAYLOAD_LEN {
+        return Err(Error::InvalidData);
+    }
+    let total = dh_outer_len(inner_ls2_bytes.len(), clients.len()).ok_or(Error::InvalidData)?;
+    if total > MAX_ENCRYPTED_DATA_LEN {
+        return Err(Error::InvalidData);
+    }
+
+    let ephemeral_secret = x25519_dalek::StaticSecret::from(*ephemeral_private);
+    let ephemeral_public = x25519_dalek::PublicKey::from(&ephemeral_secret).to_bytes();
+    let ephemeral_key = X25519StaticKey::X25519(ephemeral_secret);
+
+    let (l2_key, l2_iv) =
+        derive_layer_keys_with_cookie(inner_salt, auth_cookie, subcredential, published);
+    let mut inner_plain = Vec::with_capacity(1 + inner_ls2_bytes.len());
+    inner_plain.push(INNER_LEASESET2_TYPE);
+    inner_plain.extend_from_slice(inner_ls2_bytes);
+    chacha_apply(&l2_key, &l2_iv, &mut inner_plain);
+    let mut inner_ct = Vec::with_capacity(SALT_LEN + inner_plain.len());
+    inner_ct.extend_from_slice(inner_salt);
+    inner_ct.extend_from_slice(&inner_plain);
+    inner_plain.zeroize();
+
+    let mut records = Vec::with_capacity(clients.len() * DH_CLIENT_RECORD_LEN);
+    for client in clients {
+        let shared = dh_shared_or_reject(&ephemeral_key, client.as_bytes())?;
+        let mut shared = Zeroizing::new(shared);
+        let (ckey, civ, cid) = derive_dh_client(
+            &ephemeral_public,
+            &shared,
+            client.as_bytes(),
+            subcredential,
+            published,
+        );
+        shared.zeroize();
+        let mut encrypted = Zeroizing::new(*auth_cookie);
+        chacha_apply(&ckey, &civ, &mut encrypted[..]);
+        records.extend_from_slice(&cid);
+        records.extend_from_slice(&encrypted[..]);
+    }
+
+    let mut l1_plain = Vec::with_capacity(1 + SALT_LEN + 2 + records.len() + inner_ct.len());
+    l1_plain.push(DH_LAYER1_FLAGS);
+    l1_plain.extend_from_slice(&ephemeral_public);
+    l1_plain.extend_from_slice(&(clients.len() as u16).to_be_bytes());
+    l1_plain.extend_from_slice(&records);
+    l1_plain.extend_from_slice(&inner_ct);
+    records.zeroize();
+    inner_ct.zeroize();
+
+    let (l1_key, l1_iv) = derive_layer_keys(outer_salt, subcredential, published, L1_INFO);
+    chacha_apply(&l1_key, &l1_iv, &mut l1_plain);
+    let mut out = Vec::with_capacity(SALT_LEN + l1_plain.len());
+    out.extend_from_slice(outer_salt);
+    out.extend_from_slice(&l1_plain);
+    l1_plain.zeroize();
+
+    debug_assert_eq!(out.len(), total);
+    if out.len() != total || out.len() > MAX_ENCRYPTED_DATA_LEN {
+        out.zeroize();
+        return Err(Error::InvalidData);
+    }
+    Ok(out)
+}
+
+/// Encrypt the DH layers with a fresh ephemeral keypair and cookie.
+///
+/// Generates fresh inner/outer salts, a fresh ephemeral X25519 keypair via
+/// `StaticSecret::random_from_rng`, and a fresh auth cookie from the caller
+/// RNG. Record order is freshly randomized when more than one key exists;
+/// single-key output is deterministic given the salts/ephemeral/cookie.
+pub fn encrypt_dh(
+    subcredential: &[u8; 32],
+    published: u32,
+    inner_ls2_bytes: &[u8],
+    clients: &[DhPublicKey],
+    mut rng: impl RngCore + CryptoRng,
+) -> Result<Vec<u8>, Error> {
+    if clients.is_empty() || clients.len() > MAX_DH_CLIENTS {
+        return Err(Error::InvalidData);
+    }
+    if inner_ls2_bytes.is_empty() || inner_ls2_bytes.len() > MAX_INNER_PAYLOAD_LEN {
+        return Err(Error::InvalidData);
+    }
+    let total = dh_outer_len(inner_ls2_bytes.len(), clients.len()).ok_or(Error::InvalidData)?;
+    if total > MAX_ENCRYPTED_DATA_LEN {
+        return Err(Error::InvalidData);
+    }
+
+    let mut inner_salt = [0u8; SALT_LEN];
+    let mut outer_salt = [0u8; SALT_LEN];
+    let mut auth_cookie = Zeroizing::new([0u8; 32]);
+    rng.fill_bytes(&mut inner_salt);
+    rng.fill_bytes(&mut outer_salt);
+    rng.fill_bytes(&mut auth_cookie[..]);
+    let ephemeral_secret = x25519_dalek::StaticSecret::random_from_rng(&mut rng);
+    let mut ephemeral_private = Zeroizing::new(ephemeral_secret.to_bytes());
+
+    let mut order: Vec<usize> = (0..clients.len()).collect();
+    for i in (1..order.len()).rev() {
+        let j = (rng.next_u32() as usize) % (i + 1);
+        order.swap(i, j);
+    }
+    let shuffled: Vec<DhPublicKey> = order.iter().map(|&i| clients[i].clone()).collect();
+    let out = encrypt_dh_with_ephemeral(
+        subcredential,
+        published,
+        inner_ls2_bytes,
+        &inner_salt,
+        &outer_salt,
+        &ephemeral_private,
+        &auth_cookie,
+        &shuffled,
+    );
+    inner_salt.zeroize();
+    outer_salt.zeroize();
+    ephemeral_private.zeroize();
+    out
+}
+
+/// Decrypt a DH outer object with one candidate client private key.
+///
+/// Derives the candidate public from the private key, exchanges against the
+/// transmitted ephemeral public with explicit all-zero rejection, selects
+/// the client record matching the derived client ID, recovers the auth
+/// cookie, re-derives the cookie-bound inner layer, and returns the inner
+/// LeaseSet2 bytes. Any flags/type/salt/count/record/cookie mismatch,
+/// missing client match, all-zero shared secret, or oversize framing fails
+/// closed without fallback.
+pub fn decrypt_dh(
+    subcredential: &[u8; 32],
+    published: u32,
+    outer_ciphertext: &[u8],
+    client_private: &[u8; 32],
+) -> Result<Vec<u8>, Error> {
+    if outer_ciphertext.len() < SALT_LEN + 1 + SALT_LEN + 2 + SALT_LEN + 1
+        || outer_ciphertext.len() > MAX_ENCRYPTED_DATA_LEN
+    {
+        return Err(Error::InvalidData);
+    }
+    let mut outer_salt = [0u8; SALT_LEN];
+    outer_salt.copy_from_slice(&outer_ciphertext[..SALT_LEN]);
+    let (l1_key, l1_iv) = derive_layer_keys(&outer_salt, subcredential, published, L1_INFO);
+    let mut l1_plain = outer_ciphertext[SALT_LEN..].to_vec();
+    chacha_apply(&l1_key, &l1_iv, &mut l1_plain);
+
+    if l1_plain.is_empty() || l1_plain[0] != DH_LAYER1_FLAGS {
+        l1_plain.zeroize();
+        return Err(Error::InvalidData);
+    }
+    if l1_plain.len() < 1 + SALT_LEN + 2 {
+        l1_plain.zeroize();
+        return Err(Error::InvalidData);
+    }
+    let mut ephemeral_public = [0u8; SALT_LEN];
+    ephemeral_public.copy_from_slice(&l1_plain[1..1 + SALT_LEN]);
+    let count = u16::from_be_bytes([l1_plain[1 + SALT_LEN], l1_plain[1 + SALT_LEN + 1]]) as usize;
+    if count == 0 || count > MAX_DH_CLIENTS {
+        l1_plain.zeroize();
+        return Err(Error::InvalidData);
+    }
+    let header_len = 1 + SALT_LEN + 2;
+    let records_len = count.checked_mul(DH_CLIENT_RECORD_LEN).ok_or(Error::InvalidData)?;
+    if l1_plain.len()
+        < header_len.checked_add(records_len).ok_or(Error::InvalidData)? + SALT_LEN + 1
+    {
+        l1_plain.zeroize();
+        return Err(Error::InvalidData);
+    }
+    let records = l1_plain[header_len..header_len + records_len].to_vec();
+    let inner_ct = l1_plain[header_len + records_len..].to_vec();
+    l1_plain.zeroize();
+
+    if inner_ct.len() < SALT_LEN + 1 || inner_ct.len() > MAX_OUTER_CIPHERTEXT_LEN {
+        return Err(Error::InvalidData);
+    }
+
+    let (mut shared, derived_public) =
+        dh_shared_client_or_reject(client_private, &ephemeral_public)?;
+    let (ckey, civ, cid) = derive_dh_client(
+        &ephemeral_public,
+        &shared,
+        &derived_public,
+        subcredential,
+        published,
+    );
+    shared.zeroize();
+    let mut encrypted_cookie: Option<[u8; 32]> = None;
+    let mut offset = 0;
+    while offset + DH_CLIENT_RECORD_LEN <= records.len() {
+        let record = &records[offset..offset + DH_CLIENT_RECORD_LEN];
+        if record[..8] == cid {
+            let mut cookie = [0u8; 32];
+            cookie.copy_from_slice(&record[8..40]);
+            encrypted_cookie = Some(cookie);
+            break;
+        }
+        offset += DH_CLIENT_RECORD_LEN;
     }
     let encrypted_cookie = encrypted_cookie.ok_or(Error::InvalidData)?;
     let mut auth_cookie = Zeroizing::new(encrypted_cookie);
@@ -1761,5 +2201,368 @@ mod tests {
         other_sub[0] ^= 0xff;
         assert_ne!(sub, other_sub);
         assert!(decrypt_psk(&other_sub, PUBLISHED, &outer, &PSK_A).is_err());
+    }
+
+    const DH_BASE_PRIV: [u8; 32] = [0xA5; 32];
+    const DH_CLIENT_PRIV: [u8; 32] = [0xB6; 32];
+    const DH_EPHEMERAL_PRIV: [u8; 32] = [0xE7; 32];
+
+    fn dh_pub_of(priv_bytes: &[u8; 32]) -> [u8; 32] {
+        x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(*priv_bytes)).to_bytes()
+    }
+
+    fn dh_shared_direct(priv_bytes: &[u8; 32], pub_bytes: &[u8; 32]) -> [u8; 32] {
+        x25519_dalek::StaticSecret::from(*priv_bytes)
+            .diffie_hellman(&x25519_dalek::PublicKey::from(*pub_bytes))
+            .to_bytes()
+    }
+
+    #[test]
+    fn dh_types_enforce_bounded_nonempty_sequences() {
+        assert!(DhAuthorization::from_keys(Vec::new()).is_err());
+        let base_pub = dh_pub_of(&DH_BASE_PRIV);
+        let one = DhAuthorization::from_keys(vec![DhPublicKey::from_bytes(base_pub)]).unwrap();
+        assert_eq!(one.len(), 1);
+        assert!(!one.is_empty());
+        assert_eq!(one.as_slice()[0].as_bytes(), &base_pub);
+
+        let too_many: Vec<DhPublicKey> =
+            (0..MAX_DH_CLIENTS + 1).map(|_| DhPublicKey::from_bytes(base_pub)).collect();
+        assert!(DhAuthorization::from_keys(too_many).is_err());
+        let max: Vec<DhPublicKey> =
+            (0..MAX_DH_CLIENTS).map(|_| DhPublicKey::from_bytes(base_pub)).collect();
+        assert!(DhAuthorization::from_keys(max).is_ok());
+
+        let priv_wrap = DhPrivateKey::from_bytes(DH_BASE_PRIV);
+        assert_eq!(priv_wrap.as_bytes(), &DH_BASE_PRIV);
+        assert_eq!(priv_wrap.public(), base_pub);
+    }
+
+    #[test]
+    fn dh_outer_len_is_checked_and_bounded() {
+        assert_eq!(
+            dh_outer_len(16, 1),
+            Some(32 + 1 + 32 + 2 + 40 + 32 + 1 + 16)
+        );
+        assert_eq!(dh_outer_len(16, 1), psk_outer_len(16, 1));
+        assert_eq!(MAX_DH_CLIENTS, 99);
+        assert_eq!(DH_CLIENT_RECORD_LEN, 40);
+        assert_eq!(DH_LAYER1_FLAGS, 0x01);
+        assert!(dh_outer_len(16, 100).is_some_and(|len| len > MAX_ENCRYPTED_DATA_LEN));
+        assert!(dh_outer_len(usize::MAX, 1).is_none());
+        assert!(dh_outer_len(16, usize::MAX).is_none());
+        let min_frame = dh_outer_len(0, 0).unwrap();
+        assert_eq!(min_frame, 100);
+        let max_fit = dh_outer_len(36, 99).unwrap();
+        assert!(max_fit <= MAX_ENCRYPTED_DATA_LEN);
+        assert!(dh_outer_len(37, 99).unwrap() > MAX_ENCRYPTED_DATA_LEN);
+    }
+
+    #[test]
+    fn dh_kat_single_client_matches_independent_derivation() {
+        let (sub, _) = fixture_subcredential();
+        let base_pub = dh_pub_of(&DH_BASE_PRIV);
+        let ephemeral_pub = dh_pub_of(&DH_EPHEMERAL_PRIV);
+        let clients = [DhPublicKey::from_bytes(base_pub)];
+
+        let shared = dh_shared_direct(&DH_EPHEMERAL_PRIV, &base_pub);
+        assert_ne!(shared, [0u8; 32]);
+        let mut input = [0u8; 100];
+        input[..32].copy_from_slice(&shared);
+        input[32..64].copy_from_slice(&base_pub);
+        input[64..96].copy_from_slice(&sub);
+        input[96..100].copy_from_slice(&PUBLISHED.to_be_bytes());
+        let expected = independent_hkdf_52(&ephemeral_pub, &input, b"ELS2_XCA");
+        let (key, iv, id) = derive_dh_client(&ephemeral_pub, &shared, &base_pub, &sub, PUBLISHED);
+        assert_eq!(&key[..], &expected[..32]);
+        assert_eq!(&iv[..], &expected[32..44]);
+        assert_eq!(&id[..], &expected[44..52]);
+
+        let outer = encrypt_dh_with_ephemeral(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &DH_EPHEMERAL_PRIV,
+            &AUTH_COOKIE,
+            &clients,
+        )
+        .unwrap();
+        let total = dh_outer_len(INNER.len(), 1).unwrap();
+        assert_eq!(outer.len(), total);
+        assert!(outer.len() <= MAX_ENCRYPTED_DATA_LEN);
+        assert_eq!(&outer[..32], &OUTER_SALT);
+
+        let (l1_key, l1_iv) = derive_layer_keys(&OUTER_SALT, &sub, PUBLISHED, L1_INFO);
+        let mut plain = outer[SALT_LEN..].to_vec();
+        chacha_apply(&l1_key, &l1_iv, &mut plain);
+        assert_eq!(plain[0], DH_LAYER1_FLAGS);
+        assert_eq!(&plain[1..33], &ephemeral_pub);
+        assert_eq!(&plain[33..35], &1u16.to_be_bytes());
+        assert_eq!(&plain[35..43], &id);
+        let mut cookie = AUTH_COOKIE;
+        chacha_apply(&key, &iv, &mut cookie);
+        assert_eq!(&plain[43..75], &cookie);
+
+        let inner_ct = &plain[75..];
+        assert_eq!(&inner_ct[..32], &INNER_SALT);
+        let (l2_key, l2_iv) =
+            derive_layer_keys_with_cookie(&INNER_SALT, &AUTH_COOKIE, &sub, PUBLISHED);
+        let mut inner_plain = inner_ct[32..].to_vec();
+        chacha_apply(&l2_key, &l2_iv, &mut inner_plain);
+        assert_eq!(inner_plain[0], INNER_LEASESET2_TYPE);
+        assert_eq!(&inner_plain[1..], &INNER);
+
+        let recovered = decrypt_dh(&sub, PUBLISHED, &outer, &DH_BASE_PRIV).unwrap();
+        assert_eq!(recovered, INNER);
+
+        let (plain_l2_key, _) = derive_layer_keys(&INNER_SALT, &sub, PUBLISHED, L2_INFO);
+        assert_ne!(l2_key, plain_l2_key);
+        let (outer_l1_key, _) = derive_layer_keys(&OUTER_SALT, &sub, PUBLISHED, L1_INFO);
+        assert_eq!(l1_key, outer_l1_key);
+    }
+
+    #[test]
+    fn dh_multi_client_order_independent_and_randomized() {
+        let (sub, _) = fixture_subcredential();
+        let pub_a = dh_pub_of(&DH_BASE_PRIV);
+        let pub_b = dh_pub_of(&DH_CLIENT_PRIV);
+        let forward = [
+            DhPublicKey::from_bytes(pub_a),
+            DhPublicKey::from_bytes(pub_b),
+        ];
+        let reverse = [
+            DhPublicKey::from_bytes(pub_b),
+            DhPublicKey::from_bytes(pub_a),
+        ];
+
+        let fwd = encrypt_dh_with_ephemeral(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &DH_EPHEMERAL_PRIV,
+            &AUTH_COOKIE,
+            &forward,
+        )
+        .unwrap();
+        let rev = encrypt_dh_with_ephemeral(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &DH_EPHEMERAL_PRIV,
+            &AUTH_COOKIE,
+            &reverse,
+        )
+        .unwrap();
+        assert_ne!(fwd, rev);
+        for priv_key in [&DH_BASE_PRIV, &DH_CLIENT_PRIV] {
+            assert_eq!(decrypt_dh(&sub, PUBLISHED, &fwd, priv_key).unwrap(), INNER);
+            assert_eq!(decrypt_dh(&sub, PUBLISHED, &rev, priv_key).unwrap(), INNER);
+        }
+
+        use crate::runtime::{mock::MockRuntime, Runtime};
+        let prod_a = encrypt_dh(&sub, PUBLISHED, &INNER, &forward, MockRuntime::rng()).unwrap();
+        let prod_b = encrypt_dh(&sub, PUBLISHED, &INNER, &forward, MockRuntime::rng()).unwrap();
+        assert!(prod_a.len() <= MAX_ENCRYPTED_DATA_LEN);
+        for priv_key in [&DH_BASE_PRIV, &DH_CLIENT_PRIV] {
+            assert_eq!(
+                decrypt_dh(&sub, PUBLISHED, &prod_a, priv_key).unwrap(),
+                INNER
+            );
+            assert_eq!(
+                decrypt_dh(&sub, PUBLISHED, &prod_b, priv_key).unwrap(),
+                INNER
+            );
+        }
+    }
+
+    #[test]
+    fn dh_duplicate_entries_preserved_as_separate_records() {
+        let (sub, _) = fixture_subcredential();
+        let base_pub = dh_pub_of(&DH_BASE_PRIV);
+        let dup = [
+            DhPublicKey::from_bytes(base_pub),
+            DhPublicKey::from_bytes(base_pub),
+        ];
+        let outer = encrypt_dh_with_ephemeral(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &DH_EPHEMERAL_PRIV,
+            &AUTH_COOKIE,
+            &dup,
+        )
+        .unwrap();
+        assert_eq!(outer.len(), dh_outer_len(INNER.len(), 2).unwrap());
+
+        let (l1_key, l1_iv) = derive_layer_keys(&OUTER_SALT, &sub, PUBLISHED, L1_INFO);
+        let mut plain = outer[SALT_LEN..].to_vec();
+        chacha_apply(&l1_key, &l1_iv, &mut plain);
+        assert_eq!(&plain[33..35], &2u16.to_be_bytes());
+        assert_eq!(&plain[35..75], &plain[75..115]);
+        assert_eq!(
+            decrypt_dh(&sub, PUBLISHED, &outer, &DH_BASE_PRIV).unwrap(),
+            INNER
+        );
+
+        let max_inner = MAX_ENCRYPTED_DATA_LEN - 100 - 40 * MAX_DH_CLIENTS;
+        let dup_max: Vec<DhPublicKey> =
+            (0..MAX_DH_CLIENTS).map(|_| DhPublicKey::from_bytes(base_pub)).collect();
+        let fitting = vec![0u8; max_inner];
+        assert!(encrypt_dh_with_ephemeral(
+            &sub,
+            PUBLISHED,
+            &fitting,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &DH_EPHEMERAL_PRIV,
+            &AUTH_COOKIE,
+            &dup_max,
+        )
+        .is_ok());
+        let too_big = vec![0u8; max_inner + 1];
+        assert!(encrypt_dh_with_ephemeral(
+            &sub,
+            PUBLISHED,
+            &too_big,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &DH_EPHEMERAL_PRIV,
+            &AUTH_COOKIE,
+            &dup_max,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn dh_negative_paths_fail_closed_without_fallback() {
+        let (sub, _) = fixture_subcredential();
+        let base_pub = dh_pub_of(&DH_BASE_PRIV);
+        let clients = [DhPublicKey::from_bytes(base_pub)];
+        let outer = encrypt_dh_with_ephemeral(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &DH_EPHEMERAL_PRIV,
+            &AUTH_COOKIE,
+            &clients,
+        )
+        .unwrap();
+
+        assert!(encrypt_dh_with_ephemeral(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &DH_EPHEMERAL_PRIV,
+            &AUTH_COOKIE,
+            &[],
+        )
+        .is_err());
+        assert!(decrypt_dh(&sub, PUBLISHED, &outer, &[0x55; 32]).is_err());
+        assert!(decrypt_dh(&sub, PUBLISHED + 1, &outer, &DH_BASE_PRIV).is_err());
+        assert!(decrypt_no_auth(&sub, PUBLISHED, &outer).is_err());
+        let psks = [PskKey::from_bytes(PSK_A)];
+        let psk_outer = encrypt_psk_with_salts(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &AUTH_SALT,
+            &AUTH_COOKIE,
+            &psks,
+        )
+        .unwrap();
+        assert!(decrypt_dh(&sub, PUBLISHED, &psk_outer, &DH_BASE_PRIV).is_err());
+        assert!(decrypt_psk(&sub, PUBLISHED, &outer, &PSK_A).is_err());
+        let no_auth =
+            encrypt_no_auth_with_salts(&sub, PUBLISHED, &INNER, &INNER_SALT, &OUTER_SALT).unwrap();
+        assert!(decrypt_dh(&sub, PUBLISHED, &no_auth, &DH_BASE_PRIV).is_err());
+
+        let zero_pub = [0u8; 32];
+        let _library_accepts = x25519_dalek::PublicKey::from(zero_pub);
+        let zero_clients = [DhPublicKey::from_bytes(zero_pub)];
+        assert!(encrypt_dh_with_ephemeral(
+            &sub,
+            PUBLISHED,
+            &INNER,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &DH_EPHEMERAL_PRIV,
+            &AUTH_COOKIE,
+            &zero_clients,
+        )
+        .is_err());
+
+        let mut tampered = outer.clone();
+        tampered[SALT_LEN] ^= 0xff;
+        assert!(decrypt_dh(&sub, PUBLISHED, &tampered, &DH_BASE_PRIV).is_err());
+
+        let (l1_key, l1_iv) = derive_layer_keys(&OUTER_SALT, &sub, PUBLISHED, L1_INFO);
+        let mut plain = outer[SALT_LEN..].to_vec();
+        chacha_apply(&l1_key, &l1_iv, &mut plain);
+        let mut bad = plain.clone();
+        bad[35] ^= 0x01;
+        let mut bad_plain = bad.clone();
+        chacha_apply(&l1_key, &l1_iv, &mut bad_plain);
+        let mut bad_outer = OUTER_SALT.to_vec();
+        bad_outer.extend_from_slice(&bad_plain);
+        assert!(decrypt_dh(&sub, PUBLISHED, &bad_outer, &DH_BASE_PRIV).is_err());
+
+        let mut bad_cookie = plain.clone();
+        bad_cookie[43] ^= 0x01;
+        let mut bad_cookie_ct = bad_cookie.clone();
+        chacha_apply(&l1_key, &l1_iv, &mut bad_cookie_ct);
+        let mut bad_cookie_outer = OUTER_SALT.to_vec();
+        bad_cookie_outer.extend_from_slice(&bad_cookie_ct);
+        assert!(decrypt_dh(&sub, PUBLISHED, &bad_cookie_outer, &DH_BASE_PRIV).is_err());
+
+        let mut bad_eph = plain.clone();
+        bad_eph[1] ^= 0x01;
+        let mut bad_eph_ct = bad_eph.clone();
+        chacha_apply(&l1_key, &l1_iv, &mut bad_eph_ct);
+        let mut bad_eph_outer = OUTER_SALT.to_vec();
+        bad_eph_outer.extend_from_slice(&bad_eph_ct);
+        assert!(decrypt_dh(&sub, PUBLISHED, &bad_eph_outer, &DH_BASE_PRIV).is_err());
+
+        let mut zero_eph = plain.clone();
+        zero_eph[1..33].copy_from_slice(&[0u8; 32]);
+        let mut zero_eph_ct = zero_eph.clone();
+        chacha_apply(&l1_key, &l1_iv, &mut zero_eph_ct);
+        let mut zero_eph_outer = OUTER_SALT.to_vec();
+        zero_eph_outer.extend_from_slice(&zero_eph_ct);
+        assert!(decrypt_dh(&sub, PUBLISHED, &zero_eph_outer, &DH_BASE_PRIV).is_err());
+
+        let big_inner = vec![0u8; MAX_ENCRYPTED_DATA_LEN];
+        assert!(encrypt_dh_with_ephemeral(
+            &sub,
+            PUBLISHED,
+            &big_inner,
+            &INNER_SALT,
+            &OUTER_SALT,
+            &DH_EPHEMERAL_PRIV,
+            &AUTH_COOKIE,
+            &clients,
+        )
+        .is_err());
+        let mut oversize = outer.clone();
+        oversize.extend_from_slice(&[0u8; MAX_ENCRYPTED_DATA_LEN]);
+        assert!(decrypt_dh(&sub, PUBLISHED, &oversize, &DH_BASE_PRIV).is_err());
+
+        let mut other_sub = sub;
+        other_sub[0] ^= 0xff;
+        assert_ne!(sub, other_sub);
+        assert!(decrypt_dh(&other_sub, PUBLISHED, &outer, &DH_BASE_PRIV).is_err());
     }
 }

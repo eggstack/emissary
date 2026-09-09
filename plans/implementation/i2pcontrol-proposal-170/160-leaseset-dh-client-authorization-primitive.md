@@ -1,6 +1,11 @@
 # M160 — Encrypted LeaseSet DH Client-Authorization Primitive
 
-Status: **registered / dependency-ready; M159 closed complete**
+Status: **closed as complete; M161 hard dependency satisfied**
+
+> Closed by `plans/closure/i2pcontrol-proposal-170/160-closure.md` with zero
+> Proposal promotions and the exact four-file production set below. M161's
+> hard dependency is satisfied; M161 remains deferred/unregistered pending
+> its own registration.
 
 Class: neutral modern Encrypted LeaseSet2 client-authorization infrastructure
 

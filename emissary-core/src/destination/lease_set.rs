@@ -86,7 +86,7 @@ const STORAGE_VERIFICATION_TOTAL_TIMEOUT: Duration = Duration::from_secs(15);
 /// Narrow generation-local publication configuration for modern type-5 mode.
 ///
 /// Carries the type-7 seed, unblinded public key, optional lookup secret,
-/// and optional PSK authorization from session construction into the
+/// and optional PSK/DH authorization from session construction into the
 /// publication owner. Secret material is never `Debug`-formattable.
 /// Ordinary mode uses `None` and retains exact prior behavior.
 #[derive(Clone)]
@@ -100,8 +100,11 @@ pub struct EncryptedPublicationConfig {
     /// Generation-local lookup secret (empty means unsecreted).
     lookup_secret: els2::LookupSecret,
 
-    /// Generation-local PSK authorization (`None` means no client auth).
+    /// Generation-local PSK authorization (`None` means no PSK auth).
     psk_auth: Option<els2::PskAuthorization>,
+
+    /// Generation-local DH authorization (`None` means no DH auth).
+    dh_auth: Option<els2::DhAuthorization>,
 }
 
 impl EncryptedPublicationConfig {
@@ -112,6 +115,7 @@ impl EncryptedPublicationConfig {
             unblinded_public_key,
             lookup_secret: els2::LookupSecret::empty(),
             psk_auth: None,
+            dh_auth: None,
         }
     }
 
@@ -131,6 +135,7 @@ impl EncryptedPublicationConfig {
             unblinded_public_key,
             lookup_secret,
             psk_auth: None,
+            dh_auth: None,
         }
     }
 
@@ -150,6 +155,7 @@ impl EncryptedPublicationConfig {
             unblinded_public_key,
             lookup_secret: els2::LookupSecret::empty(),
             psk_auth: Some(psk_auth),
+            dh_auth: None,
         }
     }
 
@@ -170,9 +176,51 @@ impl EncryptedPublicationConfig {
             unblinded_public_key,
             lookup_secret,
             psk_auth: Some(psk_auth),
+            dh_auth: None,
         }
     }
 
+    /// Create a new publication configuration with DH authorization.
+    ///
+    /// The authorization sequence is owned for exactly one destination
+    /// generation. Every regenerated outer object uses a fresh ephemeral
+    /// X25519 keypair, fresh auth cookie, and freshly randomized
+    /// client-record order when more than one key exists. Core keeps no
+    /// persistent copy.
+    pub fn with_dh(
+        seed_bytes: [u8; 32],
+        unblinded_public_key: [u8; 32],
+        dh_auth: els2::DhAuthorization,
+    ) -> Self {
+        Self {
+            seed: SigningSeed::from_bytes(seed_bytes),
+            unblinded_public_key,
+            lookup_secret: els2::LookupSecret::empty(),
+            psk_auth: None,
+            dh_auth: Some(dh_auth),
+        }
+    }
+
+    /// Create a new publication configuration with lookup secret and DH.
+    ///
+    /// The lookup secret feeds daily blinding exactly as in the
+    /// secret-only mode; the DH sequence authorizes clients exactly as in
+    /// the DH-only mode. Both are generation-local with no persistent
+    /// copy in core.
+    pub fn with_secret_and_dh(
+        seed_bytes: [u8; 32],
+        unblinded_public_key: [u8; 32],
+        lookup_secret: els2::LookupSecret,
+        dh_auth: els2::DhAuthorization,
+    ) -> Self {
+        Self {
+            seed: SigningSeed::from_bytes(seed_bytes),
+            unblinded_public_key,
+            lookup_secret,
+            psk_auth: None,
+            dh_auth: Some(dh_auth),
+        }
+    }
 }
 
 /// Derive the outer expiry offset for an inner header.
@@ -514,10 +562,12 @@ impl<R: Runtime> LeaseSetManager<R> {
         let expires_offset = outer_expires_offset(inner.header.published, inner.header.expires);
         let subcredential =
             els2::subcredential(&config.unblinded_public_key, blinded_public.as_bytes());
-        let outer_ciphertext = match config.psk_auth.as_ref() {
-            None => els2::encrypt_no_auth(&subcredential, published, &self.lease_set, R::rng())
-                .map_err(|_| ())?,
-            Some(psk_auth) => els2::encrypt_psk(
+        let outer_ciphertext = match (config.psk_auth.as_ref(), config.dh_auth.as_ref()) {
+            (None, None) => {
+                els2::encrypt_no_auth(&subcredential, published, &self.lease_set, R::rng())
+                    .map_err(|_| ())?
+            }
+            (Some(psk_auth), None) => els2::encrypt_psk(
                 &subcredential,
                 published,
                 &self.lease_set,
@@ -525,6 +575,15 @@ impl<R: Runtime> LeaseSetManager<R> {
                 R::rng(),
             )
             .map_err(|_| ())?,
+            (None, Some(dh_auth)) => els2::encrypt_dh(
+                &subcredential,
+                published,
+                &self.lease_set,
+                dh_auth.as_slice(),
+                R::rng(),
+            )
+            .map_err(|_| ())?,
+            (Some(_), Some(_)) => return Err(()),
         };
         let outer = EncryptedLeaseSet2::build(
             blinded_public.as_bytes(),
@@ -4268,6 +4327,216 @@ mod tests {
         let seed = [0x4Cu8; 32];
         let (mut manager, _, _) =
             encrypted_test_manager_with_psk(1_788_000_000, seed, &[[0xA1u8; 32]]);
+        assert!(manager.encrypted_outer.is_some());
+
+        manager.lease_set = Bytes::from(vec![0u8; 10]);
+        manager.register_lease_set(Bytes::from(vec![0u8; 10]));
+        assert!(manager.encrypted_outer.is_none());
+        assert!(matches!(manager.state, PublishState::Retry { .. }));
+
+        MockRuntime::set_time(None);
+    }
+
+    fn dh_pub_of(priv_bytes: &[u8; 32]) -> [u8; 32] {
+        els2::DhPrivateKey::from_bytes(*priv_bytes).public()
+    }
+
+    fn encrypted_test_manager_with_dh(
+        published_secs: u64,
+        seed_bytes: [u8; 32],
+        client_privs: &[[u8; 32]],
+    ) -> (LeaseSetManager<MockRuntime>, [u8; 32], DestinationId) {
+        use crate::crypto::els2;
+        let (inner, signing_key, destination_id) = encrypted_test_inner(published_secs, seed_bytes);
+        let unblinded: [u8; 32] = AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap();
+        let (tp_handle, _tm_rx, _tp_tx, _srx) = TunnelPoolHandle::create();
+        let (netdb_handle, _netdb_rx) = NetDbHandle::create();
+        let noise_ctx = NoiseContext::new(
+            crate::crypto::StaticPrivateKey::random(MockRuntime::rng()),
+            Bytes::from(RouterId::random().to_vec()),
+        );
+        let mut manager = LeaseSetManager::<MockRuntime>::new(
+            Vec::new(),
+            destination_id.clone(),
+            tp_handle.sender(),
+            1usize,
+            netdb_handle,
+            noise_ctx,
+            ProfileStorage::new(&[], &[], None),
+            false,
+            inner,
+        );
+        let pubs = client_privs
+            .iter()
+            .map(|b| els2::DhPublicKey::from_bytes(dh_pub_of(b)))
+            .collect();
+        let auth = els2::DhAuthorization::from_keys(pubs).unwrap();
+        manager.enable_encrypted_publication(EncryptedPublicationConfig::with_dh(
+            seed_bytes, unblinded, auth,
+        ));
+        let _ = signing_key;
+        (manager, unblinded, destination_id)
+    }
+
+    #[tokio::test]
+    async fn encrypted_dh_publication_decrypts_and_sets_bounded_outer() {
+        use crate::{
+            crypto::els2,
+            primitives::{EncryptedLeaseSet2, LeaseSet2},
+        };
+
+        MockRuntime::set_time(Some(Duration::from_secs(1_788_000_000)));
+        let seed = [0x59u8; 32];
+        let priv_a = [0xA5u8; 32];
+        let priv_b = [0xB6u8; 32];
+        let (manager, unblinded, _) =
+            encrypted_test_manager_with_dh(1_788_000_000, seed, &[priv_a, priv_b]);
+        assert!(manager.is_encrypted());
+        let outer_bytes = manager.encrypted_outer.clone().unwrap();
+        assert!(outer_bytes.len() > 44);
+        // `EncryptedLeaseSet2::parse` verifies the Red25519 outer signature.
+        let outer = EncryptedLeaseSet2::parse(&outer_bytes).unwrap();
+
+        let day = els2::day_string_from_epoch_secs(1_788_000_000);
+        let (_, blinded, _, storage) =
+            els2::blinded_day_material(&els2::SigningSeed::from_bytes(seed), &unblinded, &day)
+                .unwrap();
+        assert_eq!(manager.key.to_vec(), storage.to_vec());
+
+        let sub = els2::subcredential(&unblinded, blinded.as_bytes());
+        for priv_key in [&priv_a, &priv_b] {
+            let recovered =
+                els2::decrypt_dh(&sub, outer.published(), outer.outer_ciphertext(), &priv_key)
+                    .unwrap();
+            assert_eq!(recovered, manager.lease_set.to_vec());
+            assert!(LeaseSet2::parse::<MockRuntime>(&recovered).is_ok());
+        }
+        assert!(els2::decrypt_dh(
+            &sub,
+            outer.published(),
+            outer.outer_ciphertext(),
+            &[0x55; 32]
+        )
+        .is_err());
+        assert!(els2::decrypt_no_auth(&sub, outer.published(), outer.outer_ciphertext()).is_err());
+        assert!(els2::decrypt_psk(
+            &sub,
+            outer.published(),
+            outer.outer_ciphertext(),
+            &[0xA1; 32]
+        )
+        .is_err());
+        assert!(outer.outer_ciphertext().len() <= els2::MAX_ENCRYPTED_DATA_LEN);
+
+        MockRuntime::set_time(None);
+    }
+
+    #[tokio::test]
+    async fn encrypted_dh_rollover_uses_fresh_object_and_keeps_auth() {
+        use crate::crypto::els2;
+
+        let before = 1_788_000_000u64;
+        let after = els2::next_day_boundary_secs(before) + 10;
+        MockRuntime::set_time(Some(Duration::from_secs(before)));
+        let seed = [0x5Au8; 32];
+        let priv_a = [0xA5u8; 32];
+        let (mut manager, unblinded, _) = encrypted_test_manager_with_dh(before, seed, &[priv_a]);
+        let old_outer = manager.encrypted_outer.clone().unwrap();
+
+        MockRuntime::set_time(Some(Duration::from_secs(after)));
+        manager.handle_rollover();
+        let new_outer = manager.encrypted_outer.clone().unwrap();
+        assert_ne!(old_outer.to_vec(), new_outer.to_vec());
+
+        let day = els2::day_string_from_epoch_secs(after);
+        let (_, blinded, _, _) =
+            els2::blinded_day_material(&els2::SigningSeed::from_bytes(seed), &unblinded, &day)
+                .unwrap();
+        let sub = els2::subcredential(&unblinded, blinded.as_bytes());
+        let outer = crate::primitives::EncryptedLeaseSet2::parse(&new_outer).unwrap();
+        let recovered =
+            els2::decrypt_dh(&sub, outer.published(), outer.outer_ciphertext(), &priv_a).unwrap();
+        assert_eq!(recovered, manager.lease_set.to_vec());
+
+        manager.state = PublishState::VerifyStorage {
+            started: MockRuntime::now(),
+            timer: None,
+        };
+        let new_key = manager.key.clone();
+        manager.register_database_store(new_key.clone(), false);
+        assert!(matches!(manager.state, PublishState::VerifyStorage { .. }));
+        manager.register_database_store(new_key, true);
+        assert!(matches!(manager.state, PublishState::Inactive));
+
+        MockRuntime::set_time(None);
+    }
+
+    #[tokio::test]
+    async fn encrypted_dh_with_secret_uses_secret_derived_key() {
+        use crate::{
+            crypto::els2,
+            primitives::{EncryptedLeaseSet2, LeaseSet2},
+        };
+
+        MockRuntime::set_time(Some(Duration::from_secs(1_788_000_000)));
+        let seed = [0x5Bu8; 32];
+        let priv_a = [0xA5u8; 32];
+        let (inner, signing_key, destination_id) = encrypted_test_inner(1_788_000_000, seed);
+        let unblinded: [u8; 32] = AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap();
+        let (tp_handle, _tm_rx, _tp_tx, _srx) = TunnelPoolHandle::create();
+        let (netdb_handle, _netdb_rx) = NetDbHandle::create();
+        let noise_ctx = NoiseContext::new(
+            crate::crypto::StaticPrivateKey::random(MockRuntime::rng()),
+            Bytes::from(RouterId::random().to_vec()),
+        );
+        let mut manager = LeaseSetManager::<MockRuntime>::new(
+            Vec::new(),
+            destination_id,
+            tp_handle.sender(),
+            1usize,
+            netdb_handle,
+            noise_ctx,
+            ProfileStorage::new(&[], &[], None),
+            false,
+            inner,
+        );
+        let pubs = vec![els2::DhPublicKey::from_bytes(dh_pub_of(&priv_a))];
+        let auth = els2::DhAuthorization::from_keys(pubs).unwrap();
+        let secret = els2::LookupSecret::from_bytes(b"lookup-secret".to_vec()).unwrap();
+        manager.enable_encrypted_publication(EncryptedPublicationConfig::with_secret_and_dh(
+            seed,
+            unblinded,
+            secret.clone(),
+            auth,
+        ));
+        assert!(manager.encrypted_outer.is_some());
+
+        let day = els2::day_string_from_epoch_secs(1_788_000_000);
+        let (_, blinded, _, storage) = els2::blinded_day_material_with_secret(
+            &els2::SigningSeed::from_bytes(seed),
+            &unblinded,
+            &day,
+            &secret,
+        )
+        .unwrap();
+        assert_eq!(manager.key.to_vec(), storage.to_vec());
+        let sub = els2::subcredential(&unblinded, blinded.as_bytes());
+        let outer_bytes = manager.encrypted_outer.clone().unwrap();
+        let outer = EncryptedLeaseSet2::parse(&outer_bytes).unwrap();
+        let recovered =
+            els2::decrypt_dh(&sub, outer.published(), outer.outer_ciphertext(), &priv_a).unwrap();
+        assert_eq!(recovered, manager.lease_set.to_vec());
+        assert!(LeaseSet2::parse::<MockRuntime>(&recovered).is_ok());
+
+        MockRuntime::set_time(None);
+    }
+
+    #[tokio::test]
+    async fn encrypted_dh_build_failure_never_falls_back() {
+        MockRuntime::set_time(Some(Duration::from_secs(1_788_000_000)));
+        let seed = [0x5Cu8; 32];
+        let (mut manager, _, _) =
+            encrypted_test_manager_with_dh(1_788_000_000, seed, &[[0xA5u8; 32]]);
         assert!(manager.encrypted_outer.is_some());
 
         manager.lease_set = Bytes::from(vec![0u8; 10]);

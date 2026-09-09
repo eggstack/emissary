@@ -41,27 +41,29 @@ Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` whe
 - M146 `UseOutproxyPlugin` ×4: closed blocked;
 - M154/M147/M148 configurable Destination `SigType` ×10: closed blocked;
 - M155-M159 LeaseSet-security neutral lineage: closed, zero Proposal promotions;
-- **M160 is the sole registered/dependency-ready handoff**.
+- M160 DH/X25519 neutral lineage: closed, zero Proposal promotions;
+- **no registered successor; M161 deferred with satisfied hard dep, registration pending**.
 
 Roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-Registered plan: `plans/implementation/i2pcontrol-proposal-170/160-leaseset-dh-client-authorization-primitive.md`.
+Registered plan: `plans/implementation/i2pcontrol-proposal-170/160-leaseset-dh-client-authorization-primitive.md`
+(closed; closure: `plans/closure/i2pcontrol-proposal-170/160-closure.md`).
 
 Closed plan: `plans/implementation/i2pcontrol-proposal-170/159-leaseset-psk-client-authorization-primitive.md`
 (closure: `plans/closure/i2pcontrol-proposal-170/159-closure.md`).
 
-## M160 exact production budget
+## M160 exact production budget (realized)
 
-Only these production files may change:
+Only these production files changed:
 
 1. `emissary-core/src/crypto/els2.rs`
 2. `emissary-core/src/destination/lease_set.rs`
 3. `emissary-core/src/sam/parser.rs`
 4. `emissary-core/src/sam/session.rs`
 
-All four are existing exact M061 owners. No new M061 path waiver is created.
+All four are existing exact M061 owners. No new M061 path waiver was created.
 
-M160 authorizes no:
+M160 authorized no:
 
 - new source file;
 - dependency;
@@ -72,9 +74,10 @@ M160 authorizes no:
 - `destination/mod.rs`/`destination/session/mod.rs` change;
 - NetDB/I2NP/primitives/event/router/tunnel/transport change.
 
-If a fifth production path or dependency is required, stop before editing and amend M160/M061/M062.
+If a fifth production path or dependency was required, the milestone would have
+stopped before editing to amend M160/M061/M062. None was required.
 
-## M160 DH contract
+## M160 DH contract (realized)
 
 Standard SAM/I2CP inputs:
 
@@ -119,19 +122,19 @@ Extended B32 sets `auth_required=true`; `secret_required` continues to reflect t
 
 Core persists no DH material. Proposal-layer key generation/persistence/names/edit/restart/Get-redaction/five-family integration remain M162.
 
-M160 promotes **zero Proposal cells**; M095 must remain exactly `336/29/475`.
+M160 promoted **zero Proposal cells**; M095 remains exactly `336/29/475`.
 
 ## Remaining line — already corrected
 
 ```text
 M159 PSK authorization             [CLOSED]
-  -> M160 DH/X25519 authorization  [REGISTERED]
+  -> M160 DH/X25519 authorization  [CLOSED]
   -> M161 legacy AES/LS1 gate      [DEFERRED; HARD-DEPENDS M160; ZERO PRODUCTION]
   -> M162 Proposal field integration [DEFERRED]
   -> M152 final requalification    [DEFERRED]
 ```
 
-M160 reuses the exact four M159 owners with the existing `x25519-dalek` dependency sufficient and no manifest/lock change. M160 must use the same 4096-byte O(N) bound, preserve duplicates, and explicitly reject all-zero X25519 shared secrets.
+M160 reused the exact four M159 owners with the existing `x25519-dalek` dependency sufficient and no manifest/lock change. M160 must use the same 4096-byte O(N) bound, preserve duplicates, and explicitly reject all-zero X25519 shared secrets.
 
 M161 runs only after M160 and cannot implement legacy LS1 inside the gate. M162 is the first milestone allowed to promote LeaseSet fields and must implement typed/redacted I2PControl state plus transactional LeaseSet-security secret custody across all five server families.
 

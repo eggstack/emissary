@@ -32,8 +32,8 @@ use crate::{
     runtime::{AddressBook, Instant as InstantT, JoinSet, Runtime},
     sam::{
         parser::{
-            is_type5_requested, is_valid_type5_no_auth, is_valid_type5_psk, DestinationContext,
-            SamCommand, SessionKind,
+            is_type5_requested, is_valid_type5_dh, is_valid_type5_no_auth, is_valid_type5_psk,
+            DestinationContext, SamCommand, SessionKind,
         },
         pending::session::SamSessionContext,
         protocol::{
@@ -438,6 +438,7 @@ impl<R: Runtime> SamSession<R> {
                 signing_key,
                 lookup_secret,
                 psk_auth,
+                dh_auth,
             } = destination;
             let destination_id = destination.id();
 
@@ -495,8 +496,14 @@ impl<R: Runtime> SamSession<R> {
                     is_type5_requested(&options) && is_valid_type5_no_auth(&options);
                 let psk_valid = is_type5_requested(&options)
                     && is_valid_type5_psk(&options)
-                    && psk_auth.is_some();
-                let type5_public_key = match no_auth_valid || psk_valid {
+                    && psk_auth.is_some()
+                    && dh_auth.is_none();
+                let dh_valid = is_type5_requested(&options)
+                    && is_valid_type5_dh(&options)
+                    && dh_auth.is_some()
+                    && psk_auth.is_none();
+                let auth_valid = psk_valid || dh_valid;
+                let type5_public_key = match no_auth_valid || auth_valid {
                     false => None,
                     true => {
                         let public_bytes: [u8; 32] = AsRef::<[u8]>::as_ref(&signing_key.public())
@@ -504,7 +511,7 @@ impl<R: Runtime> SamSession<R> {
                             .unwrap_or([0u8; 32]);
                         match public_bytes != [0u8; 32] {
                             false => None,
-                            true => Some((public_bytes, !lookup_secret.is_empty(), psk_valid)),
+                            true => Some((public_bytes, !lookup_secret.is_empty(), auth_valid)),
                         }
                     }
                 };
@@ -537,9 +544,10 @@ impl<R: Runtime> SamSession<R> {
             // Invalid companion combinations never reach this owner through
             // the socket path; direct construction enables only the exact
             // valid subsets and otherwise retains ordinary behavior. The
-            // generation-local secret and PSK authorization move once into
-            // the publication configuration; crypto or build failure never
-            // falls back to unsecreted, no-auth, or ordinary publication.
+            // generation-local secret and PSK/DH authorization move once
+            // into the publication configuration; crypto or build failure
+            // never falls back to unsecreted, no-auth, or ordinary
+            // publication.
             if is_type5_requested(&options) && is_valid_type5_no_auth(&options) {
                 let seed_bytes: [u8; 32] =
                     AsRef::<[u8]>::as_ref(&*signing_key).try_into().unwrap_or([0u8; 32]);
@@ -563,6 +571,7 @@ impl<R: Runtime> SamSession<R> {
             } else if is_type5_requested(&options)
                 && is_valid_type5_psk(&options)
                 && psk_auth.is_some()
+                && dh_auth.is_none()
             {
                 let seed_bytes: [u8; 32] =
                     AsRef::<[u8]>::as_ref(&*signing_key).try_into().unwrap_or([0u8; 32]);
@@ -581,6 +590,33 @@ impl<R: Runtime> SamSession<R> {
                                     public_bytes,
                                     lookup_secret,
                                     psk,
+                                ),
+                            );
+                        }
+                    }
+                }
+            } else if is_type5_requested(&options)
+                && is_valid_type5_dh(&options)
+                && dh_auth.is_some()
+                && psk_auth.is_none()
+            {
+                let seed_bytes: [u8; 32] =
+                    AsRef::<[u8]>::as_ref(&*signing_key).try_into().unwrap_or([0u8; 32]);
+                let public_bytes: [u8; 32] =
+                    AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap_or([0u8; 32]);
+                if seed_bytes != [0u8; 32] && public_bytes != [0u8; 32] {
+                    if let Some(dh) = dh_auth {
+                        if lookup_secret.is_empty() {
+                            session_destination.enable_encrypted_publication(
+                                EncryptedPublicationConfig::with_dh(seed_bytes, public_bytes, dh),
+                            );
+                        } else {
+                            session_destination.enable_encrypted_publication(
+                                EncryptedPublicationConfig::with_secret_and_dh(
+                                    seed_bytes,
+                                    public_bytes,
+                                    lookup_secret,
+                                    dh,
                                 ),
                             );
                         }
@@ -2232,6 +2268,7 @@ mod tests {
                     signing_key: Box::new(signing_key),
                     lookup_secret: els2::LookupSecret::empty(),
                     psk_auth: None,
+                    dh_auth: None,
                 },
                 event_handle,
                 inbound: Default::default(),
@@ -2867,6 +2904,7 @@ mod tests {
                     signing_key: Box::new(signing_key),
                     lookup_secret: els2::LookupSecret::empty(),
                     psk_auth: None,
+                    dh_auth: None,
                 },
                 event_handle,
                 inbound: Default::default(),
@@ -2999,6 +3037,26 @@ mod tests {
 
     #[test]
     fn server_destination_address_sets_auth_required_for_psk() {
+        let signing_key = SigningPrivateKey::random(MockRuntime::rng());
+        let public_bytes: [u8; 32] =
+            AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap();
+        let destination = Destination::new::<MockRuntime>(signing_key.public());
+        let destination_id = destination.id();
+
+        for secret_required in [false, true] {
+            let address = server_destination_address(
+                &destination_id,
+                Some((public_bytes, secret_required, true)),
+            );
+            let decoded = els2::decode_encrypted_service_b32(&address).expect("address decodes");
+            assert_eq!(decoded.unblinded_public_key, public_bytes);
+            assert_eq!(decoded.secret_required, secret_required);
+            assert!(decoded.auth_required);
+        }
+    }
+
+    #[test]
+    fn server_destination_address_sets_auth_required_for_dh() {
         let signing_key = SigningPrivateKey::random(MockRuntime::rng());
         let public_bytes: [u8; 32] =
             AsRef::<[u8]>::as_ref(&signing_key.public()).try_into().unwrap();

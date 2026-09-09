@@ -639,6 +639,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m157 = is_authorized_m157_path(path);
         let authorized_m158 = is_authorized_m158_path(path);
         let authorized_m159 = is_authorized_m159_path(path);
+        let authorized_m160 = is_authorized_m160_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -685,6 +686,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m157
                 || authorized_m158
                 || authorized_m159
+                || authorized_m160
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -734,6 +736,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_tunnel_runtime
                     || authorized_m158
                     || authorized_m159
+                    || authorized_m160
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
             );
@@ -1518,6 +1521,29 @@ fn is_authorized_m159_path(path: &str) -> bool {
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
             | "plans/implementation/i2pcontrol-proposal-170/159-leaseset-psk-client-authorization-primitive.md"
             | "plans/implementation/i2pcontrol-proposal-170/160-leaseset-dh-client-authorization-primitive.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md"
+    )
+}
+
+fn is_authorized_m160_path(path: &str) -> bool {
+    matches!(
+        path,
+        "AGENTS.md"
+            | "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/tunnel-manager.md"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "emissary-core/src/crypto/els2.rs"
+            | "emissary-core/src/destination/lease_set.rs"
+            | "emissary-core/src/sam/parser.rs"
+            | "emissary-core/src/sam/session.rs"
+            | "plans/closure/i2pcontrol-proposal-170/160-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/160-leaseset-dh-client-authorization-primitive.md"
+            | "plans/implementation/i2pcontrol-proposal-170/161-legacy-aes-ls1-feasibility-and-contract-gate.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"

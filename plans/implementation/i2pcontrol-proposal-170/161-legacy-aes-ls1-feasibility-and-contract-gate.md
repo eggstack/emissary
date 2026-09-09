@@ -1,6 +1,13 @@
 # M161 — Legacy AES / LeaseSet1 Feasibility and Contract Gate
 
-Status: **deferred / unregistered; hard-depends on M160 closure**
+Status: **deferred / unregistered; M160 hard dependency satisfied, registration pending**
+
+> M160 closed complete (`plans/closure/i2pcontrol-proposal-170/160-closure.md`),
+> satisfying this gate's hard dependency. The modern type-5 owner graph
+> (no-auth/lookup-secret/PSK/DH) is now frozen with zero Proposal
+> promotions. Registration must still be authored in a separate commit; this
+> file is otherwise unchanged and no production work is authorized by this
+> note.
 
 Class: invariant / compatibility-security feasibility
 

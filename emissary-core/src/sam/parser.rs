@@ -19,7 +19,10 @@
 use crate::{
     crypto::{
         base32_decode, base64_decode,
-        els2::{LookupSecret, PskAuthorization, PskKey, MAX_PSK_CLIENTS},
+        els2::{
+            DhAuthorization, DhPrivateKey, DhPublicKey, LookupSecret, PskAuthorization, PskKey,
+            MAX_DH_CLIENTS, MAX_PSK_CLIENTS,
+        },
         SigningPrivateKey,
     },
     primitives::{Destination, DestinationId, Str},
@@ -193,6 +196,11 @@ fn parse_base_psk_value(value: &str) -> Result<[u8; 32], ()> {
 fn extract_psk_authorization(
     pairs: &mut HashMap<&str, &str>,
 ) -> Result<Option<PskAuthorization>, ()> {
+    // Deferred: DH mode owns the shared base property; let the DH extractor
+    // handle type-5 auth-1 requests so they are not failed here.
+    if pairs.get("i2cp.leaseSetAuthType").is_some_and(|value| value.trim() == "1") {
+        return Ok(None);
+    }
     let has_base = pairs.contains_key("i2cp.leaseSetPrivKey");
     let has_indexed = pairs.keys().any(|key| key.starts_with("i2cp.leaseSetClient.psk."));
     let auth_is_psk = pairs.get("i2cp.leaseSetAuthType").is_some_and(|value| value.trim() == "2");
@@ -335,6 +343,260 @@ fn extract_psk_authorization(
     })
 }
 
+/// Decode one indexed DH entry value.
+///
+/// Accepts either raw Base64(32B X25519 public) or a single `name:` prefix
+/// followed by Base64(32B). The name prefix is stripped and never retained
+/// in core. Any malformed shape (empty, multiple colons, empty name/suffix,
+/// invalid Base64, or non-32-byte payload) fails closed before allocation.
+/// Only the failure shape is logged, never the value.
+fn parse_dh_entry_value(value: &str) -> Result<[u8; 32], ()> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed DH client entry",
+        );
+        return Err(());
+    }
+    let key_part = match trimmed.split_once(':') {
+        None => trimmed,
+        Some((prefix, suffix)) => {
+            if prefix.is_empty() || suffix.is_empty() || suffix.contains(':') {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    "rejecting session with malformed DH client entry",
+                );
+                return Err(());
+            }
+            suffix.trim()
+        }
+    };
+    if key_part.is_empty() {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed DH client entry",
+        );
+        return Err(());
+    }
+    let decoded = base64_decode(key_part).ok_or_else(|| {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed DH client entry",
+        );
+    })?;
+    if decoded.len() != 32 {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed DH client entry",
+        );
+        return Err(());
+    }
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&decoded);
+    Ok(out)
+}
+
+/// Decode the required DH base private value.
+///
+/// The base `i2cp.leaseSetPrivKey` carries raw Base64(32B X25519 private)
+/// with no name prefix. Any malformed shape fails closed before allocation.
+fn parse_base_dh_value(value: &str) -> Result<[u8; 32], ()> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.contains(':') {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed base DH key",
+        );
+        return Err(());
+    }
+    let decoded = base64_decode(trimmed).ok_or_else(|| {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed base DH key",
+        );
+    })?;
+    if decoded.len() != 32 {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting session with malformed base DH key",
+        );
+        return Err(());
+    }
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&decoded);
+    Ok(out)
+}
+
+/// Extract the standard DH authorization before allocation.
+///
+/// Scans `i2cp.leaseSetPrivKey` (required 32-byte X25519 base private) plus
+/// contiguous `i2cp.leaseSetClient.dh.N` entries from zero. The public key
+/// derived from the base private is always the first logical authorized
+/// key; indexed entries are additional only and zero indexed entries is
+/// valid for non-per-user modes. Duplicate public-key bytes are preserved
+/// exactly as configured, each consuming one client record and the bounded
+/// work budget.
+///
+/// Fails closed on missing base when DH is selected, malformed keys, sparse
+/// indices followed by later entries, mixed PSK entries, unsupported auth
+/// selectors, incompatible companion keys, or more than
+/// [`MAX_DH_CLIENTS`] total keys. Base/indexed values are removed from
+/// generic state so neither form survives in `SamCommand` options or later
+/// debug-capable surfaces. Returns `None` when no DH selector or key is
+/// present (no-auth/PSK path).
+fn extract_dh_authorization(
+    pairs: &mut HashMap<&str, &str>,
+) -> Result<Option<DhAuthorization>, ()> {
+    // Deferred: PSK mode owns the shared base property; let the PSK
+    // extractor handle type-5 auth-2 requests so they are not failed here.
+    if pairs.get("i2cp.leaseSetAuthType").is_some_and(|value| value.trim() == "2") {
+        return Ok(None);
+    }
+    let has_base = pairs.contains_key("i2cp.leaseSetPrivKey");
+    let has_indexed = pairs.keys().any(|key| key.starts_with("i2cp.leaseSetClient.dh."));
+    let auth_is_dh = pairs.get("i2cp.leaseSetAuthType").is_some_and(|value| value.trim() == "1");
+
+    if !has_base && !has_indexed && !auth_is_dh {
+        return Ok(None);
+    }
+
+    let is_type5 = pairs.get("i2cp.leaseSetType").is_some_and(|value| value.trim() == "5");
+    if !is_type5 {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting DH keys without type-5 selector",
+        );
+        return Err(());
+    }
+    let auth_value = pairs.get("i2cp.leaseSetAuthType").map(|value| value.trim());
+    if auth_value != Some("1") {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting DH keys with unsupported auth selector",
+        );
+        return Err(());
+    }
+    if pairs
+        .get("i2cp.encryptLeaseSet")
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("true") || value.trim() == "1")
+    {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting type-5 DH session with legacy companion",
+        );
+        return Err(());
+    }
+    if pairs
+        .get("i2cp.dontPublishLeaseSet")
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("true") || value.trim() == "1")
+    {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting unpublished type-5 DH session",
+        );
+        return Err(());
+    }
+    for key in [
+        "i2cp.leaseSetKey",
+        "i2cp.leaseSetPrivateKey",
+        "i2cp.leaseSetSigningPrivateKey",
+        "i2cp.leaseSetBlindedType",
+    ] {
+        if pairs.get(key).is_some_and(|value| !value.trim().is_empty()) {
+            tracing::warn!(
+                target: LOG_TARGET,
+                "rejecting type-5 DH session with incompatible companion",
+            );
+            return Err(());
+        }
+    }
+    if pairs.keys().any(|key| {
+        key.starts_with("leaseSetClient")
+            || key.starts_with("i2cp.leaseSetClient.psk")
+            || key.starts_with("leaseSetClient.psk")
+    }) {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting type-5 DH session with mixed client entries",
+        );
+        return Err(());
+    }
+
+    let base_value = pairs.remove("i2cp.leaseSetPrivKey").ok_or_else(|| {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting DH session with missing base key",
+        );
+    })?;
+    let base_bytes = parse_base_dh_value(base_value)?;
+    let base_priv = DhPrivateKey::from_bytes(base_bytes);
+    let base_pub = base_priv.public();
+
+    let mut indexed: Vec<(usize, &str)> = Vec::new();
+    for key in pairs.keys().copied().collect::<Vec<_>>() {
+        if let Some(suffix) = key.strip_prefix("i2cp.leaseSetClient.dh.") {
+            let index: usize = suffix.parse().map_err(|_| {
+                tracing::warn!(
+                    target: LOG_TARGET,
+                    "rejecting DH session with malformed client index",
+                );
+            })?;
+            let value = pairs.get(key).copied().ok_or(())?;
+            indexed.push((index, value));
+        } else if key.starts_with("i2cp.leaseSetClient") {
+            tracing::warn!(
+                target: LOG_TARGET,
+                "rejecting type-5 DH session with unsupported client entry",
+            );
+            return Err(());
+        }
+    }
+    if indexed.len() > MAX_DH_CLIENTS.saturating_sub(1) {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting DH session exceeding client ceiling",
+        );
+        return Err(());
+    }
+    indexed.sort_by_key(|(index, _)| *index);
+    for (expected, (index, _)) in indexed.iter().enumerate() {
+        if *index != expected {
+            tracing::warn!(
+                target: LOG_TARGET,
+                "rejecting DH session with sparse client entries",
+            );
+            return Err(());
+        }
+    }
+
+    let mut keys = Vec::with_capacity(1 + indexed.len());
+    keys.push(DhPublicKey::from_bytes(base_pub));
+    for (_, value) in &indexed {
+        keys.push(DhPublicKey::from_bytes(parse_dh_entry_value(value)?));
+    }
+    for key in indexed.iter().map(|(index, _)| format!("i2cp.leaseSetClient.dh.{index}")) {
+        pairs.remove(key.as_str());
+    }
+    if pairs
+        .keys()
+        .any(|key| key.starts_with("i2cp.leaseSetClient") || key.starts_with("leaseSetClient"))
+    {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting type-5 DH session with residual client entries",
+        );
+        return Err(());
+    }
+
+    DhAuthorization::from_keys(keys).map(Some).map_err(|_| {
+        tracing::warn!(
+            target: LOG_TARGET,
+            "rejecting DH session exceeding client ceiling",
+        );
+    })
+}
+
 /// Validate standard type-5 PSK selector state before allocation.
 ///
 /// Returns true only when type 5 is requested with auth type exactly `2`,
@@ -348,6 +610,53 @@ pub fn is_valid_type5_psk(options: &HashMap<String, String>) -> bool {
         return false;
     }
     if options.get("i2cp.leaseSetAuthType").map(|value| value.trim()) != Some("2") {
+        return false;
+    }
+    if options
+        .get("i2cp.encryptLeaseSet")
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("true") || value.trim() == "1")
+    {
+        return false;
+    }
+    for key in [
+        "i2cp.leaseSetPrivKey",
+        "i2cp.leaseSetKey",
+        "i2cp.leaseSetPrivateKey",
+        "i2cp.leaseSetSigningPrivateKey",
+        "i2cp.leaseSetBlindedType",
+    ] {
+        if options.get(key).is_some_and(|value| !value.trim().is_empty()) {
+            return false;
+        }
+    }
+    if options
+        .keys()
+        .any(|key| key.starts_with("i2cp.leaseSetClient") || key.starts_with("leaseSetClient"))
+    {
+        return false;
+    }
+    if options
+        .get("i2cp.dontPublishLeaseSet")
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("true") || value.trim() == "1")
+    {
+        return false;
+    }
+    true
+}
+
+/// Validate standard type-5 DH selector state before allocation.
+///
+/// Returns true only when type 5 is requested with auth type exactly `1`,
+/// the legacy flag absent/false, forbidden key companions absent, no
+/// residual per-client entries in generic options (DH values are already
+/// extracted), and publication enabled. The extracted DH material itself
+/// was validated during extraction; this gate covers the remaining
+/// selector subset for the session bridge.
+pub fn is_valid_type5_dh(options: &HashMap<String, String>) -> bool {
+    if !is_type5_requested(options) {
+        return false;
+    }
+    if options.get("i2cp.leaseSetAuthType").map(|value| value.trim()) != Some("1") {
         return false;
     }
     if options
@@ -443,23 +752,28 @@ pub fn is_valid_type5_no_auth(options: &HashMap<String, String>) -> bool {
 /// Validate the standard lease-set type selector before allocation.
 ///
 /// Absent or `3` preserves ordinary behavior. `5` requires either the exact
-/// no-auth subset or the exact PSK selector subset above (PSK key material
-/// itself was validated during extraction). Any other value or any type-5
-/// request with successor-only companions fails closed before session
-/// allocation.
+/// no-auth subset, the exact PSK selector subset, or the exact DH selector
+/// subset above (key material itself was validated during extraction). Any
+/// other value or any type-5 request with successor-only companions fails
+/// closed before session allocation.
 fn validate_lease_set_type_options(options: &HashMap<String, String>) -> Result<(), ()> {
     match options.get("i2cp.leaseSetType").map(|value| value.trim()) {
         None | Some("3") => Ok(()),
-        Some("5") => match is_valid_type5_no_auth(options) || is_valid_type5_psk(options) {
-            true => Ok(()),
-            false => {
-                tracing::warn!(
-                    target: LOG_TARGET,
-                    "rejecting type-5 session with unsupported companion options",
-                );
-                Err(())
+        Some("5") => {
+            match is_valid_type5_no_auth(options)
+                || is_valid_type5_psk(options)
+                || is_valid_type5_dh(options)
+            {
+                true => Ok(()),
+                false => {
+                    tracing::warn!(
+                        target: LOG_TARGET,
+                        "rejecting type-5 session with unsupported companion options",
+                    );
+                    Err(())
+                }
             }
-        },
+        }
         Some(unsupported) => {
             tracing::warn!(
                 target: LOG_TARGET,
@@ -574,9 +888,16 @@ pub struct DestinationContext {
 
     /// Generation-local PSK authorization for type-5 publication.
     ///
-    /// `None` means no client auth. Secret material: never `Debug`- or
+    /// `None` means no PSK client auth. Secret material: never `Debug`- or
     /// display-formattable; the custom `Debug` below omits all fields.
     pub psk_auth: Option<PskAuthorization>,
+
+    /// Generation-local DH authorization for type-5 publication.
+    ///
+    /// `None` means no DH client auth. Authorized client publics are never
+    /// `Debug`- or display-formattable; the custom `Debug` below omits all
+    /// fields. Mutually exclusive with [`Self::psk_auth`].
+    pub dh_auth: Option<DhAuthorization>,
 }
 
 impl fmt::Debug for DestinationContext {
@@ -593,6 +914,7 @@ impl PartialEq for DestinationContext {
                 == AsRef::<[u8]>::as_ref(&*other.signing_key)
             && self.lookup_secret == other.lookup_secret
             && self.psk_auth == other.psk_auth
+            && self.dh_auth == other.dh_auth
     }
 }
 
@@ -956,7 +1278,27 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                 // debug-capable surfaces. Malformed, sparse, mixed, or
                 // over-ceiling input fails before the session is
                 // constructed. Names are stripped and never retained.
+                // Defers to the DH extractor when DH auth is selected.
                 let psk_auth = extract_psk_authorization(&mut parsed_cmd.key_value_pairs)?;
+
+                // Extract the standard DH authorization before allocation
+                // and remove base/indexed values from generic option state
+                // so neither form survives in `SamCommand` options or later
+                // debug-capable surfaces. The base-derived public is always
+                // first; indexed publics follow with duplicates preserved.
+                // Malformed, sparse, mixed, or over-ceiling input fails
+                // before the session is constructed. Names are stripped and
+                // never retained. Defers to the PSK extractor when PSK auth
+                // is selected.
+                let dh_auth = extract_dh_authorization(&mut parsed_cmd.key_value_pairs)?;
+
+                if psk_auth.is_some() && dh_auth.is_some() {
+                    tracing::warn!(
+                        target: LOG_TARGET,
+                        "rejecting type-5 session with both PSK and DH authorization",
+                    );
+                    return Err(());
+                }
 
                 let destination = match parsed_cmd.key_value_pairs.remove("DESTINATION") {
                     Some("TRANSIENT") => {
@@ -974,6 +1316,7 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                             signing_key: Box::new(signing_key),
                             lookup_secret,
                             psk_auth,
+                            dh_auth,
                         }
                     }
                     Some(destination) => {
@@ -1019,6 +1362,7 @@ impl<'a, R: Runtime> TryFrom<ParsedCommand<'a, R>> for SamCommand {
                             ),
                             lookup_secret,
                             psk_auth,
+                            dh_auth,
                         }
                     }
                     None => {
@@ -2970,12 +3314,15 @@ mod tests {
         ))
         .is_none());
 
-        // Wrong auth selectors.
+        // Wrong auth selectors for PSK-flavored entries. A bare base key
+        // with auth 1 is a valid DH base-only request (covered by the DH
+        // suite), so PSK-indexed entries pin these vectors to PSK mode.
         for auth in ["0", "1", "00", "hello"] {
             assert!(
                 SamCommand::parse::<MockRuntime>(&format!(
                     "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
-                     i2cp.leaseSetType=5 i2cp.leaseSetAuthType={auth} i2cp.leaseSetPrivKey={base}",
+                     i2cp.leaseSetType=5 i2cp.leaseSetAuthType={auth} i2cp.leaseSetPrivKey={base} \
+                     i2cp.leaseSetClient.psk.0={other}",
                 ))
                 .is_none(),
                 "auth type {auth} was accepted"
@@ -3036,5 +3383,265 @@ mod tests {
             }
             response => panic!("invalid response: {response:?}"),
         }
+    }
+
+    fn dh_priv_b64(bytes: &[u8; 32]) -> String {
+        base64_encode(bytes)
+    }
+
+    fn dh_pub_b64(bytes: &[u8; 32]) -> String {
+        base64_encode(bytes)
+    }
+
+    fn dh_pub_of(priv_bytes: &[u8; 32]) -> [u8; 32] {
+        DhPrivateKey::from_bytes(*priv_bytes).public()
+    }
+
+    #[test]
+    fn type5_dh_base_only_accepted_and_redacted() {
+        let base_priv = [0xA5u8; 32];
+        let base = dh_priv_b64(&base_priv);
+        let expected_pub = dh_pub_of(&base_priv);
+        let command = format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base}",
+        );
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(SamCommand::CreateSession {
+                options,
+                destination,
+                ..
+            }) => {
+                assert!(is_type5_requested(&options));
+                assert!(is_valid_type5_dh(&options));
+                assert!(!is_valid_type5_no_auth(&options));
+                assert!(!is_valid_type5_psk(&options));
+                assert!(!options.contains_key("i2cp.leaseSetPrivKey"));
+                assert!(!options.values().any(|value| value.contains(&base)));
+                assert!(destination.psk_auth.is_none());
+                let dh = destination.dh_auth.expect("dh carried");
+                assert_eq!(dh.len(), 1);
+                assert_eq!(dh.as_slice()[0].as_bytes(), &expected_pub);
+                assert!(destination.lookup_secret.is_empty());
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+    }
+
+    #[test]
+    fn type5_dh_indexed_entries_ordered_and_names_stripped() {
+        let base_priv = [0xA5u8; 32];
+        let client_b_priv = [0xB6u8; 32];
+        let client_c_pub = [0xC3u8; 32];
+        let base = dh_priv_b64(&base_priv);
+        let client_b_pub = dh_pub_of(&client_b_priv);
+        let client_b = dh_pub_b64(&client_b_pub);
+        let client_c = dh_pub_b64(&client_c_pub);
+        let name_b = base64_encode(b"bob");
+        let command = format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.dh.0={name_b}:{client_b} \
+             i2cp.leaseSetClient.dh.1={client_c}",
+        );
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(SamCommand::CreateSession {
+                options,
+                destination,
+                ..
+            }) => {
+                assert!(is_valid_type5_dh(&options));
+                assert!(!options.keys().any(|key| key.contains("leaseSetClient")));
+                assert!(!options.keys().any(|key| key.contains("leaseSetPrivKey")));
+                let dh = destination.dh_auth.expect("dh carried");
+                assert_eq!(dh.len(), 3);
+                assert_eq!(dh.as_slice()[0].as_bytes(), &dh_pub_of(&base_priv));
+                assert_eq!(dh.as_slice()[1].as_bytes(), &client_b_pub);
+                assert_eq!(dh.as_slice()[2].as_bytes(), &client_c_pub);
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+    }
+
+    #[test]
+    fn type5_dh_preserves_duplicate_entries() {
+        let base_priv = [0xA5u8; 32];
+        let base = dh_priv_b64(&base_priv);
+        let base_pub = dh_pub_of(&base_priv);
+        let dup = dh_pub_b64(&base_pub);
+        let command = format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.dh.0={dup}",
+        );
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(SamCommand::CreateSession { destination, .. }) => {
+                let dh = destination.dh_auth.expect("dh carried");
+                assert_eq!(dh.len(), 2);
+                assert_eq!(dh.as_slice()[0].as_bytes(), dh.as_slice()[1].as_bytes());
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+    }
+
+    #[test]
+    fn type5_dh_with_lookup_secret_coexists() {
+        let base_priv = [0xA5u8; 32];
+        let base = dh_priv_b64(&base_priv);
+        let secret_b64 = base64_encode(b"lookup-secret");
+        let command = format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetSecret={secret_b64}",
+        );
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(SamCommand::CreateSession {
+                options,
+                destination,
+                ..
+            }) => {
+                assert!(is_valid_type5_dh(&options));
+                assert!(destination.dh_auth.is_some());
+                assert!(destination.psk_auth.is_none());
+                assert_eq!(destination.lookup_secret.as_bytes(), b"lookup-secret");
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+    }
+
+    #[test]
+    fn type5_dh_negative_paths_rejected() {
+        let base_priv = [0xA5u8; 32];
+        let base = dh_priv_b64(&base_priv);
+        let other_pub = dh_pub_b64(&[0xB2u8; 32]);
+
+        assert!(SamCommand::parse::<MockRuntime>(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1",
+        )
+        .is_none());
+
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey=AAAA",
+        ))
+        .is_none());
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.dh.0=AAAA",
+        ))
+        .is_none());
+
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.dh.1={other_pub}",
+        ))
+        .is_none());
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.dh.0={other_pub} i2cp.leaseSetClient.dh.2={other_pub}",
+        ))
+        .is_none());
+
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.psk.0={other_pub}",
+        ))
+        .is_none());
+
+        for auth in ["0", "2", "00", "hello"] {
+            assert!(
+                SamCommand::parse::<MockRuntime>(&format!(
+                    "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+                     i2cp.leaseSetType=5 i2cp.leaseSetAuthType={auth} i2cp.leaseSetPrivKey={base} \
+                     i2cp.leaseSetClient.dh.0={other_pub}",
+                ))
+                .is_none(),
+                "auth type {auth} was accepted for DH entries"
+            );
+        }
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=0 i2cp.leaseSetPrivKey={base}",
+        ))
+        .is_none());
+
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetPrivKey={base}",
+        ))
+        .is_none());
+
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.encryptLeaseSet=true",
+        ))
+        .is_none());
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.dontPublishLeaseSet=true",
+        ))
+        .is_none());
+
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.dh.0=a:b:{other_pub}",
+        ))
+        .is_none());
+    }
+
+    #[test]
+    fn type5_dh_never_leaks_through_debug_surfaces() {
+        let base_priv = [0xA5u8; 32];
+        let base = dh_priv_b64(&base_priv);
+        let client_pub = dh_pub_b64(&dh_pub_of(&[0xB6u8; 32]));
+        let name = base64_encode(b"bob");
+        let command = format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.dh.0={name}:{client_pub}",
+        );
+        match SamCommand::parse::<MockRuntime>(&command) {
+            Some(cmd @ SamCommand::CreateSession { .. }) => {
+                let debug = format!("{cmd:?}");
+                assert!(!debug.contains(&base), "command debug leaks base DH key");
+                assert!(
+                    !debug.contains(&client_pub),
+                    "command debug leaks client key"
+                );
+                assert!(!debug.contains(&name), "command debug leaks client name");
+                if let SamCommand::CreateSession { destination, .. } = &cmd {
+                    let context_debug = format!("{destination:?}");
+                    assert!(!context_debug.contains(&base));
+                    assert!(!context_debug.contains(&client_pub));
+                }
+            }
+            response => panic!("invalid response: {response:?}"),
+        }
+    }
+
+    #[test]
+    fn type5_psk_and_dh_modes_are_mutually_exclusive() {
+        let base = psk_b64(&[0xA1u8; 32]);
+        let other = psk_b64(&[0xB2u8; 32]);
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=2 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.dh.0={other}",
+        ))
+        .is_none());
+        assert!(SamCommand::parse::<MockRuntime>(&format!(
+            "SESSION CREATE STYLE=STREAM ID=test DESTINATION=TRANSIENT \
+             i2cp.leaseSetType=5 i2cp.leaseSetAuthType=1 i2cp.leaseSetPrivKey={base} \
+             i2cp.leaseSetClient.psk.0={other}",
+        ))
+        .is_none());
     }
 }

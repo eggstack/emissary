@@ -1,6 +1,6 @@
 # I2PControl Proposal 170 Full-Support Completion Roadmap
 
-Status: **active / partial; M160 registered**
+Status: **active / partial; M155-M160 closed, no registered successor**
 
 Pinned Proposal authority: revision `2026-05-20`, status Open.
 
@@ -11,7 +11,7 @@ Current whole-surface qualification authority: M153.
 Current execution authority:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`;
-- sole registered handoff: M160.
+- no registered successor; M161 deferred with satisfied hard dep, registration pending.
 
 ## 1. Current residual inventory
 
@@ -35,8 +35,8 @@ Current execution authority:
 - M157 implemented modern type-5/no-auth encrypted-LS2 publication/storage verification/UTC rollover.
 - M158 implemented standard lookup-secret contribution and encrypted-service extended B32.
 - M159 implemented neutral standard PSK client authorization.
-- M156-M159 all closed with zero Proposal promotions.
-- M160 is registered for neutral standard DH (X25519) client authorization.
+- M160 implemented neutral standard DH (X25519) client authorization.
+- M156-M160 all closed with zero Proposal promotions.
 
 Historical closures remain immutable.
 
@@ -48,8 +48,8 @@ M155 semantic/owner refreeze                   [CLOSED]
   -> M157 modern Encrypted LS2                 [CLOSED]
   -> M158 lookup-secret/blinded address        [CLOSED]
   -> M159 PSK client authorization             [CLOSED]
-  -> M160 DH/X25519 authorization              [REGISTERED]
-  -> M161 legacy AES/LS1 feasibility           [DEFERRED; ZERO PRODUCTION]
+  -> M160 DH/X25519 authorization              [CLOSED]
+  -> M161 legacy AES/LS1 feasibility           [DEFERRED; HARD DEP SATISFIED; ZERO PRODUCTION]
   -> M162 Proposal field integration           [DEFERRED]
   -> M152 final requalification                [DEFERRED]
 ```
@@ -60,24 +60,26 @@ M149-M151 are superseded historical drafts and must not be executed.
 
 M159 closed record: neutral, zero-promotion PSK infrastructure over the four exact files below (closure: `plans/closure/i2pcontrol-proposal-170/159-closure.md`). M095 remains `336/29/475`.
 
-M160 is neutral, zero-promotion infrastructure. Exact production paths:
+M160 closed record: neutral, zero-promotion DH infrastructure over the four exact files below (closure: `plans/closure/i2pcontrol-proposal-170/160-closure.md`). M095 remains `336/29/475`.
+
+M160 realized production paths:
 
 1. `emissary-core/src/crypto/els2.rs`;
 2. `emissary-core/src/destination/lease_set.rs`;
 3. `emissary-core/src/sam/parser.rs`;
 4. `emissary-core/src/sam/session.rs`.
 
-All are already exact realized M061 owners. M160 creates no new source-boundary waiver and permits no dependency, Cargo, lockfile, Yosemite, I2PControl production-source, or new-file change.
+All are already exact realized M061 owners. M160 created no new source-boundary waiver and made no dependency, Cargo, lockfile, Yosemite, I2PControl production-source, or new-file change.
 
-M160 implements the standard DH type-5 authorization layer only. It adopts the pinned Java 4096-byte encrypted-data ceiling as the allocation/O(N) work bound, uses `i2cp.leaseSetAuthType=1`, requires the base `i2cp.leaseSetPrivKey` X25519 private key, accepts bounded contiguous indexed `i2cp.leaseSetClient.dh.N` public keys with duplicates preserved, rejects all-zero shared secrets, and keeps all key material out of generic debug-capable state.
+M160 implemented the standard DH type-5 authorization layer only. It adopted the pinned Java 4096-byte encrypted-data ceiling as the allocation/O(N) work bound, used `i2cp.leaseSetAuthType=1`, required the base `i2cp.leaseSetPrivKey` X25519 private key, accepted bounded contiguous indexed `i2cp.leaseSetClient.dh.N` public keys with duplicates preserved, rejected all-zero shared secrets, and kept all key material out of generic debug-capable state.
 
-M095 must remain `336/29/475` through M160.
+M095 remains `336/29/475` after M160.
 
 ## 5. Remaining plans reviewed in advance
 
-M160 is registered with the same four-file/zero-dependency owners revalidated against the M159 closure. It uses existing X25519 support, the same 4096-byte work bound, explicit all-zero shared-secret rejection, duplicate preservation, and no persistent core secrets.
+M160 closed with the same four-file/zero-dependency owners realized against the exact envelope. It used existing X25519 support, the same 4096-byte work bound, explicit all-zero shared-secret rejection, duplicate preservation, and no persistent core secrets.
 
-M161 now hard-depends on M160 closure and is strictly zero-production. It resolves legacy `encrypted (aes)` after the modern line is stable. Outcome A requires a separate exact implementation successor; outcomes B/C keep EncryptLeaseSet blocked.
+M161 hard-depended on M160 closure (now satisfied, registration pending) and is strictly zero-production. It resolves legacy `encrypted (aes)` after the modern line is stable. Outcome A requires a separate exact implementation successor; outcomes B/C keep EncryptLeaseSet blocked.
 
 M162 has been corrected to require the exact Proposal PR mappings, including PSK/DH base-key semantics, per-user `Base64(UTF8(name)):Key` properties, typed/redacted I2PControl fields, persistent LeaseSet-security secret custody, transactional definition+secret generations, and complete-field promotion only when the full valid domain is operational.
 
@@ -118,6 +120,6 @@ M152 may declare full support only when the mechanically recomputed matrix has z
 
 ## 10. Current handoff
 
-Execute **M160 only**.
+No milestone is currently registered. Only M161 may be registered next.
 
-Do not begin M161 until M160 closes and the registry explicitly advances it. Any M160 need outside its exact four-file/zero-dependency budget requires an amendment before the edit.
+Do not begin M161 until its registration is authored and the registry explicitly advances it.

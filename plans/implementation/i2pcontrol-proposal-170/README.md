@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M160 registered**.
+Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M160 closed, no registered successor**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -12,11 +12,11 @@ Residual blockers: 10 `SigType`, 5 `EncryptLeaseSet`, 5 `OptionalLookup`, 5 `Lea
 
 Roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-Sole registered handoff:
+No registered handoff (M161 deferred with satisfied hard dep, registration pending):
 
-- **M160** `160-leaseset-dh-client-authorization-primitive.md`.
+- **M161** `161-legacy-aes-ls1-feasibility-and-contract-gate.md` (deferred/unregistered).
 
-M160 is neutral infrastructure with **zero Proposal promotion budget**.
+M160 closed the neutral DH infrastructure with **zero Proposal promotions observed**.
 
 ## Immediate lineage
 
@@ -27,7 +27,7 @@ M160 is neutral infrastructure with **zero Proposal promotion budget**.
 - M157 — modern type-5/no-auth Encrypted LeaseSet2 publication closed, zero promotions.
 - M158 — standard lookup-secret contribution + encrypted-service extended B32 closed, zero promotions.
 - M159 — neutral standard PSK client authorization closed, zero promotions.
-- **M160 — registered**; DH (X25519) client authorization, zero promotions.
+- M160 — neutral standard DH (X25519) client authorization closed, zero promotions.
 
 M146 UseOutproxyPlugin ×4 and M154/M147/M148 SigType ×10 remain blocked and are not reopened.
 
@@ -35,28 +35,18 @@ M146 UseOutproxyPlugin ×4 and M154/M147/M148 SigType ×10 remain blocked and ar
 
 M159 modified exactly the four files below and closed with zero promotions (closure: `plans/closure/i2pcontrol-proposal-170/159-closure.md`). M095 remains `336/29/475`.
 
-## M160 exact production budget
+## M160 realized record (closed)
 
-Only these four existing files may change:
+M160 modified exactly the four files below and closed with zero promotions (closure: `plans/closure/i2pcontrol-proposal-170/160-closure.md`). M095 remains `336/29/475`.
 
 1. `emissary-core/src/crypto/els2.rs`
 2. `emissary-core/src/destination/lease_set.rs`
 3. `emissary-core/src/sam/parser.rs`
 4. `emissary-core/src/sam/session.rs`
 
-All four already exist in M061's realized exact allowlist. M160 creates no new M061 path waiver.
+All four already exist in M061's realized exact allowlist. M160 created no new M061 path waiver. M062 observed zero new file/dependency/Cargo/lock/Yosemite/I2PControl production change.
 
-M062 freezes:
-
-- no new source file;
-- no new dependency;
-- no Cargo/lockfile change;
-- no Yosemite change;
-- no I2PControl production-source change.
-
-Any fifth production file or dependency change requires amendment before editing.
-
-## M160 standard DH contract
+## M160 standard DH contract (realized)
 
 Standard properties:
 
@@ -87,7 +77,7 @@ M158 lookup secret may coexist independently; extended B32 must set `auth_requir
 
 ## Proposal disposition
 
-M160 promotes **zero cells**. M095 must remain `336/29/475`.
+M160 promoted **zero cells**. M095 remains `336/29/475`.
 
 `LeaseSetClientAuths` stays blocked because Proposal mapping/names/persistent custody/edit/restart/Get-redaction/five-family integration remain M162.
 
@@ -95,13 +85,13 @@ M160 promotes **zero cells**. M095 must remain `336/29/475`.
 
 ```text
 M159 PSK authorization             [CLOSED]
-  -> M160 DH/X25519 authorization  [REGISTERED]
-  -> M161 legacy AES/LS1 gate      [DEFERRED; HARD-DEPENDS M160; ZERO PRODUCTION]
+  -> M160 DH/X25519 authorization  [CLOSED]
+  -> M161 legacy AES/LS1 gate      [DEFERRED; HARD DEP SATISFIED, REGISTRATION PENDING; ZERO PRODUCTION]
   -> M162 Proposal integration     [DEFERRED; CONTRACT PRE-CORRECTED]
   -> M152 final requalification    [DEFERRED]
 ```
 
-M161 runs only after M160. It cannot implement LS1; outcome A creates a separate exact successor, B/C leave EncryptLeaseSet blocked.
+M161 may now be registered (hard dependency satisfied by M160 closure). It cannot implement LS1; outcome A creates a separate exact successor, B/C leave EncryptLeaseSet blocked.
 
 M162 has been corrected to require the exact direct-source mappings:
 
@@ -126,4 +116,4 @@ M149-M151 remain superseded historical drafts and must not be executed.
 - No secret/private/auth material in generic diagnostics or response-facing storage.
 - External/upstream access remains read-only.
 
-Execute **M160 only**.
+No milestone is currently registered. Only M161 may be registered next.

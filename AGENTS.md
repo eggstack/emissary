@@ -12,15 +12,15 @@ Rust I2P router implementation. Cargo workspace with 3 crates + 2 examples.
 ## Commands
 
 ```bash
-cargo build                    # builds emissary-cli (default member)
+cargo build
 cargo build --release
-cargo build -p emissary-core   # core only
-cargo test                     # all workspace tests (uses cargo-nextest)
-cargo test -p emissary-core    # core tests only
+cargo build -p emissary-core
+cargo test
+cargo test -p emissary-core
 cargo fmt
 cargo clippy
-cargo run -- router-ui-dev     # dev UI, no network
-cargo run -- router-ui-dev --native  # native desktop UI
+cargo run -- router-ui-dev
+cargo run -- router-ui-dev --native
 ```
 
 I2PControl (Proposal 170) tests:
@@ -31,34 +31,47 @@ cargo test -p emissary-cli --no-default-features --features i2pcontrol
 cargo clippy -p emissary-cli --no-default-features --features i2pcontrol --all-targets -- -D warnings
 ```
 
-I2PControl supports a large partial subset of Proposal 170. Its I2PControl-owned runtime primitives and specialized backends provide bounded local-listener, accepted-stream, and Streamr datagram lifecycle ownership plus fail-before-allocation option validation. Tunnel data-plane backends and options without a canonical Emissary owner remain explicit unsupported/unavailable responses. Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` wherever possible; do not turn the administrative API into a router lifecycle or protocol implementation.
+I2PControl supports a large partial subset of Proposal 170. Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` wherever possible; neutral lower-layer behavior belongs only in exact canonical owners with Proposal-free APIs. Unsupported capabilities must fail before allocation rather than being accepted inertly.
 
-Current Proposal-170 planning authority:
+## Current Proposal-170 authority
 
-- M139 closed as the historical whole-surface qualification at `325/47/468`; superseded by M153 for current-head purposes after M141-M145 production changes;
-- M140 closed as the residual streaming applicability re-freeze;
-- M141 closed with 2 `UniqueLocalAddressPerClient` promotions;
-- M142 closed with 2 HTTP `SSLProxies`/`JumpList` promotions;
-- M143 closed with 1 retained `Profile:client` promotion through neutral streaming owners;
-- M144 closed with 4 application `UseSSL` promotions;
-- M145 closed with 2 `MultiHoming`/reply-LeaseSet-bundling promotions; accepted production evidence includes no-std/format follow-up `7cbd80a6d72aa07d158ba9dc74f8bbacef767be2`;
-- M146 closed as blocked with zero promotions: four `UseOutproxyPlugin` cells remain blocked because no real safe provider exists in current architecture;
-- **M153 closed as the current runtime/security qualification authority** (`336/29/475`, zero promotions, zero production changes): `plans/closure/i2pcontrol-proposal-170/153-closure.md`;
-- **M154 closed (disposition C: M147 path blocked)** (`336/29/475`, zero promotions, zero production changes): `plans/closure/i2pcontrol-proposal-170/154-closure.md`. Destination-capable SigType domain frozen as `{0, 1, 2, 3, 7, 11}`; type-0 generation rejected by policy; types 1–3 legacy-only; type 11 missing a maintained primitive; Ed25519-only end-to-end capability. Neither a bounded single primitive nor an honest split can satisfy the configurable field;
-- M147 closed as blocked (path via M154 disposition C): ten `SigType` cells are terminal blockers under current security/dependency policy; no production/dependency budget authorised;
-- M148 remains deferred behind the unsatisfiable M147 gate; M149-M152 remain deferred/unregistered (M149-M151 need explicit re-gating).
+- authoritative matrix: `336 apply / 29 blocked_primitive / 475 not_applicable`;
+- M153 is the current whole-surface runtime/security qualification authority;
+- M146 `UseOutproxyPlugin` remains closed blocked (4 cells);
+- M154 closed disposition C and left the general M147/M148 configurable Destination `SigType` path blocked (10 cells);
+- the M147 block does **not** imply modern Encrypted LeaseSet2 is blocked: the current corrective line separately evaluates the narrower type-7 Ed25519 -> type-11 Red25519 blinded-key primitive.
 
 Current execution roadmap:
 
-- `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md`.
+- `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-The authoritative matrix is `plans/implementation/i2pcontrol-proposal-170/095-full-support-matrix.toml` at `336 apply / 29 blocked_primitive / 475 not_applicable` after M145, unchanged by blocked M146. Remaining blockers are exactly 10 `SigType`, 15 LeaseSet-security (`EncryptLeaseSet`/`OptionalLookup`/`LeaseSetClientAuths`), and 4 `UseOutproxyPlugin`.
+Sole registered handoff:
 
-M153 has zero Proposal-promotion and zero production-code/dependency budget. It exists to restore a truthful current-head integrated qualification, reconcile stale historical aggregate test assertions, correct M095 production-head metadata, and requalify M140-M146 plus earlier security/lifecycle invariants. Any production fix required during M153 is a stop condition requiring a separate corrective plan.
+- **M155** `plans/implementation/i2pcontrol-proposal-170/155-post-m154-leaseset-security-semantic-and-owner-refreeze.md`.
 
-Do not register M147 (closed as blocked via M154 disposition C) without a separate explicit architecture/security decision and plan superseding that disposition. Broad `crypto/`, `netdb/`, `i2np/`, `destination/` or `primitives/` waivers are prohibited.
+M155 has zero production/dependency and zero Proposal-promotion budget. It must freeze the ten-value `EncryptLeaseSet` contract, the legacy AES/LS1 disposition, narrow Red25519/blinding formulas/dependency posture, Proposal field coupling, and exact future owners before M156 may be registered.
 
-M146 remains terminal blocked under the current security architecture. Do not create a dummy provider, alias `ProxyList`, or add direct-clearnet DNS/TCP egress merely to promote `UseOutproxyPlugin`. A future provider successor requires a separate explicit architecture/security decision and plan.
+Deferred corrected line:
+
+```text
+M155 semantic/owner refreeze            [REGISTERED; ZERO PRODUCTION]
+  -> M156 Red25519/blinding              [DEFERRED]
+  -> M157 modern Encrypted LS2           [DEFERRED]
+  -> M158 lookup-secret/blinded address  [DEFERRED]
+  -> M159 PSK auth                       [DEFERRED]
+  -> M160 DH auth                        [DEFERRED]
+  -> M161 legacy AES/LS1 feasibility     [DEFERRED]
+  -> M162 Proposal field integration     [DEFERRED]
+  -> M152 final requalification          [DEFERRED]
+```
+
+M149-M151 remain historical drafts but are superseded for execution by M155-M162. Do not execute them directly.
+
+Do not reopen M147/M148 without a separate explicit architecture/security decision superseding M154. Do not create a dummy outproxy provider, alias `ProxyList`, or add direct-clearnet DNS/TCP egress to resolve M146.
+
+No draft candidate path is production authority. Broad `crypto/**`, `netdb/**`, `i2np/**`, `destination/**`, `primitives/**` or transport waivers are prohibited. Exact M061/M062 file authorization must be added only when the next milestone is explicitly registered.
+
+No cryptographic suite fallback or plaintext/unsecreted/unauthenticated LeaseSet downgrade may be used to manufacture Proposal support. Yosemite remains the accepted exact optional I2PControl pin unless separately superseded.
 
 Streamr is intentionally separate from TCP tunnel helpers. Preserve its documented 16-subscriber, 60-second expiry, 1200-byte payload, 4095-byte transport-buffer, 15-second refresh, and bounded shutdown limits. Remote datagrams must never choose a local UDP destination.
 
@@ -71,7 +84,7 @@ Available targets: `short_tunnel_build_builder`, `i2np_message_builder`, `tunnel
 ## Formatting
 
 `rustfmt.toml` enforces:
-- `imports_granularity = "Crate"` (grouped imports)
+- `imports_granularity = "Crate"`
 - `max_width = 100`, `comment_width = 100`
 - `trailing_comma = "Vertical"`, `newline_style = "Unix"`
 
@@ -87,8 +100,8 @@ Always run `cargo fmt` before committing.
 
 - Crypto crates are pre-release (`ed25519-dalek 3.0.0-pre.6`, `ml-kem 0.3.0-rc.0`, etc.)
 - Two async runtimes: tokio (default), smol (opt-in via `emissary-util`)
-- Custom cargo profile `testnet` (release + debug=1 + assertions) — not standard
-- Dioxus desktop UI requires system GTK3/WebKit libs (see `Dockerfile` for full list)
-- `emissary-core` supports `no_std` (uses `spin` instead of `parking_lot`)
-- `package.json` is only for vitepress docs, not the Rust project
-- I2PControl feature (`i2pcontrol`) is optional, disabled by default; activates axum, TLS, JSON-RPC
+- Custom cargo profile `testnet` (release + debug=1 + assertions)
+- Dioxus desktop UI requires system GTK3/WebKit libs
+- `emissary-core` supports `no_std`
+- `package.json` is docs-only
+- I2PControl feature (`i2pcontrol`) is optional and disabled by default

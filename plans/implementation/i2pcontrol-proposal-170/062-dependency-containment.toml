@@ -36,15 +36,16 @@ baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 # entries below are planning documents only; their presence here does not
 # authorize any production path, dependency, or lockfile change.
 #
-# M140-M145 are closed as complete. M146 is closed as blocked with zero
-# production delta. M153 is the sole registered successor and is a
-# qualification/test/documentation corrective with zero production authority.
-# M154 is deferred/unregistered and likewise planning/audit-only. M147-M152
-# remain deferred/unregistered. Candidate crypto/NetDB/destination paths named
-# by those plans are NOT executable authority. Any future security-sensitive
-# milestone must be amended and explicitly registered with exact-file M061/M062
-# authorization before coding. No broad crypto/netdb/i2np/destination prefix
-# allowance is created here.
+# M140-M145 are closed complete; M146 is closed blocked; M153 is closed
+# qualification authority; M154 closed disposition C and left M147/M148
+# configurable SigType blocked. M155 is the sole registered successor and has
+# ZERO production/dependency authority. M156-M162 and re-gated M152 are
+# deferred/unregistered planning only. Candidate Red25519/curve25519,
+# LeaseSet2, DatabaseStore, destination publication, NetDB, secret-store and
+# I2PControl paths named in those drafts are NOT executable authority. Any
+# future security-sensitive milestone must be amended and explicitly
+# registered with exact-file M061/M062 authorization before coding. No broad
+# crypto/netdb/i2np/destination/primitives prefix allowance is created here.
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",
@@ -87,11 +88,20 @@ root_manifests = [
   "plans/implementation/i2pcontrol-proposal-170/152-final-residual-proposal-170-requalification.md",
   "plans/implementation/i2pcontrol-proposal-170/153-post-m146-current-head-requalification-and-authority-rebase.md",
   "plans/implementation/i2pcontrol-proposal-170/154-m147-signature-domain-security-and-owner-refreeze.md",
+  "plans/implementation/i2pcontrol-proposal-170/155-post-m154-leaseset-security-semantic-and-owner-refreeze.md",
+  "plans/implementation/i2pcontrol-proposal-170/156-neutral-red25519-blinding-primitive.md",
+  "plans/implementation/i2pcontrol-proposal-170/157-modern-encrypted-leaseset2-publication-primitive.md",
+  "plans/implementation/i2pcontrol-proposal-170/158-leaseset-lookup-secret-and-blinded-address-primitive.md",
+  "plans/implementation/i2pcontrol-proposal-170/159-leaseset-psk-client-authorization-primitive.md",
+  "plans/implementation/i2pcontrol-proposal-170/160-leaseset-dh-client-authorization-primitive.md",
+  "plans/implementation/i2pcontrol-proposal-170/161-legacy-aes-ls1-feasibility-and-contract-gate.md",
+  "plans/implementation/i2pcontrol-proposal-170/162-proposal-leaseset-security-field-integration.md",
   "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md",
+  "plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md",
 ]
 
 [prohibited_production_paths]

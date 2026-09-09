@@ -53,6 +53,8 @@ The Proposal-170 PR's `ServiceTunnelCreator` maps PSK modes as follows:
 
 M159 consumes this standard representation only. It does not generate Proposal-layer names or persistent keys.
 
+Reference duplicate semantics are also frozen: Java appends every configured PSK entry and does not deduplicate equal key bytes before encryption. M159 therefore preserves duplicate configured entries in order to avoid inventing a narrower standard domain. Each duplicate consumes one client record and the same bounded work/size budget. M162 may reject duplicate Proposal-level names only if the Proposal schema itself requires that; it must not silently deduplicate key entries before the standard runtime.
+
 ### 2.2 Layer-1 PSK format
 
 Pinned Java `EncryptedLeaseSet` and the Encrypted LeaseSet specification establish:
@@ -112,7 +114,7 @@ Before any per-client HKDF/ChaCha work, compute the complete encrypted-data size
 <= 4096
 ```
 
-This simultaneously bounds allocation and PSK work. `N` must also fit `u16`, but the 4096-byte bound is stricter. If the current inner LeaseSet leaves insufficient room for all configured keys, activation/publication fails closed; entries are never silently dropped or truncated.
+This simultaneously bounds allocation and PSK work. `N` must also fit `u16`, but the 4096-byte bound is stricter. If the current inner LeaseSet leaves insufficient room for all configured keys, activation/publication fails closed; entries are never silently dropped, truncated, or deduplicated to fit.
 
 ## 3. Exact production-path freeze
 
@@ -146,9 +148,9 @@ M159 authorizes no Cargo manifest, lockfile, Yosemite, feature, I2PControl produ
 
 ### 5.1 Dedicated neutral types
 
-`crypto/els2.rs` must introduce or extend narrow non-`Debug`, zeroizing types for one 32-byte PSK and the generation-local bounded PSK authorization set.
+`crypto/els2.rs` must introduce or extend narrow non-`Debug`, zeroizing types for one 32-byte PSK and the generation-local bounded PSK authorization sequence.
 
-The base `leaseSetPrivKey` PSK is always the first logical authorized key. Indexed per-user keys follow. Runtime does not need or retain user names.
+The base `leaseSetPrivKey` PSK is always the first logical authorized key. Indexed per-user keys follow in configured order before publication-order randomization. Runtime does not need or retain user names.
 
 ### 5.2 Parser extraction
 
@@ -159,7 +161,7 @@ The base `leaseSetPrivKey` PSK is always the first logical authorized key. Index
 3. scan indexed `i2cp.leaseSetClient.psk.N` entries from zero;
 4. permit an optional single `name:` prefix and validate the suffix as Base64 exactly 32 bytes;
 5. reject malformed suffixes, index gaps followed by later entries, mixed DH entries, unsupported auth selectors, or incompatible companion keys;
-6. reject duplicate PSK bytes rather than emit duplicate client IDs;
+6. preserve duplicate PSK entries exactly as the pinned Java runtime does; do not deduplicate them;
 7. enforce a checked pre-allocation absolute entry ceiling derived from the 4096-byte minimum framing and re-check exact serialized size before per-key crypto;
 8. remove `leaseSetPrivKey` and all PSK entry values from generic debug-capable options before constructing `SamCommand` or retained session state.
 
@@ -167,7 +169,7 @@ The optional M158 lookup secret remains in its existing dedicated zeroizing hand
 
 ### 5.3 No persistence in core
 
-Core does not persist PSKs. A new standard SAM generation must supply the same standard key properties to recreate the authorization set. Persistent key creation/custody and transactional edit/restart behavior are M162 authority.
+Core does not persist PSKs. A new standard SAM generation must supply the same standard key properties to recreate the authorization sequence. Persistent key creation/custody and transactional edit/restart behavior are M162 authority.
 
 ## 6. Crypto owner work
 
@@ -191,7 +193,7 @@ The no-auth M157 path and lookup-secret-only M158 path must remain byte/behavior
 
 For PSK mode:
 
-- every regenerated encrypted outer object uses a fresh auth cookie/auth salt and freshly randomized client-record order when more than one key exists;
+- every regenerated encrypted outer object uses a fresh auth cookie/auth salt and freshly randomized client-record order when more than one configured record exists;
 - daily blinding/store key continues to use the M158 lookup secret exactly;
 - storage verification remains keyed to the current blinded day;
 - build failure never falls back to no-auth or type 3;
@@ -206,19 +208,11 @@ Raw PSK material must never enter event/log/debug/public destination strings. Th
 
 ## 9. Interoperability and tests
 
-Require deterministic KATs with fixed destination/day/inner LS2/outer salt/inner salt/auth salt/auth cookie and one/multiple PSKs, independently checking:
+Require deterministic KATs with fixed destination/day/inner LS2/outer salt/inner salt/auth salt/auth cookie and one/multiple PSKs, independently checking subcredential, `ELS2PSKA` 52-byte outputs, client IDs, encrypted auth cookies, L2 key/IV with auth cookie, complete authenticated ciphertext, and outer Red25519 verification.
 
-- subcredential;
-- `ELS2PSKA` 52-byte outputs;
-- client IDs;
-- encrypted auth cookies;
-- L2 key/IV with auth cookie;
-- complete authenticated ciphertext;
-- outer Red25519 verification.
+Production ordering must be RNG-driven when `N>1`; deterministic test ordering must prove order-independence of authorization semantics. A duplicate-entry test must prove duplicates are preserved as separate records and remain bounded by the same 4096-byte ceiling.
 
-Production ordering must be RNG-driven when `N>1`; deterministic test ordering must prove order-independence of authorization semantics.
-
-Negative tests must cover missing base key, malformed/non-32-byte Base64, duplicate PSKs, sparse indexed entries, mixed PSK/DH entries, wrong auth type, wrong PSK/no client match, tampered ID/cookie/auth salt/flags, wrong lookup secret, checked-size overflow, >4096 encrypted data, stale day/material, and any attempted no-auth fallback.
+Negative tests must cover missing base key, malformed/non-32-byte Base64, sparse indexed entries, mixed PSK/DH entries, wrong auth type, wrong PSK/no client match, tampered ID/cookie/auth salt/flags, wrong lookup secret, checked-size overflow, >4096 encrypted data, stale day/material, and any attempted no-auth fallback.
 
 Reference interoperability must prove Emissary PSK output is consumable under pinned Java/reference semantics, or reproduce/decrypt a pinned reference fixture through an independent path. Deterministic reference randomness is not required if cross-implementation derivation/decryption evidence is stronger. No production client resolver is authorized.
 
@@ -249,22 +243,12 @@ Also run focused M157/M158 regressions for no-auth type 5, lookup-secret type 5,
 
 ## 12. Stop conditions
 
-Stop and amend before editing if implementation requires:
-
-- any production file outside the exact four-file set;
-- any new dependency/manifest/lockfile/Yosemite change;
-- I2PControl production changes;
-- a new NetDB/query/decryption subsystem;
-- a second publication owner/timer;
-- generic debug-capable PSK storage;
-- authenticated encrypted data larger than the pinned 4096-byte reference ceiling;
-- acceptance of malformed/sparse/mixed auth properties;
-- plaintext, unsecreted, or no-auth fallback after PSK activation.
+Stop and amend before editing if implementation requires any production file outside the exact four-file set, any new dependency/manifest/lockfile/Yosemite change, I2PControl production changes, a new NetDB/query/decryption subsystem, a second publication owner/timer, generic debug-capable PSK storage, authenticated encrypted data larger than the pinned 4096-byte reference ceiling, acceptance of malformed/sparse/mixed auth properties, or plaintext/unsecreted/no-auth fallback after PSK activation.
 
 If correct interoperability conflicts with this frozen contract, stop and amend rather than approximate.
 
 ## 13. Closure evidence
 
-Create `plans/closure/i2pcontrol-proposal-170/159-closure.md` recording implementation SHA/exact paths, standard-property parsing, custody/redaction audit, 4096-byte work-bound evidence, KAT/reference interop, randomized-order and negative tests, M157/M158/ordinary regressions, M061/M062/no-dependency evidence, no-std/lint results, exact `336/29/475`, zero-promotion attestation, and whether M160's pre-frozen envelope remains valid.
+Create `plans/closure/i2pcontrol-proposal-170/159-closure.md` recording implementation SHA/exact paths, standard-property parsing, duplicate-preservation behavior, custody/redaction audit, 4096-byte work-bound evidence, KAT/reference interop, randomized-order and negative tests, M157/M158/ordinary regressions, M061/M062/no-dependency evidence, no-std/lint results, exact `336/29/475`, zero-promotion attestation, and whether M160's pre-frozen envelope remains valid.
 
 On successful closure, remove M159 registration and advance only M160 if its pre-frozen envelope still matches the realized owner graph.

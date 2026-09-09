@@ -1,180 +1,107 @@
 # M152 — Final Residual Proposal-170 Requalification
 
-Status: **deferred / unregistered; hard-depends on M151 closure and the then-current M146/provider disposition**
+Status: **deferred / unregistered; hard-depends on M162 closure and any M161 outcome-A implementation successor**
 
 Class: invariant / qualification / final support authority
 
 Source roadmaps:
 
-- `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md`;
+- `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`;
 - `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md`.
 
 Promotion budget: **zero Proposal cells**.
+Production budget: **zero production Rust/dependency/Yosemite changes**.
 
 ## 1. Objective
 
-Perform the final current-head whole-surface Proposal-170 requalification after the safe residual implementation chain reaches its terminal state.
+Perform the final whole-surface Proposal-170 requalification after the corrected LeaseSet-security line reaches its truthful terminal state.
 
-M152 decides one of two truthful outcomes:
+M152 decides only between:
 
-1. **full support for all applicable cells at the pinned revision**, only if there are zero applicable blockers; or
-2. **safe partial / terminal under current security policy**, if all planned safe work is complete but one or more explicitly accepted blockers remain, including M146 `UseOutproxyPlugin` unless a separately accepted provider successor resolves it.
+1. **full support** for the pinned Proposal revision, requiring zero applicable blockers; or
+2. **safe partial / terminal under current policy**, when all safe implementation work is complete and every remaining blocker has an explicit accepted architecture/security disposition.
 
-M152 is not an implementation milestone. Any required production change is a stop condition requiring a separate corrective plan.
+M152 cannot implement or promote capabilities.
 
-## 2. Hard dependencies and entry conditions
+## 2. Entry gate
 
-Hard dependencies:
+Before registration:
 
-- M151 closed or otherwise reached a truthful terminal disposition under the current corrective roadmap;
-- M153 closed and established the current runtime/security qualification authority;
-- M154 and M147-M151 dispositions are recorded in the registry;
-- M146 remains either closed blocked or is explicitly superseded by a separately accepted provider successor;
+- M153 remains accepted current-head qualification ancestry;
+- M146 `UseOutproxyPlugin` is either still explicitly blocked or superseded by a separately accepted provider plan;
+- M147/M148 configurable `SigType` is either still explicitly blocked or superseded by a separately accepted architecture/security plan;
+- M155-M160 have closed with recorded dispositions;
+- M161 has an explicit legacy-AES disposition;
+- if M161 outcome A created a legacy-LS1 implementation successor, that successor has closed before M162 could promote `EncryptLeaseSet`;
+- M162 has closed with the exact final LeaseSet-field promotions/blockers;
 - no other Proposal capability plan is registered.
 
-Entry begins from a mechanically recomputed M095 state. Do not assume predecessor maximum promotion budgets were achieved.
+The entry matrix is mechanically recomputed; no predecessor promotion ceiling is assumed to have been achieved.
 
-## 3. Production path budget
+## 3. Mechanical matrix audit
 
-Production Rust, Cargo/dependency, Yosemite, runtime configuration, router, NetDB, crypto, transport and frontend changes are **forbidden** in M152.
+Parse all 840 M095 TunnelManager cells and independently verify:
 
-Authorized work is limited to:
+- exact apply/blocked/N/A totals;
+- exact blocked cell identities;
+- every `apply` row has real runtime/interoperability evidence rather than parser/persistence/serializer reachability;
+- every N/A row has affirmative family/spec evidence;
+- `SigType`, `UseOutproxyPlugin`, `EncryptLeaseSet`, `OptionalLookup`, and `LeaseSetClientAuths` dispositions match their actual closed milestones.
 
-- final qualification/integration/adversarial tests;
-- machine-evidence metadata reconciliation where mechanically stale;
-- active docs/registry/roadmaps;
-- final closure evidence.
+Full support requires `blocked_primitive == 0`.
 
-If a runtime/code/dependency change is required, stop and create/register a separate corrective implementation plan.
+Safe-partial terminal closure requires every blocker to be tied to an accepted blocked/security disposition and no remaining dependency-ready safe implementation plan under current architecture/policy.
 
-## 4. Mechanical final matrix audit
+## 4. Whole-surface composition requalification
 
-At start:
+Re-run and cross-compose:
 
-- parse every M095 TunnelManager row;
-- recompute total/apply/blocked/N/A counts;
-- independently enumerate every blocked cell identity;
-- verify every `apply` cell names real runtime evidence/closure ownership;
-- verify every `not_applicable` cell has affirmative Proposal/reference family evidence where required;
-- reject any capability represented only by parser/persistence/serializer/dormant state.
+- M127 finite token lifetime;
+- M128 bounded JSON-RPC admission/batches;
+- M129 fail-closed management TLS;
+- shared session/destination ownership and M135 live quantity/LeaseSet truthfulness;
+- Reduce -> Close -> authoritative IdlePolicy -> NewDest lifecycle;
+- M141 UniqueLocal loopback confinement;
+- M142 SSLProxies/JumpList I2P-only egress/injection safety;
+- M143 retained Profile behavior;
+- M144 application TLS separation;
+- M145 reply-LeaseSet bundling privacy/liveness;
+- M146 blocked provider behavior if still blocked;
+- M156 Red25519/blinding and M157 encrypted-LS2 publication if implemented;
+- M158 lookup-secret/addressing;
+- M159 PSK auth;
+- M160 DH auth;
+- M161 legacy AES disposition/implementation result;
+- M162 Proposal field validation, secret transactionality and no-downgrade semantics.
 
-Exactly 840 cells must be accounted for.
+Blocked predecessors are tested for exact fail-before-allocation behavior, not treated as support.
 
-### Full-support gate
+## 5. Security/containment audit
 
-A full-support claim requires:
+Independently prove:
 
-- `blocked_primitive == 0`;
-- every cell is `apply` or evidence-backed `not_applicable`.
+- Proposal/admin policy remains under `emissary-cli/src/i2pcontrol/**` wherever possible;
+- every non-I2PControl production path introduced by the line is exact in M061/M062 with a neutral owner/rationale;
+- no broad crypto/netdb/i2np/destination waiver exists;
+- no Proposal terminology leaked into core neutral APIs;
+- I2PControl-only direct dependencies remain optional/feature-owned;
+- Yosemite remains exact optional authority unless separately superseded;
+- no plaintext/unsecreted/unauthenticated downgrade exists in LeaseSet security modes;
+- Red25519/PSK/DH/private lookup material is not logged or response-facing;
+- no direct-clearnet fallback was introduced for M146;
+- no high/medium security finding is waived to improve completion status.
 
-### Safe-partial terminal gate
+## 6. Expected terminal examples
 
-If blockers remain, M152 may still close the current safe residual workstream only when:
+From the M153 baseline `336/29/475`:
 
-- every remaining blocker is explicitly named and tied to an accepted blocked/security disposition;
-- no unimplemented capability is mislabeled complete;
-- all implemented applicable cells requalify cleanly;
-- active docs remain explicitly partial;
-- the closure says what future architecture/security decision would be needed to resume.
+- if modern LeaseSet security allows `OptionalLookup` + `LeaseSetClientAuths` promotion but legacy AES keeps `EncryptLeaseSet` blocked, a possible terminal state is `346/19/475`;
+- if all ten `EncryptLeaseSet` values also close, a possible state is `351/14/475`;
+- if later independent work also resolves SigType and UseOutproxyPlugin, full support may become possible.
 
-If M146 remains unchanged, the expected terminal residual is at least the four `UseOutproxyPlugin` cells.
+These are examples only; M152 must use the actual machine matrix.
 
-## 5. Whole-surface composition requalification
-
-Re-run and cross-compose at least:
-
-### Control plane
-
-- finite token lifetime;
-- bounded JSON-RPC body/request/task/batch admission;
-- batch auth/notification semantics;
-- fail-closed non-loopback management TLS;
-- secret/token/password/private-key redaction.
-
-### Tunnel/session lifecycle
-
-- shared session/destination ownership;
-- variance/backup/live quantity/LeaseSet desired-count behavior;
-- Reduce -> Close -> authoritative `IdlePolicy` -> NewDest sequence;
-- manual/restart/failure negative paths;
-- cancellation and generation isolation.
-
-### M140-M146 residual application features
-
-- UniqueLocal source binding preserves loopback confinement;
-- SSLProxies/JumpList preserve I2P-only egress and injection safety;
-- Profile affects only the retained streaming family;
-- UseSSL remains application TLS and cannot weaken management/SAM TLS;
-- MultiHoming reply LeaseSet bundling preserves handshake/liveness/privacy rules;
-- M146 blocked behavior still cannot create direct-clearnet fallback or accept-inert provider support.
-
-### SigType/LeaseSet-security tail
-
-For every actually completed predecessor:
-
-- generated SigType identity must match selected suite with no fallback;
-- encrypted LeaseSet cannot downgrade to plaintext;
-- OptionalLookup cannot downgrade to public lookup or leak secret;
-- LeaseSetClientAuths must reject unauthorized clients and cannot downgrade to unauthenticated publication.
-
-If a predecessor closed blocked, test fail-before-allocation behavior instead of pretending support.
-
-At least one integrated test must combine late features where interaction is plausible.
-
-## 6. Containment and dependency requalification
-
-M152 must independently prove:
-
-- Proposal/admin policy remains rooted under `emissary-cli/src/i2pcontrol/**` wherever possible;
-- every non-I2PControl production file introduced by the workstream is individually present in M061 with neutral owner/rationale;
-- no broad path/glob exception was introduced for crypto/NetDB/I2NP convenience;
-- no Proposal-specific terminology/API leaked into core;
-- I2PControl-only direct dependencies remain optional and feature-owned;
-- exact Yosemite fork remains optional/pinned unless separately superseded;
-- feature-disabled/default builds do not activate I2PControl-only behavior/deps;
-- no parallel raw SAM implementation exists;
-- no direct-clearnet provider/fallback was introduced under M146 or any successor without an explicit accepted architecture/security change.
-
-## 7. Security/adversarial closure matrix
-
-Build a final table covering all sensitive residuals, including blocked ones:
-
-- UniqueLocal: hostile peer/text cannot select target/non-loopback egress;
-- proxy routing: hostile Host/proxy/jump values cannot cause DNS/direct clearnet/injection/unbounded cache;
-- TLS: no plaintext fallback, cert/key leak, handshake stall or verification bypass;
-- bundling: no wrong/private/fabricated LeaseSet;
-- SigType: wrong type/key, fallback, malformed import, persistence mismatch;
-- encrypted LeaseSet: wrong keys/type, downgrade, stale/fabricated leases;
-- lookup: wrong secret, public-lookup downgrade, negative-cache flood;
-- client auth: unauthorized/wrong-mode, auth-list flood, downgrade, rotation/restart race;
-- UseOutproxyPlugin: no dummy/accept-inert provider and no direct-clearnet escape if still blocked.
-
-No high/medium finding may be waived to improve completion status.
-
-## 8. Authority/documentation transition
-
-### If full support passes
-
-Update:
-
-- `plans/registry.md` to close the corrective/full-support roadmaps and make M152 current final Proposal-170 qualification authority;
-- full-support roadmap status to complete for pinned revision;
-- implementation README and active user-facing support docs to zero blockers/full support;
-- exact final M095 counts/hash/head.
-
-### If safe partial terminal passes
-
-Update:
-
-- registry to close the current safe residual workstream as partial/terminal under current policy;
-- M152 as current final qualification authority for the implemented subset;
-- full-support roadmap to remain partial with exact blocker list;
-- implementation README/support docs with exact terminal blockers and required future architecture/security decision;
-- no implication that blocked cells are supported.
-
-Historical closure files remain unchanged in either outcome.
-
-## 9. Verification baseline
+## 7. Verification baseline
 
 At minimum:
 
@@ -194,52 +121,27 @@ cargo fmt --all -- --check
 git diff --check
 ```
 
-Also run every durable milestone-specific security/integration test from M127 onward that remains applicable to current head. M153 should have made historical aggregate assertions compatible with this broad-run requirement.
+Also run all durable security/interoperability tests created by M156-M162.
 
-## 10. Acceptance criteria — full support
+## 8. Stop conditions
 
-M152 may close **full/complete** only when:
+Stop and create a corrective implementation plan if:
 
-- machine matrix has zero applicable blocked cells;
-- every apply/N/A row is evidence-backed;
-- whole-surface runtime/security composition passes;
-- containment/dependency isolation passes with exact paths;
-- no high/medium Proposal-scoped issue remains;
-- required live/reference interoperability is recorded;
-- active docs consistently state the same final matrix/revision;
-- no production code changed during M152;
-- external interaction remained read-only.
-
-## 11. Acceptance criteria — safe partial terminal
-
-M152 may close **partial/terminal under current policy** only when:
-
-- all remaining blockers are exact, mechanically enumerated and tied to accepted blocked/security decisions;
-- no further safe dependency-ready implementation plan exists under current architecture/policy;
-- every implemented applicable cell requalifies cleanly;
-- containment/security passes;
-- active docs remain explicitly partial and name residual blockers;
-- no production code changed during M152;
-- external interaction remained read-only.
-
-This disposition closes the current safe workstream but does **not** claim full Proposal support.
-
-## 12. Stop conditions
-
-Immediately stop and plan a corrective if:
-
-- any current `apply` row is inert/approximate;
-- any late feature weakens earlier security/containment invariants;
-- production code/dependency change is required to pass qualification;
+- any current `apply` cell is inert/approximate;
+- production code/dependency changes are required;
 - interoperability contradicts local tests;
+- a late feature weakens earlier containment/security;
 - exact path accounting requires a broad waiver;
-- a blocker lacks a defensible accepted disposition;
-- documentation cannot be reconciled without misstating support.
+- any blocker lacks an accepted disposition.
 
-## 13. External-interaction boundary
+## 9. Closure transition
 
-All external specification/reference access is read-only. M152 authorizes no upstream issue/PR/review/contact/submission or external repository mutation.
+If full support passes, make M152 the final qualification authority and close the full-support roadmap at the pinned revision.
 
-## 14. Closure evidence required
+If safe partial passes, make M152 the final qualification authority for the implemented subset, keep the full-support roadmap explicitly partial, enumerate every terminal blocker and the architecture/security decision required to resume.
 
-Record final HEAD, exact M095 hash/counts/blocked identities, full-support versus safe-partial disposition, all verification outputs, M127-M151 composition/adversarial table, M146/provider status, live/reference evidence, final M061/M062 diff, active documentation diff, historical-closure immutability review, final qualification-authority decision, and explicit external read-only attestation.
+Historical closures remain immutable. External reference access remains read-only.
+
+## 10. Closure evidence
+
+Record final HEAD, exact M095 hash/counts/blocked identities, full-vs-partial disposition, verification outputs, M127-M162 composition/adversarial table, M061/M062 evidence, live/reference interoperability, active documentation reconciliation, unresolved blockers, and external read-only attestation.

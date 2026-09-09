@@ -30,6 +30,31 @@ metrics = []
 expected = "ordinary registry Yosemite plus exact optional git fork package when i2pcontrol is enabled"
 baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
+# Exact registration-time M157 dependency/path budget. This is planning/execution
+# authority for M157 only; it does not alter the historical direct-dependency
+# ownership table above. The first M157 production commit must reconcile the
+# realized source diff into M061's ordinary [allowed]/[[evidence]] ledger.
+[registered_pending]
+milestone = "M157"
+production_paths = [
+  "emissary-core/src/crypto/els2.rs",
+  "emissary-core/src/crypto/mod.rs",
+  "emissary-core/src/primitives/lease_set.rs",
+  "emissary-core/src/primitives/mod.rs",
+  "emissary-core/src/i2np/database/store.rs",
+  "emissary-core/src/netdb/mod.rs",
+  "emissary-core/src/destination/lease_set.rs",
+  "emissary-core/src/destination/mod.rs",
+  "emissary-core/src/sam/parser.rs",
+  "emissary-core/src/sam/session.rs",
+]
+new_direct_dependencies = []
+manifest_changes = []
+lockfile_change = false
+yosemite_change = false
+i2pcontrol_source_change = false
+rationale = "M157 reuses closed M156 curve25519-dalek/Red25519 plus existing hmac, sha2, chacha20, rand, zeroize, bytes and nom. No Cargo, lockfile, Yosemite, or emissary-cli/src/i2pcontrol change is required or authorized."
+
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its
 # named production-path helpers. Implementation-plan and subsystem-roadmap
@@ -38,17 +63,12 @@ baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 #
 # M140-M145 are closed complete; M146 is closed blocked; M153 is closed
 # qualification authority; M154 closed disposition C and left M147/M148
-# configurable SigType blocked. M155 closed complete with zero production.
-# M156 is the sole registered successor with exact-file authorization only
-# (emissary-core/src/crypto/red25519.rs, emissary-core/src/crypto/mod.rs
-# declaration-only, emissary-core/Cargo.toml direct curve25519-dalek edge,
-# Cargo.lock). M157-M162 and re-gated M152 are deferred/unregistered planning
-# only. Candidate LeaseSet2, DatabaseStore, destination publication, NetDB,
-# secret-store and I2PControl paths named in those drafts are NOT executable
-# authority. Any future security-sensitive milestone must be amended and
-# explicitly registered with exact-file M061/M062 authorization before coding.
-# No broad crypto/netdb/i2np/destination/primitives prefix allowance is created
-# here.
+# configurable SigType blocked. M155 and M156 are closed complete.
+# M157 is the sole registered successor. Its exact pending production path set
+# and explicit zero-dependency/zero-manifest/zero-lock budget are recorded in
+# [registered_pending] and in M061 [registered_pending]. M158-M162 and re-gated
+# M152 remain deferred/unregistered planning only. No broad
+# crypto/netdb/i2np/destination/primitives prefix allowance is created here.
 root_manifests = [
   "Cargo.toml",
   "emissary-cli/Cargo.toml",

@@ -42,15 +42,15 @@ Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` whe
 - M154/M147/M148 configurable Destination `SigType` ×10: closed blocked;
 - M155-M159 LeaseSet-security neutral lineage: closed, zero Proposal promotions;
 - M160 DH/X25519 neutral lineage: closed, zero Proposal promotions;
-- **no registered successor; M161 deferred with satisfied hard dep, registration pending**.
+- **M161 legacy AES/LS1 gate registered / dependency-ready (zero production)**.
 
 Roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-Registered plan: `plans/implementation/i2pcontrol-proposal-170/160-leaseset-dh-client-authorization-primitive.md`
-(closed; closure: `plans/closure/i2pcontrol-proposal-170/160-closure.md`).
+Registered plan: `plans/implementation/i2pcontrol-proposal-170/161-legacy-aes-ls1-feasibility-and-contract-gate.md`
+(registered / dependency-ready; hard-depends on M160 closure).
 
-Closed plan: `plans/implementation/i2pcontrol-proposal-170/159-leaseset-psk-client-authorization-primitive.md`
-(closure: `plans/closure/i2pcontrol-proposal-170/159-closure.md`).
+Closed plan: `plans/implementation/i2pcontrol-proposal-170/160-leaseset-dh-client-authorization-primitive.md`
+(closure: `plans/closure/i2pcontrol-proposal-170/160-closure.md`).
 
 ## M160 exact production budget (realized)
 
@@ -129,14 +129,14 @@ M160 promoted **zero Proposal cells**; M095 remains exactly `336/29/475`.
 ```text
 M159 PSK authorization             [CLOSED]
   -> M160 DH/X25519 authorization  [CLOSED]
-  -> M161 legacy AES/LS1 gate      [DEFERRED; HARD-DEPENDS M160; ZERO PRODUCTION]
+  -> M161 legacy AES/LS1 gate      [REGISTERED; ZERO PRODUCTION]
   -> M162 Proposal field integration [DEFERRED]
   -> M152 final requalification    [DEFERRED]
 ```
 
 M160 reused the exact four M159 owners with the existing `x25519-dalek` dependency sufficient and no manifest/lock change. M160 must use the same 4096-byte O(N) bound, preserve duplicates, and explicitly reject all-zero X25519 shared secrets.
 
-M161 runs only after M160 and cannot implement legacy LS1 inside the gate. M162 is the first milestone allowed to promote LeaseSet fields and must implement typed/redacted I2PControl state plus transactional LeaseSet-security secret custody across all five server families.
+M161 is registered on the closed M160 head and cannot implement legacy LS1 inside the gate. M162 is the first milestone allowed to promote LeaseSet fields and must implement typed/redacted I2PControl state plus transactional LeaseSet-security secret custody across all five server families.
 
 Correct modern/legacy mappings for M162:
 

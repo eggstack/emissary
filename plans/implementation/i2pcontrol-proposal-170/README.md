@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M160 closed, no registered successor**.
+Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M160 closed, M161 registered**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -12,9 +12,9 @@ Residual blockers: 10 `SigType`, 5 `EncryptLeaseSet`, 5 `OptionalLookup`, 5 `Lea
 
 Roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md`.
 
-No registered handoff (M161 deferred with satisfied hard dep, registration pending):
+No registered handoff (M161 registered / dependency-ready, zero production):
 
-- **M161** `161-legacy-aes-ls1-feasibility-and-contract-gate.md` (deferred/unregistered).
+- **M161** `161-legacy-aes-ls1-feasibility-and-contract-gate.md` (registered/unblocked by M160 closure).
 
 M160 closed the neutral DH infrastructure with **zero Proposal promotions observed**.
 
@@ -86,12 +86,12 @@ M160 promoted **zero cells**. M095 remains `336/29/475`.
 ```text
 M159 PSK authorization             [CLOSED]
   -> M160 DH/X25519 authorization  [CLOSED]
-  -> M161 legacy AES/LS1 gate      [DEFERRED; HARD DEP SATISFIED, REGISTRATION PENDING; ZERO PRODUCTION]
+  -> M161 legacy AES/LS1 gate      [REGISTERED; ZERO PRODUCTION]
   -> M162 Proposal integration     [DEFERRED; CONTRACT PRE-CORRECTED]
   -> M152 final requalification    [DEFERRED]
 ```
 
-M161 may now be registered (hard dependency satisfied by M160 closure). It cannot implement LS1; outcome A creates a separate exact successor, B/C leave EncryptLeaseSet blocked.
+M161 is registered (hard dependency satisfied by M160 closure). It cannot implement LS1; outcome A creates a separate exact successor, B/C leave EncryptLeaseSet blocked.
 
 M162 has been corrected to require the exact direct-source mappings:
 
@@ -116,4 +116,4 @@ M149-M151 remain superseded historical drafts and must not be executed.
 - No secret/private/auth material in generic diagnostics or response-facing storage.
 - External/upstream access remains read-only.
 
-No milestone is currently registered. Only M161 may be registered next.
+No milestone beyond M161 is registered. M162/M152 remain deferred.

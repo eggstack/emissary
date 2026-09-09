@@ -30,25 +30,21 @@ metrics = []
 expected = "ordinary registry Yosemite plus exact optional git fork package when i2pcontrol is enabled"
 baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
-# Current milestone-specific dependency budget. M160 realized its exact
-# four-file subset of already-realized M061 owners and closed with zero
-# dependency/manifest/lock/Yosemite/I2PControl-source change, so this record
-# does not authorize a new source path. No successor is currently registered.
+# Current milestone-specific dependency budget. M161 is registered as a
+# strictly zero-production feasibility/contract gate over the frozen modern
+# type-5 owner graph; this record authorizes no production path, file,
+# dependency, manifest, lockfile, Yosemite, or I2PControl-source change.
+# No successor beyond M161 is registered.
 [current_registration]
-milestone = "M160 (closed complete, no registered successor)"
-production_paths = [
-  "emissary-core/src/crypto/els2.rs",
-  "emissary-core/src/destination/lease_set.rs",
-  "emissary-core/src/sam/parser.rs",
-  "emissary-core/src/sam/session.rs",
-]
+milestone = "M161 (registered / dependency-ready; zero production)"
+production_paths = []
 new_files = []
 new_direct_dependencies = []
 manifest_changes = []
 lockfile_change = false
 yosemite_change = false
 i2pcontrol_source_change = false
-rationale = "M160 realized a strict subset of already-realized M061 owners and reused existing x25519-dalek, HMAC-SHA256, ChaCha20, RNG, zeroize, Base64, Red25519 and encrypted-LS2 primitives with no new dependency or manifest/lock/Yosemite/I2PControl production change (observed; see 160-closure.md)."
+rationale = "M161 gate runs only planning/test/evidence work over the M160-closed modern owner graph with no production, dependency, manifest/lock, Yosemite, or I2PControl production change (registration; see 161 plan)."
 
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its
@@ -58,10 +54,9 @@ rationale = "M160 realized a strict subset of already-realized M061 owners and r
 #
 # M140-M145 are closed complete; M146 is closed blocked; M153 is closed
 # qualification authority; M154 closed disposition C and left M147/M148
-# configurable SigType blocked. M155-M159 are closed complete. M160 is the
-# sole registered successor with a zero-dependency budget and an exact
-# four-file subset already present in M061's realized source boundary.
-# M161/M162 and re-gated M152 remain deferred. No broad
+# configurable SigType blocked. M155-M160 are closed complete. M161 is the
+# sole registered successor with a zero-production budget (no production
+# path authorized). M162 and re-gated M152 remain deferred. No broad
 # crypto/netdb/i2np/destination/primitives prefix allowance is created.
 root_manifests = [
   "Cargo.toml",

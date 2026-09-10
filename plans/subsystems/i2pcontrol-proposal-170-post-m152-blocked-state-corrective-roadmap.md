@@ -1,8 +1,8 @@
 # Proposal 170 Post-M152 Blocked-State Corrective Roadmap
 
-Status: **active; M163 and M164 closed, M165 registered / dependency-ready**
+Status: **closed complete; M165 safe-partial current-head authority; no successor**
 
-Authority baseline: M152 closure on `11a48c1b87fadb6bce9d120f41025eaec563e837` plus post-closure current-code review.
+Authority baseline: M165 closure on `0dbaa6b1082762f5f2c42b47dcb22c1002ea4bf9` with M152 closure on `11a48c1b87fadb6bce9d120f41025eaec563e837` retained as historical evidence.
 
 ## Goal
 
@@ -31,7 +31,7 @@ This is a neutral SAM logging defect. It is independent of Proposal field suppor
 
 ### C. M095 production-head metadata is stale
 
-M095 still carries an older `current_production_head` even though later production-bearing M159/M160/M162 commits exist. After M163 and M164, a zero-production M165 must refresh that metadata to the actual last production-bearing corrective head and requalify the full surface.
+Before M165, M095 carried an older `current_production_head` even though later production-bearing M159/M160/M162/M164 commits existed. M165 refreshed that metadata to the actual last production-bearing corrective head and requalified the full surface.
 
 ## Sequence
 
@@ -39,7 +39,7 @@ M095 still carries an older `current_production_head` even though later producti
 M152 historical safe-partial qualification
   -> M163 blocked LeaseSet durable/history corrective   [CLOSED]
   -> M164 SAM invalid-command secret redaction          [CLOSED]
-  -> M165 post-corrective current-head requalification  [REGISTERED / DEPENDENCY-READY]
+  -> M165 post-corrective current-head requalification  [CLOSED; SAFE-PARTIAL AUTHORITY]
 ```
 
 ### M163 — blocked LeaseSet durable/history corrective
@@ -111,6 +111,6 @@ Future full-support work requires a separately accepted architecture/security de
 
 ## Completion rule
 
-The roadmap closes when M163 removes new and historical durable inert LeaseSet-security state, M164 removes malformed-SAM secret logging, and M165 requalifies the resulting production head with a mechanically correct matrix authority.
+The roadmap closes when M163 removes new and historical durable inert LeaseSet-security state, M164 removes malformed-SAM secret logging, and M165 requalifies the resulting production head with a mechanically correct matrix authority. M165 satisfied that rule on `0dbaa6b1082762f5f2c42b47dcb22c1002ea4bf9` with `336/29/475` unchanged.
 
-If any milestone discovers a new material defect, this roadmap remains active and the finding receives a separately registered corrective successor rather than being waived as terminal.
+No dependency-ready successor remains. Any future material defect receives a separately registered corrective plan rather than being waived as terminal; accepted blocked capability work likewise requires a new architecture/security decision.

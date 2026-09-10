@@ -2378,7 +2378,7 @@ fn read_planning_file(path: &str) -> String {
 }
 
 #[test]
-fn current_registration_and_m164_closure_are_exact_and_zero_dependency() {
+fn closed_registration_and_m164_closure_are_exact_and_zero_dependency() {
     let raw = read_planning_file(
         "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml",
     );
@@ -2390,7 +2390,7 @@ fn current_registration_and_m164_closure_are_exact_and_zero_dependency() {
 
     assert_eq!(
         registration.get("milestone").and_then(toml::Value::as_str),
-        Some("M165 (registered / dependency-ready)")
+        Some("none (M165 closed; no dependency-ready handoff)")
     );
 
     let paths = registration
@@ -2444,10 +2444,10 @@ fn current_registration_and_m164_closure_are_exact_and_zero_dependency() {
 }
 
 #[test]
-fn m164_is_closed_and_m165_is_the_registered_successor() {
+fn m163_m164_and_m165_closures_are_recorded() {
     let registry = read_planning_file("plans/registry.md");
-    assert!(registry.contains("M165 is the sole registered Proposal-170 implementation handoff"));
-    assert!(registry.contains("M165 is registered only after clean M163+M164 closures"));
+    assert!(registry.contains("M165 is the current safe-partial Proposal-170 authority"));
+    assert!(registry.contains("No dependency-ready Proposal-170 implementation handoff remains"));
 
     let m163 = read_planning_file(
         "plans/implementation/i2pcontrol-proposal-170/163-blocked-leaseset-state-persistence-corrective.md",
@@ -2464,7 +2464,7 @@ fn m164_is_closed_and_m165_is_the_registered_successor() {
     let m165 = read_planning_file(
         "plans/implementation/i2pcontrol-proposal-170/165-post-corrective-current-head-requalification.md",
     );
-    assert!(m165.contains("Status: **registered / dependency-ready**"));
+    assert!(m165.contains("Status: **closed as complete**"));
     assert!(m165.contains("Hard dependencies: M163 closure + M164 closure"));
 }
 

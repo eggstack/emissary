@@ -1,6 +1,6 @@
 # M165 — Post-Corrective Current-Head Requalification
 
-Status: **registered / dependency-ready**
+Status: **closed as complete** (closure: `plans/closure/i2pcontrol-proposal-170/165-closure.md`)
 
 Class: zero-production runtime/security/containment requalification
 

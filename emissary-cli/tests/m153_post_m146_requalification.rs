@@ -87,12 +87,12 @@ fn m153_current_matrix_is_336_29_475_with_exact_residuals() {
         matrix["source_sha256"].as_str(),
         Some("f13ae00b886c5e72131bc5d5b138a371148d1faa6899a119a1dacb65a555e7dc")
     );
-    // M153 reconciles the stale production-head pointer to the last accepted
-    // production-bearing commit (the M145 no-std/format follow-up). The M146
-    // closure commit made no production change and must not be named here.
+    // M153 historically reconciled the stale pointer to the M145 no-std/format
+    // follow-up. M165 now owns the current-head refresh after M163/M164; the
+    // M164 SAM socket commit is the last production-bearing commit.
     assert_eq!(
         matrix["current_production_head"].as_str(),
-        Some("7cbd80a6d72aa07d158ba9dc74f8bbacef767be2")
+        Some("0dbaa6b1082762f5f2c42b47dcb22c1002ea4bf9")
     );
 
     let tunnel_types = matrix["contract_names"]["canonical_tunnel_types"]

@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M152 retained as historical safe-partial qualification; M163 and M164 are closed, M165 is the sole registered corrective handoff**.
+Status: **partial Proposal 170 support; M165 is the current safe-partial qualification authority; no dependency-ready corrective handoff remains**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -24,11 +24,15 @@ Closed corrective:
 
 - **M164** `164-sam-invalid-command-secret-redaction-corrective.md` — neutral SAM log hardening after M163; closed with zero Proposal promotions.
 
-Registered handoff:
+Closed qualification:
 
-- **M165** `165-post-corrective-current-head-requalification.md` — zero-production current-head authority refresh after M163+M164; dependency-ready.
+- **M165** `165-post-corrective-current-head-requalification.md` — zero-production current-head authority refresh after M163+M164; closed as the safe-partial current-head authority.
 
 M149-M151 remain superseded historical drafts and must not be executed. M147/M148 remain blocked under M154-C. M146 remains blocked for `UseOutproxyPlugin`.
+
+No dependency-ready Proposal-170 implementation handoff remains. Future work on
+M146, M147/M148, or the superseded M149-M151 line requires a separately
+accepted architecture/security plan; M165 does not unblock any of those paths.
 
 ## Why M163 exists
 
@@ -86,7 +90,7 @@ It must remove rejected payload content wholesale and log only safe structural m
 
 M164 is closed by `plans/closure/i2pcontrol-proposal-170/164-closure.md`.
 
-## M165 registered current-head requalification
+## M165 closed current-head requalification
 
 After clean M163+M164 closures, M165 is zero-production/zero-promotion. It must:
 
@@ -153,8 +157,8 @@ M159 PSK authorization                       [CLOSED]
   -> M162 Proposal integration               [CLOSED; BLOCKED INTEGRATION]
   -> M152 historical requalification         [CLOSED; SAFE PARTIAL]
   -> M163 blocked-state persistence/history  [CLOSED]
-  -> M164 SAM invalid-command redaction      [REGISTERED]
-  -> M165 current-head requalification       [DEFERRED]
+  -> M164 SAM invalid-command redaction      [CLOSED]
+  -> M165 current-head requalification       [CLOSED; SAFE-PARTIAL AUTHORITY]
 ```
 
 ## Containment rules
@@ -167,4 +171,5 @@ M159 PSK authorization                       [CLOSED]
 - No secret/private/auth material in generic diagnostics, logs or response-facing storage.
 - External/upstream access remains read-only.
 
-File presence alone never authorizes production work; only the sole registered handoff does.
+File presence alone never authorizes production work; only an explicitly
+registered dependency-ready handoff does. No such handoff currently exists.

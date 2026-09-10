@@ -50,17 +50,17 @@ Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` whe
 - M161 legacy AES/LS1 gate: closed outcome B (valid but blocked), zero production/promotions;
 - M162 Proposal LeaseSet-security blocked integration: closed, zero promotions; all 15 LeaseSet cells remain blocked;
 - M152: closed historical safe-partial qualification on the M162 head; post-closure review found blocked-state persistence and malformed-SAM logging defects, so it is not the current terminal handoff authority;
-- **M163 and M164 are closed as complete; M165 is the sole registered/dependency-ready handoff**.
+- **M163, M164, and M165 are closed as complete; M165 is the current safe-partial authority and no dependency-ready handoff remains**.
 
-Current roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m152-blocked-state-corrective-roadmap.md`.
+Closed corrective roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m152-blocked-state-corrective-roadmap.md`.
 
 Closed plan: `plans/implementation/i2pcontrol-proposal-170/163-blocked-leaseset-state-persistence-corrective.md`.
 
 Closed plan: `plans/implementation/i2pcontrol-proposal-170/164-sam-invalid-command-secret-redaction-corrective.md`.
 
-Registered successor:
+Closed qualification:
 
-- M165 `165-post-corrective-current-head-requalification.md` — zero-production requalification after M163+M164 (registered / dependency-ready).
+- M165 `165-post-corrective-current-head-requalification.md` — zero-production requalification after M163+M164 (closed; current safe-partial authority; no successor).
 
 ## M163 exact production budget
 
@@ -108,9 +108,9 @@ M164 closed on exactly:
 
 Invalid-command handling now treats the complete rejected payload as sensitive and omits it from tracing, retaining only safe structural metadata such as observation id, peer and byte length. No ad-hoc key-name redaction was used; parser/session/connection semantics are unchanged. No dependencies or Proposal promotions.
 
-## M165 registered current-head requalification
+## M165 closed current-head requalification
 
-After clean M163+M164 closures, M165 is registered as zero-production/zero-promotion qualification. It must refresh M095 `current_production_head` to the actual last production-bearing M164 closure commit, mechanically re-evaluate `336/29/475`, and re-run whole-surface behavioral/security/containment evidence. It may become the new safe-partial current-head authority only if no high/medium defect remains.
+After clean M163+M164 closures, M165 completed zero-production/zero-promotion qualification. It refreshed M095 `current_production_head` to `0dbaa6b1082762f5f2c42b47dcb22c1002ea4bf9`, mechanically re-evaluated `336/29/475`, and re-ran whole-surface behavioral/security/containment evidence. No high/medium defect remains; M165 is the current safe-partial authority and no dependency-ready successor remains.
 
 ## M160 exact production budget (realized)
 
@@ -193,7 +193,7 @@ M159 PSK authorization                       [CLOSED]
   -> M152 historical requalification         [CLOSED; SAFE PARTIAL]
   -> M163 blocked-state persistence/history  [CLOSED]
   -> M164 SAM invalid-command redaction      [CLOSED]
-  -> M165 current-head requalification       [REGISTERED]
+  -> M165 current-head requalification       [CLOSED; SAFE-PARTIAL AUTHORITY]
 ```
 
 Correct modern/legacy mappings retained from M162:

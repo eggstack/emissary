@@ -30,22 +30,26 @@ metrics = []
 expected = "ordinary registry Yosemite plus exact optional git fork package when i2pcontrol is enabled"
 baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
-# Current milestone-specific dependency budget. M152 is closed as the final
-# zero-production whole-surface requalification on the M162-closed
-# blocked-integration head (safe partial / terminal). No production path,
-# dependency, manifest, lockfile, Yosemite, or core change was authorized or
-# made; planning/test/evidence only (same scope as the M161 zero-production
-# gate closure).
+# Current milestone-specific dependency budget. M163 is the sole registered
+# Proposal-170 handoff after post-M152 review found that M162-era blocked
+# LeaseSet-security fields could be durably persisted inertly, including in
+# retained generation history. M163 is an I2PControl-only three-path
+# corrective with zero dependency/manifest/lockfile/Yosemite/core expansion
+# and zero Proposal promotions.
 [current_registration]
-milestone = "M152 (closed complete, safe partial / terminal)"
-production_paths = []
+milestone = "M163 (registered / dependency-ready)"
+production_paths = [
+  "emissary-cli/src/i2pcontrol/tunnel_manager.rs",
+  "emissary-cli/src/i2pcontrol/stores/tunnel_store.rs",
+  "emissary-cli/src/i2pcontrol/stores/generation_store.rs",
+]
 new_files = []
 new_direct_dependencies = []
 manifest_changes = []
 lockfile_change = false
 yosemite_change = false
-i2pcontrol_source_change = false
-rationale = "M152 requalified the actual head with zero production/promotions and closed safe partial / terminal; planning/test/evidence only (same scope as the M161 zero-production gate closure)."
+i2pcontrol_source_change = true
+rationale = "M163 rejects blocked LeaseSet-security fields before Create/Edit persistence and performs a crash-resumable scrub of historical M162-era typed state, including fail-closed removal of contaminated retained generations after two clean fallback generations exist. All owners are inside the existing M061 I2PControl policy root; no broader production owner or dependency is authorized."
 
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its
@@ -53,12 +57,11 @@ rationale = "M152 requalified the actual head with zero production/promotions an
 # entries below are planning documents only; their presence here does not
 # authorize any production path, dependency, or lockfile change.
 #
-# M140-M145 are closed complete; M146 is closed blocked; M153 is closed
-# qualification authority; M154 closed disposition C and left M147/M148
-# configurable SigType blocked. M155-M161 are closed complete. M162 is the
-# sole registered successor with an I2PControl-only ten-file envelope
-# inside the M061 policy root (zero new dependency). Re-gated M152 remains
-# deferred. No broad
+# M140-M145 are closed complete; M146 is closed blocked; M153 is historical
+# qualification ancestry; M154 closed disposition C and left M147/M148
+# configurable SigType blocked. M155-M162 and M152 are closed historical
+# authority. M163 is the sole registered corrective, limited to the three
+# exact I2PControl paths above. M164/M165 are deferred/unregistered. No broad
 # crypto/netdb/i2np/destination/primitives prefix allowance is created.
 root_manifests = [
   "Cargo.toml",
@@ -110,12 +113,16 @@ root_manifests = [
   "plans/implementation/i2pcontrol-proposal-170/160-leaseset-dh-client-authorization-primitive.md",
   "plans/implementation/i2pcontrol-proposal-170/161-legacy-aes-ls1-feasibility-and-contract-gate.md",
   "plans/implementation/i2pcontrol-proposal-170/162-proposal-leaseset-security-field-integration.md",
+  "plans/implementation/i2pcontrol-proposal-170/163-blocked-leaseset-state-persistence-corrective.md",
+  "plans/implementation/i2pcontrol-proposal-170/164-sam-invalid-command-secret-redaction-corrective.md",
+  "plans/implementation/i2pcontrol-proposal-170/165-post-corrective-current-head-requalification.md",
   "plans/subsystems/i2pcontrol-proposal-170-post-m114-corrective-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md",
   "plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md",
+  "plans/subsystems/i2pcontrol-proposal-170-post-m152-blocked-state-corrective-roadmap.md",
 ]
 
 [prohibited_production_paths]

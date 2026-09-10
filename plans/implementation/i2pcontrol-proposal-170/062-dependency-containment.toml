@@ -30,23 +30,21 @@ metrics = []
 expected = "ordinary registry Yosemite plus exact optional git fork package when i2pcontrol is enabled"
 baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
-# Current milestone-specific dependency budget. M164 is the sole registered
-# Proposal-170 handoff after M163 closed the post-M152 M162-era blocked
-# LeaseSet-security fields could be durably persisted inertly, including in
-# retained generation history. M163 was an I2PControl-only three-path
-# corrective with zero dependency/manifest/lockfile/Yosemite/core expansion;
-# M164 is a one-file neutral core corrective with the same zero-expansion and
-# zero Proposal-promotion budget.
+# Current milestone-specific dependency budget. M165 is the sole registered
+# Proposal-170 handoff after M164 closed the post-M152 corrective line. M163
+# was an I2PControl-only three-path corrective; M164 was a one-file neutral
+# core corrective. Both had zero dependency/manifest/lockfile/Yosemite
+# expansion and zero Proposal-promotion budgets. M165 is qualification-only.
 [current_registration]
-milestone = "M164 (registered / dependency-ready)"
-production_paths = ["emissary-core/src/sam/socket.rs"]
+milestone = "M165 (registered / dependency-ready)"
+production_paths = []
 new_files = []
 new_direct_dependencies = []
 manifest_changes = []
 lockfile_change = false
 yosemite_change = false
 i2pcontrol_source_change = false
-rationale = "M164 is now dependency-ready after M163 closure. It removes raw rejected SAM command content from tracing in the exact neutral socket owner; no broader production owner or dependency is authorized."
+rationale = "M165 is dependency-ready after clean M163 and M164 closures. It is zero-production qualification that refreshes M095 current-head authority; no production owner or dependency is authorized."
 
 [m163_closure]
 milestone = "M163 (closed as complete; zero promotions)"
@@ -62,6 +60,16 @@ lockfile_change = false
 yosemite_change = false
 i2pcontrol_source_change = true
 
+[m164_closure]
+milestone = "M164 (closed as complete; zero promotions)"
+production_paths = ["emissary-core/src/sam/socket.rs"]
+new_files = []
+new_direct_dependencies = []
+manifest_changes = []
+lockfile_change = false
+yosemite_change = false
+i2pcontrol_source_change = false
+
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its
 # named production-path helpers. Implementation-plan and subsystem-roadmap
@@ -72,7 +80,8 @@ i2pcontrol_source_change = true
 # qualification ancestry; M154 closed disposition C and left M147/M148
 # configurable SigType blocked. M155-M162 and M152 are closed historical
 # authority. M163 is the sole registered corrective, limited to the three
-# exact I2PControl paths above. M164/M165 are deferred/unregistered. No broad
+# exact I2PControl paths above. M164 is closed and M165 is the current
+# qualification-only registration. No broad
 # crypto/netdb/i2np/destination/primitives prefix allowance is created.
 root_manifests = [
   "Cargo.toml",

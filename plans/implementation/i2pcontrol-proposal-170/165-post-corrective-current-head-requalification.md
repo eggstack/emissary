@@ -1,6 +1,6 @@
 # M165 — Post-Corrective Current-Head Requalification
 
-Status: **deferred / unregistered**
+Status: **registered / dependency-ready**
 
 Class: zero-production runtime/security/containment requalification
 

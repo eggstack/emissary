@@ -176,7 +176,9 @@ impl<R: Runtime> Stream for SamSocket<R> {
                                     Some(command) => return Poll::Ready(Some(command)),
                                     None => tracing::warn!(
                                         target: LOG_TARGET,
-                                        %command,
+                                        observation_id = this.observation_id,
+                                        ?this.peer,
+                                        command_len = command.len(),
                                         "invalid sam command",
                                     ),
                                 }
@@ -263,8 +265,61 @@ mod tests {
         sam::parser::SamVersion,
     };
     use futures::StreamExt;
-    use std::time::Duration;
+    use std::{
+        fmt::Write as _,
+        future::Future as _,
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
     use tokio::{io::AsyncWriteExt, net::TcpListener};
+    use tracing_subscriber::{
+        layer::{Context, SubscriberExt},
+        registry::LookupSpan,
+        Layer,
+    };
+
+    #[derive(Clone)]
+    struct EventCapture {
+        events: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl<S> Layer<S> for EventCapture
+    where
+        S: tracing::Subscriber + for<'span> LookupSpan<'span>,
+    {
+        fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
+            let mut fields = String::new();
+            event.record(&mut EventVisitor(&mut fields));
+            self.events.lock().unwrap().push(fields);
+        }
+    }
+
+    struct EventVisitor<'a>(&'a mut String);
+
+    impl tracing::field::Visit for EventVisitor<'_> {
+        fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+            if !self.0.is_empty() {
+                self.0.push(' ');
+            }
+            let _ = write!(self.0, "{}={value:?}", field.name());
+        }
+
+        fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+            self.record_debug(field, &value);
+        }
+
+        fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
+            self.record_debug(field, &value);
+        }
+
+        fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
+            self.record_debug(field, &value);
+        }
+
+        fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
+            self.record_debug(field, &value);
+        }
+    }
 
     #[tokio::test]
     async fn read_command_normal() {
@@ -339,5 +394,60 @@ mod tests {
         }
 
         assert_eq!(socket.read_offset, 0usize);
+    }
+
+    #[tokio::test]
+    async fn invalid_command_log_omits_rejected_secret_bearing_payload() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let (stream1, stream2) = tokio::join!(listener.accept(), MockTcpStream::connect(address));
+
+        let (mut stream, _) = stream1.unwrap();
+        let observation_peer = Some(address);
+        let mut socket =
+            SamSocket::<MockRuntime>::new_with_peer(stream2.unwrap(), observation_peer);
+        let observation_id = socket.observation_id();
+        let markers = [
+            "LOOKUP_SECRET_M164_UNIQUE",
+            "PSK_SECRET_M164_UNIQUE",
+            "DH_PRIVATE_M164_UNIQUE",
+        ];
+        let malformed = format!(
+            "BOGUS i2cp.leaseSetSecret={} i2cp.leaseSetClient.psk.0={} \
+             i2cp.leaseSetClient.dh.0={}\n",
+            markers[0], markers[1], markers[2]
+        );
+        let command_len = malformed.trim_end_matches('\n').len();
+        stream.write_all(malformed.as_bytes()).await.unwrap();
+        stream.shutdown().await.unwrap();
+
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let subscriber = tracing_subscriber::registry().with(EventCapture {
+            events: events.clone(),
+        });
+        let dispatch = tracing::Dispatch::new(subscriber);
+        let mut next = Box::pin(socket.next());
+        let result = futures::future::poll_fn(|cx| {
+            let _guard = tracing::dispatcher::set_default(&dispatch);
+            next.as_mut().poll(cx)
+        })
+        .await;
+
+        assert!(
+            result.is_none(),
+            "invalid command must preserve stream behavior"
+        );
+        let captured = events.lock().unwrap().join("\n");
+        assert!(captured.contains("invalid sam command"));
+        assert!(captured.contains(&format!("observation_id={observation_id}")));
+        assert!(captured.contains(&format!("peer={observation_peer:?}")));
+        assert!(captured.contains(&format!("command_len={command_len}")));
+        assert!(!captured.contains("command="));
+        for marker in markers {
+            assert!(
+                !captured.contains(marker),
+                "rejected command marker leaked into captured fields: {marker}"
+            );
+        }
     }
 }

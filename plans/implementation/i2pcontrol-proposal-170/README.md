@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M152 retained as historical safe-partial qualification; M163 is closed and M164 is the sole registered corrective handoff**.
+Status: **partial Proposal 170 support; M152 retained as historical safe-partial qualification; M163 and M164 are closed, M165 is the sole registered corrective handoff**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -20,13 +20,13 @@ Closed corrective:
 
 - **M163** `163-blocked-leaseset-state-persistence-corrective.md` — I2PControl-only correctness/security corrective; closed with zero Proposal promotions.
 
+Closed corrective:
+
+- **M164** `164-sam-invalid-command-secret-redaction-corrective.md` — neutral SAM log hardening after M163; closed with zero Proposal promotions.
+
 Registered handoff:
 
-- **M164** `164-sam-invalid-command-secret-redaction-corrective.md` — neutral SAM log hardening after M163; dependency-ready.
-
-Deferred successor:
-
-- **M165** `165-post-corrective-current-head-requalification.md` — zero-production current-head authority refresh after M163+M164.
+- **M165** `165-post-corrective-current-head-requalification.md` — zero-production current-head authority refresh after M163+M164; dependency-ready.
 
 M149-M151 remain superseded historical drafts and must not be executed. M147/M148 remain blocked under M154-C. M146 remains blocked for `UseOutproxyPlugin`.
 
@@ -74,7 +74,7 @@ Required sequence:
 
 Do not change ordinary `GenerationStore::cleanup()` retention semantics globally.
 
-## M164 planned SAM log hardening
+## M164 completed SAM log hardening
 
 Current `emissary-core/src/sam/socket.rs` logs the complete rejected UTF-8 `%command` when `SamCommand::parse()` returns `None`. Malformed standard SAM/I2CP commands can therefore echo lookup passwords or PSK/DH key material into logs.
 
@@ -84,7 +84,9 @@ M164 is intentionally one production file only:
 
 It must remove rejected payload content wholesale and log only safe structural metadata such as observation id, peer and command byte length. No ad-hoc secret-key regex/list; no parser/session/connection semantic change; no dependency/Yosemite/I2PControl production change; zero Proposal promotions.
 
-## M165 planned current-head requalification
+M164 is closed by `plans/closure/i2pcontrol-proposal-170/164-closure.md`.
+
+## M165 registered current-head requalification
 
 After clean M163+M164 closures, M165 is zero-production/zero-promotion. It must:
 

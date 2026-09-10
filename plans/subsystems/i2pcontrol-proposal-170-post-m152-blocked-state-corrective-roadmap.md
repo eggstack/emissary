@@ -1,6 +1,6 @@
 # Proposal 170 Post-M152 Blocked-State Corrective Roadmap
 
-Status: **active; M163 closed, M164 registered / dependency-ready**
+Status: **active; M163 and M164 closed, M165 registered / dependency-ready**
 
 Authority baseline: M152 closure on `11a48c1b87fadb6bce9d120f41025eaec563e837` plus post-closure current-code review.
 
@@ -38,8 +38,8 @@ M095 still carries an older `current_production_head` even though later producti
 ```text
 M152 historical safe-partial qualification
   -> M163 blocked LeaseSet durable/history corrective   [CLOSED]
-  -> M164 SAM invalid-command secret redaction          [REGISTERED / DEPENDENCY-READY]
-  -> M165 post-corrective current-head requalification  [DEFERRED]
+  -> M164 SAM invalid-command secret redaction          [CLOSED]
+  -> M165 post-corrective current-head requalification  [REGISTERED / DEPENDENCY-READY]
 ```
 
 ### M163 — blocked LeaseSet durable/history corrective
@@ -80,7 +80,7 @@ Responsibilities:
 - preserve parser/session/connection behavior;
 - zero dependencies and zero Proposal promotions.
 
-M164 is registered after clean M163 closure. `sam/socket.rs` is already an exact realized M061 neutral owner, so no broad source-boundary waiver is needed.
+M164 closed after clean M163 closure. `sam/socket.rs` is already an exact realized M061 neutral owner, so no broad source-boundary waiver was needed. Closure evidence is recorded in `plans/closure/i2pcontrol-proposal-170/164-closure.md`.
 
 ### M165 — post-corrective qualification
 

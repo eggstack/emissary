@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | subordinate to current corrective roadmap |
-| Post-M152 blocked-state/security corrective | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m152-blocked-state-corrective-roadmap.md` | **M164 registered / dependency-ready** |
+| Post-M152 blocked-state/security corrective | **active** | `plans/subsystems/i2pcontrol-proposal-170-post-m152-blocked-state-corrective-roadmap.md` | **M165 registered / dependency-ready** |
 | Post-M154 LeaseSet-security corrective | historical through M152 | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | M152 historical safe-partial closure; superseded as active handoff by M163 |
 | Post-M146 corrective | historical through M154 | `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` | M153 complete; M154 disposition C |
 | Residual primitive completion | historical through M146 | `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md` | M140-M145 complete; M146 blocked |
@@ -118,31 +118,31 @@ Create/Edit with any supplied blocked LeaseSet-security field must also fail bef
 
 No Proposal promotion/demotion occurs. A fourth production path, new dependency, Yosemite/core change, new secret store, or matrix change requires amendment before implementation.
 
-## Active handoff — M164
+## Closed handoff — M164
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/164-sam-invalid-command-secret-redaction-corrective.md`.
 
-Status: **registered / dependency-ready; M163 closure satisfied**.
+Status: **closed as complete** (`plans/closure/i2pcontrol-proposal-170/164-closure.md`); M163 closure satisfied.
 
 Class: neutral SAM security hardening.
 
-Exact production budget when registered: `emissary-core/src/sam/socket.rs` only. That path is already an exact M061 neutral owner.
+Exact production budget: `emissary-core/src/sam/socket.rs` only. That path is already an exact M061 neutral owner.
 
-M164 removes the raw `%command` field from rejected-SAM logging. The complete rejected payload is treated as sensitive; only structural metadata such as observation id, peer and byte length may be logged. No parser/session semantics, dependency, Yosemite or Proposal disposition may change.
+M164 removes the raw rejected command field from rejected-SAM logging. The complete rejected payload is treated as sensitive; only structural metadata such as observation id, peer and byte length is logged. No parser/session semantics, dependency, Yosemite or Proposal disposition changed.
 
-## Planned successor — M165
+## Active handoff — M165
 
 Plan:
 
 - `plans/implementation/i2pcontrol-proposal-170/165-post-corrective-current-head-requalification.md`.
 
-Status: **deferred / unregistered; hard-depends on M163 + M164 closure**.
+Status: **registered / dependency-ready; hard-depends on M163 + M164 closure**.
 
 M165 is zero-production/zero-promotion. It refreshes M095 `current_production_head` to the actual last production-bearing M164 closure commit, mechanically recomputes `336/29/475`, re-runs whole-surface behavioral/security/containment qualification through M164, and becomes the new current-head safe-partial authority only if no high/medium defect remains.
 
-M164 is the sole registered implementation handoff after clean M163 closure. Only M165 may be registered after clean M163+M164 closures.
+M165 is the sole registered implementation handoff after clean M163+M164 closures. It is zero-production and zero-promotion; it must refresh M095 only after current-head qualification succeeds.
 
 ## Closed handoff — M160 (realized record)
 
@@ -283,8 +283,8 @@ M095 remains `336/29/475` after M159.
 | M162 Proposal integration | closed complete, blocked integration | nine-file I2PControl subset realized; typed domain + ten-mode table + runtime fail-closed gates; zero promotions; post-M152 review found durable blocked-state defect |
 | M152 final requalification | closed historical safe partial | immutable evidence for its reviewed head, superseded as active authority by the M163-M165 corrective chain |
 | M163 blocked-state persistence/history | closed complete | exact three-file I2PControl corrective; zero promotions |
-| M164 SAM rejected-command logging | **registered / dependency-ready** | exact one-file neutral core hardening; M163 closed |
-| M165 post-corrective requalification | deferred/unregistered | zero-production authority refresh; hard-depends M163+M164 |
+| M164 SAM rejected-command logging | **closed complete** | exact one-file neutral core hardening; zero promotions |
+| M165 post-corrective requalification | **registered / dependency-ready** | zero-production authority refresh; hard-depends M163+M164 |
 
 M161 closed outcome B (valid legacy-LS1 contract but disproportionate/unsafe; no implementation successor). All five `EncryptLeaseSet` cells remain blocked. M162 correctly kept modern field integration blocked by the frozen Yosemite base-key/duplicate/bound gaps plus inherited M161-B legacy block, but its CRUD persistence behavior requires M163 correction. No partial-enum apply is claimed; M095 remains unchanged.
 
@@ -343,14 +343,14 @@ M146 UseOutproxyPlugin                         [CLOSED BLOCKED]
   -> M162 Proposal integration                 [CLOSED; BLOCKED INTEGRATION]
   -> M152 final qualification                  [CLOSED HISTORICAL; SAFE PARTIAL]
   -> M163 blocked-state persistence/history    [CLOSED]
-  -> M164 SAM invalid-command secret redaction [REGISTERED]
-  -> M165 current-head requalification         [DEFERRED]
+  -> M164 SAM invalid-command secret redaction [CLOSED]
+  -> M165 current-head requalification         [REGISTERED]
 ```
 
 ## Canonical containment/registration rules
 
-1. **M164 is the sole registered Proposal-170 implementation handoff.**
-2. M164 may be registered only after a clean M163 closure; M165 only after clean M163+M164 closures.
+1. **M165 is the sole registered Proposal-170 implementation handoff.**
+2. M164 was registered only after a clean M163 closure; M165 is registered only after clean M163+M164 closures.
 3. Proposal/admin policy remains I2PControl-owned; neutral core changes are exact and Proposal-free.
 4. No broad core prefix waiver.
 5. No secret/auth downgrade or diagnostic exposure.

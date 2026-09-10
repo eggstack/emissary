@@ -1,6 +1,6 @@
 # M164 — SAM Invalid-Command Secret-Redaction Corrective
 
-Status: **registered / dependency-ready**
+Status: **closed as complete** (`plans/closure/i2pcontrol-proposal-170/164-closure.md`)
 
 Class: neutral SAM security hardening
 

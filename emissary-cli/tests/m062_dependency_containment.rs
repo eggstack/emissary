@@ -642,6 +642,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m160 = is_authorized_m160_path(path);
         let authorized_m161 = is_authorized_m161_path(path);
         let authorized_m162 = is_authorized_m162_path(path);
+        let authorized_m152 = is_authorized_m152_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -691,6 +692,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m160
                 || authorized_m161
                 || authorized_m162
+                || authorized_m152
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -743,6 +745,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m160
                     || authorized_m161
                     || authorized_m162
+                    || authorized_m152
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
             );
@@ -1596,6 +1599,24 @@ fn is_authorized_m162_path(path: &str) -> bool {
             | "plans/closure/i2pcontrol-proposal-170/162-closure.md"
             | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
             | "plans/implementation/i2pcontrol-proposal-170/162-proposal-leaseset-security-field-integration.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md"
+    )
+}
+
+fn is_authorized_m152_path(path: &str) -> bool {
+    matches!(
+        path,
+        "AGENTS.md"
+            | "docs/i2pcontrol/README.md"
+            | "docs/i2pcontrol/proposal-170-support.md"
+            | "docs/i2pcontrol/tunnel-manager.md"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/152-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/152-final-residual-proposal-170-requalification.md"
             | "plans/implementation/i2pcontrol-proposal-170/README.md"
             | "plans/registry.md"
             | "plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md"

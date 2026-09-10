@@ -1,12 +1,14 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M153 is current whole-surface qualification authority; M152 registered**.
+Status: **partial Proposal 170 support; M152 closed as final qualification authority (safe partial / terminal); M153 ancestry retained**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
 Current M095 state: `336 apply / 29 blocked_primitive / 475 not_applicable` across 840 cells.
 
 Residual blockers: 10 `SigType`, 5 `EncryptLeaseSet`, 5 `OptionalLookup`, 5 `LeaseSetClientAuths`, 4 `UseOutproxyPlugin`.
+
+Historical qualification/promotion lineage: M139 historical whole-surface requalification (superseded by M153); M141 `UniqueLocalAddressPerClient` ×2; M142 `SSLProxies`/`JumpList` ×2; M143 retained `Profile:client`; M144 `UseSSL` ×4; M145 `MultiHoming` ×2; M153 whole-surface ancestry at `336/29/475`.
 
 ## Current execution authority
 
@@ -98,12 +100,12 @@ M159 PSK authorization             [CLOSED]
   -> M160 DH/X25519 authorization  [CLOSED]
   -> M161 legacy AES/LS1 gate      [CLOSED; OUTCOME B]
   -> M162 Proposal integration     [CLOSED; BLOCKED INTEGRATION]
-  -> M152 final requalification    [REGISTERED; ZERO-PRODUCTION REQUALIFICATION]
+  -> M152 final requalification    [CLOSED; SAFE PARTIAL / TERMINAL]
 ```
 
 M161 closed outcome B. It did not implement LS1; no successor is created and EncryptLeaseSet stays blocked.
 
-M162 closed blocked with zero promotions: typed/redacted domain, ten-mode table, five-family fail-closed gates, and redaction hardening over a nine-file I2PControl subset (server_secret_store.rs intentionally unchanged). Yosemite base/duplicate/bound gaps plus M161-B legacy block keep all fifteen cells blocked; M095 remains `336/29/475`. M152 is now registered for final requalification.
+M162 closed blocked with zero promotions: typed/redacted domain, ten-mode table, five-family fail-closed gates, and redaction hardening over a nine-file I2PControl subset (server_secret_store.rs intentionally unchanged). Yosemite base/duplicate/bound gaps plus M161-B legacy block keep all fifteen cells blocked; M095 remains `336/29/475`. M152 is now closed as the final requalification (safe partial / terminal, zero promotions).
 
 M162 has been corrected to require the exact direct-source mappings:
 

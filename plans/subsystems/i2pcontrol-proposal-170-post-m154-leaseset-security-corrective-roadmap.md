@@ -1,12 +1,12 @@
 # I2PControl Proposal 170 Post-M154 LeaseSet-Security Corrective Roadmap
 
-Status: **active / partial; M155-M162 closed, M152 registered**
+Status: **active / partial; M155-M162 closed, M152 closed safe partial / terminal**
 
 This roadmap supersedes the LeaseSet-security execution ordering in the older residual and post-M146 roadmaps while preserving M146/M147/M154 closures as historical evidence.
 
 Current authority:
 
-- whole-surface qualification: M153;
+- whole-surface qualification: M152 (final; safe partial / terminal) with M153 ancestry;
 - M095: `336 apply / 29 blocked_primitive / 475 not_applicable`;
 - M146 `UseOutproxyPlugin` ×4 closed blocked;
 - M154 configurable Destination `SigType` ×10 closed blocked;
@@ -124,7 +124,7 @@ legacy block keep all fifteen cells blocked.
 
 ### M152 — final requalification
 
-Rebased to treat M156-M158 as closed lineage and explicitly requalify M159/M160 authenticated ELS2 bounds/negative behavior plus M162 blocked-integration evidence (typed domain, ten-mode table, fail-closed gates, redaction, Yosemite gaps, zero promotions). Zero production/promotions. Hard dependency satisfied by M162 closure; registration pending.
+Closed safe partial / terminal on the M162-blocked head: requalified M156-M158 lineage, M159/M160 authenticated ELS2 bounds/negative behavior, M161 outcome B, and M162 blocked-integration evidence (typed domain, ten-mode table, fail-closed gates, redaction, Yosemite gaps, zero promotions). Zero production/promotions. Hard dependency was M162 closure; now closed with M152 as final authority.
 
 ## 6. Dependency graph
 
@@ -159,10 +159,10 @@ M161 legacy AES/LS1 feasibility                [CLOSED; OUTCOME B]
 M162 Proposal field integration                [CLOSED; BLOCKED INTEGRATION]
   |
   v
-M152 final whole-surface requalification       [REGISTERED; ZERO-PRODUCTION REQUALIFICATION]
+M152 final whole-surface requalification       [CLOSED; SAFE PARTIAL / TERMINAL]
 ```
 
-M152 is the sole registered handoff.
+No milestone is currently registered (M152 closed; no successor).
 
 ## 7. Promotion ceilings
 

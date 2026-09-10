@@ -1,6 +1,7 @@
 # M152 — Final Residual Proposal-170 Requalification
 
-Status: **registered / dependency-ready; M162 closed blocked**
+Status: **closed as complete; safe partial / terminal
+(`plans/closure/i2pcontrol-proposal-170/152-closure.md`)**
 
 > Registration baseline: `babf9fa6` (M162 blocked-integration
 > implementation/closure head; clean worktree before M152 work). Current M095

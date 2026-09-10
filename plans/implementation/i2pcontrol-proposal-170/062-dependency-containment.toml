@@ -30,12 +30,14 @@ metrics = []
 expected = "ordinary registry Yosemite plus exact optional git fork package when i2pcontrol is enabled"
 baseline_commit = "a70dd3ac82f12fbea1f8fba51e30a9e2e516650a"
 
-# Current milestone-specific dependency budget. M152 is registered for
-# zero-production final whole-surface requalification on the M162-closed
-# blocked-integration head. No production path, dependency, manifest,
-# lockfile, Yosemite, or core change is authorized at registration.
+# Current milestone-specific dependency budget. M152 is closed as the final
+# zero-production whole-surface requalification on the M162-closed
+# blocked-integration head (safe partial / terminal). No production path,
+# dependency, manifest, lockfile, Yosemite, or core change was authorized or
+# made; planning/test/evidence only (same scope as the M161 zero-production
+# gate closure).
 [current_registration]
-milestone = "M152 (registered / dependency-ready)"
+milestone = "M152 (closed complete, safe partial / terminal)"
 production_paths = []
 new_files = []
 new_direct_dependencies = []
@@ -43,7 +45,7 @@ manifest_changes = []
 lockfile_change = false
 yosemite_change = false
 i2pcontrol_source_change = false
-rationale = "M152 requalifies the actual head with zero production/promotions; planning/test/evidence only (same scope as the M161 zero-production gate registration)."
+rationale = "M152 requalified the actual head with zero production/promotions and closed safe partial / terminal; planning/test/evidence only (same scope as the M161 zero-production gate closure)."
 
 [allowed_production_paths]
 # The M062 test consumes this list as an exact-path allowlist in addition to its

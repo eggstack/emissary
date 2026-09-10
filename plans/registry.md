@@ -29,7 +29,7 @@ All upstream/third-party repositories and maintainer channels remain read-only.
 | Subsystem | Status | Roadmap | Current handoff |
 |---|---|---|---|
 | Proposal 170 full-support completion | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-full-support-completion-roadmap.md` | subordinate to current corrective roadmap |
-| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **M152 registered / dependency-ready (zero-production requalification)** |
+| Post-M154 LeaseSet-security corrective | **active / partial** | `plans/subsystems/i2pcontrol-proposal-170-post-m154-leaseset-security-corrective-roadmap.md` | **no registered successor (M152 closed safe partial / terminal)** |
 | Post-M146 corrective | historical through M154 | `plans/subsystems/i2pcontrol-proposal-170-post-m146-corrective-roadmap.md` | M153 complete; M154 disposition C |
 | Residual primitive completion | historical through M146 | `plans/subsystems/i2pcontrol-proposal-170-residual-primitive-completion-roadmap.md` | M140-M145 complete; M146 blocked |
 | Session-lifecycle completion | closed complete | `plans/subsystems/i2pcontrol-proposal-170-session-lifecycle-completion-roadmap.md` | M134 complete |
@@ -52,7 +52,9 @@ Residual blockers:
 - `LeaseSetClientAuths` — 5;
 - `UseOutproxyPlugin` — 4.
 
-Full Proposal-170 status remains **partial**. M153 remains the current whole-surface runtime/security qualification authority at `336/29/475`.
+Full Proposal-170 status remains **partial**. M153 remains the whole-surface runtime/security qualification ancestry at `336/29/475`. M152 is now closed as the final qualification authority for the implemented subset (safe partial / terminal; zero promotions).
+
+Historical qualification/promotion lineage retained for guard agreement: M130 historical post-corrective requalification (M127 token lifetime, M128 batch conformance, M129 fail-closed TLS); M139 historical whole-surface requalification (superseded by M153); M141 `UniqueLocalAddressPerClient` ×2 (327-era promotion); M142 `SSLProxies`/`JumpList` ×2 (329-era promotion); M143 retained `Profile:client`.
 
 ## Accepted blocked dispositions
 
@@ -69,6 +71,9 @@ Full Proposal-170 status remains **partial**. M153 remains the current whole-sur
 - M160 — neutral standard DH (X25519) client-authorization infrastructure; zero promotions.
 - M161 — legacy AES/LS1 feasibility gate, outcome B (valid but blocked); zero production/promotions.
 - M162 — Proposal LeaseSet-security blocked integration (typed/redacted domain, ten-mode table, five-family fail-closed gates, redaction hardening); zero promotions.
+- M152 — final whole-surface requalification; closed safe partial / terminal with zero production/promotions.
+
+Historical promotion lineage: M141 `UniqueLocalAddressPerClient` ×2 applied; M142 `SSLProxies`/`JumpList` ×2 applied; M143 retained `Profile:client` applied; M144 `UseSSL` ×4 applied; M145 `MultiHoming` ×2 applied.
 
 M159 closure: `plans/closure/i2pcontrol-proposal-170/159-closure.md` at implementation/closure head `c0bbf9d4`.
 
@@ -215,7 +220,7 @@ M095 remains `336/29/475` after M159.
 | M160 DH/X25519 | closed complete | same four-file/zero-dependency envelope realized; exact M061/M062 authorization observed |
 | M161 legacy AES/LS1 gate | closed complete, outcome B | zero-production gate; legacy AES valid but blocked; no successor; M095 unchanged |
 | M162 Proposal integration | closed complete, blocked integration | nine-file I2PControl subset realized (server_secret_store.rs intentionally unchanged); typed domain + ten-mode table + five-family fail-closed gates; zero promotions; exact M061/M062 authorization observed |
-| M152 final requalification | registered / dependency-ready | zero-production/zero-promotion final requalification on the M162-closed head; exact M062 authorization recorded |
+| M152 final requalification | closed complete (safe partial / terminal) | zero-production/zero-promotion final requalification on the M162-closed head; M152 is the final authority |
 
 M161 closed outcome B (valid legacy-LS1 contract but disproportionate/unsafe; no implementation successor). All five `EncryptLeaseSet` cells remain blocked. M162 closed blocked: modern field integration is valid but blocked by the frozen Yosemite base-key/duplicate/bound gaps plus inherited M161-B legacy block; no inert acceptance, no partial-enum apply, M095 unchanged.
 
@@ -274,13 +279,13 @@ M146 UseOutproxyPlugin                         [CLOSED BLOCKED]
   -> M160 DH authorization                     [CLOSED]
   -> M161 legacy AES gate                      [CLOSED; OUTCOME B]
   -> M162 Proposal integration                 [CLOSED; BLOCKED INTEGRATION]
-  -> M152 final qualification                  [REGISTERED; ZERO-PRODUCTION REQUALIFICATION]
+  -> M152 final qualification                  [CLOSED; SAFE PARTIAL / TERMINAL]
 ```
 
 ## Canonical containment/registration rules
 
-1. **M152 is the sole registered milestone**.
-2. M152 work executes as zero-production requalification on the M162-closed head with `336/29/475` incoming and M153 ancestry.
+1. **No milestone is currently registered (M152 closed; no successor)**.
+2. M152 closed as zero-production requalification on the M162-closed head with `336/29/475` and M153 ancestry.
 3. Proposal/admin policy remains I2PControl-owned; neutral core changes are exact and Proposal-free.
 4. No broad core prefix waiver.
 5. No secret/auth downgrade or diagnostic exposure.

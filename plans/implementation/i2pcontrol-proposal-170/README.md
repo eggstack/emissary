@@ -1,6 +1,6 @@
 # Proposal 170 Implementation Handoffs
 
-Status: **partial Proposal 170 support; M152 retained as historical safe-partial qualification; M163 is the sole registered corrective handoff**.
+Status: **partial Proposal 170 support; M152 retained as historical safe-partial qualification; M163 is closed and M164 is the sole registered corrective handoff**.
 
 Pinned Proposal revision: `2026-05-20` (Open).
 
@@ -16,13 +16,16 @@ Roadmap:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m152-blocked-state-corrective-roadmap.md`.
 
+Closed corrective:
+
+- **M163** `163-blocked-leaseset-state-persistence-corrective.md` — I2PControl-only correctness/security corrective; closed with zero Proposal promotions.
+
 Registered handoff:
 
-- **M163** `163-blocked-leaseset-state-persistence-corrective.md` — I2PControl-only correctness/security corrective; zero Proposal promotions.
+- **M164** `164-sam-invalid-command-secret-redaction-corrective.md` — neutral SAM log hardening after M163; dependency-ready.
 
-Deferred successors:
+Deferred successor:
 
-- **M164** `164-sam-invalid-command-secret-redaction-corrective.md` — neutral SAM log hardening after M163;
 - **M165** `165-post-corrective-current-head-requalification.md` — zero-production current-head authority refresh after M163+M164.
 
 M149-M151 remain superseded historical drafts and must not be executed. M147/M148 remain blocked under M154-C. M146 remains blocked for `UseOutproxyPlugin`.
@@ -147,8 +150,8 @@ M159 PSK authorization                       [CLOSED]
   -> M161 legacy AES/LS1 gate                [CLOSED; OUTCOME B]
   -> M162 Proposal integration               [CLOSED; BLOCKED INTEGRATION]
   -> M152 historical requalification         [CLOSED; SAFE PARTIAL]
-  -> M163 blocked-state persistence/history  [REGISTERED]
-  -> M164 SAM invalid-command redaction      [DEFERRED]
+  -> M163 blocked-state persistence/history  [CLOSED]
+  -> M164 SAM invalid-command redaction      [REGISTERED]
   -> M165 current-head requalification       [DEFERRED]
 ```
 

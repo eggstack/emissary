@@ -50,15 +50,17 @@ Keep Proposal/admin/application policy within `emissary-cli/src/i2pcontrol/` whe
 - M161 legacy AES/LS1 gate: closed outcome B (valid but blocked), zero production/promotions;
 - M162 Proposal LeaseSet-security blocked integration: closed, zero promotions; all 15 LeaseSet cells remain blocked;
 - M152: closed historical safe-partial qualification on the M162 head; post-closure review found blocked-state persistence and malformed-SAM logging defects, so it is not the current terminal handoff authority;
-- **M163 is the sole registered/dependency-ready handoff**.
+- **M163 is closed as complete; M164 is the sole registered/dependency-ready handoff**.
 
 Current roadmap: `plans/subsystems/i2pcontrol-proposal-170-post-m152-blocked-state-corrective-roadmap.md`.
 
-Registered plan: `plans/implementation/i2pcontrol-proposal-170/163-blocked-leaseset-state-persistence-corrective.md`.
+Closed plan: `plans/implementation/i2pcontrol-proposal-170/163-blocked-leaseset-state-persistence-corrective.md`.
+
+Registered plan: `plans/implementation/i2pcontrol-proposal-170/164-sam-invalid-command-secret-redaction-corrective.md`.
 
 Deferred successors:
 
-- M164 `164-sam-invalid-command-secret-redaction-corrective.md` — exact neutral `emissary-core/src/sam/socket.rs` hardening after M163;
+- M164 `164-sam-invalid-command-secret-redaction-corrective.md` — exact neutral `emissary-core/src/sam/socket.rs` hardening after M163 (registered / dependency-ready);
 - M165 `165-post-corrective-current-head-requalification.md` — zero-production requalification after M163+M164.
 
 ## M163 exact production budget

@@ -243,6 +243,12 @@ pub struct GenerationStore<T> {
     fail_next_directory_sync: bool,
 
     #[cfg(test)]
+    fail_next_history_purge: bool,
+
+    #[cfg(test)]
+    fail_next_history_purge_directory_sync: bool,
+
+    #[cfg(test)]
     pause_before_rename: Option<(Arc<AtomicBool>, Arc<Notify>)>,
 
     #[cfg(test)]
@@ -271,6 +277,10 @@ where
             #[cfg(test)]
             fail_next_directory_sync: false,
             #[cfg(test)]
+            fail_next_history_purge: false,
+            #[cfg(test)]
+            fail_next_history_purge_directory_sync: false,
+            #[cfg(test)]
             pause_before_rename: None,
             #[cfg(test)]
             pause_after_directory_sync: None,
@@ -293,6 +303,18 @@ where
     #[cfg(test)]
     pub fn fail_next_directory_sync(&mut self) {
         self.fail_next_directory_sync = true;
+    }
+
+    /// Cause the next history purge to fail before deleting any generation.
+    #[cfg(test)]
+    pub fn fail_next_history_purge(&mut self) {
+        self.fail_next_history_purge = true;
+    }
+
+    /// Cause the next history purge to fail while syncing the directory.
+    #[cfg(test)]
+    pub fn fail_next_history_purge_directory_sync(&mut self) {
+        self.fail_next_history_purge_directory_sync = true;
     }
 
     #[cfg(test)]
@@ -574,14 +596,82 @@ where
             let _ = tokio::fs::remove_file(path).await;
         }
     }
+
+    /// Remove all but the newest `keep` generation files and sync the store
+    /// directory after the removals.
+    ///
+    /// This is intentionally separate from [`Self::cleanup`]. It is a narrow,
+    /// fail-closed primitive for migrations that must remove prohibited state
+    /// from retained history; ordinary generation retention remains best
+    /// effort and unchanged.
+    pub(crate) async fn purge_history_keep_newest(&mut self, keep: usize) -> StoreResult<()> {
+        if keep == 0 {
+            return Err(StoreError::InvalidState(
+                "history purge must retain at least one generation".to_string(),
+            ));
+        }
+
+        let mut entries = Vec::new();
+        let mut dir_entries = tokio::fs::read_dir(&self.dir)
+            .await
+            .map_err(|e| StoreError::Io(e.to_string()))?;
+        while let Some(entry) =
+            dir_entries.next_entry().await.map_err(|e| StoreError::Io(e.to_string()))?
+        {
+            let path = entry.path();
+            if !is_generation_name(&path) {
+                continue;
+            }
+            if path.is_symlink() {
+                return Err(StoreError::PathEscape(format!(
+                    "generation path is a symlink: {}",
+                    path.display()
+                )));
+            }
+            if !path.is_file() {
+                return Err(StoreError::InvalidState(format!(
+                    "generation path is not a regular file: {}",
+                    path.display()
+                )));
+            }
+            entries.push(validate_confined_path(&path, &self.dir)?);
+        }
+
+        entries.sort();
+        if entries.len() <= keep {
+            return Ok(());
+        }
+
+        #[cfg(test)]
+        if self.fail_next_history_purge {
+            self.fail_next_history_purge = false;
+            return Err(StoreError::Io("injected history-purge failure".to_string()));
+        }
+
+        let to_delete = entries.len() - keep;
+        for path in entries.iter().take(to_delete) {
+            tokio::fs::remove_file(path).await.map_err(|e| StoreError::Io(e.to_string()))?;
+        }
+
+        #[cfg(test)]
+        if self.fail_next_history_purge_directory_sync {
+            self.fail_next_history_purge_directory_sync = false;
+            return Err(StoreError::Io(
+                "injected history-purge directory-sync failure".to_string(),
+            ));
+        }
+
+        sync_directory(&self.dir).await.map_err(StoreError::Io)
+    }
+}
+
+fn is_generation_name(path: &Path) -> bool {
+    path.extension().is_some_and(|ext| ext == "json")
+        && !path.file_name().is_some_and(|name| name.to_string_lossy().starts_with('.'))
 }
 
 fn is_generation_file(path: &Path) -> bool {
-    path.is_file()
-        && path.extension().is_some_and(|ext| ext == "json")
-        && !path
-            .file_name()
-            .is_some_and(|name| name.to_string_lossy().starts_with('.'))
+    path.is_file() && is_generation_name(path)
 }
 
 #[cfg(test)]
@@ -885,6 +975,114 @@ mod tests {
         let mut store2 = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
         let loaded = store2.load().await.unwrap();
         assert!(loaded.is_some());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn explicit_history_purge_keeps_newest_generations_and_syncs() {
+        let dir = test_store_dir();
+        let mut store = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        for i in 0..4 {
+            store
+                .publish(
+                    TestPayload {
+                        value: format!("gen-{i}"),
+                    },
+                    |_| Ok(()),
+                )
+                .await
+                .unwrap();
+        }
+
+        store.purge_history_keep_newest(2).await.unwrap();
+        let mut names: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.ends_with(".json"))
+            .collect();
+        names.sort();
+        assert_eq!(names, [
+            "gen-00000000000000000003.json",
+            "gen-00000000000000000004.json"
+        ]);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn explicit_history_purge_deletion_failure_is_fail_closed() {
+        let dir = test_store_dir();
+        let mut store = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        for value in ["one", "two", "three"] {
+            store
+                .publish(
+                    TestPayload {
+                        value: value.to_string(),
+                    },
+                    |_| Ok(()),
+                )
+                .await
+                .unwrap();
+        }
+        store.fail_next_history_purge();
+        assert!(store.purge_history_keep_newest(2).await.is_err());
+        assert_eq!(
+            std::fs::read_dir(&dir).unwrap().filter_map(Result::ok).count(),
+            3
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn explicit_history_purge_directory_sync_failure_is_returned() {
+        let dir = test_store_dir();
+        let mut store = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        for value in ["one", "two", "three"] {
+            store
+                .publish(
+                    TestPayload {
+                        value: value.to_string(),
+                    },
+                    |_| Ok(()),
+                )
+                .await
+                .unwrap();
+        }
+        store.fail_next_history_purge_directory_sync();
+        assert!(store.purge_history_keep_newest(2).await.is_err());
+        assert_eq!(
+            std::fs::read_dir(&dir).unwrap().filter_map(Result::ok).count(),
+            2
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn explicit_history_purge_rejects_generation_symlink() {
+        let dir = test_store_dir();
+        let mut store = GenerationStore::<TestPayload>::new(dir.clone(), 1024 * 1024);
+        store
+            .publish(
+                TestPayload {
+                    value: "one".to_string(),
+                },
+                |_| Ok(()),
+            )
+            .await
+            .unwrap();
+        std::os::unix::fs::symlink(
+            dir.join("gen-00000000000000000001.json"),
+            dir.join("gen-00000000000000000099.json"),
+        )
+        .unwrap();
+        assert!(matches!(
+            store.purge_history_keep_newest(1).await,
+            Err(StoreError::PathEscape(_))
+        ));
 
         let _ = std::fs::remove_dir_all(&dir);
     }

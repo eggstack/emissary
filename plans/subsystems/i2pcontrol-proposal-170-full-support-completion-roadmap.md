@@ -6,15 +6,15 @@ Pinned Proposal authority: revision `2026-05-20`, status Open.
 
 Current machine authority: M095 `336 apply / 29 blocked_primitive / 475 not_applicable` across 840 TunnelManager option/family cells. Its cell dispositions remain authoritative; its `current_production_head` metadata is stale and is scheduled for refresh by M165 after the production-bearing M163/M164 correctives.
 
-Current whole-surface qualification ancestry: M152 with M153 ancestry; M152 is immutable historical evidence for the M162 head, not the final post-corrective authority.
+Current whole-surface qualification ancestry: M152 with M153 ancestry; M152 is immutable historical evidence for the M162 head, not the final post-corrective authority. M139 remains the historical post-lifecycle qualification predecessor to M153.
 
 Historical promotion lineage: M141 `UniqueLocalAddressPerClient` ×2; M142 `SSLProxies`/`JumpList` ×2; M143 retained `Profile:client`; M144 `UseSSL` ×4; M145 `MultiHoming` ×2.
 
 Current execution authority:
 
 - `plans/subsystems/i2pcontrol-proposal-170-post-m152-blocked-state-corrective-roadmap.md`;
-- M163 is the sole registered handoff;
-- M164/M165 are deferred successors.
+- M163 is closed and M164 is the sole registered handoff;
+- M165 remains deferred until M164 closes.
 
 ## 1. Current residual inventory
 
@@ -58,8 +58,8 @@ M155 semantic/owner refreeze                   [CLOSED]
   -> M161 legacy AES/LS1 feasibility           [CLOSED; OUTCOME B]
   -> M162 Proposal field integration           [CLOSED; BLOCKED INTEGRATION]
   -> M152 historical requalification           [CLOSED; SAFE PARTIAL]
-  -> M163 blocked LeaseSet durable/history fix [REGISTERED]
-  -> M164 SAM invalid-command secret redaction [DEFERRED]
+  -> M163 blocked LeaseSet durable/history fix [CLOSED]
+  -> M164 SAM invalid-command secret redaction [REGISTERED / DEPENDENCY-READY]
   -> M165 post-corrective requalification      [DEFERRED]
 ```
 
@@ -166,6 +166,6 @@ Safe-partial/terminal closure requires every remaining blocker to have an explic
 
 ## 12. Current handoff
 
-**M163 is the sole registered milestone.**
+**M164 is the sole registered milestone.**
 
-M164 may be registered only after a clean M163 closure. M165 may be registered only after clean M163+M164 closures. File presence alone never authorizes production work.
+M163 is closed. M165 may be registered only after clean M163+M164 closures. File presence alone never authorizes production work.

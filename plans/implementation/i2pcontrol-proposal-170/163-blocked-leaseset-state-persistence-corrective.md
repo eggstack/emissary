@@ -1,6 +1,6 @@
 # M163 — Blocked LeaseSet-Security State Persistence Corrective
 
-Status: **registered / dependency-ready**
+Status: **closed as complete** (`plans/closure/i2pcontrol-proposal-170/163-closure.md`)
 
 Class: correctness/security corrective; I2PControl-only
 

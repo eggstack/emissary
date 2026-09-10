@@ -643,6 +643,7 @@ fn allowed_production_paths_match_the_m062_budget() {
         let authorized_m161 = is_authorized_m161_path(path);
         let authorized_m162 = is_authorized_m162_path(path);
         let authorized_m152 = is_authorized_m152_path(path);
+        let authorized_m163 = is_authorized_m163_path(path);
         let authorized_tunnel_runtime = is_authorized_tunnel_runtime_path(path);
         assert!(
             permitted
@@ -693,6 +694,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                 || authorized_m161
                 || authorized_m162
                 || authorized_m152
+                || authorized_m163
                 || authorized_tunnel_runtime
                 || is_authorized_planning_path(path),
             "M062 changed an unauthorized production path: {path}"
@@ -746,6 +748,7 @@ fn allowed_production_paths_match_the_m062_budget() {
                     || authorized_m161
                     || authorized_m162
                     || authorized_m152
+                    || authorized_m163
                     || !glob_matches(pattern, path),
                 "M062 changed a path under prohibited pattern {pattern}: {path}"
             );
@@ -1624,6 +1627,24 @@ fn is_authorized_m152_path(path: &str) -> bool {
     )
 }
 
+fn is_authorized_m163_path(path: &str) -> bool {
+    matches!(
+        path,
+        "emissary-cli/src/i2pcontrol/tunnel_manager.rs"
+            | "emissary-cli/src/i2pcontrol/stores/tunnel_store.rs"
+            | "emissary-cli/src/i2pcontrol/stores/generation_store.rs"
+            | "emissary-cli/tests/m062_dependency_containment.rs"
+            | "plans/closure/i2pcontrol-proposal-170/163-closure.md"
+            | "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml"
+            | "plans/implementation/i2pcontrol-proposal-170/163-blocked-leaseset-state-persistence-corrective.md"
+            | "plans/implementation/i2pcontrol-proposal-170/164-sam-invalid-command-secret-redaction-corrective.md"
+            | "plans/implementation/i2pcontrol-proposal-170/165-post-corrective-current-head-requalification.md"
+            | "plans/implementation/i2pcontrol-proposal-170/README.md"
+            | "plans/registry.md"
+            | "plans/subsystems/i2pcontrol-proposal-170-post-m152-blocked-state-corrective-roadmap.md"
+    )
+}
+
 fn is_authorized_m126_path(path: &str) -> bool {
     matches!(
         path,
@@ -2337,7 +2358,7 @@ fn read_planning_file(path: &str) -> String {
 }
 
 #[test]
-fn current_m163_registration_is_exact_and_zero_dependency() {
+fn current_registration_and_m163_closure_are_exact_and_zero_dependency() {
     let raw = read_planning_file(
         "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml",
     );
@@ -2349,7 +2370,7 @@ fn current_m163_registration_is_exact_and_zero_dependency() {
 
     assert_eq!(
         registration.get("milestone").and_then(toml::Value::as_str),
-        Some("M163 (registered / dependency-ready)")
+        Some("M164 (registered / dependency-ready)")
     );
 
     let paths = registration
@@ -2359,14 +2380,37 @@ fn current_m163_registration_is_exact_and_zero_dependency() {
         .iter()
         .map(|value| value.as_str().expect("production path string"))
         .collect::<BTreeSet<_>>();
-    let expected = [
-        "emissary-cli/src/i2pcontrol/tunnel_manager.rs",
-        "emissary-cli/src/i2pcontrol/stores/tunnel_store.rs",
-        "emissary-cli/src/i2pcontrol/stores/generation_store.rs",
-    ]
-    .into_iter()
-    .collect::<BTreeSet<_>>();
-    assert_eq!(paths, expected, "M163 production budget must remain exact");
+    let expected = ["emissary-core/src/sam/socket.rs"]
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(paths, expected, "M164 production budget must remain exact");
+
+    let m163 = manifest
+        .get("m163_closure")
+        .and_then(toml::Value::as_table)
+        .expect("M163 closure table");
+    assert_eq!(
+        m163.get("milestone").and_then(toml::Value::as_str),
+        Some("M163 (closed as complete; zero promotions)")
+    );
+    let m163_paths = m163
+        .get("production_paths")
+        .and_then(toml::Value::as_array)
+        .expect("M163 closure production_paths")
+        .iter()
+        .map(|value| value.as_str().expect("production path string"))
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        m163_paths,
+        [
+            "emissary-cli/src/i2pcontrol/tunnel_manager.rs",
+            "emissary-cli/src/i2pcontrol/stores/tunnel_store.rs",
+            "emissary-cli/src/i2pcontrol/stores/generation_store.rs",
+        ]
+        .into_iter()
+        .collect::<BTreeSet<_>>(),
+        "M163 closure budget must remain exact"
+    );
 
     for key in ["new_files", "new_direct_dependencies", "manifest_changes"] {
         assert!(
@@ -2384,27 +2428,27 @@ fn current_m163_registration_is_exact_and_zero_dependency() {
     );
     assert_eq!(
         registration.get("i2pcontrol_source_change").and_then(toml::Value::as_bool),
-        Some(true)
+        Some(false)
     );
 }
 
 #[test]
 fn m163_is_sole_registered_handoff_and_successors_are_deferred() {
     let registry = read_planning_file("plans/registry.md");
-    assert!(registry.contains("M163 is the sole registered Proposal-170 implementation handoff"));
+    assert!(registry.contains("M164 is the sole registered Proposal-170 implementation handoff"));
     assert!(registry.contains("M164 may be registered only after a clean M163 closure"));
     assert!(registry.contains("Only M165 may be registered after clean M163+M164 closures"));
 
     let m163 = read_planning_file(
         "plans/implementation/i2pcontrol-proposal-170/163-blocked-leaseset-state-persistence-corrective.md",
     );
-    assert!(m163.contains("Status: **registered / dependency-ready**"));
+    assert!(m163.contains("Status: **closed as complete**"));
     assert!(m163.contains("Promotion budget: **zero Proposal cells**"));
 
     let m164 = read_planning_file(
         "plans/implementation/i2pcontrol-proposal-170/164-sam-invalid-command-secret-redaction-corrective.md",
     );
-    assert!(m164.contains("Status: **deferred / unregistered**"));
+    assert!(m164.contains("Status: **registered / dependency-ready**"));
     assert!(m164.contains("Hard dependency: M163 closure"));
 
     let m165 = read_planning_file(
@@ -2420,7 +2464,7 @@ fn m163_budget_stays_inside_m061_i2pcontrol_policy_root() {
         "plans/implementation/i2pcontrol-proposal-170/062-dependency-containment.toml",
     );
     let manifest: toml::Value = toml::from_str(&raw).expect("valid M062 TOML");
-    let paths = manifest["current_registration"]["production_paths"]
+    let paths = manifest["m163_closure"]["production_paths"]
         .as_array()
         .expect("M163 production paths");
     assert!(paths.iter().all(|path| {

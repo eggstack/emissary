@@ -317,6 +317,10 @@ async fn handle_create(
         }
     };
 
+    if let Err(message) = reject_blocked_leaseset_options(params, &options) {
+        return error_response(id, rpc::error_codes::INVALID_PARAMS, message);
+    }
+
     // Validate description length if present
     if let Some(ref desc) = options.description {
         if desc.len() > MAX_DESCRIPTION_LENGTH {
@@ -479,6 +483,10 @@ async fn handle_edit(
         }
     };
 
+    if let Err(message) = reject_blocked_leaseset_options(params, &new_options) {
+        return error_response(id, rpc::error_codes::INVALID_PARAMS, message);
+    }
+
     // Validate description length if present
     if let Some(ref desc) = new_options.description {
         if desc.len() > MAX_DESCRIPTION_LENGTH {
@@ -495,6 +503,14 @@ async fn handle_edit(
 
     // Merge options: existing values preserved where new is None
     let merged_options = merge_tunnel_options(&existing.options, &new_options);
+
+    if has_blocked_leaseset_options(&merged_options) {
+        return error_response(
+            id,
+            rpc::error_codes::INVALID_PARAMS,
+            "blocked LeaseSet-security option is not supported",
+        );
+    }
 
     // Type is immutable in Edit. A supplied value must still be a valid
     // canonical type and must agree with the stored definition.
@@ -1644,12 +1660,35 @@ fn is_typed_secret_key(key: &str) -> bool {
         key,
         "ProxyPassword"
             | "OutproxyPassword"
+            | "EncryptLeaseSet"
             | "OptionalLookup"
             | "LeaseSetClientAuths"
             | "i2p.tunnel.sslKey"
             | "i2p.tunnel.proxyPassword"
             | "i2p.tunnel.ircPassword"
     )
+}
+
+fn has_blocked_leaseset_options(options: &TunnelOptions) -> bool {
+    options.encrypt_lease_set.is_some()
+        || options.optional_lookup.is_some()
+        || !options.lease_set_client_auths.is_empty()
+}
+
+fn reject_blocked_leaseset_options(
+    params: &serde_json::Map<String, serde_json::Value>,
+    options: &TunnelOptions,
+) -> Result<(), String> {
+    if let Some(key) = ["EncryptLeaseSet", "OptionalLookup", "LeaseSetClientAuths"]
+        .into_iter()
+        .find(|key| params.contains_key(*key))
+    {
+        return Err(format!("{key} is not supported"));
+    }
+    if has_blocked_leaseset_options(options) {
+        return Err("blocked LeaseSet-security option is not supported".to_string());
+    }
+    Ok(())
 }
 
 fn validate_canonical_request(
@@ -2274,9 +2313,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn m162_leaseset_secrets_never_enter_raw_config_or_get() {
-        // Typed secrets persist in the definition store (redacted convention)
-        // but never serialize into `raw_config` and never appear in Get.
+    async fn m163_blocked_leaseset_fields_fail_before_persistence() {
         let state = test_state();
         let create = tm_request(
             "TunnelManager",
@@ -2291,43 +2328,86 @@ mod tests {
                 ],
             }),
         );
-        assert!(handle_tunnel_manager(&state, &create).await["error"].is_null());
-
-        let stored = state.tunnel_get("m162-secret").await.unwrap().unwrap();
-        assert_eq!(
-            stored.options.encrypt_lease_set,
-            Some(EncryptLeaseSetMode::Blinded)
-        );
-        assert!(stored.options.optional_lookup.is_some());
-        assert_eq!(stored.options.lease_set_client_auths.len(), 1);
-        // No raw secret serialization.
-        assert!(!stored.raw_config.contains_key("OptionalLookup"));
-        assert!(!stored.raw_config.contains_key("LeaseSetClientAuths"));
-        // Debug never carries secrets or names.
-        let debug = format!("{stored:?}");
-        assert!(!debug.contains("lookup-password-value"));
-        assert!(!debug.contains("alice"));
-        assert!(!debug.contains("AAAA"));
-
-        let get = handle_tunnel_manager(
-            &state,
-            &tm_request(
-                "TunnelManager",
-                serde_json::json!({"Action": "get", "Name": "m162-secret"}),
-            ),
-        )
-        .await;
-        let serialized = serde_json::to_string(&get).unwrap();
+        let response = handle_tunnel_manager(&state, &create).await;
+        assert_eq!(response["error"]["code"], rpc::error_codes::INVALID_PARAMS);
+        let serialized = serde_json::to_string(&response).unwrap();
         assert!(!serialized.contains("lookup-password-value"));
         assert!(!serialized.contains("alice"));
         assert!(!serialized.contains("AAAA"));
-        // Mode string is safe and returned; secrets are omitted.
-        assert_eq!(
-            get["result"]["info"]["rawConfig"]["EncryptLeaseSet"],
-            "blinded"
+        assert!(state.tunnel_get("m162-secret").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn m163_each_blocked_leaseset_field_fails_before_create() {
+        for (name, field) in [
+            ("encrypt", serde_json::json!({"EncryptLeaseSet": "disable"})),
+            (
+                "lookup",
+                serde_json::json!({"OptionalLookup": "secret-value"}),
+            ),
+            (
+                "auths",
+                serde_json::json!({
+                    "LeaseSetClientAuths": [{
+                        "Name": "alice",
+                        "Key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                    }]
+                }),
+            ),
+        ] {
+            let state = test_state();
+            let mut params = serde_json::json!({
+                "Action": "create",
+                "Type": "server",
+                "Name": format!("blocked-{name}"),
+            });
+            for (key, value) in field.as_object().unwrap() {
+                params[key] = value.clone();
+            }
+            let response =
+                handle_tunnel_manager(&state, &tm_request("TunnelManager", params)).await;
+            assert_eq!(response["error"]["code"], rpc::error_codes::INVALID_PARAMS);
+            assert!(state.tunnel_get(&format!("blocked-{name}")).await.unwrap().is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn m163_blocked_edit_preserves_definition_and_revision() {
+        let state = test_state();
+        let create = tm_request(
+            "TunnelManager",
+            serde_json::json!({
+                "Action": "create",
+                "Type": "server",
+                "Name": "ordinary",
+                "Description": "before"
+            }),
         );
-        assert!(get["result"]["info"]["rawConfig"]["OptionalLookup"].is_null());
-        assert!(get["result"]["info"]["rawConfig"]["LeaseSetClientAuths"].is_null());
+        assert!(handle_tunnel_manager(&state, &create).await["error"].is_null());
+        let before = state.tunnel_get("ordinary").await.unwrap().unwrap();
+
+        for field in [
+            serde_json::json!({"EncryptLeaseSet": "disable"}),
+            serde_json::json!({"OptionalLookup": "secret-value"}),
+            serde_json::json!({
+                "LeaseSetClientAuths": [{
+                    "Name": "alice",
+                    "Key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                }]
+            }),
+        ] {
+            let mut params = serde_json::json!({
+                "Action": "edit",
+                "Name": "ordinary",
+            });
+            for (key, value) in field.as_object().unwrap() {
+                params[key] = value.clone();
+            }
+            let response =
+                handle_tunnel_manager(&state, &tm_request("TunnelManager", params)).await;
+            assert_eq!(response["error"]["code"], rpc::error_codes::INVALID_PARAMS);
+            assert_eq!(state.tunnel_get("ordinary").await.unwrap().unwrap(), before);
+        }
     }
 
     #[tokio::test]

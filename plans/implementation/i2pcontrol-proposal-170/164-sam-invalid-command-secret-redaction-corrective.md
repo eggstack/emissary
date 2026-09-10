@@ -1,6 +1,6 @@
 # M164 — SAM Invalid-Command Secret-Redaction Corrective
 
-Status: **deferred / unregistered**
+Status: **registered / dependency-ready**
 
 Class: neutral SAM security hardening
 

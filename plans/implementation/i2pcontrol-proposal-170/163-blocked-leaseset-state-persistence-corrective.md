@@ -139,6 +139,7 @@ At minimum add/adjust tests proving:
 - ordinary `GenerationStore::cleanup()` behavior is unchanged outside the explicit purge call;
 - ordinary tunnel-store load/upsert/update/remove and corruption fallback regressions remain green;
 - M162 backend/session rejection tests remain green as defense in depth;
+- the M062 current-registration guard binds the exact three-path, zero-dependency M163 budget and deferred successor sequence;
 - M095 matrix recomputes unchanged at `336/29/475`.
 
 Test-only failure injection may be added inside the two store files if needed to deterministically cover purge interruption/error behavior; it must not alter production semantics.
